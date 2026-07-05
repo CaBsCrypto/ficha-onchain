@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   ficha | onchain — design tokens
+   Clinical blue / mint / near-white premium palette
+--------------------------------------------------------------------------- */
+@theme {
+  --color-clinical: #0ea5e9;
+  --color-clinical-600: #0284c7;
+  --color-clinical-50: #f0f9ff;
+  --color-mint: #10b981;
+  --color-mint-50: #ecfdf5;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-canvas: #f8fafc;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle blueprint grid used behind hero / sections */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(14, 165, 233, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 165, 233, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Soft radial spotlight */
+.bg-spotlight {
+  background:
+    radial-gradient(60% 50% at 70% 20%, rgba(14, 165, 233, 0.12), transparent 70%),
+    radial-gradient(50% 50% at 20% 80%, rgba(16, 185, 129, 0.1), transparent 70%);
+}
+
+/* Frosted glass surface */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+/* Gradient brand text */
+.text-gradient {
+  background: linear-gradient(120deg, #0f172a 0%, #0ea5e9 60%, #10b981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
