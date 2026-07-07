@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "doctor-registry",
+    "dispensary-registry",
+    "prescription-soulbound",
+    "dispense-record",
+    "clinical-record",
+    "document-soulbound",
+    # Test-only crate holding the cross-contract end-to-end scenarios.
+    "e2e",
+]
+
+# Release profile is centralized here so every contract WASM is built with the
+# same size-optimized, overflow-checked settings. Profiles declared in member
+# crates are ignored by Cargo, so they live only at the workspace root.
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+codegen-units = 1
+lto = true
+panic = "abort"

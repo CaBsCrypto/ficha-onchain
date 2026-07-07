@@ -2,11 +2,13 @@
 name = "prescription-soulbound"
 version = "0.1.0"
 edition = "2021"
-description = "Soulbound (non-transferable) prescription records for ficha | onchain"
+description = "Soulbound (non-transferable) prescription records for TrustLeaf"
 license = "MIT"
 
 [lib]
-crate-type = ["cdylib"]
+# `lib` sits alongside `cdylib` so the contract type can be imported as a path
+# dependency by the cross-contract integration tests in `contracts/e2e`.
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 soroban-sdk = "22.0.0"
@@ -14,11 +16,7 @@ soroban-sdk = "22.0.0"
 [dev-dependencies]
 soroban-sdk = { version = "22.0.0", features = ["testutils"] }
 
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-debug = 0
-strip = "symbols"
-codegen-units = 1
-lto = true
-panic = "abort"
+[features]
+# Lets a downstream test crate build this contract against Soroban's test host
+# so it can `env.register(PrescriptionSoulbound, ())` in integration tests.
+testutils = ["soroban-sdk/testutils"]

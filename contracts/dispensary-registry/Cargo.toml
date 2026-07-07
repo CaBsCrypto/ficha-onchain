@@ -1,8 +1,8 @@
 [package]
-name = "clinical-record"
+name = "dispensary-registry"
 version = "0.1.0"
 edition = "2021"
-description = "Patient-owned FHIR clinical history anchored on-chain (Phase 1)"
+description = "Registry of authorized dispensaries (pharmacies) for TrustLeaf"
 license = "MIT"
 
 [lib]
@@ -18,5 +18,5 @@ soroban-sdk = { version = "22.0.0", features = ["testutils"] }
 
 [features]
 # Lets a downstream test crate build this contract against Soroban's test host
-# so it can `env.register(ClinicalRecord, ())` in integration tests.
+# so it can `env.register(DispensaryRegistry, ())` in integration tests.
 testutils = ["soroban-sdk/testutils"]

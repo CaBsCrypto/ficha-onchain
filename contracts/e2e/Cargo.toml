@@ -1,0 +1,19 @@
+[package]
+name = "trustleaf-e2e"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-contract end-to-end integration tests for TrustLeaf"
+license = "MIT"
+publish = false
+
+[lib]
+# Test-only crate: carries no contract, just the empty lib target that lets the
+# `tests/` integration scenarios exist. No `cdylib` — nothing to deploy here.
+crate-type = ["rlib"]
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+# The two contracts under test, each built with its `testutils` feature so their
+# contract types can be `env.register(...)`-ed and wired together below.
+doctor-registry = { path = "../doctor-registry", features = ["testutils"] }
+prescription-soulbound = { path = "../prescription-soulbound", features = ["testutils"] }

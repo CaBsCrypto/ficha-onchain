@@ -1,4 +1,4 @@
-# ficha | onchain — Soroban Contracts
+# TrustLeaf — Soroban Contracts
 
 Smart contracts powering verifiable medical records on **Stellar Soroban**.
 
