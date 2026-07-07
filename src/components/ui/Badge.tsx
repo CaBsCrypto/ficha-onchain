@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-type Tone = "clinical" | "mint" | "muted";
+type Tone = "clinical" | "mint" | "muted" | "amber";
 
 const tones: Record<Tone, string> = {
   clinical: "bg-clinical-50 text-clinical-600 ring-clinical/20",
   mint: "bg-mint-50 text-mint ring-mint/20",
   muted: "bg-slate-100 text-muted ring-slate-200",
+  amber: "bg-amber-50 text-amber-700 ring-amber-500/20",
 };
 
 export function Badge({

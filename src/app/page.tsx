@@ -4,6 +4,7 @@ import { ProblemSection } from "@/components/landing/ProblemSection";
 import { SolutionSection } from "@/components/landing/SolutionSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { AudienceSection } from "@/components/landing/AudienceSection";
+import { LegalSection } from "@/components/landing/LegalSection";
 import { RoadmapSection } from "@/components/landing/RoadmapSection";
 import { WaitlistSection } from "@/components/landing/WaitlistSection";
 import { Footer } from "@/components/landing/Footer";
@@ -18,6 +19,7 @@ export default function Home() {
         <SolutionSection />
         <HowItWorksSection />
         <AudienceSection />
+        <LegalSection />
         <RoadmapSection />
         <WaitlistSection />
       </main>

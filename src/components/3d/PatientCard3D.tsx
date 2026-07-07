@@ -16,25 +16,43 @@ const INK = "#0f172a";
 const CLINICAL = "#0ea5e9";
 const MINT = "#10b981";
 const MUTED = "#64748b";
+const VIOLET = "#8b5cf6";
+const INDIGO = "#6366f1";
 
 /** The floating glass card mesh + on-card typography. */
 function Card({ content }: { content: CardContent }) {
   return (
     <Float speed={1.6} rotationIntensity={0.5} floatIntensity={0.9}>
       <group rotation={[0.08, -0.35, 0]}>
-        {/* Blue glow slab behind the card */}
+        {/* Violet glow slab behind the card — vibrant halo */}
         <RoundedBox
-          args={[3.7, 2.45, 0.05]}
-          radius={0.16}
+          args={[3.95, 2.7, 0.05]}
+          radius={0.18}
           smoothness={6}
-          position={[0, 0, -0.12]}
+          position={[0, 0, -0.14]}
         >
           <meshStandardMaterial
-            color={CLINICAL}
-            emissive={CLINICAL}
-            emissiveIntensity={0.6}
+            color={VIOLET}
+            emissive={VIOLET}
+            emissiveIntensity={1.15}
             transparent
-            opacity={0.18}
+            opacity={0.4}
+          />
+        </RoundedBox>
+
+        {/* Indigo under-glow for extra depth */}
+        <RoundedBox
+          args={[3.72, 2.5, 0.05]}
+          radius={0.16}
+          smoothness={6}
+          position={[0, 0, -0.13]}
+        >
+          <meshStandardMaterial
+            color={INDIGO}
+            emissive={INDIGO}
+            emissiveIntensity={0.9}
+            transparent
+            opacity={0.3}
           />
         </RoundedBox>
 
@@ -161,8 +179,8 @@ export default function PatientCard3D(props: PatientCard3DProps) {
     >
       <ambientLight intensity={0.75} />
       <directionalLight position={[4, 5, 5]} intensity={1.3} />
-      <pointLight position={[0, 0, -3]} color={CLINICAL} intensity={6} distance={12} />
-      <pointLight position={[-3, 2, 2]} color={MINT} intensity={2} distance={12} />
+      <pointLight position={[0, 0, -3]} color={VIOLET} intensity={9} distance={12} />
+      <pointLight position={[-3, 2, 2]} color={INDIGO} intensity={3} distance={12} />
       <Suspense fallback={null}>
         <Card content={props} />
       </Suspense>

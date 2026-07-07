@@ -14,14 +14,14 @@ export function SectionHeading({
   const alignment = align === "center" ? "text-center mx-auto" : "text-left";
   return (
     <Reveal className={`max-w-2xl ${alignment}`}>
-      <p className="text-sm font-semibold uppercase tracking-wider text-clinical">
+      <p className="text-base font-semibold uppercase tracking-wider text-clinical">
         {kicker}
       </p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+      <h2 className="mt-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
         {title}
       </h2>
       {subtitle && (
-        <p className="mt-4 text-lg leading-relaxed text-muted">{subtitle}</p>
+        <p className="mt-4 text-xl leading-relaxed text-muted">{subtitle}</p>
       )}
     </Reveal>
   );

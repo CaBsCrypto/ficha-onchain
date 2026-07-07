@@ -14,11 +14,10 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-clinical text-white">
-                <span className="text-sm font-bold">f</span>
+                <span className="text-sm font-bold">T</span>
               </span>
               <span className="text-ink">
-                ficha <span className="text-slate-300">|</span>{" "}
-                <span className="text-clinical">onchain</span>
+                Trust<span className="text-clinical">Leaf</span>
               </span>
             </div>
             <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-muted">
@@ -44,7 +43,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-6 text-sm text-muted sm:flex-row">
-          <p>© {year} ficha | onchain. {t.footer.rights}</p>
+          <p>© {year} TrustLeaf. {t.footer.rights}</p>
           <p className="text-xs">Santiago · Chile 🇨🇱</p>
         </div>
       </div>

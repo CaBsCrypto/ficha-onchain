@@ -13,7 +13,7 @@ function CheckList({ points, tone }: { points: readonly string[]; tone: "clinica
           <svg viewBox="0 0 24 24" className={`mt-0.5 h-5 w-5 shrink-0 ${dot}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6 9 17l-5-5" />
           </svg>
-          <span className="text-sm leading-relaxed text-slate-700">{p}</span>
+          <span className="text-base leading-relaxed text-slate-700">{p}</span>
         </li>
       ))}
     </ul>
@@ -23,7 +23,7 @@ function CheckList({ points, tone }: { points: readonly string[]; tone: "clinica
 export function AudienceSection() {
   const { t } = useLanguage();
   return (
-    <section className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+    <section className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
       <SectionHeading kicker={t.audience.kicker} title={t.audience.title} />
 
       <div className="mt-14 grid gap-6 md:grid-cols-2">

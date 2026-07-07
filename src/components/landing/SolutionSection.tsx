@@ -19,7 +19,7 @@ const icons = [
 export function SolutionSection() {
   const { t } = useLanguage();
   return (
-    <section id="solution" className="relative overflow-hidden py-24 sm:py-28">
+    <section id="solution" className="relative overflow-hidden py-28 sm:py-32">
       <div className="absolute inset-0 bg-gradient-to-b from-clinical-50/60 to-mint-50/40" />
       <div className="relative mx-auto max-w-6xl px-6">
         <SectionHeading
@@ -46,8 +46,8 @@ export function SolutionSection() {
                       {icons[i]}
                     </svg>
                   </div>
-                  <p className="mt-4 font-semibold text-ink">{step.title}</p>
-                  <p className="mt-1 text-sm text-muted">{step.desc}</p>
+                  <p className="mt-4 text-lg font-semibold text-ink">{step.title}</p>
+                  <p className="mt-1 text-base text-muted">{step.desc}</p>
                 </div>
                 {i < t.solution.steps.length - 1 && (
                   <span className="hidden shrink-0 text-2xl text-clinical/40 sm:block">

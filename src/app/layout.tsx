@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ficha | onchain — Verifiable medical records on Stellar",
+  title: "TrustLeaf — Verifiable medical records on Stellar",
   description:
     "Doctors issue prescriptions as blockchain records. Patients receive them instantly — no fees, no paperwork, no borders. Built on Stellar Soroban.",
   keywords: [
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "Chile",
   ],
   openGraph: {
-    title: "ficha | onchain",
+    title: "TrustLeaf",
     description: "Your medical history. Verified. Always yours.",
     type: "website",
   },
