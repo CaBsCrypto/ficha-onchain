@@ -73,3 +73,11 @@ export function listConsultationsByDoctor(doctorWallet: string): Consultation[] 
     .filter((c) => c.doctorWallet === doctorWallet)
     .sort((a, b) => b.createdAt - a.createdAt);
 }
+
+export function listConsultationsByPatient(
+  patientWallet: string,
+): Consultation[] {
+  return [...store.values()]
+    .filter((c) => c.patientWallet === patientWallet)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}

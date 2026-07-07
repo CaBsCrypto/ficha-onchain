@@ -13,17 +13,31 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function WaitlistForm() {
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "error" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "error" | "submitting" | "done">(
+    "idle",
+  );
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (status === "submitting") return;
     if (!EMAIL_RE.test(email)) {
       setStatus("error");
       return;
     }
-    // TODO: POST to /api/waitlist — stored client-side for now.
-    setStatus("done");
-    setEmail("");
+    setStatus("submitting");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      setStatus("done");
+      setEmail("");
+    } catch {
+      // Network / server error — surface the same inline error as invalid input.
+      setStatus("error");
+    }
   }
 
   if (status === "done") {
@@ -66,9 +80,10 @@ export function WaitlistForm() {
         />
         <button
           type="submit"
-          className="inline-flex h-14 items-center justify-center rounded-full bg-white px-8 text-base font-medium text-[#4c1d95] transition-all duration-200 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
+          disabled={status === "submitting"}
+          className="inline-flex h-14 items-center justify-center rounded-full bg-white px-8 text-base font-medium text-[#4c1d95] transition-all duration-200 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 disabled:opacity-70"
         >
-          {t.waitlist.cta}
+          {status === "submitting" ? "…" : t.waitlist.cta}
         </button>
       </form>
 

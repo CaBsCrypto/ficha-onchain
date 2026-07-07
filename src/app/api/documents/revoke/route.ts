@@ -22,6 +22,7 @@ import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stell
 import { server } from "@/lib/stellar/client";
 import { feeBumpAndSend } from "@/lib/stellar/server";
 import { getDocument } from "@/lib/stellar/documents";
+import { withAuth } from "@/lib/auth/withAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ interface RevokeBody {
   docId?: string | number;
 }
 
-export async function POST(request: Request) {
+async function handleRevokeDocument(request: Request) {
   let body: RevokeBody;
   try {
     body = await request.json();
@@ -64,6 +65,9 @@ export async function POST(request: Request) {
     : "no issuer signer configured";
   return NextResponse.json({ data: simulated(docId, reason) });
 }
+
+// Revoking a document is an issuer action — guard it (demo mode passes through).
+export const POST = withAuth(handleRevokeDocument, { role: "doctor" });
 
 async function realRevoke(args: { doctorSecret: string; docId: string }) {
   const issuer = Keypair.fromSecret(args.doctorSecret);

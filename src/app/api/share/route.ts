@@ -8,6 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { signShareToken, SHARE_TTL_SECONDS } from "@/lib/share/token";
+import { buildVerifyUrl } from "@/lib/share/url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     const origin = new URL(request.url).origin;
     return NextResponse.json({
       token,
-      url: `${origin}/verify?token=${encodeURIComponent(token)}`,
+      url: buildVerifyUrl(origin, token),
       expiresInSeconds: SHARE_TTL_SECONDS,
     });
   } catch (err) {

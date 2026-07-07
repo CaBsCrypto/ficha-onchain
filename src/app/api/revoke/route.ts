@@ -17,11 +17,12 @@ import {
 import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { server, getPrescription } from "@/lib/stellar/client";
 import { feeBumpAndSend } from "@/lib/stellar/server";
+import { withAuth } from "@/lib/auth/withAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function handleRevoke(request: Request) {
   let body: { rxId?: string };
   try {
     body = await request.json();
@@ -76,3 +77,6 @@ export async function POST(request: Request) {
     reason: "not the issuing doctor / no signer configured",
   });
 }
+
+// Revoking a prescription is a doctor action — guard it (demo mode passes through).
+export const POST = withAuth(handleRevoke, { role: "doctor" });

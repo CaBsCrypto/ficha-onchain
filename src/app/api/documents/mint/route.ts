@@ -28,6 +28,7 @@ import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stell
 import { server } from "@/lib/stellar/client";
 import { feeBumpAndSend } from "@/lib/stellar/server";
 import { hashDocumentContent, DOC_LABEL } from "@/lib/fhir/documents";
+import { withAuth } from "@/lib/auth/withAuth";
 import type { DocumentType, DocumentContent } from "@/types";
 
 export const runtime = "nodejs";
@@ -53,7 +54,7 @@ const VALID_DOC_TYPES = new Set<DocumentType>([
   "PsychCare", "PsychEval", "TreatmentDischarge",
 ]);
 
-export async function POST(request: Request) {
+async function handleMintDocument(request: Request) {
   let body: MintDocBody;
   try {
     body = await request.json();
@@ -115,6 +116,9 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ data: simulated(contentHash, docType, reason) });
 }
+
+// Issuing a document is an issuer (doctor/institution) action — guard it.
+export const POST = withAuth(handleMintDocument, { role: "doctor" });
 
 // ---------------------------------------------------------------------------
 // Helpers

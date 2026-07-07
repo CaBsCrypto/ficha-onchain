@@ -13,6 +13,7 @@ import { truncateHash } from "@/lib/stellar/config";
 import { cn } from "@/lib/utils";
 import { PRESCRIPTION_TYPE_LABELS } from "@/lib/decreto41";
 import type { OnChainPrescription, WithExpiry } from "@/lib/stellar";
+import type { Consultation } from "@/lib/consultations/store";
 
 type PatientRx = WithExpiry<OnChainPrescription>;
 import {
@@ -55,6 +56,7 @@ function PatientDashboard({
   const [items, setItems] = useState<PatientRx[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [share, setShare] = useState<OnChainPrescription | null>(null);
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
 
   const load = useCallback(async () => {
     setItems(null);
@@ -76,6 +78,27 @@ function PatientDashboard({
     load();
   }, [load]);
 
+  // Telemedicine consultations linked to this patient wallet (Meet links).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/consultations?patientWallet=${encodeURIComponent(session.address)}`,
+        );
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.data)) {
+          setConsultations(data.data as Consultation[]);
+        }
+      } catch {
+        // Non-critical — the portal still works without the Meet panel.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.address]);
+
   return (
     <main className="min-h-screen bg-canvas">
       <PortalHeader
@@ -87,6 +110,11 @@ function PatientDashboard({
       />
 
       <div className="mx-auto max-w-3xl px-4 py-8">
+        {consultations.length > 0 && (
+          <div className="mb-6">
+            <Teleconsultas items={consultations} />
+          </div>
+        )}
         {items === null ? (
           <LoadingList />
         ) : items.length === 0 ? (
@@ -268,6 +296,86 @@ function ExpiryAlerts({ items }: { items: PatientRx[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Teleconsultas — the patient's Google Meet links for scheduled/recent
+ * telemedicine sessions, fetched from /api/consultations. Sorted newest-first
+ * by the API; we surface the join link + short meeting code so the patient can
+ * enter the consultation from their portal.
+ */
+function Teleconsultas({ items }: { items: Consultation[] }) {
+  return (
+    <section aria-label="Teleconsultas" className="space-y-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+        Tus teleconsultas
+      </h2>
+      {items.map((c) => {
+        const when = c.scheduledAt
+          ? new Date(c.scheduledAt).toLocaleString("es-CL", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })
+          : "A convenir";
+        return (
+          <Card key={c.id} className="p-0">
+            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1a73e8]/10 text-[#1a73e8]">
+                    <VideoIcon />
+                  </div>
+                  <h3 className="text-base font-semibold text-ink">
+                    Consulta médica
+                  </h3>
+                  <Badge tone={c.status === "completed" ? "muted" : "clinical"}>
+                    {c.status === "completed" ? "Completada" : "Programada"}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted">
+                  <span className="font-medium">Cuándo:</span> {when}
+                </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                  <span className="font-medium uppercase tracking-wide">
+                    Meet:
+                  </span>
+                  <a
+                    href={c.meetLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 truncate font-mono text-[#1a73e8] hover:underline"
+                  >
+                    {c.meetLink}
+                  </a>
+                  <span className="shrink-0 rounded bg-[#1a73e8]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#1a73e8]">
+                    {c.meetingCode}
+                  </span>
+                </div>
+              </div>
+              <a
+                href={c.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[#1a73e8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1765cc]"
+              >
+                <VideoIcon />
+                Abrir Meet
+              </a>
+            </div>
+          </Card>
+        );
+      })}
+    </section>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <rect x="2" y="6" width="13" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M15 10l5.5-3v10L15 14V10z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
   );
 }
 

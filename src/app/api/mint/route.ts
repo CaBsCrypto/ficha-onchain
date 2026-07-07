@@ -36,6 +36,7 @@ import { server, isDoctorAuthorized } from "@/lib/stellar/client";
 import { feeBumpAndSend } from "@/lib/stellar/server";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
+import { withAuth } from "@/lib/auth/withAuth";
 import type {
   Decreto41Prescription,
   PatientDocType,
@@ -83,7 +84,7 @@ interface MintBody {
   consentDate?: string | null;
 }
 
-export async function POST(request: Request) {
+async function handleMint(request: Request) {
   let body: MintBody;
   try {
     body = await request.json();
@@ -195,6 +196,9 @@ export async function POST(request: Request) {
     : "patient is not a Stellar address";
   return NextResponse.json(simulated(rxHash, reason));
 }
+
+// Issuing a prescription is a doctor action — guard it (demo mode passes through).
+export const POST = withAuth(handleMint, { role: "doctor" });
 
 async function realMint(args: {
   doctorSecret: string;

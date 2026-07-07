@@ -21,7 +21,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedClient, hasTokens } from "@/lib/google/auth";
 import { createMeetSpace } from "@/lib/google/meet";
-import { createConsultation } from "@/lib/consultations/store";
+import {
+  createConsultation,
+  listConsultationsByDoctor,
+  listConsultationsByPatient,
+} from "@/lib/consultations/store";
+import { withAuth } from "@/lib/auth/withAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +38,38 @@ interface ConsultationBody {
   notes?: string;
 }
 
-export async function POST(request: NextRequest) {
+/**
+ * GET /api/consultations?patientWallet=G… (or ?doctorWallet=G…)
+ * Returns the consultations linked to the given wallet, newest first. The
+ * patient portal uses this to surface its telemedicine Meet link.
+ *
+ * 200 → { data: Consultation[] }
+ * 400 → { error }
+ */
+export async function GET(request: NextRequest) {
+  const params = new URL(request.url).searchParams;
+  const patientWallet = (
+    params.get("patientWallet") ??
+    params.get("wallet") ??
+    ""
+  ).trim();
+  const doctorWallet = (params.get("doctorWallet") ?? "").trim();
+
+  if (!patientWallet && !doctorWallet) {
+    return NextResponse.json(
+      { error: "patientWallet or doctorWallet is required" },
+      { status: 400 },
+    );
+  }
+
+  const data = patientWallet
+    ? listConsultationsByPatient(patientWallet)
+    : listConsultationsByDoctor(doctorWallet);
+
+  return NextResponse.json({ data });
+}
+
+async function handleCreateConsultation(request: Request) {
   let body: ConsultationBody;
   try {
     body = (await request.json()) as ConsultationBody;
@@ -81,3 +117,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// Creating a Meet consultation is a doctor action — guard it (demo passes through).
+export const POST = withAuth(handleCreateConsultation, { role: "doctor" });
