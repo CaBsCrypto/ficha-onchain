@@ -32,8 +32,14 @@ const STORAGE_KEY = "ficha-lang";
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>("en");
 
-  // Restore persisted preference on mount (client only).
+  // Resolve the initial preference on mount (client only).
+  // Priority: ?lang= query param > localStorage.
   useEffect(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get("lang");
+    if (fromQuery === "en" || fromQuery === "es") {
+      setLangState(fromQuery);
+      return;
+    }
     const stored = window.localStorage.getItem(STORAGE_KEY) as Language | null;
     if (stored === "en" || stored === "es") {
       setLangState(stored);
@@ -43,6 +49,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = lang;
     window.localStorage.setItem(STORAGE_KEY, lang);
+    // Keep ?lang= in sync so the current language is shareable via URL.
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("lang") !== lang) {
+      url.searchParams.set("lang", lang);
+      window.history.replaceState(null, "", url);
+    }
   }, [lang]);
 
   const setLang = useCallback((next: Language) => setLangState(next), []);

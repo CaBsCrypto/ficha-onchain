@@ -1,4 +1,6 @@
-# ficha | onchain
+# TrustLeaf
+
+[![contracts](https://github.com/CaBsCrypto/ficha-onchain/actions/workflows/contracts.yml/badge.svg)](https://github.com/CaBsCrypto/ficha-onchain/actions/workflows/contracts.yml)
 
 **Your medical history. Verified. Always yours.**
 
