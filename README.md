@@ -224,3 +224,7 @@ Released under the **MIT License**. See [`LICENSE`](./LICENSE) for details.
 **Built on Stellar Soroban.** Launching first in 🇨🇱 Chile.
 
 </div>
+
+---
+
+© 2026 Browns Studio. All rights reserved. This source code is made available for evaluation purposes only. No license is granted to use, copy, modify, distribute, or create derivative works.
