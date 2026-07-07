@@ -1,0 +1,38 @@
+name: contracts
+
+# D1 deliverable: green CI proving the Soroban contract test suite passes.
+# Scoped to the two contracts under test (DoctorRegistry, PrescriptionSoulbound)
+# plus the cross-contract end-to-end crate, so an in-progress contract elsewhere
+# in the workspace can't turn the badge red.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
+
+jobs:
+  test:
+    name: cargo test (Soroban contracts)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+
+      - name: Run test suite
+        run: cargo test -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
