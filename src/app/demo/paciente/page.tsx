@@ -2055,7 +2055,7 @@ function ExamenesSection() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 flex-wrap items-center gap-2 pl-13 sm:pl-0">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 pl-[3.25rem] sm:pl-0">
                 {e.detail && (
                   <span
                     className={cn(

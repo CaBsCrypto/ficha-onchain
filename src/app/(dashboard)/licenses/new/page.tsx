@@ -260,9 +260,27 @@ function NewLicenseForm({
     setBusy(true);
     setError(null);
 
+    const recipient = form.recipientWallet.trim();
+    if (!recipient) {
+      setError("Ingresa la wallet del destinatario (empieza con G).");
+      setBusy(false);
+      return;
+    }
+    // Guardia ligera: una wallet pública de Stellar empieza con "G". Evitamos un
+    // regex estricto de longitud para no rechazar wallets de testnet/demo.
+    if (!recipient.startsWith("G")) {
+      setError(
+        "La wallet del destinatario no parece válida: una dirección de Stellar empieza con «G».",
+      );
+      setBusy(false);
+      return;
+    }
+
     const payload = buildPayload(form);
     if (!payload) {
-      setError("Completa todos los campos requeridos para este tipo de documento.");
+      setError(
+        "Faltan campos requeridos para este tipo de documento (marcados con *). Complétalos e inténtalo de nuevo.",
+      );
       setBusy(false);
       return;
     }
@@ -341,7 +359,7 @@ function NewLicenseForm({
             <h2 className="font-semibold text-ink">Datos del destinatario</h2>
           </div>
           <div className="space-y-4 px-6 py-5">
-            <Field label="Wallet del destinatario (G…)">
+            <Field label="Wallet del destinatario (G…)" required>
               <input
                 value={form.recipientWallet}
                 onChange={(e) => set("recipientWallet", e.target.value)}
@@ -351,7 +369,7 @@ function NewLicenseForm({
               />
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Nombre completo">
+              <Field label="Nombre completo" required>
                 <input
                   value={form.recipientFullName}
                   onChange={(e) => set("recipientFullName", e.target.value)}
@@ -1203,15 +1221,18 @@ const inputClass =
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted">
         {label}
+        {required && <span className="ml-0.5 text-rose-500">*</span>}
       </span>
       {children}
     </label>

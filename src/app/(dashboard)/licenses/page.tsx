@@ -51,10 +51,12 @@ function LicensesDashboard({
 }) {
   const [docs, setDocs] = useState<LicenseDoc[] | null>(null);
   const [reason, setReason] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   const loadDocs = useCallback(async () => {
     setDocs(null);
     setReason(null);
+    setError(false);
     try {
       const res = await fetch(
         `/api/documents?wallet=${session.address}&role=issuer`,
@@ -64,6 +66,7 @@ function LicensesDashboard({
       setDocs(json.data.documents ?? []);
       if (json.data.reason) setReason(json.data.reason);
     } catch (err) {
+      setError(true);
       setDocs([]);
       setReason(err instanceof Error ? err.message : "No se pudo cargar");
     }
@@ -144,7 +147,7 @@ function LicensesDashboard({
         )}
 
         {/* Document list */}
-        <DocList docs={docs} walletDisplay={truncateHash(session.address, 4, 4)} onReload={loadDocs} />
+        <DocList docs={docs} error={error} walletDisplay={truncateHash(session.address, 4, 4)} onReload={loadDocs} />
       </div>
     </main>
   );
@@ -156,10 +159,12 @@ function LicensesDashboard({
 
 function DocList({
   docs,
+  error,
   walletDisplay,
   onReload,
 }: {
   docs: LicenseDoc[] | null;
+  error?: boolean;
   walletDisplay: string;
   onReload: () => void;
 }) {
@@ -173,6 +178,28 @@ function DocList({
           />
         ))}
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="py-10 text-center">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-500">
+          <AlertIcon />
+        </div>
+        <h3 className="text-base font-semibold text-ink">
+          No se pudieron cargar los documentos
+        </h3>
+        <p className="mt-2 text-sm text-muted">
+          Hubo un problema al leer tus documentos desde la red. Revisa tu
+          conexión e inténtalo de nuevo.
+        </p>
+        <div className="mt-5 flex justify-center">
+          <Button variant="secondary" onClick={onReload}>
+            Reintentar
+          </Button>
+        </div>
+      </Card>
     );
   }
 
@@ -263,6 +290,25 @@ function PlusIcon() {
     >
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
     </svg>
   );
 }

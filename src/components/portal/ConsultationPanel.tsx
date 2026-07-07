@@ -122,6 +122,10 @@ export function ConsultationPanel({ doctorWallet, onIssueRx }: Props) {
         const authUrl = "authUrl" in data ? data.authUrl : undefined;
         if (authUrl) {
           window.location.href = authUrl;
+        } else {
+          setError(
+            "Necesitas conectar tu cuenta de Google para crear la videollamada. Vuelve a intentarlo desde el banner de conexión.",
+          );
         }
         return;
       }

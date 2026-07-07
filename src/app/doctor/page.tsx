@@ -42,6 +42,16 @@ function CheckIcon() {
     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
   );
 }
+function AlertIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  );
+}
+function RxIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6h5a3 3 0 0 1 0 6H5V6zm0 6 6 6M5 12h4"/><path d="m15 13 5 6m0-6-5 6"/></svg>
+  );
+}
 
 type Tab = "emitir" | "recetas" | "consultas";
 
@@ -103,6 +113,7 @@ function DoctorDashboard({
   const [tab, setTab] = useState<Tab>("emitir");
   const [auth, setAuth] = useState<AuthStatus | null>(null);
   const [items, setItems] = useState<OnChainPrescription[] | null>(null);
+  const [itemsError, setItemsError] = useState(false);
   // Pre-filled patient wallet when coming from "Emitir receta" in a consultation.
   const [prefillPatient, setPrefillPatient] = useState<string>("");
 
@@ -119,13 +130,16 @@ function DoctorDashboard({
 
   const loadItems = useCallback(async () => {
     setItems(null);
+    setItemsError(false);
     try {
       const res = await fetch(
         `/api/prescriptions?role=doctor&wallet=${session.address}`,
       );
+      if (!res.ok) throw new Error("request failed");
       const data = await res.json();
       setItems(data.prescriptions ?? []);
     } catch {
+      setItemsError(true);
       setItems([]);
     }
   }, [session.address]);
@@ -207,6 +221,7 @@ function DoctorDashboard({
           ) : (
             <PrescriptionList
               items={items}
+              error={itemsError}
               onReload={loadItems}
               doctorWallet={session.address}
             />
@@ -812,10 +827,12 @@ function IssueSuccess({
 
 function PrescriptionList({
   items,
+  error,
   onReload,
   doctorWallet,
 }: {
   items: OnChainPrescription[] | null;
+  error?: boolean;
   onReload: () => void;
   doctorWallet: string;
 }) {
@@ -858,9 +875,32 @@ function PrescriptionList({
     );
   }
 
+  if (error) {
+    return (
+      <Card className="text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+          <AlertIcon />
+        </div>
+        <h2 className="text-lg font-semibold text-ink">
+          No se pudieron cargar las recetas
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Hubo un problema al leer tus prescripciones desde la red. Revisa tu
+          conexión e inténtalo de nuevo.
+        </p>
+        <Button variant="secondary" className="mt-5" onClick={onReload}>
+          Reintentar
+        </Button>
+      </Card>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <Card className="text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-muted">
+          <RxIcon />
+        </div>
         <h2 className="text-lg font-semibold text-ink">Sin recetas emitidas</h2>
         <p className="mt-2 text-sm text-muted">
           Las prescripciones que emitas como{" "}

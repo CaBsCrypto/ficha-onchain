@@ -100,21 +100,35 @@ function QrModal({
   onClose: () => void;
 }) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [qrError, setQrError] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const url = `${window.location.origin}/verify/license/${docId}`;
+    setQrError(false);
     QRCode.toDataURL(url, {
       width: 280,
       margin: 1,
       color: { dark: "#0f172a", light: "#ffffff" },
     })
       .then(setQrDataUrl)
-      .catch(() => {});
+      .catch(() => setQrError(true));
   }, [docId]);
+
+  // Cerrar con Escape (accesibilidad de teclado).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   function copyLink() {
     const url = `${window.location.origin}/verify/license/${docId}`;
     navigator.clipboard?.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -123,6 +137,9 @@ function QrModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Verificar documento"
         className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -141,7 +158,11 @@ function QrModal({
         </div>
 
         <div className="mt-5 flex flex-col items-center">
-          {!qrDataUrl ? (
+          {qrError ? (
+            <div className="grid h-[240px] w-[240px] place-items-center rounded-2xl bg-rose-50 px-6 text-center text-sm text-rose-600">
+              No se pudo generar el código QR. Usa el enlace de verificación.
+            </div>
+          ) : !qrDataUrl ? (
             <div className="grid h-[240px] w-[240px] animate-pulse place-items-center rounded-2xl bg-slate-50 text-sm text-muted">
               Generando…
             </div>
@@ -163,7 +184,7 @@ function QrModal({
 
         <div className="mt-5 flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={copyLink}>
-            Copiar enlace
+            {copied ? "¡Copiado!" : "Copiar enlace"}
           </Button>
           <Button className="flex-1" onClick={onClose}>
             Listo

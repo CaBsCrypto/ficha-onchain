@@ -309,8 +309,15 @@ function PharmacyConsole({
             </p>
           )}
           {results?.length === 0 && !error && !note && (
-            <Card className="text-center text-sm text-muted">
-              Sin resultados para esta búsqueda.
+            <Card className="py-10 text-center">
+              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-slate-100 text-muted">
+                <SearchIcon />
+              </div>
+              <h3 className="text-base font-semibold text-ink">Sin resultados</h3>
+              <p className="mt-2 text-sm text-muted">
+                No encontramos recetas con esos datos. Verifica el número de
+                receta o el RUT del paciente e inténtalo de nuevo.
+              </p>
             </Card>
           )}
           {results?.map((rx) => (
@@ -518,6 +525,20 @@ function LockIcon({ className }: { className?: string }) {
       />
       <path
         d="M8 10V7a4 4 0 0 1 8 0v3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="m20 20-3.2-3.2"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"

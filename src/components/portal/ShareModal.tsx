@@ -25,10 +25,25 @@ export function ShareModal({
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [copied, setCopied] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Cerrar con Escape (accesibilidad de teclado).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // 1. Request a fresh 15-min share token for this prescription.
+  //    reloadKey lets the user regenerate a new token once the current one expires.
   useEffect(() => {
     let alive = true;
+    setState(null);
+    setQrDataUrl("");
+    setError(null);
     (async () => {
       try {
         const res = await fetch("/api/share", {
@@ -58,7 +73,7 @@ export function ShareModal({
     return () => {
       alive = false;
     };
-  }, [rx.id, patientWallet]);
+  }, [rx.id, patientWallet, reloadKey]);
 
   // 2. Tick the countdown.
   useEffect(() => {
@@ -80,6 +95,9 @@ export function ShareModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compartir receta"
         className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -142,14 +160,28 @@ export function ShareModal({
         </div>
 
         <div className="mt-5 flex gap-2">
-          {state && (
+          {state && expired ? (
             <Button
               variant="secondary"
               className="flex-1"
-              onClick={() => navigator.clipboard?.writeText(state.url)}
+              onClick={() => setReloadKey((k) => k + 1)}
             >
-              Copiar enlace
+              Generar nuevo enlace
             </Button>
+          ) : (
+            state && (
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  navigator.clipboard?.writeText(state.url);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? "¡Copiado!" : "Copiar enlace"}
+              </Button>
+            )
           )}
           <Button className="flex-1" onClick={onClose}>
             Listo
