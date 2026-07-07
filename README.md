@@ -14,7 +14,7 @@ Doctors issue **clinical records, prescriptions, and medical licenses** as
 [![FHIR](https://img.shields.io/badge/FHIR-R4-E1352C?style=flat-square&logo=hl7&logoColor=white)](https://hl7.org/fhir/R4/)
 
 [![contracts](https://github.com/CaBsCrypto/ficha-onchain/actions/workflows/contracts.yml/badge.svg)](https://github.com/CaBsCrypto/ficha-onchain/actions/workflows/contracts.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](#-license)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg?style=flat-square)](#-license)
 
 </div>
 
@@ -217,7 +217,9 @@ project settings, **never** in the repo.
 
 ## 📄 License
 
-Released under the **MIT License**. See [`LICENSE`](./LICENSE) for details.
+**Proprietary — © 2026 Browns Studio. All rights reserved.** This source code is
+made available for evaluation purposes only. No license is granted to use, copy,
+modify, distribute, or create derivative works.
 
 <div align="center">
 
