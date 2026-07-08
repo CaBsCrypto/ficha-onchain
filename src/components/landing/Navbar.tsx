@@ -5,6 +5,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { WaitlistModal } from "./WaitlistModal";
+import { PrivyLoginButton } from "@/components/auth/PrivyLoginButton";
 import type { Language } from "@/types";
 
 /* Soft outline demo buttons — deliberately distinct from the solid primary CTA. */
@@ -106,6 +107,7 @@ export function Navbar() {
               {t.nav.demoDoctor}
             </a>
           </div>
+          <PrivyLoginButton />
           <button
             type="button"
             onClick={() => setShowModal(true)}
