@@ -45,7 +45,7 @@ function base58Decode(encoded: string): Uint8Array {
 /** Convert a Solana-format base58 public key to a Stellar G… address. */
 function solanaToStellar(solanaAddress: string): string {
   const raw = base58Decode(solanaAddress); // 32-byte Ed25519 public key
-  return StrKey.encodeEd25519PublicKey(raw);
+  return StrKey.encodeEd25519PublicKey(Buffer.from(raw));
 }
 
 // ---------------------------------------------------------------------------
@@ -60,8 +60,8 @@ export function usePrivyAuth() {
 export function usePrivyWallet() {
   const { wallets } = useWallets();
   // Find the first embedded Solana wallet — Ed25519 key, same curve as Stellar
-  const wallet = wallets.find((w) => w.chainType === 'solana' && w.walletClientType === 'privy')
-    ?? wallets.find((w) => w.chainType === 'solana')
+  const wallet = wallets.find((w) => (w as any).chainType === 'solana' && w.walletClientType === 'privy')
+    ?? wallets.find((w) => (w as any).chainType === 'solana')
     ?? wallets[0];
 
   const stellarAddress = wallet?.address

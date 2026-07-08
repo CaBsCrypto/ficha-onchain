@@ -12,7 +12,9 @@ export function AppPrivyProvider({ children }: { children: React.ReactNode }) {
           accentColor: '#0ea5e9',
         },
         embeddedWallets: {
-          createOnLogin: 'all-users',
+          solana: {
+            createOnLogin: 'all-users',
+          },
         },
       }}
     >
