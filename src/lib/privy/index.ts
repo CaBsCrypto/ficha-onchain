@@ -10,7 +10,8 @@
  * We convert to the Stellar G… address format with StrKey.
  */
 
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { usePrivy } from '@privy-io/react-auth';
+import { useWallets as useSolanaWallets } from '@privy-io/react-auth/solana';
 import { StrKey } from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
@@ -58,11 +59,11 @@ export function usePrivyAuth() {
 }
 
 export function usePrivyWallet() {
-  const { wallets } = useWallets();
-  // Find the first embedded Solana wallet — Ed25519 key, same curve as Stellar
-  const wallet = wallets.find((w) => (w as any).chainType === 'solana' && w.walletClientType === 'privy')
-    ?? wallets.find((w) => (w as any).chainType === 'solana')
-    ?? wallets[0];
+  // The /solana entrypoint returns only Solana Standard wallets (Ed25519 —
+  // same curve as Stellar). Login is email/Google only, so the sole wallet
+  // here is Privy's embedded Solana wallet.
+  const { wallets } = useSolanaWallets();
+  const wallet = wallets[0];
 
   const stellarAddress = wallet?.address
     ? (() => {
