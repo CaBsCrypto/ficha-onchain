@@ -9,8 +9,11 @@ export function Footer() {
 
   // Most footer links are still placeholders; resolve the ones that have a
   // real destination today. Keyed by label text (EN + ES).
-  const hrefFor = (label: string) =>
-    label === "Traction" || label === "Tracción" ? "/traction" : "#";
+  const hrefFor = (label: string) => {
+    if (label === "Traction" || label === "Tracción") return "/traction";
+    if (label === "Verify" || label === "Verificar") return "/verify";
+    return "#";
+  };
 
   return (
     <footer className="border-t border-slate-200 bg-white">

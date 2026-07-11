@@ -15,23 +15,34 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://trustleaf-demo.vercel.app";
+
 export const metadata: Metadata = {
-  title: "TrustLeaf — Verifiable medical records on Stellar",
+  metadataBase: new URL(SITE_URL),
+  title: "TrustLeaf — Patient-owned health records on Stellar",
   description:
-    "Doctors issue prescriptions as blockchain records. Patients receive them instantly — no fees, no paperwork, no borders. Built on Stellar Soroban.",
+    "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
   keywords: [
-    "healthtech",
-    "blockchain",
-    "prescriptions",
-    "Stellar",
-    "Soroban",
     "medical records",
+    "blockchain health",
+    "Stellar",
     "Chile",
+    "patient owned",
   ],
   openGraph: {
-    title: "TrustLeaf",
-    description: "Your medical history. Verified. Always yours.",
+    title: "TrustLeaf — Patient-owned health records on Stellar",
+    description:
+      "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
+    url: SITE_URL,
     type: "website",
+    images: ["/og-image.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TrustLeaf — Patient-owned health records on Stellar",
+    description:
+      "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
+    images: ["/og-image.png"],
   },
 };
 
