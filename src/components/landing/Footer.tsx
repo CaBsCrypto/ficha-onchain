@@ -7,6 +7,11 @@ export function Footer() {
   const cols = t.footer.columns;
   const year = 2026;
 
+  // Most footer links are still placeholders; resolve the ones that have a
+  // real destination today. Keyed by label text (EN + ES).
+  const hrefFor = (label: string) =>
+    label === "Traction" || label === "Tracción" ? "/traction" : "#";
+
   return (
     <footer className="border-t border-slate-200 bg-white">
       <div className="mx-auto max-w-6xl px-6 py-14">
@@ -32,7 +37,10 @@ export function Footer() {
               <ul className="mt-4 space-y-3">
                 {col.links.map((link) => (
                   <li key={link}>
-                    <a href="#" className="text-sm text-muted transition-colors hover:text-clinical">
+                    <a
+                      href={hrefFor(link)}
+                      className="text-sm text-muted transition-colors hover:text-clinical"
+                    >
                       {link}
                     </a>
                   </li>

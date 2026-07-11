@@ -12,6 +12,7 @@ export const translations = {
       how: "How it works",
       roadmap: "Roadmap",
       legal: "Legal",
+      traction: "Traction",
       cta: "Join Waitlist",
       demoPatient: "Patient Demo",
       demoDoctor: "Doctor Demo",
@@ -215,13 +216,42 @@ export const translations = {
       cta: "Join Waitlist",
       success: "You're on the list. We'll be in touch.",
       invalid: "Please enter a valid email address.",
+      /** {count} is replaced with the live waitlist number. */
+      socialProof: "Join {count} doctors and patients already on the list.",
+    },
+    traction: {
+      badge: "Live traction",
+      title: "Real usage, verifiable on-chain",
+      subtitle:
+        "Every prescription TrustLeaf issues is signed on Stellar and publicly auditable. Here's where the pilot stands today.",
+      metrics: {
+        prescriptions: "Prescriptions issued",
+        doctors: "Doctors registered",
+        stellarTx: "Stellar transactions",
+        waitlist: "On the waitlist",
+      },
+      verified: {
+        title: "Verified on Stellar",
+        desc: "Every record is written to the Stellar testnet — inspect the transactions yourself.",
+        cta: "View on Stellar Explorer",
+      },
+      compliance: {
+        title: "Built for Chilean regulation",
+        desc: "TrustLeaf is designed around the norms that govern prescriptions and clinical records in Chile.",
+        items: [
+          { label: "Decreto 41 MINSAL", desc: "Cannabis prescription requirements" },
+          { label: "Ley 20.584", desc: "Patient rights & clinical records" },
+          { label: "Ley 21.541", desc: "Medicinal cannabis framework" },
+        ],
+      },
+      back: "Back to home",
     },
     footer: {
       tagline: "Built on Stellar Soroban",
       built: "Built on Stellar Soroban",
       rights: "All rights reserved.",
       columns: {
-        product: { title: "Product", links: ["Problem", "Solution", "How it works", "Roadmap"] },
+        product: { title: "Product", links: ["Problem", "Solution", "How it works", "Roadmap", "Traction"] },
         company: { title: "Company", links: ["About", "Contact", "Careers"] },
         legal: { title: "Legal", links: ["Privacy", "Terms", "Security"] },
       },
@@ -234,6 +264,7 @@ export const translations = {
       how: "Cómo funciona",
       roadmap: "Roadmap",
       legal: "Legal",
+      traction: "Tracción",
       cta: "Unirse a la lista",
       demoPatient: "Demo Paciente",
       demoDoctor: "Demo Médico",
@@ -437,13 +468,42 @@ export const translations = {
       cta: "Unirse a la Lista",
       success: "Estás en la lista. Te contactaremos.",
       invalid: "Ingresa un correo electrónico válido.",
+      /** {count} se reemplaza con el número real de la lista. */
+      socialProof: "Únete a {count} médicos y pacientes que ya están en la lista.",
+    },
+    traction: {
+      badge: "Tracción en vivo",
+      title: "Uso real, verificable on-chain",
+      subtitle:
+        "Cada receta que emite TrustLeaf se firma en Stellar y es auditable públicamente. Así va el piloto hoy.",
+      metrics: {
+        prescriptions: "Recetas emitidas",
+        doctors: "Médicos registrados",
+        stellarTx: "Transacciones Stellar",
+        waitlist: "En la lista de espera",
+      },
+      verified: {
+        title: "Verificado en Stellar",
+        desc: "Cada registro se escribe en la testnet de Stellar — inspecciona las transacciones tú mismo.",
+        cta: "Ver en Stellar Explorer",
+      },
+      compliance: {
+        title: "Hecho para la normativa chilena",
+        desc: "TrustLeaf está diseñado en torno a las normas que rigen las recetas y las fichas clínicas en Chile.",
+        items: [
+          { label: "Decreto 41 MINSAL", desc: "Requisitos de receta canábica" },
+          { label: "Ley 20.584", desc: "Derechos del paciente y ficha clínica" },
+          { label: "Ley 21.541", desc: "Marco de cannabis medicinal" },
+        ],
+      },
+      back: "Volver al inicio",
     },
     footer: {
       tagline: "Construido sobre Stellar Soroban",
       built: "Construido sobre Stellar Soroban",
       rights: "Todos los derechos reservados.",
       columns: {
-        product: { title: "Producto", links: ["Problema", "Solución", "Cómo funciona", "Roadmap"] },
+        product: { title: "Producto", links: ["Problema", "Solución", "Cómo funciona", "Roadmap", "Tracción"] },
         company: { title: "Empresa", links: ["Nosotros", "Contacto", "Trabaja con nosotros"] },
         legal: { title: "Legal", links: ["Privacidad", "Términos", "Seguridad"] },
       },

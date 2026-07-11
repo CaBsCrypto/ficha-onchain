@@ -53,7 +53,7 @@ function RxIcon() {
   );
 }
 
-type Tab = "emitir" | "recetas" | "consultas";
+type Tab = "emitir" | "recetas" | "consultas" | "pacientes";
 
 export default function DoctorPortal() {
   const [session, setSession] = useState<PasskeySession | null>(null);
@@ -179,8 +179,11 @@ function DoctorDashboard({
         <AuthBanner auth={auth} />
 
         <div className="mt-6 flex flex-wrap gap-2">
+          <TabButton active={tab === "pacientes"} onClick={() => setTab("pacientes")}>
+            <UsersIcon /> Mis Pacientes
+          </TabButton>
           <TabButton active={tab === "emitir"} onClick={() => setTab("emitir")}>
-            Emitir prescripción
+            <RxIcon /> Emitir prescripción
           </TabButton>
           <TabButton active={tab === "consultas"} onClick={() => setTab("consultas")}>
             Consultas Meet
@@ -199,7 +202,15 @@ function DoctorDashboard({
         </div>
 
         <div className="mt-6">
-          {tab === "emitir" ? (
+          {tab === "pacientes" ? (
+            <PacientesTab
+              doctorWallet={session.address}
+              onIssueRx={(patientWallet) => {
+                setPrefillPatient(patientWallet);
+                setTab("emitir");
+              }}
+            />
+          ) : tab === "emitir" ? (
             <EmitForm
               doctorWallet={session.address}
               initialPatient={prefillPatient}
@@ -1018,6 +1029,113 @@ function LicenseIcon() {
   );
 }
 
+// -----------------
+// ---------------------------------------------------------------------------
+// Mis Pacientes tab
+// ---------------------------------------------------------------------------
+
+interface MockPatient {
+  wallet: string;
+  name: string;
+  age: number;
+  lastRx: string;
+  condition: string;
+}
+
+const MOCK_PATIENTS: MockPatient[] = [
+  { wallet: "GBQD7XK2Q9YAV4RPLM8W6H5T1BUFS0DQKX9ZE7NR", name: "María González R.", age: 52, lastRx: "2026-06-18", condition: "Hipertensión / Hipotiroidismo" },
+  { wallet: "GCMK8P2NJZR5HVQA3DLM7W4F6C9BUFS0DQKX9ZE7", name: "Roberto Silva P.", age: 38, lastRx: "2026-07-02", condition: "Diabetes tipo 2" },
+  { wallet: "GDXF3KP1NZQH5YVRA4DLM8W3F7C9BUFS0EQKX2ZE", name: "Carmen Rojas M.", age: 67, lastRx: "2026-06-25", condition: "Artritis reumatoidea" },
+];
+
+function PacientesTab({
+  doctorWallet,
+  onIssueRx,
+}: {
+  doctorWallet: string;
+  onIssueRx: (patientWallet: string) => void;
+}) {
+  const patients = MOCK_PATIENTS; // production: read from AccessControl contract
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-2xl border border-clinical/20 bg-clinical-50/60 px-4 py-3.5">
+        <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-clinical" aria-hidden>
+          <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        </svg>
+        <p className="text-xs leading-relaxed text-clinical-600">
+          <span className="font-semibold">Pacientes con acceso autorizado.</span>{" "}
+          Solo ves pacientes que te otorgaron un grant explícito en el contrato
+          AccessControl de Soroban.{" "}
+          <span className="text-clinical/70">(datos de ejemplo en modo demo)</span>
+        </p>
+      </div>
+
+      {patients.length === 0 ? (
+        <Card className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-muted">
+            <UsersIcon />
+          </div>
+          <h2 className="text-lg font-semibold text-ink">Sin pacientes autorizados</h2>
+          <p className="mt-2 text-sm text-muted">
+            Los pacientes que te otorguen acceso a su ficha aparecerán aquí.
+            Comparte tu wallet{" "}
+            <span className="font-mono">{truncateHash(doctorWallet, 4, 4)}</span>{" "}
+            para que te autoricen.
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-muted">
+            {patients.length} paciente{patients.length > 1 ? "s" : ""} con acceso activo
+          </p>
+          {patients.map((p) => (
+            <Card key={p.wallet} className="p-0" interactive>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-clinical-50 text-clinical">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+                      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.7" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
+                      <Badge tone="muted">{p.age} años</Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted">{p.condition}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted/80">
+                      <span className="font-mono">{truncateHash(p.wallet, 5, 4)}</span>
+                      <span>Última receta: {p.lastRx}</span>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  className="shrink-0"
+                  onClick={() => onIssueRx(p.wallet)}
+                >
+                  <RxIcon /> Emitir receta
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <circle cx="9" cy="7" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M2 20c0-3.5 3.1-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M19 8c1.1.5 2 1.7 2 3M21 20c0-2.5-1.8-4.5-4-5.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function TabButton({
   active,
   onClick,
@@ -1030,7 +1148,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-medium ring-1 ring-inset transition-colors ${
+      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium ring-1 ring-inset transition-colors ${
         active
           ? "bg-clinical text-white ring-clinical"
           : "bg-white text-muted ring-slate-200 hover:text-ink"

@@ -990,34 +990,22 @@ function Dashboard({
   onOpenQr: (rx: DemoRx) => void;
 }) {
   const [section, setSection] = useState<SectionId>("prescriptions");
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   const selectSection = (id: SectionId) => {
     setSection(id);
-    setMobileOpen(false);
   };
 
   return (
     <div className="relative min-h-screen">
-      {/* Mobile backdrop */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-ink/40 backdrop-blur-sm md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      <Sidebar active={section} onSelect={selectSection} mobileOpen={mobileOpen} />
+      {/* Sidebar — hidden on mobile, visible on md+ */}
+      <Sidebar active={section} onSelect={selectSection} />
 
       {/* Main area */}
       <div className="flex min-h-screen flex-col md:pl-60">
-        <MainHeader
-          title={SECTION_TITLES[section]}
-          onMenu={() => setMobileOpen(true)}
-        />
+        <MainHeader title={SECTION_TITLES[section]} />
 
-        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-8 md:py-10">
+        {/* pb-24 on mobile to clear the fixed bottom nav */}
+        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24 md:px-8 md:py-10 md:pb-10">
           {section === "prescriptions" ? (
             <PrescriptionsSection activeCount={activeCount} onOpenQr={onOpenQr} />
           ) : section === "records" ? (
@@ -1031,6 +1019,9 @@ function Dashboard({
           )}
         </div>
       </div>
+
+      {/* Bottom navigation — mobile only */}
+      <DemoBottomNav active={section} onSelect={selectSection} activeCount={activeCount} />
     </div>
   );
 }
@@ -1040,17 +1031,14 @@ function Dashboard({
 function Sidebar({
   active,
   onSelect,
-  mobileOpen,
 }: {
   active: SectionId;
   onSelect: (id: SectionId) => void;
-  mobileOpen: boolean;
 }) {
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-white transition-transform duration-300 md:translate-x-0",
-        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        "fixed inset-y-0 left-0 z-40 hidden w-60 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-white md:flex",
       )}
     >
       {/* Brand */}
@@ -1130,26 +1118,93 @@ function Sidebar({
 
 /* -------------------------------- Main header ----------------------------- */
 
-function MainHeader({
-  title,
-  onMenu,
-}: {
-  title: string;
-  onMenu: () => void;
-}) {
+function MainHeader({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 py-4 backdrop-blur-sm md:px-8">
-      <button
-        onClick={onMenu}
-        aria-label="Abrir menú"
-        className="grid h-9 w-9 place-items-center rounded-lg text-ink ring-1 ring-slate-200 transition-colors hover:bg-white md:hidden"
-      >
-        <MenuIcon className="h-5 w-5" />
-      </button>
-      <h1 className="text-lg font-semibold tracking-tight text-ink md:text-xl">
+      {/* TrustLeaf logo — mobile only (replaces the sidebar brand) */}
+      <div className="flex items-center gap-2 md:hidden">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-clinical text-white shadow-sm shadow-clinical/30">
+          <span className="text-xs font-bold">T</span>
+        </span>
+      </div>
+      <h1 className="flex-1 text-lg font-semibold tracking-tight text-ink md:text-xl">
         {title}
       </h1>
     </header>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Mobile Bottom Navigation Bar (md:hidden)                                  */
+/* -------------------------------------------------------------------------- */
+
+const BOTTOM_NAV_ITEMS: {
+  id: SectionId;
+  label: string;
+  path: string;
+}[] = [
+  { id: "prescriptions", label: "Recetas", path: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5zM14 3v5h5M9 13h6M9 17h4" },
+  { id: "history",       label: "Historial", path: "M3 3v5h5M3.05 13a9 9 0 1 0 2.6-6.36L3 8M12 8v4l3 2" },
+  { id: "records",       label: "Ficha", path: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" },
+  { id: "exams",         label: "Exámenes", path: "M3 3v18h18M7 15l3-4 3 2 4-6" },
+];
+
+function DemoBottomNav({
+  active,
+  onSelect,
+  activeCount,
+}: {
+  active: SectionId;
+  onSelect: (id: SectionId) => void;
+  activeCount: number;
+}) {
+  return (
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-sm md:hidden"
+      aria-label="Navegación principal"
+    >
+      <div className="flex pb-safe">
+        {BOTTOM_NAV_ITEMS.map(({ id, label, path }) => {
+          const isActive = active === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onSelect(id)}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
+                isActive ? "text-clinical" : "text-muted hover:text-ink",
+              )}
+            >
+              <span className="relative">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden
+                >
+                  <path d={path} />
+                </svg>
+                {/* Badge for active prescriptions count */}
+                {id === "prescriptions" && activeCount > 0 && !isActive && (
+                  <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-clinical text-[9px] font-bold text-white">
+                    {activeCount > 9 ? "9+" : activeCount}
+                  </span>
+                )}
+              </span>
+              <span>{label}</span>
+              {isActive && (
+                <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-clinical" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
