@@ -20,11 +20,11 @@ export const translations = {
       pharmacy: "Pharmacy Portal",
     },
     hero: {
-      badge: "Patient-owned health records on Stellar",
-      title: "Your Medical History.",
-      titleAccent: "Always Yours. Always Verified.",
+      badge: "Digital Clinical Records",
+      title: "Your complete medical history,",
+      titleAccent: "owned by you.",
       subtitle:
-        "Your complete medical record, owned by you and verified on-chain. It follows you to any doctor, any city, any country — no lost files, no phone calls, no borders.",
+        "TrustLeaf puts your clinical history on blockchain — verified, portable, and always under your control. No more lost records when you switch doctors.",
       cta: "Join the Waitlist",
       secondary: "See how it works",
       card: {
@@ -302,11 +302,11 @@ export const translations = {
       pharmacy: "Portal Farmacia",
     },
     hero: {
-      badge: "Tu historial de salud, en Stellar",
-      title: "Tu Historial Médico.",
-      titleAccent: "Siempre Tuyo. Siempre Verificado.",
+      badge: "Historial Clínico Digital",
+      title: "Tu historial clínico completo,",
+      titleAccent: "tuyo para siempre.",
       subtitle:
-        "Tu ficha clínica completa, tuya y verificada on-chain. Te sigue a cualquier médico, ciudad o país — sin papeles perdidos, sin llamadas, sin fronteras.",
+        "TrustLeaf lleva tu ficha clínica a la blockchain — verificada, portátil y siempre bajo tu control. No más registros perdidos al cambiar de médico.",
       cta: "Unirse a la Lista",
       secondary: "Ver cómo funciona",
       card: {
