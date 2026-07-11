@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppPrivyProvider } from "@/providers/PrivyProvider";
@@ -48,6 +49,7 @@ export default function RootLayout({
         <AppPrivyProvider>
           <LanguageProvider>{children}</LanguageProvider>
         </AppPrivyProvider>
+        <Toaster richColors position="bottom-center" />
       </body>
     </html>
   );
