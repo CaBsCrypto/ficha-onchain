@@ -8,7 +8,6 @@ import { WaitlistModal } from "./WaitlistModal";
 import { PrivyLoginButton } from "@/components/auth/PrivyLoginButton";
 import type { Language } from "@/types";
 
-/* Soft outline demo buttons — deliberately distinct from the solid primary CTA. */
 const demoBase =
   "inline-flex items-center justify-center gap-2 rounded-full border px-4 h-9 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
@@ -48,9 +47,13 @@ export function Navbar() {
   const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => {
+      setScrolled(window.scrollY > 8);
+      if (window.scrollY > 8) setMobileOpen(false);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -66,69 +69,132 @@ export function Navbar() {
   ];
 
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled ? "glass shadow-sm" : "bg-transparent",
+    <>
+      {/* Mobile menu overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
-    >
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <a href="#top" className="group flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-clinical text-white shadow-sm shadow-clinical/30">
-            <span className="text-sm font-bold">T</span>
-          </span>
-          <span className="text-ink">
-            Trust<span className="text-clinical">Leaf</span>
-          </span>
-        </a>
 
-        <div className="hidden items-center gap-8 md:flex">
-          {links.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-muted transition-colors hover:text-ink"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-50 transition-all duration-300",
+          scrolled ? "glass shadow-sm" : "bg-transparent",
+        )}
+      >
+        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
+          {/* Logo */}
+          <a href="#top" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-clinical text-white shadow-sm shadow-clinical/30">
+              <span className="text-sm font-bold">T</span>
+            </span>
+            <span className="text-ink">
+              Trust<span className="text-clinical">Leaf</span>
+            </span>
+          </a>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <LangSwitch />
-          {/* Demo buttons — inline next to the CTA on large screens.
-              Visibility lives on this wrapper so the buttons' own `inline-flex`
-              (from demoBase) never clashes with a `hidden` utility. */}
-          <div className="hidden items-center gap-2 lg:flex">
-            <a href="/demo/paciente" className={demoPatientClass}>
-              {t.nav.demoPatient}
-            </a>
-            <a href="/demo/medico" className={demoDoctorClass}>
-              {t.nav.demoDoctor}
-            </a>
+          {/* Desktop nav links */}
+          <div className="hidden items-center gap-6 md:flex lg:gap-8">
+            {links.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted transition-colors hover:text-ink"
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
-          <PrivyLoginButton />
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className={buttonVariants({ size: "sm" })}
-          >
-            {t.nav.cta}
-          </button>
-        </div>
-      </nav>
 
-      {/* Demo buttons — collapse into an accessible row below the bar on mobile/tablet */}
-      <div className="flex items-center justify-center gap-2 px-6 pb-2 lg:hidden">
-        <a href="/demo/paciente" className={cn(demoPatientClass, "flex-1")}>
-          {t.nav.demoPatient}
-        </a>
-        <a href="/demo/medico" className={cn(demoDoctorClass, "flex-1")}>
-          {t.nav.demoDoctor}
-        </a>
-      </div>
+          {/* Right side */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:block">
+              <LangSwitch />
+            </div>
+            <div className="hidden items-center gap-2 lg:flex">
+              <a href="/demo/paciente" className={demoPatientClass}>
+                {t.nav.demoPatient}
+              </a>
+              <a href="/demo/medico" className={demoDoctorClass}>
+                {t.nav.demoDoctor}
+              </a>
+            </div>
+            <div className="hidden sm:block">
+              <PrivyLoginButton />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className={cn(buttonVariants({ size: "sm" }), "hidden sm:inline-flex")}
+            >
+              {t.nav.cta}
+            </button>
+
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/80 text-slate-600 transition-colors hover:bg-white md:hidden"
+              aria-label="Menú"
+            >
+              {mobileOpen ? (
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile dropdown menu */}
+        <div
+          className={cn(
+            "overflow-hidden transition-all duration-300 md:hidden",
+            mobileOpen ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0",
+          )}
+        >
+          <div className="border-t border-slate-100 bg-white/95 backdrop-blur-sm px-4 py-4 space-y-1">
+            {links.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-clinical"
+              >
+                {link.label}
+              </a>
+            ))}
+            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <a href="/demo/paciente" className={cn(demoPatientClass, "flex-1 text-xs")}>
+                  {t.nav.demoPatient}
+                </a>
+                <a href="/demo/medico" className={cn(demoDoctorClass, "flex-1 text-xs")}>
+                  {t.nav.demoDoctor}
+                </a>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <LangSwitch />
+                <button
+                  type="button"
+                  onClick={() => { setShowModal(true); setMobileOpen(false); }}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {t.nav.cta}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
 
       <WaitlistModal open={showModal} onClose={() => setShowModal(false)} />
-    </header>
+    </>
   );
 }

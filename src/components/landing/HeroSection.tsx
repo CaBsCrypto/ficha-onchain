@@ -51,7 +51,7 @@ export function HeroSection() {
   return (
     <section
       id="top"
-      className="relative overflow-hidden bg-grid pt-24 pb-16 sm:pt-40 sm:pb-32"
+      className="relative overflow-hidden bg-grid pt-20 pb-12 sm:pt-36 sm:pb-28 lg:pt-40 lg:pb-32"
     >
       <div className="bg-spotlight pointer-events-none absolute inset-0" />
       <div className="relative mx-auto grid max-w-6xl gap-8 px-6 lg:grid-cols-2 lg:grid-rows-2 lg:gap-x-12 lg:gap-y-0">
@@ -71,7 +71,7 @@ export function HeroSection() {
 
           <motion.h1
             variants={item}
-            className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-ink sm:text-6xl lg:text-7xl"
+            className="mt-6 text-3xl font-semibold leading-[1.05] tracking-tight text-ink sm:text-5xl lg:text-7xl"
           >
             {t.hero.title}
             <br />
@@ -119,12 +119,12 @@ export function HeroSection() {
         >
           <motion.p
             variants={item}
-            className="max-w-xl text-xl leading-relaxed text-muted"
+            className="max-w-xl text-base leading-relaxed text-muted sm:text-xl"
           >
             {t.hero.subtitle}
           </motion.p>
 
-          <motion.div variants={item} className="mt-9 flex flex-wrap items-center gap-4">
+          <motion.div variants={item} className="mt-6 sm:mt-9 flex flex-wrap items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => setModalOpen(true)}

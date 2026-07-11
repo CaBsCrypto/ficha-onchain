@@ -8,7 +8,7 @@ export function WaitlistSection() {
   const { t } = useLanguage();
 
   return (
-    <section id="waitlist" className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
+    <section id="waitlist" className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
       <Reveal>
         <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1e3a8a] via-[#7c3aed] to-[#0f0f1a] px-6 py-20 text-center sm:px-16">
           <div className="bg-spotlight pointer-events-none absolute inset-0 opacity-60" />

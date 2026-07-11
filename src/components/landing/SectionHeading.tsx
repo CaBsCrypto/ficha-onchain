@@ -17,11 +17,11 @@ export function SectionHeading({
       <p className="text-base font-semibold uppercase tracking-wider text-clinical">
         {kicker}
       </p>
-      <h2 className="mt-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl lg:text-5xl">
         {title}
       </h2>
       {subtitle && (
-        <p className="mt-4 text-xl leading-relaxed text-muted">{subtitle}</p>
+        <p className="mt-3 text-base leading-relaxed text-muted sm:text-xl">{subtitle}</p>
       )}
     </Reveal>
   );

@@ -8,7 +8,7 @@ import { SectionHeading } from "./SectionHeading";
 export function ProblemSection() {
   const { t } = useLanguage();
   return (
-    <section id="problem" className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
+    <section id="problem" className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
       <SectionHeading
         kicker={t.problem.kicker}
         title={t.problem.title}

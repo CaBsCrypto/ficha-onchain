@@ -23,7 +23,7 @@ function CheckList({ points, tone }: { points: readonly string[]; tone: "clinica
 export function AudienceSection() {
   const { t } = useLanguage();
   return (
-    <section className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
+    <section className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
       <SectionHeading kicker={t.audience.kicker} title={t.audience.title} />
 
       <div className="mt-14 grid gap-6 md:grid-cols-2">

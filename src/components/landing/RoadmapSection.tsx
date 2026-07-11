@@ -8,7 +8,7 @@ import { SectionHeading } from "./SectionHeading";
 export function RoadmapSection() {
   const { t } = useLanguage();
   return (
-    <section id="roadmap" className="relative py-28 sm:py-32">
+    <section id="roadmap" className="relative py-16 sm:py-24 lg:py-32">
       <div className="absolute inset-0 bg-grid opacity-60" />
       <div className="relative mx-auto max-w-6xl px-6">
         <SectionHeading kicker={t.roadmap.kicker} title={t.roadmap.title} />

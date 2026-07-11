@@ -19,7 +19,7 @@ const icons = [
 export function SolutionSection() {
   const { t } = useLanguage();
   return (
-    <section id="solution" className="relative overflow-hidden py-28 sm:py-32">
+    <section id="solution" className="relative overflow-hidden py-16 sm:py-24 lg:py-32">
       <div className="absolute inset-0 bg-gradient-to-b from-clinical-50/60 to-mint-50/40" />
       <div className="relative mx-auto max-w-6xl px-6">
         <SectionHeading
