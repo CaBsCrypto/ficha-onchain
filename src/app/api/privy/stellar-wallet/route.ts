@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
     }
 
     // No Stellar wallet yet — create one
-    const wallet = await privy.wallets().createWallet({
+    // Note: use privy.walletApi (property), not privy.wallets() (does not exist)
+    const wallet = await privy.walletApi.createWallet({
       chainType: 'stellar',
       owner: { userId },
     });
