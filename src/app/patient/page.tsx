@@ -154,26 +154,57 @@ const MOCK_AUTHORIZED_DOCTORS: AuthorizedDoctor[] = [
 // Root — session gate
 // ---------------------------------------------------------------------------
 export default function PatientPortal() {
-  const { authenticated, user } = usePrivy();
+  const { authenticated, user, getAccessToken } = usePrivy();
   const [session, setSession] = useState<PasskeySession | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // If there's an existing passkey session, use it immediately
     const existing = loadSession("patient");
     if (existing) {
       setSession(existing);
-    } else if (authenticated) {
-      // Usuario autenticado con Privy — bypasear passkey gate con sesion mock
-      setSession({
-        role: "patient",
-        address:
-          process.env.NEXT_PUBLIC_DEMO_PATIENT_WALLET ??
-          "GD7WGS7MACGCZCECTNO5V3CH3FORZ2JQYILB5VDCQOYYEAJQOS2V4ZFW",
-        mock: true,
-      });
+      setReady(true);
+      return;
     }
-    setReady(true);
-  }, [authenticated]);
+
+    if (!authenticated) {
+      setReady(true);
+      return;
+    }
+
+    // Privy-authenticated user: fetch their real Stellar wallet
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch("/api/privy/stellar-wallet", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (data.address) {
+          setSession({
+            role: "patient",
+            address: data.address as string,
+            mock: false,
+          });
+        } else {
+          throw new Error(data.error ?? "No address returned");
+        }
+      } catch (err) {
+        console.error("[PatientPortal] stellar wallet error:", err);
+        // Graceful fallback to demo mode
+        setSession({
+          role: "patient",
+          address:
+            process.env.NEXT_PUBLIC_DEMO_PATIENT_WALLET ??
+            "GD7WGS7MACGCZCECTNO5V3CH3FORZ2JQYILB5VDCQOYYEAJQOS2V4ZFW",
+          mock: true,
+        });
+      } finally {
+        setReady(true);
+      }
+    })();
+  }, [authenticated, getAccessToken]);
 
   // Extract display name from Privy user
   const privyEmail =
