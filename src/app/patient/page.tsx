@@ -269,7 +269,7 @@ function PatientDashboard({
     <main className="min-h-screen bg-canvas">
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto max-w-3xl px-4 py-3">
+        <div className="mx-auto max-w-6xl px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <Link
@@ -298,40 +298,87 @@ function PatientDashboard({
         </div>
       </header>
 
-      {/* ── Content — pb-24 clears the fixed bottom nav ── */}
-      <div className="mx-auto max-w-3xl px-4 py-6 pb-28">
-        {tab === "inicio" && (
-          <InicioTab
-            session={session}
-            activeRxCount={activeRxCount}
-            authorizedDoctors={authorizedDoctors}
-            onGoToRecetas={() => setTab("recetas")}
-            onGoToFicha={() => setTab("ficha")}
-          />
-        )}
-        {tab === "recetas" && (
-          <RecetasTab
-            items={items}
-            error={rxError}
-            consultations={consultations}
-            onReload={loadRx}
-            onShare={setShare}
-            onShowPharmacy={setPharmacyRx}
-            wallet={session.address}
-            mock={session.mock}
-          />
-        )}
-        {tab === "licencias" && <LicenciasTab />}
-        {tab === "ficha" && (
-          <FichaTab wallet={session.address} mock={session.mock} />
-        )}
-        {tab === "accesos" && (
-          <AccesosTab wallet={session.address} mock={session.mock} />
-        )}
+      {/* ── Body: sidebar on desktop, stack on mobile ── */}
+      <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8">
+        {/* Sidebar nav — desktop only */}
+        <aside className="hidden md:flex md:w-52 lg:w-60 md:flex-col md:shrink-0">
+          <div className="sticky top-24 flex flex-col gap-1">
+            {(
+              [
+                { id: "inicio", label: "Inicio", icon: <HomeIcon className="h-5 w-5" /> },
+                { id: "recetas", label: "Recetas", icon: <PillIcon className="h-5 w-5" /> },
+                { id: "licencias", label: "Licencias", icon: <ClipboardCheckIcon className="h-5 w-5" /> },
+                { id: "ficha", label: "Mi Ficha", icon: <FichaIcon className="h-5 w-5" /> },
+                { id: "accesos", label: "Accesos", icon: <LockIcon className="h-5 w-5" /> },
+              ] as { id: Tab; label: string; icon: React.ReactNode }[]
+            ).map(({ id, label, icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors text-left",
+                  tab === id
+                    ? "bg-clinical/10 text-clinical"
+                    : "text-muted hover:bg-slate-100 hover:text-ink",
+                )}
+              >
+                {icon}
+                {label}
+                {id === "recetas" && activeRxCount > 0 && tab !== "recetas" && (
+                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-clinical text-[10px] font-bold text-white">
+                    {activeRxCount > 9 ? "9+" : activeRxCount}
+                  </span>
+                )}
+              </button>
+            ))}
+            {/* Pain diary — separate page */}
+            <Link
+              href="/patient/pain-diary"
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+            >
+              <HeartPulseIcon className="h-5 w-5" />
+              Diario de Dolor
+            </Link>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="flex-1 pb-28 md:pb-6">
+          {tab === "inicio" && (
+            <InicioTab
+              session={session}
+              activeRxCount={activeRxCount}
+              authorizedDoctors={authorizedDoctors}
+              onGoToRecetas={() => setTab("recetas")}
+              onGoToFicha={() => setTab("ficha")}
+            />
+          )}
+          {tab === "recetas" && (
+            <RecetasTab
+              items={items}
+              error={rxError}
+              consultations={consultations}
+              onReload={loadRx}
+              onShare={setShare}
+              onShowPharmacy={setPharmacyRx}
+              wallet={session.address}
+              mock={session.mock}
+            />
+          )}
+          {tab === "licencias" && <LicenciasTab />}
+          {tab === "ficha" && (
+            <FichaTab wallet={session.address} mock={session.mock} />
+          )}
+          {tab === "accesos" && (
+            <AccesosTab wallet={session.address} mock={session.mock} />
+          )}
+        </div>
       </div>
 
-      {/* ── Bottom Navigation ── */}
-      <BottomNav tab={tab} setTab={setTab} rxCount={activeRxCount} />
+      {/* ── Bottom Navigation — mobile only ── */}
+      <div className="md:hidden">
+        <BottomNav tab={tab} setTab={setTab} rxCount={activeRxCount} />
+      </div>
 
       {share && (
         <ShareModal
@@ -370,11 +417,6 @@ function BottomNav({
       id: "recetas",
       label: "Recetas",
       icon: <PillIcon className="h-5 w-5" />,
-    },
-    {
-      id: "licencias",
-      label: "Licencias",
-      icon: <ClipboardCheckIcon className="h-5 w-5" />,
     },
     {
       id: "ficha",
@@ -423,6 +465,14 @@ function BottomNav({
             </button>
           );
         })}
+        {/* Pain diary — link to separate page */}
+        <Link
+          href="/patient/pain-diary"
+          className="relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-muted transition-colors hover:text-clinical"
+        >
+          <HeartPulseIcon className="h-5 w-5" />
+          <span>Dolor</span>
+        </Link>
       </div>
     </nav>
   );
