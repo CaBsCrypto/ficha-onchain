@@ -42,6 +42,7 @@ export async function GET(request: Request) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not read prescriptions";
-    return NextResponse.json({ error: message, prescriptions: [] }, { status: 200 });
+    console.error("[prescriptions] error:", message);
+    return NextResponse.json({ error: "Failed to load prescriptions" }, { status: 500 });
   }
 }

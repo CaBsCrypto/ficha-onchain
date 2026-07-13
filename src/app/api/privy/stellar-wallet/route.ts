@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrivyClient } from '@privy-io/server-auth';
 
+// PRIVY_APP_ID is the server-side alias (same value as NEXT_PUBLIC_PRIVY_APP_ID but
+// without the NEXT_PUBLIC_ prefix so it is never inlined into the client bundle).
 const privy = new PrivyClient(
-  process.env.NEXT_PUBLIC_PRIVY_APP_ID!,
+  (process.env.PRIVY_APP_ID ?? process.env.NEXT_PUBLIC_PRIVY_APP_ID)!,
   process.env.PRIVY_APP_SECRET!,
 );
 
@@ -51,6 +53,6 @@ export async function GET(req: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[stellar-wallet] error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Could not provision Stellar wallet' }, { status: 500 });
   }
 }

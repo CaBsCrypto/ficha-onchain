@@ -16,7 +16,8 @@ export interface MeetSpace {
 
 /** Creates a new Google Meet space on behalf of the authenticated doctor. */
 export async function createMeetSpace(auth: GoogleOAuth2): Promise<MeetSpace> {
-  const meet = google.meet({ version: "v2", auth });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meet = (google as any).meet({ version: "v2", auth });
   const response = await meet.spaces.create({ requestBody: {} });
   const { name, meetingUri, meetingCode } = response.data;
   if (!name || !meetingUri || !meetingCode) {
@@ -32,7 +33,8 @@ export async function getMeetSpace(
   auth: GoogleOAuth2,
   spaceName: string,
 ): Promise<MeetSpace> {
-  const meet = google.meet({ version: "v2", auth });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meet = (google as any).meet({ version: "v2", auth });
   const response = await meet.spaces.get({ name: spaceName });
   const { name, meetingUri, meetingCode } = response.data;
   if (!name || !meetingUri || !meetingCode) {

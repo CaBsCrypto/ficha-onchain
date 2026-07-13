@@ -6,7 +6,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { AccessScreen } from "@/components/portal/AccessScreen";
 import { ShareModal } from "@/components/portal/ShareModal";
 import { RxStatusBadge } from "@/components/prescriptions/RxStatusBadge";
 import { formatLedgerDate } from "@/lib/stellar/status";

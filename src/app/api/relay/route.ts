@@ -16,7 +16,24 @@ import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Simple origin guard: only allow requests originating from the same app.
+// In production this should be backed by a proper API key or session check.
+function isAllowedOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  // Allow same-origin requests (no Origin header) and our own domain.
+  if (!origin) return true;
+  if (appUrl && origin === appUrl) return true;
+  // Allow localhost in development
+  if (process.env.NODE_ENV !== "production") return true;
+  return false;
+}
+
 export async function POST(request: Request) {
+  if (!isAllowedOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   let body: { xdr?: string };
   try {
     body = await request.json();
@@ -33,7 +50,7 @@ export async function POST(request: Request) {
 
   if (!process.env.RELAYER_SECRET) {
     return NextResponse.json(
-      { error: "Relayer not configured (RELAYER_SECRET missing)" },
+      { error: "Relayer not configured" },
       { status: 501 },
     );
   }
@@ -47,6 +64,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Relay failed";
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("[relay] error:", message);
+    return NextResponse.json({ error: "Transaction relay failed" }, { status: 502 });
   }
 }
