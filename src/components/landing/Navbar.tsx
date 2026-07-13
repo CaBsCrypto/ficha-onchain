@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { WaitlistModal } from "./WaitlistModal";
 import { PrivyLoginButton } from "@/components/auth/PrivyLoginButton";
 import type { Language } from "@/types";
 
@@ -33,7 +31,6 @@ function LangSwitch() {
 export function Navbar() {
   const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -51,7 +48,6 @@ export function Navbar() {
     { href: "#solution", label: t.nav.solution },
     { href: "#how", label: t.nav.how },
     { href: "#roadmap", label: t.nav.roadmap },
-    { href: "/traction", label: t.nav.traction },
     { href: "/verify", label: t.nav.verify },
     { href: "/legal", label: t.nav.legal },
     { href: "/pharmacy", label: t.nav.pharmacy },
@@ -99,20 +95,13 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <LangSwitch />
-            </div>
-
             {/* Login button — visible on ALL screen sizes */}
             <PrivyLoginButton />
 
-            <button
-              type="button"
-              onClick={() => setShowModal(true)}
-              className={cn(buttonVariants({ size: "sm" }), "hidden sm:inline-flex")}
-            >
-              {t.nav.cta}
-            </button>
+            {/* Lang toggle — far right, desktop only */}
+            <div className="hidden sm:block">
+              <LangSwitch />
+            </div>
 
             {/* Hamburger — mobile only */}
             <button
@@ -152,21 +141,13 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
               <LangSwitch />
-              <button
-                type="button"
-                onClick={() => { setShowModal(true); setMobileOpen(false); }}
-                className={buttonVariants({ size: "sm" })}
-              >
-                {t.nav.cta}
-              </button>
             </div>
           </div>
         </div>
       </header>
 
-      <WaitlistModal open={showModal} onClose={() => setShowModal(false)} />
     </>
   );
 }
