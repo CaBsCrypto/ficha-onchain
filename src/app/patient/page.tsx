@@ -373,29 +373,32 @@ function InicioTab({
   onGoToRecetas: () => void;
   onGoToFicha: () => void;
 }) {
+  const { user } = usePrivy();
+  const privyEmail =
+    user?.email?.address ??
+    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
+    null;
+  const displayName = privyEmail ?? "Mi portal";
+  const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
+
   return (
     <div className="space-y-5">
       {/* ── Patient hero card ── */}
       <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-clinical to-clinical/80 p-6 text-white shadow-lg shadow-clinical/20">
         <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
-            <UserIcon className="h-7 w-7 text-white" />
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30 text-2xl font-bold">
+            {avatarLetter}
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-white/70">Portal del paciente</p>
-            <h2 className="text-xl font-semibold">
-              {session.mock ? "Demo Paciente" : "Mi portal"}
+            <h2 className="text-xl font-semibold truncate">
+              {displayName}
             </h2>
             <p className="mt-0.5 font-mono text-xs text-white/60">
               {truncateHash(session.address, 6, 4)}
             </p>
           </div>
         </div>
-        {session.mock && (
-          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-inset ring-white/25">
-            <InfoIcon className="h-3 w-3" /> Modo demo · datos simulados
-          </div>
-        )}
       </div>
 
       {/* ── Stats row ── */}
@@ -1056,6 +1059,13 @@ function MockRxCard({ rx }: { rx: MockRx }) {
 // ---------------------------------------------------------------------------
 function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const ficha = MOCK_FICHA;
+  const { user } = usePrivy();
+  const privyEmail =
+    user?.email?.address ??
+    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
+    null;
+  const displayName = privyEmail ?? (mock ? "Mi Cuenta" : "Tu perfil");
+  const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
 
   return (
     <div className="space-y-5">
@@ -1066,7 +1076,7 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           Tu ficha médica vive on-chain en Soroban — solo los médicos con acceso
           que tú autoricen pueden verla completa.{" "}
           {mock
-            ? "Datos de ejemplo en modo demo."
+            ? "Datos de ejemplo · tu historial real estará aquí cuando conectes tu wallet."
             : "Los datos de resumen se leen desde tu wallet."}
         </p>
       </div>
@@ -1077,12 +1087,12 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           {/* Avatar con inicial */}
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-clinical/10 text-clinical">
             <span className="text-2xl font-bold leading-none">
-              {mock ? "P" : "?"}
+              {avatarLetter}
             </span>
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink">
-              {mock ? "Paciente Demo" : "Tu perfil"}
+              {displayName}
             </h2>
             <p className="font-mono text-xs text-muted">
               {truncateHash(wallet, 6, 6)}

@@ -296,10 +296,14 @@ export default function BodyMap3D({
     }
 
     // Mouse events
+    let dragStartX = 0;
+    let dragStartY = 0;
     function onMouseDown(e: MouseEvent) {
       isDragging = true;
       prevX = e.clientX;
       prevY = e.clientY;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
       renderer.domElement.style.cursor = "grabbing";
     }
     function onMouseMove(e: MouseEvent) {
@@ -315,7 +319,10 @@ export default function BodyMap3D({
       }
     }
     function onMouseUp(e: MouseEvent) {
-      if (isDragging && Math.abs(e.clientX - prevX) < 2 && Math.abs(e.clientY - prevY) < 2) {
+      // Compare against drag START position (not last mousemove position)
+      const totalDx = Math.abs(e.clientX - dragStartX);
+      const totalDy = Math.abs(e.clientY - dragStartY);
+      if (isDragging && totalDx < 6 && totalDy < 6) {
         // treat as click
         const rel = getCanvasRelative(e);
         pointer.set(rel.x, rel.y);

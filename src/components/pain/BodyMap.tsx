@@ -48,19 +48,22 @@ export const ZONE_NAMES: Record<BodyZone, string> = {
 
 type ViewSide = "front" | "back";
 
-function getPainStyle(level: number | undefined, hovered: boolean) {
-  const base = hovered
-    ? { fill: "rgba(125,211,252,0.15)", stroke: "#7dd3fc", glow: true }
-    : !level
-    ? { fill: "rgba(15,23,42,0.55)", stroke: "#334155", glow: false }
-    : level <= 3
-    ? { fill: "rgba(34,197,94,0.22)", stroke: "#22c55e", glow: false }
-    : level <= 6
-    ? { fill: "rgba(234,179,8,0.26)", stroke: "#eab308", glow: true }
-    : level <= 9
-    ? { fill: "rgba(249,115,22,0.30)", stroke: "#f97316", glow: true }
-    : { fill: "rgba(239,68,68,0.34)", stroke: "#ef4444", glow: true };
-  return base;
+function getPainFill(level: number | undefined, hovered: boolean): string {
+  if (hovered) return "rgba(125,211,252,0.18)";
+  if (!level) return "rgba(15,23,42,0.5)";
+  if (level <= 3) return "rgba(34,197,94,0.22)";
+  if (level <= 6) return "rgba(234,179,8,0.26)";
+  if (level <= 9) return "rgba(249,115,22,0.30)";
+  return "rgba(239,68,68,0.34)";
+}
+
+function getPainStroke(level: number | undefined, hovered: boolean): string {
+  if (hovered) return "#7dd3fc";
+  if (!level) return "#334155";
+  if (level <= 3) return "#22c55e";
+  if (level <= 6) return "#eab308";
+  if (level <= 9) return "#f97316";
+  return "#ef4444";
 }
 
 export default function BodyMap({ entries, onZoneClick, readOnly = false }: BodyMapProps) {
@@ -75,186 +78,98 @@ export default function BodyMap({ entries, onZoneClick, readOnly = false }: Body
   }
 
   function zp(zone: BodyZone) {
-    const { fill, stroke, glow } = getPainStyle(levelMap[zone], hovered === zone);
-    const sw = hovered === zone ? 2.5 : levelMap[zone] ? 2 : 1.2;
+    const lv = levelMap[zone];
+    const hov = hovered === zone;
+    const hasGlow = hov || (lv !== undefined && lv >= 6);
     return {
-      fill,
-      stroke,
-      strokeWidth: sw,
-      filter: glow ? "url(#glow)" : undefined,
+      fill: getPainFill(lv, hov),
+      stroke: getPainStroke(lv, hov),
+      strokeWidth: hov ? 2.5 : lv ? 2 : 1.2,
+      filter: hasGlow ? "url(#glow)" : undefined,
       onClick: readOnly ? undefined : () => onZoneClick(zone),
       onMouseEnter: readOnly ? undefined : () => setHovered(zone),
       onMouseLeave: readOnly ? undefined : () => setHovered(null),
-      onTouchStart: readOnly ? undefined : (e: React.TouchEvent) => { e.preventDefault(); setHovered(zone); },
-      onTouchEnd: readOnly ? undefined : (e: React.TouchEvent) => { e.preventDefault(); setHovered(null); onZoneClick(zone); },
-      style: { transition: "fill 0.15s ease, stroke 0.15s ease" },
       className: readOnly ? "" : "cursor-pointer",
+      style: { transition: "fill 0.12s, stroke 0.12s" } as React.CSSProperties,
     };
   }
 
-  // ── FRONT VIEW ──────────────────────────────────────────────────────────────
-  const frontBody = (
+  // Front zones
+  const front = (
     <>
-      {/* Head */}
-      <ellipse cx="100" cy="34" rx="26" ry="30" {...zp("head")}><title>{ZONE_NAMES.head}</title></ellipse>
-
-      {/* Neck */}
-      <path d="M 91 62 C 90 68 89 73 89 80 L 111 80 C 111 73 110 68 109 62 Z" {...zp("neck")}><title>{ZONE_NAMES.neck}</title></path>
-
-      {/* Left shoulder */}
-      <ellipse cx="56" cy="97" rx="23" ry="15" {...zp("shoulder_l")}><title>{ZONE_NAMES.shoulder_l}</title></ellipse>
-
-      {/* Right shoulder */}
-      <ellipse cx="144" cy="97" rx="23" ry="15" {...zp("shoulder_r")}><title>{ZONE_NAMES.shoulder_r}</title></ellipse>
-
-      {/* Chest */}
-      <path d="M 77 82 L 123 82 C 138 86 145 96 141 112 C 138 126 130 134 126 150 L 74 150 C 70 134 62 126 59 112 C 55 96 62 86 77 82 Z" {...zp("chest")}><title>{ZONE_NAMES.chest}</title></path>
-
-      {/* Abdomen */}
-      <path d="M 74 150 L 126 150 C 128 163 130 173 130 185 C 130 193 117 197 100 197 C 83 197 70 193 70 185 C 70 173 72 163 74 150 Z" {...zp("abdomen")}><title>{ZONE_NAMES.abdomen}</title></path>
-
-      {/* Left arm */}
-      <path d="M 35 106 C 27 116 23 132 23 148 C 23 166 27 180 32 194 C 34 200 40 200 43 196 C 46 192 46 176 46 160 C 48 142 52 120 54 108 Z" {...zp("arm_l")}><title>{ZONE_NAMES.arm_l}</title></path>
-
-      {/* Right arm */}
-      <path d="M 165 106 C 173 116 177 132 177 148 C 177 166 173 180 168 194 C 166 200 160 200 157 196 C 154 192 154 176 154 160 C 152 142 148 120 146 108 Z" {...zp("arm_r")}><title>{ZONE_NAMES.arm_r}</title></path>
-
-      {/* Left hand */}
-      <ellipse cx="40" cy="214" rx="16" ry="20" {...zp("hand_l")}><title>{ZONE_NAMES.hand_l}</title></ellipse>
-
-      {/* Right hand */}
-      <ellipse cx="160" cy="214" rx="16" ry="20" {...zp("hand_r")}><title>{ZONE_NAMES.hand_r}</title></ellipse>
-
-      {/* Left hip */}
-      <path d="M 70 193 L 100 193 L 100 232 C 86 232 73 225 70 214 C 68 207 68 200 70 193 Z" {...zp("hip_l")}><title>{ZONE_NAMES.hip_l}</title></path>
-
-      {/* Right hip */}
-      <path d="M 100 193 L 130 193 C 132 200 132 207 130 214 C 127 225 114 232 100 232 L 100 193 Z" {...zp("hip_r")}><title>{ZONE_NAMES.hip_r}</title></path>
-
-      {/* Left thigh */}
-      <path d="M 70 230 C 68 244 67 262 67 278 C 67 298 69 312 73 318 L 99 318 L 99 230 Z" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></path>
-
-      {/* Right thigh */}
-      <path d="M 101 230 L 101 318 L 127 318 C 131 312 133 298 133 278 C 133 262 132 244 130 230 Z" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></path>
-
-      {/* Left knee */}
-      <ellipse cx="84" cy="326" rx="19" ry="12" {...zp("knee_l")}><title>{ZONE_NAMES.knee_l}</title></ellipse>
-
-      {/* Right knee */}
-      <ellipse cx="116" cy="326" rx="19" ry="12" {...zp("knee_r")}><title>{ZONE_NAMES.knee_r}</title></ellipse>
-
-      {/* Left lower leg */}
-      <path d="M 70 336 C 68 354 66 372 68 388 C 70 400 77 406 84 406 C 91 406 98 400 100 388 L 100 336 Z" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></path>
-
-      {/* Right lower leg */}
-      <path d="M 100 336 L 100 388 C 102 400 109 406 116 406 C 123 406 130 400 132 388 C 134 372 132 354 130 336 Z" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></path>
-
-      {/* Left foot */}
-      <path d="M 68 404 C 60 406 54 412 58 420 C 62 424 76 426 90 424 C 98 422 100 416 100 408 L 100 404 Z" {...zp("foot_l")}><title>{ZONE_NAMES.foot_l}</title></path>
-
-      {/* Right foot */}
-      <path d="M 100 404 L 100 408 C 100 416 102 422 110 424 C 124 426 138 424 142 420 C 146 412 140 406 132 404 Z" {...zp("foot_r")}><title>{ZONE_NAMES.foot_r}</title></path>
+      <ellipse cx="100" cy="34" rx="24" ry="27" {...zp("head")}><title>{ZONE_NAMES.head}</title></ellipse>
+      <rect x="89" y="59" width="22" height="18" rx="5" {...zp("neck")}><title>{ZONE_NAMES.neck}</title></rect>
+      <ellipse cx="58" cy="98" rx="22" ry="14" {...zp("shoulder_l")}><title>{ZONE_NAMES.shoulder_l}</title></ellipse>
+      <ellipse cx="142" cy="98" rx="22" ry="14" {...zp("shoulder_r")}><title>{ZONE_NAMES.shoulder_r}</title></ellipse>
+      <rect x="73" y="75" width="54" height="54" rx="10" {...zp("chest")}><title>{ZONE_NAMES.chest}</title></rect>
+      <rect x="73" y="127" width="54" height="46" rx="8" {...zp("abdomen")}><title>{ZONE_NAMES.abdomen}</title></rect>
+      <rect x="34" y="106" width="22" height="74" rx="10" {...zp("arm_l")}><title>{ZONE_NAMES.arm_l}</title></rect>
+      <rect x="144" y="106" width="22" height="74" rx="10" {...zp("arm_r")}><title>{ZONE_NAMES.arm_r}</title></rect>
+      <ellipse cx="45" cy="197" rx="15" ry="19" {...zp("hand_l")}><title>{ZONE_NAMES.hand_l}</title></ellipse>
+      <ellipse cx="155" cy="197" rx="15" ry="19" {...zp("hand_r")}><title>{ZONE_NAMES.hand_r}</title></ellipse>
+      <rect x="73" y="171" width="27" height="38" rx="6" {...zp("hip_l")}><title>{ZONE_NAMES.hip_l}</title></rect>
+      <rect x="100" y="171" width="27" height="38" rx="6" {...zp("hip_r")}><title>{ZONE_NAMES.hip_r}</title></rect>
+      <rect x="74" y="207" width="24" height="78" rx="10" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></rect>
+      <rect x="102" y="207" width="24" height="78" rx="10" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></rect>
+      <ellipse cx="86" cy="294" rx="18" ry="12" {...zp("knee_l")}><title>{ZONE_NAMES.knee_l}</title></ellipse>
+      <ellipse cx="114" cy="294" rx="18" ry="12" {...zp("knee_r")}><title>{ZONE_NAMES.knee_r}</title></ellipse>
+      <rect x="74" y="304" width="24" height="70" rx="10" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></rect>
+      <rect x="102" y="304" width="24" height="70" rx="10" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></rect>
+      <ellipse cx="83" cy="388" rx="24" ry="12" {...zp("foot_l")}><title>{ZONE_NAMES.foot_l}</title></ellipse>
+      <ellipse cx="117" cy="388" rx="24" ry="12" {...zp("foot_r")}><title>{ZONE_NAMES.foot_r}</title></ellipse>
     </>
   );
 
-  // ── BACK VIEW ───────────────────────────────────────────────────────────────
-  const backBody = (
+  // Back zones — same geometry, different labels for torso
+  const back = (
     <>
-      {/* Head */}
-      <ellipse cx="100" cy="34" rx="26" ry="30" {...zp("head")}><title>{ZONE_NAMES.head}</title></ellipse>
-
-      {/* Neck */}
-      <path d="M 91 62 C 90 68 89 73 89 80 L 111 80 C 111 73 110 68 109 62 Z" {...zp("neck")}><title>{ZONE_NAMES.neck}</title></path>
-
-      {/* Left shoulder */}
-      <ellipse cx="56" cy="97" rx="23" ry="15" {...zp("shoulder_l")}><title>{ZONE_NAMES.shoulder_l}</title></ellipse>
-
-      {/* Right shoulder */}
-      <ellipse cx="144" cy="97" rx="23" ry="15" {...zp("shoulder_r")}><title>{ZONE_NAMES.shoulder_r}</title></ellipse>
-
-      {/* Back upper */}
-      <path d="M 77 82 L 123 82 C 138 86 145 96 141 112 C 138 126 130 134 126 150 L 74 150 C 70 134 62 126 59 112 C 55 96 62 86 77 82 Z" {...zp("back_upper")}><title>{ZONE_NAMES.back_upper}</title></path>
-
-      {/* Back lower */}
-      <path d="M 74 150 L 126 150 C 128 163 130 173 130 185 C 130 193 117 197 100 197 C 83 197 70 193 70 185 C 70 173 72 163 74 150 Z" {...zp("back_lower")}><title>{ZONE_NAMES.back_lower}</title></path>
-
-      {/* Left arm */}
-      <path d="M 35 106 C 27 116 23 132 23 148 C 23 166 27 180 32 194 C 34 200 40 200 43 196 C 46 192 46 176 46 160 C 48 142 52 120 54 108 Z" {...zp("arm_l")}><title>{ZONE_NAMES.arm_l}</title></path>
-
-      {/* Right arm */}
-      <path d="M 165 106 C 173 116 177 132 177 148 C 177 166 173 180 168 194 C 166 200 160 200 157 196 C 154 192 154 176 154 160 C 152 142 148 120 146 108 Z" {...zp("arm_r")}><title>{ZONE_NAMES.arm_r}</title></path>
-
-      {/* Left hand */}
-      <ellipse cx="40" cy="214" rx="16" ry="20" {...zp("hand_l")}><title>{ZONE_NAMES.hand_l}</title></ellipse>
-
-      {/* Right hand */}
-      <ellipse cx="160" cy="214" rx="16" ry="20" {...zp("hand_r")}><title>{ZONE_NAMES.hand_r}</title></ellipse>
-
-      {/* Left hip / glute */}
-      <path d="M 70 193 L 100 193 L 100 232 C 86 232 73 225 70 214 C 68 207 68 200 70 193 Z" {...zp("hip_l")}><title>{ZONE_NAMES.hip_l}</title></path>
-
-      {/* Right hip / glute */}
-      <path d="M 100 193 L 130 193 C 132 200 132 207 130 214 C 127 225 114 232 100 232 L 100 193 Z" {...zp("hip_r")}><title>{ZONE_NAMES.hip_r}</title></path>
-
-      {/* Left thigh (back) */}
-      <path d="M 70 230 C 68 244 67 262 67 278 C 67 298 69 312 73 318 L 99 318 L 99 230 Z" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></path>
-
-      {/* Right thigh (back) */}
-      <path d="M 101 230 L 101 318 L 127 318 C 131 312 133 298 133 278 C 133 262 132 244 130 230 Z" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></path>
-
-      {/* Left knee (back) */}
-      <ellipse cx="84" cy="326" rx="19" ry="12" {...zp("knee_l")}><title>{ZONE_NAMES.knee_l}</title></ellipse>
-
-      {/* Right knee (back) */}
-      <ellipse cx="116" cy="326" rx="19" ry="12" {...zp("knee_r")}><title>{ZONE_NAMES.knee_r}</title></ellipse>
-
-      {/* Left calf */}
-      <path d="M 70 336 C 68 354 66 372 68 388 C 70 400 77 406 84 406 C 91 406 98 400 100 388 L 100 336 Z" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></path>
-
-      {/* Right calf */}
-      <path d="M 100 336 L 100 388 C 102 400 109 406 116 406 C 123 406 130 400 132 388 C 134 372 132 354 130 336 Z" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></path>
-
-      {/* Left foot (back) */}
-      <path d="M 68 404 C 60 406 54 412 58 420 C 62 424 76 426 90 424 C 98 422 100 416 100 408 L 100 404 Z" {...zp("foot_l")}><title>{ZONE_NAMES.foot_l}</title></path>
-
-      {/* Right foot (back) */}
-      <path d="M 100 404 L 100 408 C 100 416 102 422 110 424 C 124 426 138 424 142 420 C 146 412 140 406 132 404 Z" {...zp("foot_r")}><title>{ZONE_NAMES.foot_r}</title></path>
+      <ellipse cx="100" cy="34" rx="24" ry="27" {...zp("head")}><title>{ZONE_NAMES.head}</title></ellipse>
+      <rect x="89" y="59" width="22" height="18" rx="5" {...zp("neck")}><title>{ZONE_NAMES.neck}</title></rect>
+      <ellipse cx="58" cy="98" rx="22" ry="14" {...zp("shoulder_l")}><title>{ZONE_NAMES.shoulder_l}</title></ellipse>
+      <ellipse cx="142" cy="98" rx="22" ry="14" {...zp("shoulder_r")}><title>{ZONE_NAMES.shoulder_r}</title></ellipse>
+      <rect x="73" y="75" width="54" height="54" rx="10" {...zp("back_upper")}><title>{ZONE_NAMES.back_upper}</title></rect>
+      <rect x="73" y="127" width="54" height="46" rx="8" {...zp("back_lower")}><title>{ZONE_NAMES.back_lower}</title></rect>
+      <rect x="34" y="106" width="22" height="74" rx="10" {...zp("arm_l")}><title>{ZONE_NAMES.arm_l}</title></rect>
+      <rect x="144" y="106" width="22" height="74" rx="10" {...zp("arm_r")}><title>{ZONE_NAMES.arm_r}</title></rect>
+      <ellipse cx="45" cy="197" rx="15" ry="19" {...zp("hand_l")}><title>{ZONE_NAMES.hand_l}</title></ellipse>
+      <ellipse cx="155" cy="197" rx="15" ry="19" {...zp("hand_r")}><title>{ZONE_NAMES.hand_r}</title></ellipse>
+      <rect x="73" y="171" width="27" height="38" rx="6" {...zp("hip_l")}><title>{ZONE_NAMES.hip_l}</title></rect>
+      <rect x="100" y="171" width="27" height="38" rx="6" {...zp("hip_r")}><title>{ZONE_NAMES.hip_r}</title></rect>
+      <rect x="74" y="207" width="24" height="78" rx="10" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></rect>
+      <rect x="102" y="207" width="24" height="78" rx="10" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></rect>
+      <ellipse cx="86" cy="294" rx="18" ry="12" {...zp("knee_l")}><title>{ZONE_NAMES.knee_l}</title></ellipse>
+      <ellipse cx="114" cy="294" rx="18" ry="12" {...zp("knee_r")}><title>{ZONE_NAMES.knee_r}</title></ellipse>
+      <rect x="74" y="304" width="24" height="70" rx="10" {...zp("leg_l")}><title>{ZONE_NAMES.leg_l}</title></rect>
+      <rect x="102" y="304" width="24" height="70" rx="10" {...zp("leg_r")}><title>{ZONE_NAMES.leg_r}</title></rect>
+      <ellipse cx="83" cy="388" rx="24" ry="12" {...zp("foot_l")}><title>{ZONE_NAMES.foot_l}</title></ellipse>
+      <ellipse cx="117" cy="388" rx="24" ry="12" {...zp("foot_r")}><title>{ZONE_NAMES.foot_r}</title></ellipse>
     </>
   );
 
   return (
     <div className="flex flex-col items-center gap-3 select-none">
       {/* Front / Back toggle */}
-      <div className="flex items-center gap-1 bg-slate-900 rounded-full p-1 border border-slate-700">
-        <button
-          onClick={() => setSide("front")}
-          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-            side === "front"
-              ? "bg-sky-500 text-white shadow-sm"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          Frontal
-        </button>
-        <button
-          onClick={() => setSide("back")}
-          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-            side === "back"
-              ? "bg-sky-500 text-white shadow-sm"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          Trasera
-        </button>
+      <div className="flex items-center gap-1 bg-slate-900/80 rounded-full p-1 border border-slate-700">
+        {(["front", "back"] as ViewSide[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => setSide(s)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+              side === s ? "bg-sky-500 text-white shadow-sm" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            {s === "front" ? "Frontal" : "Trasera"}
+          </button>
+        ))}
       </div>
 
-      {/* Tooltip */}
+      {/* Tooltip bar */}
       <div className="h-7 flex items-center">
         {hovered ? (
           <span className="text-sm font-medium text-white bg-slate-900 border border-slate-600 px-3 py-1 rounded-full">
             {ZONE_NAMES[hovered]}
             {levelMap[hovered] !== undefined && (
-              <span className="ml-2 text-xs opacity-70">· Dolor {levelMap[hovered]}/10</span>
+              <span className="ml-2 text-xs opacity-60">· {levelMap[hovered]}/10</span>
             )}
           </span>
         ) : (
@@ -266,45 +181,36 @@ export default function BodyMap({ entries, onZoneClick, readOnly = false }: Body
 
       {/* SVG Body */}
       <svg
-        viewBox="0 0 200 440"
-        className="w-full max-w-[210px]"
+        viewBox="0 0 200 406"
+        className="w-full max-w-[200px]"
         role="img"
         aria-label="Mapa corporal interactivo"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+          <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
-
-        {/* Subtle body outline silhouette behind zones */}
-        <path
-          d="M 100 4 C 82 4 74 18 74 34 C 74 48 80 58 88 63 C 86 68 86 74 86 80 C 74 80 60 84 52 92 C 44 98 42 104 40 110 C 34 112 22 120 20 136 C 18 150 22 168 28 186 C 32 198 38 202 42 200 C 42 206 40 212 36 222 C 34 228 36 234 40 236 L 62 236 C 64 244 66 254 66 268 C 66 290 68 308 70 318 L 66 326 C 62 332 62 340 66 342 L 68 342 C 66 356 64 374 66 394 C 68 412 76 428 86 428 L 96 428 C 96 418 98 412 100 408 C 102 412 104 418 104 428 L 114 428 C 124 428 132 412 134 394 C 136 374 134 356 132 342 L 134 342 C 138 340 138 332 134 326 L 130 318 C 132 308 134 290 134 268 C 134 254 136 244 138 236 L 160 236 C 164 234 166 228 164 222 C 160 212 158 206 158 200 C 162 202 168 198 172 186 C 178 168 182 150 180 136 C 178 120 166 112 160 110 C 158 104 156 98 148 92 C 140 84 126 80 114 80 C 114 74 114 68 112 63 C 120 58 126 48 126 34 C 126 18 118 4 100 4 Z"
-          fill="rgba(15,23,42,0.3)"
-          stroke="#1e293b"
-          strokeWidth="1"
-        />
-
-        {side === "front" ? frontBody : backBody}
+        {side === "front" ? front : back}
       </svg>
 
-      {/* Pain level legend */}
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
+      {/* Legend */}
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
         {[
-          { color: "#475569", label: "Sin dolor" },
-          { color: "#22c55e", label: "Leve" },
-          { color: "#eab308", label: "Moderado" },
-          { color: "#f97316", label: "Intenso" },
-          { color: "#ef4444", label: "Severo" },
-        ].map(({ color, label }) => (
-          <span key={label} className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
-            {label}
+          { c: "#475569", l: "Sin dolor" },
+          { c: "#22c55e", l: "Leve 1–3" },
+          { c: "#eab308", l: "Mod. 4–6" },
+          { c: "#f97316", l: "Intenso 7–9" },
+          { c: "#ef4444", l: "Severo 10" },
+        ].map(({ c, l }) => (
+          <span key={l} className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full inline-block" style={{ background: c }} />
+            {l}
           </span>
         ))}
       </div>

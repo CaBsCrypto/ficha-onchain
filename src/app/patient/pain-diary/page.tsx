@@ -171,31 +171,38 @@ export default function PainDiaryPage() {
           <h1 className="text-xl font-bold text-gray-900 leading-tight">Diario de Dolor</h1>
           <p className="text-gray-500 text-sm capitalize">{formatTodayDate()}</p>
         </div>
-        {history.length > 0 && (
-          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 border border-gray-200">
-            <button
-              onClick={() => setPageTab("hoy")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                pageTab === "hoy" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
-              }`}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => setPageTab("historial")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                pageTab === "historial" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
-              }`}
-            >
-              Historial ({history.length})
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 border border-gray-200">
+          <button
+            onClick={() => setPageTab("hoy")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              pageTab === "hoy" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            Hoy
+          </button>
+          <button
+            onClick={() => setPageTab("historial")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              pageTab === "historial" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            Historial{history.length > 0 ? ` (${history.length})` : ""}
+          </button>
+        </div>
       </div>
 
       {/* HISTORIAL VIEW */}
       {pageTab === "historial" && (
         <div className="max-w-lg mx-auto px-4 space-y-3">
+          {history.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
+              <p className="text-gray-500 text-sm font-medium">Sin registros anteriores</p>
+              <p className="text-gray-400 text-xs mt-1">
+                Guarda el registro de hoy y aquí aparecerá tu historial
+              </p>
+            </div>
+          ) : (
+          <>
           <p className="text-gray-400 text-xs">Últimos 30 días con registros guardados</p>
           {history.map((day) => (
             <div key={day.dateStr} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -255,6 +262,8 @@ export default function PainDiaryPage() {
               )}
             </div>
           ))}
+          </>
+          )}
         </div>
       )}
 
