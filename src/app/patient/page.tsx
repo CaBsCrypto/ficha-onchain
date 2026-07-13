@@ -15,6 +15,7 @@ import { PRESCRIPTION_TYPE_LABELS } from "@/lib/decreto41";
 import type { OnChainPrescription, WithExpiry } from "@/lib/stellar";
 import type { Consultation } from "@/lib/consultations/store";
 import { clearSession, loadSession, type PasskeySession } from "@/lib/passkey";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   HomeIcon,
   ChevronRightIcon,
@@ -152,13 +153,26 @@ const MOCK_AUTHORIZED_DOCTORS: AuthorizedDoctor[] = [
 // Root — session gate
 // ---------------------------------------------------------------------------
 export default function PatientPortal() {
+  const { authenticated } = usePrivy();
   const [session, setSession] = useState<PasskeySession | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setSession(loadSession("patient"));
+    const existing = loadSession("patient");
+    if (existing) {
+      setSession(existing);
+    } else if (authenticated) {
+      // Usuario autenticado con Privy — bypasear passkey gate con sesión mock
+      setSession({
+        role: "patient",
+        address:
+          process.env.NEXT_PUBLIC_DEMO_PATIENT_WALLET ??
+          "GD7WGS7MACGCZCECTNO5V3CH3FORZ2JQYILB5VDCQOYYEAJQOS2V4ZFW",
+        mock: true,
+      });
+    }
     setReady(true);
-  }, []);
+  }, [authenticated]);
 
   if (!ready) return null;
   if (!session) {
@@ -1709,48 +1723,4 @@ function Teleconsultas({ items }: { items: Consultation[] }) {
                   <a href={c.meetLink} target="_blank" rel="noopener noreferrer"
                     className="min-w-0 truncate font-mono text-[#1a73e8] hover:underline">
                     {c.meetLink}
-                  </a>
-                  <span className="shrink-0 rounded bg-[#1a73e8]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#1a73e8]">
-                    {c.meetingCode}
-                  </span>
-                </div>
-              </div>
-              <a href={c.meetLink} target="_blank" rel="noopener noreferrer"
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[#1a73e8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1765cc]">
-                <VideoIcon /> Abrir Meet
-              </a>
-            </div>
-          </Card>
-        );
-      })}
-    </section>
-  );
-}
-
-function LoadingList() {
-  return (
-    <div className="space-y-4">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="h-32 animate-pulse rounded-3xl border border-slate-200/70 bg-white" />
-      ))}
-      <p className="text-center text-xs text-muted">Cargando desde Soroban…</p>
-    </div>
-  );
-}
-
-function EmptyRxState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
-  return (
-    <Card className="text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-muted">
-        <PillIcon className="h-6 w-6" />
-      </div>
-      <h2 className="text-lg font-semibold text-ink">Aún no tienes recetas</h2>
-      <p className="mt-2 text-sm text-muted">
-        Cuando un médico emita una prescripción a tu wallet, aparecerá aquí, leída directamente desde Stellar Soroban.
-      </p>
-      {error && <p className="mt-3 text-xs text-amber-600">Detalle: {error}</p>}
-      <Button variant="secondary" className="mt-5" onClick={onRetry}>Actualizar</Button>
-    </Card>
-  );
-}
-
+              
