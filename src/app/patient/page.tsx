@@ -16,7 +16,7 @@ import { PRESCRIPTION_TYPE_LABELS } from "@/lib/decreto41";
 import type { OnChainPrescription, WithExpiry } from "@/lib/stellar";
 import type { Consultation } from "@/lib/consultations/store";
 import { clearSession, loadSession, type PasskeySession } from "@/lib/passkey";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useLogout } from "@privy-io/react-auth";
 import {
   HomeIcon,
   ChevronRightIcon,
@@ -155,6 +155,8 @@ const MOCK_AUTHORIZED_DOCTORS: AuthorizedDoctor[] = [
 // ---------------------------------------------------------------------------
 export default function PatientPortal() {
   const { authenticated, user, getAccessToken } = usePrivy();
+  const { logout: privyLogout } = useLogout({ onSuccess: () => router.push("/") });
+  const router = useRouter();
   const [session, setSession] = useState<PasskeySession | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -213,8 +215,10 @@ export default function PatientPortal() {
     null;
 
   if (!ready) return null;
+  // No session and not authenticated → go to landing
   if (!session) {
-    return <AccessScreen role="patient" onAuthenticated={setSession} />;
+    router.push("/");
+    return null;
   }
   return (
     <PatientDashboard
@@ -223,6 +227,7 @@ export default function PatientPortal() {
       onLogout={() => {
         clearSession();
         setSession(null);
+        privyLogout(); // logs out from Privy + redirects to /
       }}
     />
   );
