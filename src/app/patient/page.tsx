@@ -301,6 +301,14 @@ function PatientDashboardInner({
   );
 
   // Info bar — user identity shown above tab content
+  const [copied, setCopied] = useState(false);
+  function copyAddress() {
+    navigator.clipboard.writeText(session.address).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div>
       {/* Session info bar */}
@@ -314,9 +322,18 @@ function PatientDashboardInner({
             <p className="text-sm font-medium text-slate-800 leading-none">
               {privyEmail ?? "Paciente"}
             </p>
-            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-              {truncateHash(session.address, 4, 4)}
-            </p>
+            <button
+              onClick={copyAddress}
+              title="Copiar dirección completa"
+              className="flex items-center gap-1 group text-left"
+            >
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5 group-hover:text-sky-500 transition-colors">
+                {truncateHash(session.address, 6, 6)}
+              </p>
+              <span className="text-[10px] text-slate-300 group-hover:text-sky-400 transition-colors mt-0.5">
+                {copied ? "✓" : "⎘"}
+              </span>
+            </button>
           </div>
         </div>
         <button
