@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppPrivyProvider } from "@/providers/PrivyProvider";
+import DemoSwitcher from "../components/DemoSwitcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +20,7 @@ const SITE_URL = "https://trustleaf-demo.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "TrustLeaf — Patient-owned health records on Stellar",
+  title: "TrustLeaf â€” Patient-owned health records on Stellar",
   description:
     "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
   keywords: [
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
     "patient owned",
   ],
   openGraph: {
-    title: "TrustLeaf — Patient-owned health records on Stellar",
+    title: "TrustLeaf â€” Patient-owned health records on Stellar",
     description:
       "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
     url: SITE_URL,
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "TrustLeaf — Patient-owned health records on Stellar",
+    title: "TrustLeaf â€” Patient-owned health records on Stellar",
     description:
       "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
     images: ["/og-image.png"],
@@ -59,9 +60,16 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-canvas text-ink">
         <AppPrivyProvider>
           <LanguageProvider>{children}</LanguageProvider>
+<<<<<<< HEAD
         </AppPrivyProvider>
         <Toaster richColors position="bottom-center" />
+=======
+        </AppPrivyProvider>      <DemoSwitcher />
+
+>>>>>>> dbc1e41 (fix: ignoreBuildErrors next.config)
       </body>
     </html>
   );
 }
+
+
