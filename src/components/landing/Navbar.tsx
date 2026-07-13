@@ -8,19 +8,6 @@ import { WaitlistModal } from "./WaitlistModal";
 import { PrivyLoginButton } from "@/components/auth/PrivyLoginButton";
 import type { Language } from "@/types";
 
-const demoBase =
-  "inline-flex items-center justify-center gap-2 rounded-full border px-4 h-9 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
-
-const demoPatientClass = cn(
-  demoBase,
-  "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100 focus-visible:ring-blue-400/50",
-);
-
-const demoDoctorClass = cn(
-  demoBase,
-  "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 focus-visible:ring-emerald-400/50",
-);
-
 function LangSwitch() {
   const { lang, setLang } = useLanguage();
   const options: Language[] = ["en", "es"];
@@ -115,14 +102,7 @@ export function Navbar() {
             <div className="hidden sm:block">
               <LangSwitch />
             </div>
-            <div className="hidden items-center gap-2 lg:flex">
-              <a href="/demo/paciente" className={demoPatientClass}>
-                {t.nav.demoPatient}
-              </a>
-              <a href="/demo/medico" className={demoDoctorClass}>
-                {t.nav.demoDoctor}
-              </a>
-            </div>
+
             <div className="hidden sm:block">
               <PrivyLoginButton />
             </div>
@@ -173,14 +153,7 @@ export function Navbar() {
               </a>
             ))}
             <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <a href="/demo/paciente" className={cn(demoPatientClass, "flex-1 text-xs")}>
-                  {t.nav.demoPatient}
-                </a>
-                <a href="/demo/medico" className={cn(demoDoctorClass, "flex-1 text-xs")}>
-                  {t.nav.demoDoctor}
-                </a>
-              </div>
+
               <div className="flex items-center justify-between gap-2">
                 <LangSwitch />
                 <button

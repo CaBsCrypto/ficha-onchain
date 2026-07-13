@@ -7,7 +7,7 @@ export function AppPrivyProvider({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
-      onSuccess={() => router.push('/patient/pain-diary')}
+      onSuccess={() => router.push('/patient')}
       config={{
         loginMethods: ['email', 'google'],
         appearance: {
