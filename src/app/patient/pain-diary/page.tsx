@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import BodyMap, { type BodyZone, type PainEntry, ZONE_NAMES } from "@/components/pain/BodyMap";
 import BodyMap3D from "@/components/pain/BodyMap3D";
@@ -112,34 +111,12 @@ export default function PainDiaryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-gray-900 pb-8">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-4">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </Link>
-            <div>
-              <h1 className="text-gray-900 font-bold text-base leading-tight">Diario de Dolor</h1>
-              <p className="text-gray-500 text-xs capitalize">{formatTodayDate()}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-sky-500">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
-              </svg>
-              <span className="hidden sm:inline">Registro diario</span>
-            </span>
-          </div>
-        </div>
-      </header>
+    <div className="text-gray-900 pb-8">
+      {/* Page title */}
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900 leading-tight">Diario de Dolor</h1>
+        <p className="text-gray-500 text-sm capitalize">{formatTodayDate()}</p>
+      </div>
 
       <main className="max-w-lg mx-auto px-4 pt-6 space-y-6">
         {/* Info banner */}

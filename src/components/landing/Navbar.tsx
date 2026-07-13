@@ -103,9 +103,9 @@ export function Navbar() {
               <LangSwitch />
             </div>
 
-            <div className="hidden sm:block">
-              <PrivyLoginButton />
-            </div>
+            {/* Login button — visible on ALL screen sizes */}
+            <PrivyLoginButton />
+
             <button
               type="button"
               onClick={() => setShowModal(true)}
@@ -136,40 +136,4 @@ export function Navbar() {
 
         {/* Mobile dropdown menu */}
         <div
-          className={cn(
-            "overflow-hidden transition-all duration-300 md:hidden",
-            mobileOpen ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0",
-          )}
-        >
-          <div className="border-t border-slate-100 bg-white/95 backdrop-blur-sm px-4 py-4 space-y-1">
-            {links.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-clinical"
-              >
-                {link.label}
-              </a>
-            ))}
-            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
-
-              <div className="flex items-center justify-between gap-2">
-                <LangSwitch />
-                <button
-                  type="button"
-                  onClick={() => { setShowModal(true); setMobileOpen(false); }}
-                  className={buttonVariants({ size: "sm" })}
-                >
-                  {t.nav.cta}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <WaitlistModal open={showModal} onClose={() => setShowModal(false)} />
-    </>
-  );
-}
+         

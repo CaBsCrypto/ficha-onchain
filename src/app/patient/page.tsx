@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -192,14 +193,16 @@ export default function PatientPortal() {
 // ---------------------------------------------------------------------------
 // Dashboard shell
 // ---------------------------------------------------------------------------
-function PatientDashboard({
+function PatientDashboardInner({
   session,
   onLogout,
 }: {
   session: PasskeySession;
   onLogout: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("inicio");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tab = (searchParams.get("tab") as Tab) ?? "inicio";
   const [items, setItems] = useState<PatientRx[] | null>(null);
   const [rxError, setRxError] = useState<string | null>(null);
   const [share, setShare] = useState<OnChainPrescription | null>(null);
@@ -257,128 +260,54 @@ function PatientDashboard({
     [items],
   );
 
-  const SECTION_TITLES: Record<Tab, string> = {
-    inicio: "Mi Portal de Salud",
-    recetas: "Mis Recetas",
-    licencias: "Mis Licencias",
-    ficha: "Mi Ficha",
-    accesos: "Mis Accesos",
-  };
-
+  // Info bar — user identity shown above tab content
   return (
-    <main className="min-h-screen bg-canvas">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <Link
-                href="/"
-                className="text-xs font-medium text-muted hover:text-clinical"
-              >
-                TrustLeaf
-              </Link>
-              <h1 className="truncate text-base font-semibold text-ink sm:text-lg">
-                {SECTION_TITLES[tab]}
-              </h1>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <p className="hidden font-mono text-xs text-muted sm:block">
-                {truncateHash(session.address, 5, 4)}
-              </p>
-              {session.mock && <Badge tone="muted">demo</Badge>}
-              <button
-                onClick={onLogout}
-                className="min-h-[44px] rounded-xl px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-              >
-                Salir
-              </button>
-            </div>
-          </div>
+    <div>
+      {/* Session info bar */}
+      <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <p className="font-mono text-xs text-muted">
+            {truncateHash(session.address, 6, 4)}
+          </p>
+          {session.mock && <Badge tone="muted">demo</Badge>}
         </div>
-      </header>
-
-      {/* ── Body: sidebar on desktop, stack on mobile ── */}
-      <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8">
-        {/* Sidebar nav — desktop only */}
-        <aside className="hidden md:flex md:w-52 lg:w-60 md:flex-col md:shrink-0">
-          <div className="sticky top-24 flex flex-col gap-1">
-            {(
-              [
-                { id: "inicio", label: "Inicio", icon: <HomeIcon className="h-5 w-5" /> },
-                { id: "recetas", label: "Recetas", icon: <PillIcon className="h-5 w-5" /> },
-                { id: "licencias", label: "Licencias", icon: <ClipboardCheckIcon className="h-5 w-5" /> },
-                { id: "ficha", label: "Mi Ficha", icon: <FichaIcon className="h-5 w-5" /> },
-                { id: "accesos", label: "Accesos", icon: <LockIcon className="h-5 w-5" /> },
-              ] as { id: Tab; label: string; icon: React.ReactNode }[]
-            ).map(({ id, label, icon }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors text-left",
-                  tab === id
-                    ? "bg-clinical/10 text-clinical"
-                    : "text-muted hover:bg-slate-100 hover:text-ink",
-                )}
-              >
-                {icon}
-                {label}
-                {id === "recetas" && activeRxCount > 0 && tab !== "recetas" && (
-                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-clinical text-[10px] font-bold text-white">
-                    {activeRxCount > 9 ? "9+" : activeRxCount}
-                  </span>
-                )}
-              </button>
-            ))}
-            {/* Pain diary — separate page */}
-            <Link
-              href="/patient/pain-diary"
-              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-slate-100 hover:text-ink"
-            >
-              <HeartPulseIcon className="h-5 w-5" />
-              Diario de Dolor
-            </Link>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <div className="flex-1 pb-28 md:pb-6">
-          {tab === "inicio" && (
-            <InicioTab
-              session={session}
-              activeRxCount={activeRxCount}
-              authorizedDoctors={authorizedDoctors}
-              onGoToRecetas={() => setTab("recetas")}
-              onGoToFicha={() => setTab("ficha")}
-            />
-          )}
-          {tab === "recetas" && (
-            <RecetasTab
-              items={items}
-              error={rxError}
-              consultations={consultations}
-              onReload={loadRx}
-              onShare={setShare}
-              onShowPharmacy={setPharmacyRx}
-              wallet={session.address}
-              mock={session.mock}
-            />
-          )}
-          {tab === "licencias" && <LicenciasTab />}
-          {tab === "ficha" && (
-            <FichaTab wallet={session.address} mock={session.mock} />
-          )}
-          {tab === "accesos" && (
-            <AccesosTab wallet={session.address} mock={session.mock} />
-          )}
-        </div>
+        <button
+          onClick={onLogout}
+          className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-rose-50 hover:text-rose-500"
+        >
+          Cerrar sesión
+        </button>
       </div>
 
-      {/* ── Bottom Navigation — mobile only ── */}
-      <div className="md:hidden">
-        <BottomNav tab={tab} setTab={setTab} rxCount={activeRxCount} />
-      </div>
+      {/* Tab content */}
+      {tab === "inicio" && (
+        <InicioTab
+          session={session}
+          activeRxCount={activeRxCount}
+          authorizedDoctors={authorizedDoctors}
+          onGoToRecetas={() => router.push("/patient?tab=recetas")}
+          onGoToFicha={() => router.push("/patient?tab=ficha")}
+        />
+      )}
+      {tab === "recetas" && (
+        <RecetasTab
+          items={items}
+          error={rxError}
+          consultations={consultations}
+          onReload={loadRx}
+          onShare={setShare}
+          onShowPharmacy={setPharmacyRx}
+          wallet={session.address}
+          mock={session.mock}
+        />
+      )}
+      {tab === "licencias" && <LicenciasTab />}
+      {tab === "ficha" && (
+        <FichaTab wallet={session.address} mock={session.mock} />
+      )}
+      {tab === "accesos" && (
+        <AccesosTab wallet={session.address} mock={session.mock} />
+      )}
 
       {share && (
         <ShareModal
@@ -391,90 +320,21 @@ function PatientDashboard({
       {pharmacyRx && (
         <RxPharmacyModal rx={pharmacyRx} onClose={() => setPharmacyRx(null)} />
       )}
-    </main>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// NEW: Bottom Navigation Bar
-// ---------------------------------------------------------------------------
-function BottomNav({
-  tab,
-  setTab,
-  rxCount,
+function PatientDashboard({
+  session,
+  onLogout,
 }: {
-  tab: Tab;
-  setTab: (t: Tab) => void;
-  rxCount: number;
+  session: PasskeySession;
+  onLogout: () => void;
 }) {
-  const items: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    {
-      id: "inicio",
-      label: "Inicio",
-      icon: <HomeIcon className="h-5 w-5" />,
-    },
-    {
-      id: "recetas",
-      label: "Recetas",
-      icon: <PillIcon className="h-5 w-5" />,
-    },
-    {
-      id: "ficha",
-      label: "Ficha",
-      icon: <FichaIcon className="h-5 w-5" />,
-    },
-    {
-      id: "accesos",
-      label: "Accesos",
-      icon: <LockIcon className="h-5 w-5" />,
-    },
-  ];
-
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-sm"
-      aria-label="Navegación principal"
-    >
-      {/* Safe area padding for iOS home bar */}
-      <div className="mx-auto flex max-w-3xl pb-safe">
-        {items.map(({ id, label, icon }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
-                active ? "text-clinical" : "text-muted hover:text-ink",
-              )}
-            >
-              <span className="relative">
-                {icon}
-                {/* Badge for active rx count on Recetas tab */}
-                {id === "recetas" && rxCount > 0 && !active && (
-                  <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-clinical text-[9px] font-bold text-white">
-                    {rxCount > 9 ? "9+" : rxCount}
-                  </span>
-                )}
-              </span>
-              <span>{label}</span>
-              {active && (
-                <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-clinical" />
-              )}
-            </button>
-          );
-        })}
-        {/* Pain diary — link to separate page */}
-        <Link
-          href="/patient/pain-diary"
-          className="relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-muted transition-colors hover:text-clinical"
-        >
-          <HeartPulseIcon className="h-5 w-5" />
-          <span>Dolor</span>
-        </Link>
-      </div>
-    </nav>
+    <Suspense>
+      <PatientDashboardInner session={session} onLogout={onLogout} />
+    </Suspense>
   );
 }
 
