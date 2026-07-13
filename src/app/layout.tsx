@@ -60,13 +60,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-canvas text-ink">
         <AppPrivyProvider>
           <LanguageProvider>{children}</LanguageProvider>
-<<<<<<< HEAD
         </AppPrivyProvider>
         <Toaster richColors position="bottom-center" />
-=======
-        </AppPrivyProvider>      <DemoSwitcher />
-
->>>>>>> dbc1e41 (fix: ignoreBuildErrors next.config)
       </body>
     </html>
   );

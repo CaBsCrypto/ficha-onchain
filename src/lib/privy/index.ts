@@ -11,7 +11,7 @@
  */
 
 import { usePrivy } from '@privy-io/react-auth';
-import { useWallets as useSolanaWallets } from '@privy-io/react-auth/solana';
+import { useWallets as useSolanaWallets } from '@privy-io/react-auth';
 import { StrKey } from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
