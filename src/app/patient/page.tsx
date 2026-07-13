@@ -154,7 +154,7 @@ const MOCK_AUTHORIZED_DOCTORS: AuthorizedDoctor[] = [
 // Root — session gate
 // ---------------------------------------------------------------------------
 export default function PatientPortal() {
-  const { authenticated } = usePrivy();
+  const { authenticated, user } = usePrivy();
   const [session, setSession] = useState<PasskeySession | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -175,6 +175,12 @@ export default function PatientPortal() {
     setReady(true);
   }, [authenticated]);
 
+  // Extract display name from Privy user
+  const privyEmail =
+    user?.email?.address ??
+    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
+    null;
+
   if (!ready) return null;
   if (!session) {
     return <AccessScreen role="patient" onAuthenticated={setSession} />;
@@ -182,6 +188,7 @@ export default function PatientPortal() {
   return (
     <PatientDashboard
       session={session}
+      privyEmail={privyEmail}
       onLogout={() => {
         clearSession();
         setSession(null);
@@ -196,9 +203,11 @@ export default function PatientPortal() {
 function PatientDashboardInner({
   session,
   onLogout,
+  privyEmail,
 }: {
   session: PasskeySession;
   onLogout: () => void;
+  privyEmail?: string | null;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -266,16 +275,24 @@ function PatientDashboardInner({
       {/* Session info bar */}
       <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <p className="font-mono text-xs text-muted">
-            {truncateHash(session.address, 6, 4)}
-          </p>
-          {session.mock && <Badge tone="muted">demo</Badge>}
+          {/* Avatar circle */}
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">
+            {privyEmail ? privyEmail[0].toUpperCase() : "P"}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-800 leading-none">
+              {privyEmail ?? "Paciente"}
+            </p>
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+              {truncateHash(session.address, 4, 4)}
+            </p>
+          </div>
         </div>
         <button
           onClick={onLogout}
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-rose-50 hover:text-rose-500"
         >
-          Cerrar sesión
+          Salir
         </button>
       </div>
 
@@ -327,13 +344,15 @@ function PatientDashboardInner({
 function PatientDashboard({
   session,
   onLogout,
+  privyEmail,
 }: {
   session: PasskeySession;
   onLogout: () => void;
+  privyEmail?: string | null;
 }) {
   return (
     <Suspense>
-      <PatientDashboardInner session={session} onLogout={onLogout} />
+      <PatientDashboardInner session={session} onLogout={onLogout} privyEmail={privyEmail} />
     </Suspense>
   );
 }

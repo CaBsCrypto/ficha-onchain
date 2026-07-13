@@ -149,20 +149,23 @@ export default function BodyMap3D({
 
     // ── Scene ──
     const scene = new THREE.Scene();
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambient = new THREE.AmbientLight(0xfff8f0, 0.65);
     scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    const dirLight = new THREE.DirectionalLight(0xfff0d8, 0.85);
     dirLight.position.set(0.5, 2, 1.5);
     scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0x4488ff, 0.25);
-    fillLight.position.set(-1, -0.5, -1);
+    const fillLight = new THREE.DirectionalLight(0x88aacc, 0.30);
+    fillLight.position.set(-1.5, 0.5, -1);
     scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xaaccff, 0.20);
+    rimLight.position.set(0, -1, -2);
+    scene.add(rimLight);
 
-    // ── Body material ──
+    // ── Body material — warm skin tone ──
     const bodyMat = new THREE.MeshPhongMaterial({
-      color: 0x1e3a5f,
-      shininess: 40,
-      specular: 0x0a1a3a,
+      color: 0xc49a6c,
+      shininess: 22,
+      specular: 0x3a1a06,
     });
 
     // Helper
@@ -218,7 +221,7 @@ export default function BodyMap3D({
       ? [...GENERAL_HOTSPOTS, ...FIBRO_HOTSPOTS]
       : GENERAL_HOTSPOTS;
 
-    const hotspotGeo = new THREE.SphereGeometry(0.025, 8, 8);
+    const hotspotGeo = new THREE.SphereGeometry(0.032, 10, 10);
 
     for (const def of [...GENERAL_HOTSPOTS, ...FIBRO_HOTSPOTS]) {
       const level = painDataRef.current[def.id];
@@ -399,8 +402,28 @@ export default function BodyMap3D({
 
     // ── Render loop ──
     let rafId = 0;
+    let time = 0;
     function animate() {
       rafId = requestAnimationFrame(animate);
+      time += 0.022;
+
+      // Idle auto-rotation when not dragging
+      if (!isDragging) {
+        rotY += 0.004;
+      }
+
+      // Pulse hotspots that have pain recorded
+      hotspotMeshes.forEach((mesh, id) => {
+        if (!mesh.visible) return;
+        const level = painDataRef.current[id];
+        if (level && level > 0 && hoveredMesh !== mesh) {
+          // Pulse speed scales with pain intensity
+          const speed = 0.8 + level * 0.06;
+          const pulse = 1 + 0.25 * Math.sin(time * speed + id.charCodeAt(0) * 0.7);
+          mesh.scale.setScalar(pulse);
+        }
+      });
+
       pivot.rotation.y = rotY;
       pivot.rotation.x = rotX;
       renderer.render(scene, camera);

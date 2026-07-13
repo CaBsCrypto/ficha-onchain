@@ -12,6 +12,10 @@ function getTodayKey(): string {
   return `trustleaf_pain_${new Date().toISOString().split("T")[0]}`;
 }
 
+function getDateKey(date: Date): string {
+  return `trustleaf_pain_${date.toISOString().split("T")[0]}`;
+}
+
 function formatTodayDate(): string {
   return new Date().toLocaleDateString("es-CL", {
     weekday: "long",
@@ -21,6 +25,12 @@ function formatTodayDate(): string {
   });
 }
 
+function formatShortDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
+}
+
 function getLevelBadgeClass(level: number): string {
   if (level <= 3) return "bg-green-100 text-green-700 border border-green-300";
   if (level <= 6) return "bg-yellow-100 text-yellow-700 border border-yellow-300";
@@ -28,12 +38,54 @@ function getLevelBadgeClass(level: number): string {
   return "bg-red-100 text-red-700 border border-red-300";
 }
 
+function getLevelColor(level: number): string {
+  if (level <= 3) return "#22c55e";
+  if (level <= 6) return "#eab308";
+  if (level <= 9) return "#f97316";
+  return "#ef4444";
+}
+
+interface HistoryDay {
+  dateStr: string;   // "2026-07-12"
+  entries: PainEntry[];
+  avgLevel: number;
+  maxLevel: number;
+}
+
+function loadHistory(days = 30): HistoryDay[] {
+  const history: HistoryDay[] = [];
+  const today = new Date();
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = getDateKey(d);
+    const dateStr = key.replace("trustleaf_pain_", "");
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const entries = JSON.parse(raw) as PainEntry[];
+        if (entries.length > 0) {
+          const avg = entries.reduce((s, e) => s + e.level, 0) / entries.length;
+          const max = Math.max(...entries.map((e) => e.level));
+          history.push({ dateStr, entries, avgLevel: avg, maxLevel: max });
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  return history;
+}
+
+type PageTab = "hoy" | "historial";
+
 export default function PainDiaryPage() {
   const [entries, setEntries] = useState<PainEntry[]>([]);
   const [selectedZone, setSelectedZone] = useState<BodyZone | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [view3D, setView3D] = useState(false);
   const [fibromyalgiaMode, setFibromyalgiaMode] = useState(false);
+  const [pageTab, setPageTab] = useState<PageTab>("hoy");
+  const [history, setHistory] = useState<HistoryDay[]>([]);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -41,6 +93,7 @@ export default function PainDiaryPage() {
       if (raw) setEntries(JSON.parse(raw) as PainEntry[]);
       const savedView = localStorage.getItem(VIEW_PREF_KEY);
       if (savedView === "3d") setView3D(true);
+      setHistory(loadHistory(30));
     } catch {
       // ignore
     }
@@ -113,12 +166,101 @@ export default function PainDiaryPage() {
   return (
     <div className="text-gray-900 pb-8">
       {/* Page title */}
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900 leading-tight">Diario de Dolor</h1>
-        <p className="text-gray-500 text-sm capitalize">{formatTodayDate()}</p>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 leading-tight">Diario de Dolor</h1>
+          <p className="text-gray-500 text-sm capitalize">{formatTodayDate()}</p>
+        </div>
+        {history.length > 0 && (
+          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 border border-gray-200">
+            <button
+              onClick={() => setPageTab("hoy")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                pageTab === "hoy" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Hoy
+            </button>
+            <button
+              onClick={() => setPageTab("historial")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                pageTab === "historial" ? "bg-sky-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Historial ({history.length})
+            </button>
+          </div>
+        )}
       </div>
 
-      <main className="max-w-lg mx-auto px-4 pt-6 space-y-6">
+      {/* HISTORIAL VIEW */}
+      {pageTab === "historial" && (
+        <div className="max-w-lg mx-auto px-4 space-y-3">
+          <p className="text-gray-400 text-xs">Últimos 30 días con registros guardados</p>
+          {history.map((day) => (
+            <div key={day.dateStr} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setExpandedDay(expandedDay === day.dateStr ? null : day.dateStr)}
+                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ background: getLevelColor(day.maxLevel) }}
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 capitalize">{formatShortDate(day.dateStr)}</p>
+                    <p className="text-xs text-gray-400">{day.entries.length} zona{day.entries.length !== 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">Promedio</p>
+                    <p className="text-sm font-bold" style={{ color: getLevelColor(day.avgLevel) }}>
+                      {day.avgLevel.toFixed(1)}/10
+                    </p>
+                  </div>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className={`w-4 h-4 text-gray-400 transition-transform ${expandedDay === day.dateStr ? "rotate-180" : ""}`}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+              </button>
+
+              {expandedDay === day.dateStr && (
+                <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-2">
+                  {day.entries.sort((a, b) => b.level - a.level).map((entry) => (
+                    <div key={entry.zone} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">{ZONE_NAMES[entry.zone]}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getLevelBadgeClass(entry.level)}`}>
+                        {entry.level}/10
+                      </span>
+                    </div>
+                  ))}
+                  {day.entries.some((e) => e.note) && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      {day.entries.filter((e) => e.note).map((e) => (
+                        <p key={e.zone} className="text-xs text-gray-400 italic">
+                          {ZONE_NAMES[e.zone]}: &quot;{e.note}&quot;
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* TODAY VIEW */}
+      {pageTab === "hoy" && (
+      <main className="max-w-lg mx-auto px-4 pt-2 space-y-6">
         {/* Info banner */}
         <div className="flex items-center gap-3 p-3 bg-sky-50 border border-sky-200 rounded-xl">
           <svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="1.5" className="w-5 h-5 shrink-0">
@@ -252,6 +394,7 @@ export default function PainDiaryPage() {
           Guardar registro de hoy
         </button>
       </main>
+      )}
 
       {/* Pain Logger panel */}
       <PainLogger
