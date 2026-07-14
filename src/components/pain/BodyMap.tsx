@@ -4,9 +4,11 @@
 import React, { useState } from "react";
 
 export type BodyZone =
-  | "head" | "neck" | "shoulder_l" | "shoulder_r"
+  | "head" | "jaw" | "ear_l" | "ear_r"
+  | "neck" | "shoulder_l" | "shoulder_r"
   | "chest" | "abdomen" | "back_upper" | "back_lower"
-  | "arm_l" | "arm_r" | "hand_l" | "hand_r"
+  | "arm_l" | "arm_r" | "forearm_l" | "forearm_r"
+  | "wrist_l" | "wrist_r" | "hand_l" | "hand_r"
   | "hip_l" | "hip_r" | "leg_l" | "leg_r"
   | "knee_l" | "knee_r" | "foot_l" | "foot_r";
 
@@ -25,6 +27,9 @@ export interface BodyMapProps {
 
 export const ZONE_NAMES: Record<BodyZone, string> = {
   head: "Cabeza",
+  jaw: "Mandíbula",
+  ear_l: "Oreja Izq.",
+  ear_r: "Oreja Der.",
   neck: "Cuello",
   shoulder_l: "Hombro Izq.",
   shoulder_r: "Hombro Der.",
@@ -34,6 +39,10 @@ export const ZONE_NAMES: Record<BodyZone, string> = {
   back_lower: "Espalda Baja",
   arm_l: "Brazo Izq.",
   arm_r: "Brazo Der.",
+  forearm_l: "Antebrazo Izq.",
+  forearm_r: "Antebrazo Der.",
+  wrist_l: "Muñeca Izq.",
+  wrist_r: "Muñeca Der.",
   hand_l: "Mano Izq.",
   hand_r: "Mano Der.",
   hip_l: "Cadera Izq.",
