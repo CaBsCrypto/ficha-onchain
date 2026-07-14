@@ -11,6 +11,7 @@ export interface BodyMap3DProps {
   readOnly?: boolean;
   onZoneSelect?: (zoneId: string) => void;
   onMultiZoneSelect?: (zoneIds: string[]) => void;
+  onNeedlePlaced?: (zoneId: string, level: number) => void;
 }
 
 type SelectorTool = "pin" | "area";
@@ -124,6 +125,7 @@ export default function BodyMap3D({
   readOnly = false,
   onZoneSelect,
   onMultiZoneSelect,
+  onNeedlePlaced,
 }: BodyMap3DProps) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const tooltipRef    = useRef<HTMLSpanElement>(null);
@@ -131,12 +133,54 @@ export default function BodyMap3D({
   const sceneRef      = useRef<SceneState | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [tool, setTool] = useState<SelectorTool>("pin");
+  // Tool is always "pin" — area brush kept for compat but not exposed in UI
   const toolRef = useRef<SelectorTool>("pin");
-  useEffect(() => { toolRef.current = tool; }, [tool]);
 
   const [brush, setBrush] = useState<{ x: number; y: number; r: number } | null>(null);
   const brushRef = useRef<{ x: number; y: number; r: number } | null>(null);
+
+  // ── Drag-and-drop needle state ─────────────────────────────────────────────
+  const [draggingNeedle, setDraggingNeedle] = useState(false);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [pendingZone, setPendingZone] = useState<string | null>(null);
+  const [pendingLevel, setPendingLevel] = useState(5);
+  const setPendingZoneRef = useRef<((z: string) => void) | null>(null);
+  useEffect(() => { setPendingZoneRef.current = setPendingZone; }, []);
+
+  // Drag pointer events (window-level, attached when dragging)
+  useEffect(() => {
+    if (!draggingNeedle) return;
+    function onMove(e: PointerEvent) { setDragPos({ x: e.clientX, y: e.clientY }); }
+    function onUp(e: PointerEvent) {
+      setDraggingNeedle(false); setDragPos(null);
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right &&
+          e.clientY >= rect.top  && e.clientY <= rect.bottom) {
+        const nx = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+        const ny = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+        const zone = sceneRef.current?.raycastAt(nx, ny) ?? null;
+        if (zone) { setPendingZone(zone); setPendingLevel(5); }
+      }
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup",   onUp);
+    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+  }, [draggingNeedle]);
+
+  function handleNeedlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDraggingNeedle(true);
+    setDragPos({ x: e.clientX, y: e.clientY });
+  }
+
+  function confirmNeedle() {
+    if (!pendingZone) return;
+    onNeedlePlaced?.(pendingZone, pendingLevel);
+    onZoneSelect?.(pendingZone);
+    setPendingZone(null);
+  }
 
   const onZoneSelectRef      = useRef(onZoneSelect);
   const onMultiZoneSelectRef = useRef(onMultiZoneSelect);
@@ -478,10 +522,13 @@ export default function BodyMap3D({
         const { nx, ny } = screenToNDC(e);
         pointer.set(nx, ny); raycaster.setFromCamera(pointer, camera);
         const hits = raycaster.intersectObjects(getTargets());
-        if (hits[0]) onZoneSelectRef.current?.((hits[0].object as THREEMesh).userData["id"] as string);
+        if (hits[0]) {
+          const zoneId = (hits[0].object as THREEMesh).userData["id"] as string;
+          setPendingZoneRef.current?.(zoneId);
+        }
       }
       isDragging = false;
-      renderer.domElement.style.cursor = toolRef.current === "area" ? "crosshair" : "grab";
+      renderer.domElement.style.cursor = "grab";
     }
 
     function onWheel(e: WheelEvent) {
@@ -544,7 +591,10 @@ export default function BodyMap3D({
         const { nx, ny } = screenToNDC(t);
         pointer.set(nx, ny); raycaster.setFromCamera(pointer, camera);
         const hits = raycaster.intersectObjects(getTargets());
-        if (hits[0]) onZoneSelectRef.current?.((hits[0].object as THREEMesh).userData["id"] as string);
+        if (hits[0]) {
+          const zoneId = (hits[0].object as THREEMesh).userData["id"] as string;
+          setPendingZoneRef.current?.(zoneId);
+        }
       }
       isDragging = false;
     }
@@ -606,6 +656,12 @@ export default function BodyMap3D({
     sceneRef.current = {
       renderer, scene, camera, pivot, hitMeshes, hitByZone,
       painIndicators, fibroMeshes, rafId, ro,
+      raycastAt(nx: number, ny: number) {
+        pointer.set(nx, ny);
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects([...hitMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])]);
+        return hits[0] ? ((hits[0].object as THREEMesh).userData["id"] as string) : null;
+      },
       cleanup() {
         cancelAnimationFrame(rafId); ro.disconnect();
         el.removeEventListener("mousedown",  onMouseDown);
@@ -651,45 +707,19 @@ export default function BodyMap3D({
     return () => { sceneRef.current?.cleanup(); sceneRef.current = null; };
   }, [initScene]);
 
+  // Pain level color preview
+  function levelColor(lvl: number) {
+    if (lvl <= 3) return "#4ade80";
+    if (lvl <= 6) return "#fbbf24";
+    if (lvl <= 9) return "#f97316";
+    return "#ef4444";
+  }
+
   return (
-    <div className="flex flex-col items-center gap-2 select-none w-full">
+    <div className="select-none w-full flex gap-2" style={{ height: "clamp(420px, 85vw, 560px)" }}>
 
-      {/* Selector toolbar */}
-      {!readOnly && (
-        <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/80 p-1">
-          <button onClick={() => setTool("pin")} title="Zona puntual"
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-              tool === "pin" ? "bg-sky-500 text-white shadow-md shadow-sky-500/30" : "text-slate-400 hover:text-white"}`}>
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22" />
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-            </svg>
-            Puntual
-          </button>
-          <button onClick={() => setTool("area")} title="Área de dolor"
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-              tool === "area" ? "bg-violet-500 text-white shadow-md shadow-violet-500/30" : "text-slate-400 hover:text-white"}`}>
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="9" strokeDasharray="4 2" />
-              <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-            </svg>
-            Área
-          </button>
-        </div>
-      )}
-
-      {/* Hint / tooltip */}
-      <div className="h-6 flex items-center justify-center">
-        <span ref={tooltipRef} className="text-sm font-medium text-white bg-slate-900 border border-slate-600 px-3 py-0.5 rounded-full hidden" />
-        <span ref={hintRef} className="text-xs text-slate-500">
-          {readOnly ? "Vista 3D · arrastra · scroll para zoom"
-            : tool === "pin" ? "Toca una zona · scroll para zoom · arrastra para rotar 360°"
-            : "Mantén y arrastra para marcar un área de dolor"}
-        </span>
-      </div>
-
-      {/* Canvas */}
-      <div className="relative w-full rounded-xl overflow-hidden" style={{ height: "clamp(420px, 85vw, 560px)" }}>
+      {/* ── 3D Canvas ── */}
+      <div className="relative flex-1 rounded-xl overflow-hidden">
         {/* Loading spinner */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-10 rounded-xl">
@@ -701,35 +731,123 @@ export default function BodyMap3D({
         )}
         {/* Three.js canvas */}
         <div ref={containerRef} className="absolute inset-0" />
-        {/* Area brush overlay */}
+
+        {/* Tooltip (zone name on hover) */}
+        <span ref={tooltipRef} className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 text-sm font-medium text-white bg-slate-900/90 border border-slate-600 px-3 py-1 rounded-full hidden z-10" />
+        <span ref={hintRef} className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-slate-400 whitespace-nowrap z-10">
+          {readOnly ? "Vista 3D · arrastra · scroll para zoom"
+            : "Arrastra una aguja al cuerpo · toca una zona · scroll para zoom"}
+        </span>
+
+        {/* Area brush overlay (kept for compat) */}
         {brush && (
           <svg className="pointer-events-none absolute inset-0 w-full h-full">
             <circle cx={brush.x} cy={brush.y} r={brush.r} fill="rgba(167,139,250,0.12)" stroke="#a78bfa" strokeWidth="2" strokeDasharray="6 3" />
             <circle cx={brush.x} cy={brush.y} r="4" fill="#a78bfa" />
           </svg>
         )}
+
+        {/* ── Pain level slider overlay ── */}
+        {pendingZone && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 rounded-xl">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 mx-4 w-full max-w-xs shadow-2xl">
+              <div className="flex items-center gap-2 mb-1">
+                {/* Mini needle icon */}
+                <svg viewBox="0 0 16 60" className="h-10 w-3 flex-shrink-0" style={{ color: levelColor(pendingLevel) }}>
+                  <ellipse cx="8" cy="8" rx="6" ry="6" fill="currentColor" />
+                  <rect x="6.5" y="13" width="3" height="38" rx="1.5" fill="currentColor" opacity="0.85" />
+                  <polygon points="8,55 5.5,51 10.5,51" fill="currentColor" opacity="0.7" />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-semibold text-white leading-tight">{ZONE_NAMES[pendingZone] ?? pendingZone}</h3>
+                  <p className="text-xs text-slate-400">¿Qué tan intenso es el dolor?</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mt-4 mb-2">
+                <span className="text-3xl font-bold w-8 text-center" style={{ color: levelColor(pendingLevel) }}>
+                  {pendingLevel}
+                </span>
+                <input
+                  type="range" min={1} max={10} value={pendingLevel}
+                  onChange={(e) => setPendingLevel(Number(e.target.value))}
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
+                  style={{ accentColor: levelColor(pendingLevel) }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500 mb-5 px-1">
+                <span>Sin dolor</span><span>Máximo dolor</span>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setPendingZone(null)}
+                  className="flex-1 rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-800 transition">
+                  Cancelar
+                </button>
+                <button onClick={confirmNeedle}
+                  className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white shadow transition"
+                  style={{ backgroundColor: levelColor(pendingLevel) }}>
+                  Insertar aguja
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Fibro legend */}
-      {fibromyalgiaMode && (
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-violet-400 inline-block" />
-          18 puntos de gatillo fibromialgia activos
+      {/* ── Needle sidebar ── */}
+      {!readOnly && (
+        <div className="w-14 flex flex-col items-center gap-3 rounded-2xl bg-slate-900/90 border border-slate-700/60 py-4 px-2 backdrop-blur-sm">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">Aguja</p>
+
+          {/* Draggable needle */}
+          <div
+            className="touch-none cursor-grab active:cursor-grabbing flex flex-col items-center"
+            onPointerDown={handleNeedlePointerDown}
+            title="Arrastra al cuerpo"
+          >
+            <svg viewBox="0 0 20 70" className="h-16 w-5 text-sky-400 hover:text-sky-300 transition-colors drop-shadow-[0_0_6px_rgba(56,189,248,0.6)]">
+              <ellipse cx="10" cy="9" rx="8" ry="8" fill="currentColor" />
+              <rect x="8.5" y="16" width="3" height="44" rx="1.5" fill="currentColor" opacity="0.8" />
+              <polygon points="10,65 7,58 13,58" fill="currentColor" opacity="0.6" />
+            </svg>
+          </div>
+
+          <p className="text-[9px] text-slate-500 text-center leading-tight">Arrastra al cuerpo</p>
+
+          {/* Fibro legend */}
+          {fibromyalgiaMode && (
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-violet-400 inline-block" />
+              <span className="text-[9px] text-slate-500 text-center">Fibro</span>
+            </div>
+          )}
+
+          {/* Pain scale dots */}
+          <div className="mt-auto flex flex-col items-center gap-1">
+            {[{ c: "#4ade80", l: "1–3" }, { c: "#fbbf24", l: "4–6" }, { c: "#f97316", l: "7–9" }, { c: "#ef4444", l: "10" }].map(({ c, l }) => (
+              <div key={l} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c }} />
+                <span className="text-[9px] text-slate-500">{l}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Pain scale */}
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-slate-500">
-        {[
-          { c: "#4ade80", l: "Leve 1–3" }, { c: "#fbbf24", l: "Mod. 4–6" },
-          { c: "#f97316", l: "Intenso 7–9" }, { c: "#ef4444", l: "Severo 10" },
-        ].map(({ c, l }) => (
-          <span key={l} className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: c }} />
-            {l}
-          </span>
-        ))}
-      </div>
+      {/* ── Drag ghost needle (follows cursor) ── */}
+      {draggingNeedle && dragPos && (
+        <div
+          className="pointer-events-none fixed z-[9999]"
+          style={{ left: dragPos.x - 10, top: dragPos.y - 50, transform: "rotate(0deg)" }}
+        >
+          <svg viewBox="0 0 20 70" className="h-16 w-5 text-sky-300 drop-shadow-[0_0_10px_rgba(56,189,248,0.9)]">
+            <ellipse cx="10" cy="9" rx="8" ry="8" fill="currentColor" />
+            <rect x="8.5" y="16" width="3" height="44" rx="1.5" fill="currentColor" opacity="0.9" />
+            <polygon points="10,65 7,58 13,58" fill="currentColor" opacity="0.7" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -778,5 +896,7 @@ interface SceneState {
   renderer: THREERenderer; scene: THREEScene; camera: THREECamera; pivot: THREEGroup;
   hitMeshes: THREEMesh[]; hitByZone: Map<string, THREEMesh[]>;
   painIndicators: Map<string, THREEGroup>; fibroMeshes: THREEMesh[];
-  rafId: number; ro: ResizeObserver; cleanup(): void;
+  rafId: number; ro: ResizeObserver;
+  raycastAt(nx: number, ny: number): string | null;
+  cleanup(): void;
 }
