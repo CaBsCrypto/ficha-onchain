@@ -1,9 +1,11 @@
 'use client';
 import { usePrivyAuth } from '@/lib/privy';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useTrackUser } from '@/hooks/useTrackUser';
 
 export function PrivyLoginButton() {
   const { ready, authenticated, user, login, logout } = usePrivyAuth();
+  useTrackUser(); // track on any page where this button renders
   const { lang } = useLanguage();
 
   const labels = {
