@@ -665,21 +665,17 @@ export default function BodyMap3D({
         // Precise free-form raycast against actual GLB mesh surface
         const glbHits = raycaster.intersectObjects(glbMeshesArr, true);
         if (glbHits[0]) {
+          // p is in world space — convert to pivot-local using Three.js built-in
           const p = glbHits[0].point;
-          // Convert hit world position to pivot-local space (undo pivot rotation)
-          const cosY = Math.cos(-rotY), sinY = Math.sin(-rotY);
-          const cosX = Math.cos(-rotX), sinX = Math.sin(-rotX);
-          let px = p.x, py = p.y, pz = p.z;
-          const rx = px * cosY + pz * sinY; pz = -px * sinY + pz * cosY; px = rx;
-          const ry2 = py * cosX - pz * sinX; const rz2 = py * sinX + pz * cosX; py = ry2; pz = rz2;
-          // Find nearest zone by distance in pivot-local space
+          pivot.worldToLocal(p); // mutates p to pivot-local coords
+          // Find nearest zone
           let nearestZone = "torso";
           let minDist = Infinity;
           for (const [zid, zpos] of Object.entries(ZONE_CENTERS)) {
-            const d = Math.hypot(px - zpos[0], py - zpos[1], pz - zpos[2]);
+            const d = Math.hypot(p.x - zpos[0], p.y - zpos[1], p.z - zpos[2]);
             if (d < minDist) { minDist = d; nearestZone = zid; }
           }
-          return { zone: nearestZone, pos: [px, py, pz] as [number, number, number] };
+          return { zone: nearestZone, pos: [p.x, p.y, p.z] as [number, number, number] };
         }
         // Fallback: invisible hit zones
         const hits = raycaster.intersectObjects([...hitMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])]);
@@ -932,7 +928,7 @@ interface THREEObj3D {
 }
 interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat; geometry: THREEGeo }
 interface THREEScene  extends THREEObj3D {}
-interface THREEGroup  extends THREEObj3D { remove(o: THREEObj3D): void }
+interface THREEGroup  extends THREEObj3D { remove(o: THREEObj3D): void; worldToLocal(v: THREEVec3): THREEVec3 }
 interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMatrix?(): void }
 interface THREEBox3   { setFromObject(o: THREEObj3D): THREEBox3; getSize(v: THREEVec3): THREEVec3; getCenter(v: THREEVec3): THREEVec3 }
 interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void }
