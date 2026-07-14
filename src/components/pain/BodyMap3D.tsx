@@ -1,7 +1,7 @@
 "use client";
 // Copyright © 2026 Browns Studio
 
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -10,137 +10,127 @@ export interface BodyMap3DProps {
   fibromyalgiaMode?: boolean;
   readOnly?: boolean;
   onZoneSelect?: (zoneId: string) => void;
+  /** Called when area-brush selects multiple zones at once */
+  onMultiZoneSelect?: (zoneIds: string[]) => void;
 }
+
+// ─── Selector tool type ───────────────────────────────────────────────────────
+
+type SelectorTool = "pin" | "area";
 
 // ─── Zone names ───────────────────────────────────────────────────────────────
 
 const ZONE_NAMES: Record<string, string> = {
-  head: "Cabeza",
-  jaw: "Mandíbula",
-  ear_l: "Oreja Izq.",
-  ear_r: "Oreja Der.",
+  head: "Cabeza",        jaw: "Mandíbula",
+  ear_l: "Oreja Izq.",  ear_r: "Oreja Der.",
   neck: "Cuello",
-  shoulder_l: "Hombro Izq.",
-  shoulder_r: "Hombro Der.",
-  chest: "Pecho",
-  abdomen: "Abdomen",
-  back_upper: "Espalda Alta",
-  back_lower: "Espalda Baja",
-  hip_l: "Cadera Izq.",
-  hip_r: "Cadera Der.",
-  arm_l: "Brazo Izq.",
-  arm_r: "Brazo Der.",
-  forearm_l: "Antebrazo Izq.",
-  forearm_r: "Antebrazo Der.",
-  wrist_l: "Muñeca Izq.",
-  wrist_r: "Muñeca Der.",
-  hand_l: "Mano Izq.",
-  hand_r: "Mano Der.",
-  leg_l: "Pierna Izq.",
-  leg_r: "Pierna Der.",
-  knee_l: "Rodilla Izq.",
-  knee_r: "Rodilla Der.",
-  foot_l: "Pie Izq.",
-  foot_r: "Pie Der.",
+  shoulder_l: "Hombro Izq.", shoulder_r: "Hombro Der.",
+  chest: "Pecho",        abdomen: "Abdomen",
+  back_upper: "Espalda Alta", back_lower: "Espalda Baja",
+  hip_l: "Cadera Izq.", hip_r: "Cadera Der.",
+  arm_l: "Brazo Izq.",   arm_r: "Brazo Der.",
+  forearm_l: "Antebrazo Izq.", forearm_r: "Antebrazo Der.",
+  wrist_l: "Muñeca Izq.", wrist_r: "Muñeca Der.",
+  hand_l: "Mano Izq.",   hand_r: "Mano Der.",
+  leg_l: "Pierna Izq.",  leg_r: "Pierna Der.",
+  knee_l: "Rodilla Izq.", knee_r: "Rodilla Der.",
+  foot_l: "Pie Izq.",    foot_r: "Pie Der.",
 };
 
-// ─── Segment definitions ──────────────────────────────────────────────────────
-// Each entry defines one Three.js mesh that IS a clickable body zone.
-// Multiple entries can share the same id (e.g., thigh + shin both = "leg_l").
+// ─── Segment definitions (A-pose, improved mannequin proportions) ──────────
 
 type GeoType = "sphere" | "cylinder" | "box";
-
 interface SegDef {
   id: string;
   geoType: GeoType;
-  geoArgs: number[];                    // sphere:[r,w,h] cylinder:[rt,rb,h,s] box:[w,h,d]
+  geoArgs: number[];
   pos: [number, number, number];
-  rot?: [number, number, number];       // rx, ry, rz in radians
+  rot?: [number, number, number];
   scale?: [number, number, number];
 }
 
 const SEGMENT_DEFS: SegDef[] = [
   // ── Head region ──────────────────────────────────────────────────────────
-  { id: "head",       geoType: "sphere",   geoArgs: [0.13, 22, 22],        pos: [0, 1.57, 0.005],  scale: [1, 1.14, 1] },
-  { id: "jaw",        geoType: "sphere",   geoArgs: [0.11, 16, 16],        pos: [0, 1.39, 0.045],  scale: [0.85, 0.48, 0.80] },
-  { id: "ear_l",      geoType: "sphere",   geoArgs: [0.038, 12, 12],       pos: [-0.137, 1.56, 0], scale: [0.38, 0.74, 0.30] },
-  { id: "ear_r",      geoType: "sphere",   geoArgs: [0.038, 12, 12],       pos: [ 0.137, 1.56, 0], scale: [0.38, 0.74, 0.30] },
+  // Head: slightly oval, tilted forward (mannequin has no face)
+  { id: "head",       geoType: "sphere",   geoArgs: [0.135, 24, 24],          pos: [0, 1.60, 0.008],  scale: [0.95, 1.16, 1.02] },
+  // Jaw: flatter oval at bottom of head
+  { id: "jaw",        geoType: "sphere",   geoArgs: [0.115, 18, 18],          pos: [0, 1.42, 0.048],  scale: [0.84, 0.44, 0.80] },
+  // Ears: thin discs on the sides
+  { id: "ear_l",      geoType: "sphere",   geoArgs: [0.040, 12, 12],          pos: [-0.140, 1.60, 0], scale: [0.35, 0.70, 0.28] },
+  { id: "ear_r",      geoType: "sphere",   geoArgs: [0.040, 12, 12],          pos: [ 0.140, 1.60, 0], scale: [0.35, 0.70, 0.28] },
   // ── Neck ─────────────────────────────────────────────────────────────────
-  { id: "neck",       geoType: "cylinder", geoArgs: [0.054, 0.068, 0.14, 14], pos: [0, 1.34, 0] },
-  // ── Torso ────────────────────────────────────────────────────────────────
-  { id: "chest",      geoType: "cylinder", geoArgs: [0.200, 0.172, 0.27, 20], pos: [0, 1.10, 0.006] },
-  { id: "abdomen",    geoType: "cylinder", geoArgs: [0.162, 0.178, 0.22, 20], pos: [0, 0.83, 0.006] },
-  // Back (z offset negative — visible when body rotated ~180°)
-  { id: "back_upper", geoType: "cylinder", geoArgs: [0.200, 0.172, 0.27, 20], pos: [0, 1.10, -0.006] },
-  { id: "back_lower", geoType: "cylinder", geoArgs: [0.162, 0.178, 0.22, 20], pos: [0, 0.83, -0.006] },
-  // ── Pelvis/hips ───────────────────────────────────────────────────────────
-  { id: "hip_l",      geoType: "sphere",   geoArgs: [0.092, 14, 14],       pos: [-0.132, 0.57, 0] },
-  { id: "hip_r",      geoType: "sphere",   geoArgs: [0.092, 14, 14],       pos: [ 0.132, 0.57, 0] },
-  // ── Shoulders ─────────────────────────────────────────────────────────────
-  { id: "shoulder_l", geoType: "sphere",   geoArgs: [0.096, 16, 16],       pos: [-0.275, 1.22, 0] },
-  { id: "shoulder_r", geoType: "sphere",   geoArgs: [0.096, 16, 16],       pos: [ 0.275, 1.22, 0] },
-  // ── Upper arms ───────────────────────────────────────────────────────────
-  { id: "arm_l",      geoType: "cylinder", geoArgs: [0.066, 0.055, 0.29, 14], pos: [-0.390, 0.970, 0], rot: [0, 0,  0.30] },
-  { id: "arm_r",      geoType: "cylinder", geoArgs: [0.066, 0.055, 0.29, 14], pos: [ 0.390, 0.970, 0], rot: [0, 0, -0.30] },
-  // ── Elbows (connector joints) — share arm zone ────────────────────────────
-  { id: "arm_l",      geoType: "sphere",   geoArgs: [0.060, 12, 12],       pos: [-0.446, 0.820, 0] },
-  { id: "arm_r",      geoType: "sphere",   geoArgs: [0.060, 12, 12],       pos: [ 0.446, 0.820, 0] },
+  { id: "neck",       geoType: "cylinder", geoArgs: [0.058, 0.072, 0.15, 16], pos: [0, 1.37, 0] },
+  // ── Chest (wider at top — pec area) ──────────────────────────────────────
+  { id: "chest",      geoType: "cylinder", geoArgs: [0.210, 0.178, 0.28, 22], pos: [0, 1.12, 0.008] },
+  // ── Abdomen (narrower at waist, slightly forward) ─────────────────────────
+  { id: "abdomen",    geoType: "cylinder", geoArgs: [0.168, 0.190, 0.22, 22], pos: [0, 0.86, 0.010] },
+  // ── Back (offset negative Z — visible when rotated) ──────────────────────
+  { id: "back_upper", geoType: "cylinder", geoArgs: [0.210, 0.178, 0.28, 22], pos: [0, 1.12, -0.008] },
+  { id: "back_lower", geoType: "cylinder", geoArgs: [0.168, 0.190, 0.22, 22], pos: [0, 0.86, -0.010] },
+  // ── Pelvis / hips ─────────────────────────────────────────────────────────
+  { id: "hip_l",      geoType: "sphere",   geoArgs: [0.105, 16, 16],          pos: [-0.138, 0.59, 0] },
+  { id: "hip_r",      geoType: "sphere",   geoArgs: [0.105, 16, 16],          pos: [ 0.138, 0.59, 0] },
+  // ── Shoulders (deltoid caps — wider, rounder) ─────────────────────────────
+  { id: "shoulder_l", geoType: "sphere",   geoArgs: [0.105, 18, 18],          pos: [-0.292, 1.24, 0] },
+  { id: "shoulder_r", geoType: "sphere",   geoArgs: [0.105, 18, 18],          pos: [ 0.292, 1.24, 0] },
+  // ── Upper arms (slight A-pose angle: ~20°) ────────────────────────────────
+  { id: "arm_l",      geoType: "cylinder", geoArgs: [0.068, 0.056, 0.30, 16], pos: [-0.400, 0.985, 0], rot: [0, 0,  0.22] },
+  { id: "arm_r",      geoType: "cylinder", geoArgs: [0.068, 0.056, 0.30, 16], pos: [ 0.400, 0.985, 0], rot: [0, 0, -0.22] },
+  // ── Elbow joints (connector, shares arm zone) ─────────────────────────────
+  { id: "arm_l",      geoType: "sphere",   geoArgs: [0.062, 14, 14],          pos: [-0.450, 0.832, 0] },
+  { id: "arm_r",      geoType: "sphere",   geoArgs: [0.062, 14, 14],          pos: [ 0.450, 0.832, 0] },
   // ── Forearms ─────────────────────────────────────────────────────────────
-  { id: "forearm_l",  geoType: "cylinder", geoArgs: [0.053, 0.042, 0.25, 14], pos: [-0.454, 0.695, 0], rot: [0, 0,  0.10] },
-  { id: "forearm_r",  geoType: "cylinder", geoArgs: [0.053, 0.042, 0.25, 14], pos: [ 0.454, 0.695, 0], rot: [0, 0, -0.10] },
+  { id: "forearm_l",  geoType: "cylinder", geoArgs: [0.056, 0.044, 0.26, 16], pos: [-0.462, 0.700, 0], rot: [0, 0,  0.08] },
+  { id: "forearm_r",  geoType: "cylinder", geoArgs: [0.056, 0.044, 0.26, 16], pos: [ 0.462, 0.700, 0], rot: [0, 0, -0.08] },
   // ── Wrists ───────────────────────────────────────────────────────────────
-  { id: "wrist_l",    geoType: "sphere",   geoArgs: [0.046, 12, 12],       pos: [-0.462, 0.558, 0] },
-  { id: "wrist_r",    geoType: "sphere",   geoArgs: [0.046, 12, 12],       pos: [ 0.462, 0.558, 0] },
-  // ── Hands ────────────────────────────────────────────────────────────────
-  { id: "hand_l",     geoType: "sphere",   geoArgs: [0.072, 14, 14],       pos: [-0.458, 0.466, 0], scale: [1.0, 0.65, 1.15] },
-  { id: "hand_r",     geoType: "sphere",   geoArgs: [0.072, 14, 14],       pos: [ 0.458, 0.466, 0], scale: [1.0, 0.65, 1.15] },
-  // ── Thighs ───────────────────────────────────────────────────────────────
-  { id: "leg_l",      geoType: "cylinder", geoArgs: [0.092, 0.080, 0.32, 14], pos: [-0.128, 0.275, 0] },
-  { id: "leg_r",      geoType: "cylinder", geoArgs: [0.092, 0.080, 0.32, 14], pos: [ 0.128, 0.275, 0] },
+  { id: "wrist_l",    geoType: "sphere",   geoArgs: [0.048, 14, 14],          pos: [-0.468, 0.562, 0] },
+  { id: "wrist_r",    geoType: "sphere",   geoArgs: [0.048, 14, 14],          pos: [ 0.468, 0.562, 0] },
+  // ── Hands (wider palm shape) ──────────────────────────────────────────────
+  { id: "hand_l",     geoType: "sphere",   geoArgs: [0.075, 16, 16],          pos: [-0.464, 0.466, 0.010], scale: [1.10, 0.60, 1.20] },
+  { id: "hand_r",     geoType: "sphere",   geoArgs: [0.075, 16, 16],          pos: [ 0.464, 0.466, 0.010], scale: [1.10, 0.60, 1.20] },
+  // ── Thighs (wider at top) ─────────────────────────────────────────────────
+  { id: "leg_l",      geoType: "cylinder", geoArgs: [0.098, 0.082, 0.34, 18], pos: [-0.130, 0.280, 0] },
+  { id: "leg_r",      geoType: "cylinder", geoArgs: [0.098, 0.082, 0.34, 18], pos: [ 0.130, 0.280, 0] },
   // ── Knees ─────────────────────────────────────────────────────────────────
-  { id: "knee_l",     geoType: "sphere",   geoArgs: [0.082, 14, 14],       pos: [-0.128, 0.048, 0.048], scale: [1, 0.88, 1] },
-  { id: "knee_r",     geoType: "sphere",   geoArgs: [0.082, 14, 14],       pos: [ 0.128, 0.048, 0.048], scale: [1, 0.88, 1] },
-  // ── Shins (reuse leg_l / leg_r) ──────────────────────────────────────────
-  { id: "leg_l",      geoType: "cylinder", geoArgs: [0.072, 0.058, 0.28, 14], pos: [-0.128, -0.220, 0] },
-  { id: "leg_r",      geoType: "cylinder", geoArgs: [0.072, 0.058, 0.28, 14], pos: [ 0.128, -0.220, 0] },
+  { id: "knee_l",     geoType: "sphere",   geoArgs: [0.084, 16, 16],          pos: [-0.130, 0.040, 0.055], scale: [1, 0.86, 1.05] },
+  { id: "knee_r",     geoType: "sphere",   geoArgs: [0.084, 16, 16],          pos: [ 0.130, 0.040, 0.055], scale: [1, 0.86, 1.05] },
+  // ── Shins/calves (reuse leg zone) ────────────────────────────────────────
+  { id: "leg_l",      geoType: "cylinder", geoArgs: [0.074, 0.058, 0.30, 18], pos: [-0.130, -0.235, 0] },
+  { id: "leg_r",      geoType: "cylinder", geoArgs: [0.074, 0.058, 0.30, 18], pos: [ 0.130, -0.235, 0] },
   // ── Feet ─────────────────────────────────────────────────────────────────
-  { id: "foot_l",     geoType: "box",      geoArgs: [0.094, 0.066, 0.19],  pos: [-0.128, -0.420, 0.062] },
-  { id: "foot_r",     geoType: "box",      geoArgs: [0.094, 0.066, 0.19],  pos: [ 0.128, -0.420, 0.062] },
+  { id: "foot_l",     geoType: "box",      geoArgs: [0.098, 0.068, 0.200],    pos: [-0.130, -0.432, 0.072] },
+  { id: "foot_r",     geoType: "box",      geoArgs: [0.098, 0.068, 0.200],    pos: [ 0.130, -0.432, 0.072] },
 ];
 
 // ─── Fibromyalgia tender points ───────────────────────────────────────────────
 
-interface FibroPoint {
-  id: string;
-  name: string;
-  position: [number, number, number];
-}
-
+interface FibroPoint { id: string; name: string; position: [number, number, number] }
 const FIBRO_POINTS: FibroPoint[] = [
-  { id: "fibro_occiput_l",      name: "Occipucio Izq.",       position: [-0.07, 1.66, -0.10] },
-  { id: "fibro_occiput_r",      name: "Occipucio Der.",       position: [ 0.07, 1.66, -0.10] },
-  { id: "fibro_cervical_l",     name: "Cervical Bajo Izq.",   position: [-0.05, 1.30, -0.08] },
-  { id: "fibro_cervical_r",     name: "Cervical Bajo Der.",   position: [ 0.05, 1.30, -0.08] },
-  { id: "fibro_trapezius_l",    name: "Trapecio Izq.",        position: [-0.20, 1.20, -0.05] },
-  { id: "fibro_trapezius_r",    name: "Trapecio Der.",        position: [ 0.20, 1.20, -0.05] },
-  { id: "fibro_supraspinous_l", name: "Supraespinoso Izq.",   position: [-0.22, 1.08, -0.14] },
-  { id: "fibro_supraspinous_r", name: "Supraespinoso Der.",   position: [ 0.22, 1.08, -0.14] },
-  { id: "fibro_rib2_l",         name: "2ª Costilla Izq.",     position: [-0.10, 1.08,  0.14] },
-  { id: "fibro_rib2_r",         name: "2ª Costilla Der.",     position: [ 0.10, 1.08,  0.14] },
-  { id: "fibro_epicondyle_l",   name: "Epicóndilo Izq.",      position: [-0.38, 0.82,  0.06] },
-  { id: "fibro_epicondyle_r",   name: "Epicóndilo Der.",      position: [ 0.38, 0.82,  0.06] },
-  { id: "fibro_gluteal_l",      name: "Glúteo Izq.",          position: [-0.15, 0.54, -0.18] },
-  { id: "fibro_gluteal_r",      name: "Glúteo Der.",          position: [ 0.15, 0.54, -0.18] },
-  { id: "fibro_trochanter_l",   name: "Trocánter Izq.",       position: [-0.22, 0.44, -0.10] },
-  { id: "fibro_trochanter_r",   name: "Trocánter Der.",       position: [ 0.22, 0.44, -0.10] },
-  { id: "fibro_knee_l",         name: "Rodilla (medial) Izq.",position: [-0.07, 0.00,  0.10] },
-  { id: "fibro_knee_r",         name: "Rodilla (medial) Der.",position: [ 0.07, 0.00,  0.10] },
+  { id: "fibro_occiput_l",      name: "Occipucio Izq.",        position: [-0.07, 1.68, -0.10] },
+  { id: "fibro_occiput_r",      name: "Occipucio Der.",        position: [ 0.07, 1.68, -0.10] },
+  { id: "fibro_cervical_l",     name: "Cervical Bajo Izq.",    position: [-0.05, 1.32, -0.08] },
+  { id: "fibro_cervical_r",     name: "Cervical Bajo Der.",    position: [ 0.05, 1.32, -0.08] },
+  { id: "fibro_trapezius_l",    name: "Trapecio Izq.",         position: [-0.21, 1.22, -0.05] },
+  { id: "fibro_trapezius_r",    name: "Trapecio Der.",         position: [ 0.21, 1.22, -0.05] },
+  { id: "fibro_supraspinous_l", name: "Supraespinoso Izq.",    position: [-0.23, 1.10, -0.14] },
+  { id: "fibro_supraspinous_r", name: "Supraespinoso Der.",    position: [ 0.23, 1.10, -0.14] },
+  { id: "fibro_rib2_l",         name: "2ª Costilla Izq.",      position: [-0.10, 1.10,  0.14] },
+  { id: "fibro_rib2_r",         name: "2ª Costilla Der.",      position: [ 0.10, 1.10,  0.14] },
+  { id: "fibro_epicondyle_l",   name: "Epicóndilo Izq.",       position: [-0.39, 0.84,  0.06] },
+  { id: "fibro_epicondyle_r",   name: "Epicóndilo Der.",       position: [ 0.39, 0.84,  0.06] },
+  { id: "fibro_gluteal_l",      name: "Glúteo Izq.",           position: [-0.16, 0.56, -0.18] },
+  { id: "fibro_gluteal_r",      name: "Glúteo Der.",           position: [ 0.16, 0.56, -0.18] },
+  { id: "fibro_trochanter_l",   name: "Trocánter Izq.",        position: [-0.23, 0.46, -0.10] },
+  { id: "fibro_trochanter_r",   name: "Trocánter Der.",        position: [ 0.23, 0.46, -0.10] },
+  { id: "fibro_knee_l",         name: "Rodilla (medial) Izq.", position: [-0.07, 0.02,  0.10] },
+  { id: "fibro_knee_r",         name: "Rodilla (medial) Der.", position: [ 0.07, 0.02,  0.10] },
 ];
 
-// ─── Color helpers ────────────────────────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────────────────
 
-const SKIN_HEX  = 0xc5956a;
-const HOVER_HEX = 0xbae6fd;
+const SKIN_HEX  = 0xc8956a;
+const HOVER_HEX = 0x7dd3fc;
+const SELECT_HEX = 0x38bdf8;
 
 function painHex(level: number | undefined): number {
   if (!level || level === 0) return SKIN_HEX;
@@ -157,26 +147,39 @@ export default function BodyMap3D({
   fibromyalgiaMode = false,
   readOnly = false,
   onZoneSelect,
+  onMultiZoneSelect,
 }: BodyMap3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
   const tooltipRef   = useRef<HTMLSpanElement>(null);
   const hintRef      = useRef<HTMLSpanElement>(null);
   const sceneRef     = useRef<SceneState | null>(null);
 
+  // Selector tool state (React-controlled, passed down to scene via ref)
+  const [tool, setTool] = useState<SelectorTool>("pin");
+  const toolRef = useRef<SelectorTool>("pin");
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+
+  // Area brush overlay state
+  const [brush, setBrush] = useState<{ x: number; y: number; r: number } | null>(null);
+  const brushRef = useRef<{ x: number; y: number; r: number } | null>(null);
+
   const onZoneSelectRef = useRef(onZoneSelect);
   useEffect(() => { onZoneSelectRef.current = onZoneSelect; }, [onZoneSelect]);
+  const onMultiZoneSelectRef = useRef(onMultiZoneSelect);
+  useEffect(() => { onMultiZoneSelectRef.current = onMultiZoneSelect; }, [onMultiZoneSelect]);
 
   const painDataRef = useRef(painData);
   useEffect(() => { painDataRef.current = painData; }, [painData]);
 
-  // Update segment colors when painData changes (no reinit needed)
+  // Update segment colors on painData change
   useEffect(() => {
     const s = sceneRef.current;
     if (!s) return;
     s.zoneToMeshes.forEach((meshes, id) => {
       const level = painData[id];
       meshes.forEach((m) => {
-        (m.material as THREEMeshStdMaterial).color.setHex(painHex(level));
+        (m.material as THREEMeshStdMat).color.setHex(painHex(level));
       });
     });
   }, [painData]);
@@ -191,12 +194,11 @@ export default function BodyMap3D({
   const initScene = useCallback(() => {
     const container = containerRef.current;
     if (!container || sceneRef.current) return;
-
     const THREE = (window as WindowWithTHREE).THREE;
     if (!THREE) return;
-    const T: THREEConstructors = THREE;
+    const T: THREECtors = THREE;
 
-    // ── Renderer ────────────────────────────────────────────────────────────
+    // ── Renderer ─────────────────────────────────────────────────────────────
     const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const w = container.clientWidth;
@@ -205,51 +207,40 @@ export default function BodyMap3D({
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
-    // ── Camera ──────────────────────────────────────────────────────────────
-    const camera = new T.PerspectiveCamera(42, w / h, 0.1, 100);
-    camera.position.set(0, 0.55, 3.2);
+    // ── Camera ────────────────────────────────────────────────────────────────
+    const camera = new T.PerspectiveCamera(40, w / h, 0.1, 100);
+    camera.position.set(0, 0.55, 3.4);
 
-    // ── Scene + lights ───────────────────────────────────────────────────────
+    // ── Lights ────────────────────────────────────────────────────────────────
     const scene = new T.Scene();
-    const ambient = new T.AmbientLight(0xffeedd, 0.55);
-    scene.add(ambient);
-    const keyLight = new T.DirectionalLight(0xfff0e0, 1.10);
-    keyLight.position.set(0.6, 2.2, 1.8);
-    scene.add(keyLight);
-    const fillLight = new T.DirectionalLight(0x9bb8d8, 0.35);
-    fillLight.position.set(-2, 0.6, -1);
-    scene.add(fillLight);
-    const rimLight = new T.DirectionalLight(0xaaccff, 0.25);
-    rimLight.position.set(0, -1.5, -2.5);
-    scene.add(rimLight);
+    scene.add(new T.AmbientLight(0xfff0e8, 0.60));
+    const key = new T.DirectionalLight(0xfff0e0, 1.15);
+    key.position.set(0.8, 2.5, 2.0); scene.add(key);
+    const fill = new T.DirectionalLight(0x9bb8d8, 0.38);
+    fill.position.set(-2.5, 0.8, -1.0); scene.add(fill);
+    const rim = new T.DirectionalLight(0xc0d8ff, 0.28);
+    rim.position.set(0, -2.0, -3.0); scene.add(rim);
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    function makeMat(hex: number): THREEMeshStdMaterial {
-      return new T.MeshStandardMaterial({
-        color: hex,
-        roughness: 0.74,
-        metalness: 0.0,
-      });
+    // ── Material factory ──────────────────────────────────────────────────────
+    function makeMat(hex: number): THREEMeshStdMat {
+      return new T.MeshStandardMaterial({ color: hex, roughness: 0.72, metalness: 0.0 });
     }
 
-    function makeGeo(def: SegDef): THREEBufferGeometry {
-      switch (def.geoType) {
-        case "sphere":   return new T.SphereGeometry  (def.geoArgs[0], def.geoArgs[1], def.geoArgs[2]);
-        case "cylinder": return new T.CylinderGeometry(def.geoArgs[0], def.geoArgs[1], def.geoArgs[2], def.geoArgs[3]);
-        case "box":      return new T.BoxGeometry     (def.geoArgs[0], def.geoArgs[1], def.geoArgs[2]);
-      }
+    function makeGeo(def: SegDef): THREEGeo {
+      if (def.geoType === "sphere")   return new T.SphereGeometry(def.geoArgs[0], def.geoArgs[1], def.geoArgs[2]);
+      if (def.geoType === "cylinder") return new T.CylinderGeometry(def.geoArgs[0], def.geoArgs[1], def.geoArgs[2], def.geoArgs[3]);
+      return new T.BoxGeometry(def.geoArgs[0], def.geoArgs[1], def.geoArgs[2]);
     }
 
-    // ── Build body segments ──────────────────────────────────────────────────
-    const segmentMeshes: THREEMesh[] = [];               // all meshes for raycasting
-    const zoneToMeshes = new Map<string, THREEMesh[]>(); // zone id → [meshes]
+    // ── Build segments ────────────────────────────────────────────────────────
+    const segmentMeshes: THREEMesh[] = [];
+    const zoneToMeshes = new Map<string, THREEMesh[]>();
 
     for (const def of SEGMENT_DEFS) {
       const level = painDataRef.current[def.id];
-      const mat   = makeMat(painHex(level));
-      const mesh  = new T.Mesh(makeGeo(def), mat);
+      const mesh  = new T.Mesh(makeGeo(def), makeMat(painHex(level)));
       mesh.position.set(...def.pos);
-      if (def.rot) { mesh.rotation.x = def.rot[0]; mesh.rotation.y = def.rot[1]; mesh.rotation.z = def.rot[2]; }
+      if (def.rot)   { mesh.rotation.x = def.rot[0]; mesh.rotation.y = def.rot[1]; mesh.rotation.z = def.rot[2]; }
       if (def.scale) mesh.scale.set(def.scale[0], def.scale[1], def.scale[2]);
       mesh.userData["id"]   = def.id;
       mesh.userData["name"] = ZONE_NAMES[def.id] ?? def.id;
@@ -259,166 +250,267 @@ export default function BodyMap3D({
       zoneToMeshes.set(def.id, arr);
     }
 
-    // ── Fibromyalgia tender point markers (small glowing dots) ──────────────
+    // ── Fibro markers ─────────────────────────────────────────────────────────
     const fibroMeshes: THREEMesh[] = [];
+    const fibroMat = new T.MeshStandardMaterial({ color: 0xa78bfa, roughness: 0.4, metalness: 0.0, emissive: 0x6d28d9, emissiveIntensity: 0.55 });
     for (const pt of FIBRO_POINTS) {
-      const mat  = new T.MeshStandardMaterial({ color: 0xa78bfa, roughness: 0.4, metalness: 0.1, emissive: 0x6d28d9, emissiveIntensity: 0.5 });
-      const mesh = new T.Mesh(new T.SphereGeometry(0.030, 10, 10), mat as unknown as THREEMeshStdMaterial);
-      mesh.position.set(...pt.position);
-      mesh.userData["id"]     = pt.id;
-      mesh.userData["name"]   = pt.name;
-      mesh.userData["fibro"]  = true;
-      mesh.visible = fibromyalgiaMode;
-      fibroMeshes.push(mesh);
+      const m = new T.Mesh(new T.SphereGeometry(0.032, 10, 10), fibroMat as unknown as THREEMeshStdMat);
+      m.position.set(...pt.position);
+      m.userData["id"] = pt.id; m.userData["name"] = pt.name; m.userData["fibro"] = true;
+      m.visible = fibromyalgiaMode;
+      fibroMeshes.push(m);
     }
 
-    // ── Body group ───────────────────────────────────────────────────────────
+    // ── Scene group ───────────────────────────────────────────────────────────
     const bodyGroup = new T.Group();
     segmentMeshes.forEach((m) => bodyGroup.add(m));
     fibroMeshes.forEach((m) => bodyGroup.add(m));
-
     const pivot = new T.Group();
     pivot.position.set(0, -0.5, 0);
     pivot.add(bodyGroup);
     scene.add(pivot);
 
-    // ── Interaction state ────────────────────────────────────────────────────
+    // ── Raycasting helpers ────────────────────────────────────────────────────
     const raycaster = new T.Raycaster();
     const pointer   = new T.Vector2();
     let hoveredMesh: THREEMesh | null = null;
     let hoveredOrigHex = SKIN_HEX;
 
-    let isDragging = false;
-    let prevX = 0, prevY = 0;
-    let dragStartX = 0, dragStartY = 0;
-    let rotY = 0, rotX = 0;
-    const ROT_X_MIN = -Math.PI / 6;
-    const ROT_X_MAX =  Math.PI / 3;
+    function getTargets() {
+      return [...segmentMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])];
+    }
 
-    function getCanvasXY(e: MouseEvent | Touch) {
+    function canvasXY(e: MouseEvent | Touch) {
       const r = renderer.domElement.getBoundingClientRect();
       return {
-        x: ((e.clientX - r.left) / r.width)  * 2 - 1,
-        y: -((e.clientY - r.top) / r.height) * 2 + 1,
+        nx: ((e.clientX - r.left) / r.width)  * 2 - 1,
+        ny: -((e.clientY - r.top) / r.height) * 2 + 1,
+        px: e.clientX - r.left,
+        py: e.clientY - r.top,
+        pw: r.width, ph: r.height,
       };
     }
 
-    function showTooltip(id: string, name: string) {
+    /** Project a 3D mesh center to 2D canvas pixel coordinates */
+    function projectMesh(m: THREEMesh): { x: number; y: number } {
+      const cam = camera as unknown as { matrixWorldInverse: unknown; projectionMatrix: unknown };
+      // Use the mesh's world position
+      const pos = m.position;
+      // We need pivot's world transform — approximate: pivot.position + bodyGroup is at (0, -0.5, 0) + pivot rotation
+      // For simplicity, we'll do it numerically
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+
+      // Apply pivot offset
+      let px = pos.x, py = pos.y - 0.5, pz = pos.z;
+      // Rotate Y
+      const rx = px * cosY + pz * sinY;
+      const rz = -px * sinY + pz * cosY;
+      px = rx; pz = rz;
+      // Rotate X
+      const ry2 = py * cosX - pz * sinX;
+      const rz2 = py * sinX + pz * cosX;
+      py = ry2; pz = rz2;
+
+      // Project with camera (simple perspective at z=3.4, fov~40)
+      const fov = 40 * Math.PI / 180;
+      const aspect = (container?.clientWidth ?? 1) / (container?.clientHeight ?? 1);
+      const camZ = 3.4;
+      const d = camZ - pz; // depth
+      if (d <= 0) return { x: -9999, y: -9999 };
+      const scale = (1 / Math.tan(fov / 2)) / d;
+      const sx = ((px * scale) / aspect) * 0.5 + 0.5;
+      const sy = ((-py * scale) * 0.5 + 0.5) + 0.04; // slight offset for camera Y
+      const cw = container?.clientWidth ?? 1;
+      const ch = container?.clientHeight ?? 1;
+      return { x: sx * cw, y: sy * ch };
+    }
+
+    function showTip(id: string, name: string) {
       const lvl = painDataRef.current[id];
-      const tt = tooltipRef.current;
-      const hint = hintRef.current;
-      if (tt) {
-        tt.textContent = lvl ? `${name} · Dolor ${lvl}/10` : name;
-        tt.classList.remove("hidden");
-      }
-      if (hint) hint.classList.add("hidden");
+      const tt = tooltipRef.current, hi = hintRef.current;
+      if (tt) { tt.textContent = lvl ? `${name} · Dolor ${lvl}/10` : name; tt.classList.remove("hidden"); }
+      if (hi) hi.classList.add("hidden");
     }
-
-    function hideTooltip() {
-      const tt = tooltipRef.current;
-      const hint = hintRef.current;
+    function hideTip() {
+      const tt = tooltipRef.current, hi = hintRef.current;
       if (tt) tt.classList.add("hidden");
-      if (hint) hint.classList.remove("hidden");
+      if (hi) hi.classList.remove("hidden");
     }
 
-    function updateHover(x: number, y: number) {
-      pointer.set(x, y);
+    function restoreHovered() {
+      if (!hoveredMesh) return;
+      const id  = hoveredMesh.userData["id"] as string;
+      const lvl = painDataRef.current[id];
+      (hoveredMesh.material as THREEMeshStdMat).color.setHex(painHex(lvl));
+      hoveredMesh.scale.setScalar(1);
+      hoveredMesh = null;
+    }
+
+    function updateHover(nx: number, ny: number) {
+      if (toolRef.current === "area") return; // no hover in area mode
+      pointer.set(nx, ny);
       raycaster.setFromCamera(pointer, camera);
-
-      // Ray against segments + fibro markers
-      const targets = [...segmentMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])];
-      const hits = raycaster.intersectObjects(targets);
+      const hits = raycaster.intersectObjects(getTargets());
       const hit  = hits[0]?.object as THREEMesh | undefined;
-
-      if (hoveredMesh && hoveredMesh !== hit) {
-        // Restore original color
-        (hoveredMesh.material as THREEMeshStdMaterial).color.setHex(hoveredOrigHex);
-        hoveredMesh.scale.setScalar(1);
-      }
-
+      if (hoveredMesh && hoveredMesh !== hit) { restoreHovered(); }
       if (hit) {
-        const id  = hit.userData["id"] as string;
-        const lvl = painDataRef.current[id];
         if (hoveredMesh !== hit) {
-          hoveredOrigHex = painHex(lvl);
-          (hit.material as THREEMeshStdMaterial).color.setHex(HOVER_HEX);
-          hit.scale.setScalar(1.06);
+          hoveredOrigHex = painHex(painDataRef.current[hit.userData["id"] as string]);
+          (hit.material as THREEMeshStdMat).color.setHex(HOVER_HEX);
+          hit.scale.setScalar(1.07);
         }
         renderer.domElement.style.cursor = "pointer";
-        showTooltip(id, hit.userData["name"] as string);
+        showTip(hit.userData["id"] as string, hit.userData["name"] as string);
       } else {
-        renderer.domElement.style.cursor = "grab";
-        hideTooltip();
+        renderer.domElement.style.cursor = "grab"; // updateHover returns early when tool==="area"
+        hideTip();
       }
       hoveredMesh = hit ?? null;
     }
 
-    // ── Mouse events ─────────────────────────────────────────────────────────
+    // ── Interaction state ─────────────────────────────────────────────────────
+    let isDragging   = false;
+    let isAreaBrush  = false;
+    let prevX = 0, prevY = 0;
+    let dragStartX = 0, dragStartY = 0;
+    let areaCX = 0, areaCY = 0; // area brush center (canvas px)
+    let rotY = 0, rotX = 0;
+    const ROT_X_MIN = -Math.PI / 6, ROT_X_MAX = Math.PI / 3;
+
     function onMouseDown(e: MouseEvent) {
+      const { nx, ny, px, py } = canvasXY(e);
       isDragging = true;
       prevX = dragStartX = e.clientX;
       prevY = dragStartY = e.clientY;
-      renderer.domElement.style.cursor = "grabbing";
+
+      if (toolRef.current === "area" && !readOnly) {
+        // Start area brush — check if there's a hit to start from
+        pointer.set(nx, ny);
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(getTargets());
+        if (hits.length > 0) {
+          isAreaBrush = true;
+          areaCX = px; areaCY = py;
+          const b = { x: px, y: py, r: 0 };
+          brushRef.current = b;
+          setBrush({ ...b });
+        }
+      } else {
+        renderer.domElement.style.cursor = "grabbing";
+      }
     }
+
     function onMouseMove(e: MouseEvent) {
-      if (isDragging) {
+      const { nx, ny, px, py } = canvasXY(e);
+
+      if (isDragging && isAreaBrush) {
+        // Update brush circle
+        const dx = px - areaCX, dy = py - areaCY;
+        const r  = Math.sqrt(dx * dx + dy * dy);
+        const b  = { x: areaCX, y: areaCY, r };
+        brushRef.current = b;
+        setBrush({ ...b });
+        return;
+      }
+
+      if (isDragging && toolRef.current === "pin") {
         rotY += (e.clientX - prevX) * 0.008;
         rotX += (e.clientY - prevY) * 0.008;
         rotX  = Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, rotX));
-        prevX = e.clientX;
-        prevY = e.clientY;
-      } else {
-        updateHover(getCanvasXY(e).x, getCanvasXY(e).y);
+      } else if (!isDragging) {
+        updateHover(nx, ny);
       }
+      prevX = e.clientX; prevY = e.clientY;
     }
+
     function onMouseUp(e: MouseEvent) {
       const dx = Math.abs(e.clientX - dragStartX);
       const dy = Math.abs(e.clientY - dragStartY);
-      if (isDragging && dx < 6 && dy < 6 && !readOnly) {
-        const { x, y } = getCanvasXY(e);
-        pointer.set(x, y);
+
+      if (isAreaBrush && brushRef.current) {
+        // Find zones within the brush circle
+        const b = brushRef.current;
+        const selected = new Set<string>();
+        for (const m of segmentMeshes) {
+          const { x, y } = projectMesh(m);
+          const dist = Math.sqrt((x - b.x) ** 2 + (y - b.y) ** 2);
+          if (dist <= b.r) selected.add(m.userData["id"] as string);
+        }
+        if (selected.size > 0 && !readOnly) {
+          onMultiZoneSelectRef.current?.([...selected]);
+        }
+        brushRef.current = null;
+        setBrush(null);
+        isAreaBrush = false;
+      } else if (isDragging && dx < 6 && dy < 6 && toolRef.current === "pin" && !readOnly) {
+        // Pin click
+        const { nx, ny } = canvasXY(e);
+        pointer.set(nx, ny);
         raycaster.setFromCamera(pointer, camera);
-        const targets = [...segmentMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])];
-        const hits = raycaster.intersectObjects(targets);
+        const hits = raycaster.intersectObjects(getTargets());
         if (hits[0]) {
           onZoneSelectRef.current?.((hits[0].object as THREEMesh).userData["id"] as string);
         }
       }
+
       isDragging = false;
-      renderer.domElement.style.cursor = "grab";
+      renderer.domElement.style.cursor = toolRef.current === "area" ? "crosshair" : "grab";
     }
 
-    // ── Touch events ─────────────────────────────────────────────────────────
+    // ── Touch events ──────────────────────────────────────────────────────────
     let touchStartX = 0, touchStartY = 0;
     function onTouchStart(e: TouchEvent) {
-      if (e.touches.length === 1) {
-        isDragging = true;
-        prevX = touchStartX = e.touches[0].clientX;
-        prevY = touchStartY = e.touches[0].clientY;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const { nx, ny, px, py } = canvasXY(t);
+      isDragging = true;
+      prevX = touchStartX = t.clientX;
+      prevY = touchStartY = t.clientY;
+      if (toolRef.current === "area" && !readOnly) {
+        pointer.set(nx, ny);
+        raycaster.setFromCamera(pointer, camera);
+        if (raycaster.intersectObjects(getTargets()).length > 0) {
+          isAreaBrush = true; areaCX = px; areaCY = py;
+          const b = { x: px, y: py, r: 0 };
+          brushRef.current = b; setBrush({ ...b });
+        }
       }
     }
     function onTouchMove(e: TouchEvent) {
       if (!isDragging || e.touches.length !== 1) return;
       e.preventDefault();
-      rotY += (e.touches[0].clientX - prevX) * 0.010;
-      rotX += (e.touches[0].clientY - prevY) * 0.010;
-      rotX  = Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, rotX));
-      prevX = e.touches[0].clientX;
-      prevY = e.touches[0].clientY;
+      const t = e.touches[0];
+      const { px, py } = canvasXY(t);
+      if (isAreaBrush) {
+        const dx = px - areaCX, dy = py - areaCY;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const b = { x: areaCX, y: areaCY, r };
+        brushRef.current = b; setBrush({ ...b });
+        return;
+      }
+      rotY += (t.clientX - prevX) * 0.010;
+      rotX += (t.clientY - prevY) * 0.010;
+      rotX = Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, rotX));
+      prevX = t.clientX; prevY = t.clientY;
     }
     function onTouchEnd(e: TouchEvent) {
       const t = e.changedTouches[0];
-      const dx = Math.abs(t.clientX - touchStartX);
-      const dy = Math.abs(t.clientY - touchStartY);
-      if (dx < 8 && dy < 8 && !readOnly) {
-        const { x, y } = getCanvasXY(t);
-        pointer.set(x, y);
-        raycaster.setFromCamera(pointer, camera);
-        const targets = [...segmentMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])];
-        const hits = raycaster.intersectObjects(targets);
-        if (hits[0]) {
-          onZoneSelectRef.current?.((hits[0].object as THREEMesh).userData["id"] as string);
+      const dx = Math.abs(t.clientX - touchStartX), dy = Math.abs(t.clientY - touchStartY);
+      if (isAreaBrush && brushRef.current) {
+        const b = brushRef.current;
+        const selected = new Set<string>();
+        for (const m of segmentMeshes) {
+          const { x, y } = projectMesh(m);
+          if (Math.sqrt((x - b.x) ** 2 + (y - b.y) ** 2) <= b.r) selected.add(m.userData["id"] as string);
         }
+        if (selected.size > 0 && !readOnly) onMultiZoneSelectRef.current?.([...selected]);
+        brushRef.current = null; setBrush(null); isAreaBrush = false;
+      } else if (dx < 10 && dy < 10 && toolRef.current === "pin" && !readOnly) {
+        const { nx, ny } = canvasXY(t);
+        pointer.set(nx, ny); raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(getTargets());
+        if (hits[0]) onZoneSelectRef.current?.((hits[0].object as THREEMesh).userData["id"] as string);
       }
       isDragging = false;
     }
@@ -435,60 +527,44 @@ export default function BodyMap3D({
     // ── ResizeObserver ────────────────────────────────────────────────────────
     const ro = new ResizeObserver(() => {
       if (!container) return;
-      const cw = container.clientWidth;
-      const ch = container.clientHeight;
+      const cw = container.clientWidth, ch = container.clientHeight;
       renderer.setSize(cw, ch);
-      (camera as unknown as { aspect: number; updateProjectionMatrix(): void }).aspect = cw / ch;
-      (camera as unknown as { updateProjectionMatrix(): void }).updateProjectionMatrix();
+      const cam = camera as unknown as { aspect: number; updateProjectionMatrix(): void };
+      cam.aspect = cw / ch; cam.updateProjectionMatrix();
     });
     ro.observe(container);
 
     // ── Render loop ───────────────────────────────────────────────────────────
-    let rafId = 0;
-    let time  = 0;
-
+    let rafId = 0, time = 0;
     function animate() {
       rafId = requestAnimationFrame(animate);
       time += 0.020;
-
-      // Gentle idle rotation
-      if (!isDragging) rotY += 0.0035;
-
-      // Pulse fibro markers
+      if (!isDragging && toolRef.current === "pin") rotY += 0.0035;
       if (fibromyalgiaMode) {
         fibroMeshes.forEach((m, i) => {
           if (!m.visible) return;
-          const s = 1 + 0.22 * Math.sin(time * 1.4 + i * 0.55);
-          m.scale.setScalar(s);
+          m.scale.setScalar(1 + 0.20 * Math.sin(time * 1.5 + i * 0.55));
         });
       }
-
-      // Pulse painful segments (skip hovered so color isn't overwritten)
       zoneToMeshes.forEach((meshes, id) => {
         const lvl = painDataRef.current[id];
         if (!lvl || lvl <= 0) return;
         meshes.forEach((m) => {
           if (m === hoveredMesh) return;
-          const speed = 0.7 + lvl * 0.05;
-          const pulse = 1 + 0.04 * Math.sin(time * speed + id.charCodeAt(0) * 0.4);
+          const pulse = 1 + 0.038 * Math.sin(time * (0.7 + lvl * 0.05) + id.charCodeAt(0) * 0.4);
           m.scale.setScalar(pulse);
         });
       });
-
       pivot.rotation.y = rotY;
       pivot.rotation.x = rotX;
       renderer.render(scene, camera);
     }
     animate();
 
-    // ── Save state ref ────────────────────────────────────────────────────────
     sceneRef.current = {
-      renderer, scene, camera, pivot,
-      zoneToMeshes, fibroMeshes,
-      rafId, ro,
+      renderer, scene, camera, pivot, zoneToMeshes, fibroMeshes, rafId, ro,
       cleanup() {
-        cancelAnimationFrame(rafId);
-        ro.disconnect();
+        cancelAnimationFrame(rafId); ro.disconnect();
         el.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
@@ -513,38 +589,98 @@ export default function BodyMap3D({
     return () => { sceneRef.current?.cleanup(); sceneRef.current = null; };
   }, [initScene]);
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col items-center gap-2 select-none w-full">
-      {/* Tooltip / hint */}
-      <div className="h-7 flex items-center justify-center">
-        <span
-          ref={tooltipRef}
-          className="text-sm font-medium text-white bg-slate-900 border border-slate-600 px-3 py-1 rounded-full hidden"
-        />
-        <span ref={hintRef} className="text-xs text-slate-500">
-          {readOnly ? "Rotación libre · vista 3D" : "Arrastra para rotar · toca para registrar dolor"}
-        </span>
-      </div>
 
-      {/* Canvas */}
-      <div
-        ref={containerRef}
-        className="w-full rounded-xl overflow-hidden"
-        style={{ height: "clamp(340px, 55vw, 440px)", background: "transparent" }}
-      />
+      {/* ── Selector tool bar ─────────────────────────────────────────────── */}
+      {!readOnly && (
+        <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/80 p-1">
+          {/* Pin / needle tool */}
+          <button
+            onClick={() => setTool("pin")}
+            title="Zona puntual"
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+              tool === "pin"
+                ? "bg-sky-500 text-white shadow-md shadow-sky-500/30"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            {/* Pin icon */}
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="17" x2="12" y2="22" />
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+            </svg>
+            Puntual
+          </button>
 
-      {/* Fibro legend */}
-      {fibromyalgiaMode && (
-        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-violet-400 inline-block" />
-          18 puntos de gatillo fibromialgia
+          {/* Area brush tool */}
+          <button
+            onClick={() => setTool("area")}
+            title="Área de dolor"
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+              tool === "area"
+                ? "bg-violet-500 text-white shadow-md shadow-violet-500/30"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            {/* Circle/area icon */}
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" strokeDasharray="4 2" />
+              <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+            </svg>
+            Área
+          </button>
         </div>
       )}
 
-      {/* Pain legend */}
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
+      {/* ── Hint text / tooltip ───────────────────────────────────────────── */}
+      <div className="h-6 flex items-center justify-center">
+        <span ref={tooltipRef}
+          className="text-sm font-medium text-white bg-slate-900 border border-slate-600 px-3 py-0.5 rounded-full hidden" />
+        <span ref={hintRef} className="text-xs text-slate-500">
+          {readOnly
+            ? "Vista 3D · arrastra para rotar"
+            : tool === "pin"
+              ? "Toca una zona exacta · arrastra para rotar"
+              : "Mantén y arrastra para seleccionar un área de dolor"}
+        </span>
+      </div>
+
+      {/* ── Canvas + area brush overlay ───────────────────────────────────── */}
+      <div ref={canvasWrapRef} className="relative w-full rounded-xl overflow-hidden"
+        style={{ height: "clamp(340px, 55vw, 440px)" }}>
+        {/* Three.js canvas */}
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {/* Area brush SVG overlay */}
+        {brush && (
+          <svg className="pointer-events-none absolute inset-0 w-full h-full">
+            <circle
+              cx={brush.x} cy={brush.y} r={brush.r}
+              fill={`rgba(167,139,250,0.12)`}
+              stroke="#a78bfa"
+              strokeWidth="2"
+              strokeDasharray="6 3"
+            />
+            <circle cx={brush.x} cy={brush.y} r="4" fill="#a78bfa" />
+          </svg>
+        )}
+      </div>
+
+      {/* Fibro legend */}
+      {fibromyalgiaMode && (
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span className="w-2.5 h-2.5 rounded-full bg-violet-400 inline-block" />
+          18 puntos de gatillo fibromialgia activos
+        </div>
+      )}
+
+      {/* Pain scale */}
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-slate-500">
         {[
-          { c: "#c5956a", l: "Sin dolor" },
+          { c: "#c8956a", l: "Sin dolor" },
           { c: "#4ade80", l: "Leve 1–3" },
           { c: "#fbbf24", l: "Mod. 4–6" },
           { c: "#f97316", l: "Intenso 7–9" },
@@ -562,78 +698,54 @@ export default function BodyMap3D({
 
 // ─── Three.js type shims ──────────────────────────────────────────────────────
 
-interface THREEColor         { setHex(hex: number): void }
-interface THREEVector2       { set(x: number, y: number): void }
-interface THREEVector3       { set(x: number, y: number, z: number): void }
-interface THREEBufferGeometry { dispose(): void }
-interface THREEMeshStdMaterial {
-  color: THREEColor;
-  roughness: number;
-  metalness: number;
-  emissive?: THREEColor;
-  emissiveIntensity?: number;
-  dispose(): void;
+interface THREEColor       { setHex(h: number): void }
+interface THREEVec2        { set(x: number, y: number): void }
+interface THREEVec3        { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
+interface THREEGeo         { dispose(): void }
+interface THREEMeshStdMat  {
+  color: THREEColor; roughness: number; metalness: number;
+  emissive?: THREEColor; emissiveIntensity?: number; dispose(): void;
 }
-interface THREEObject3D {
-  position: THREEVector3;
+interface THREEObj3D {
+  position: THREEVec3;
   rotation: { x: number; y: number; z: number };
   scale: { set(x: number, y: number, z: number): void; setScalar(s: number): void };
-  add(o: THREEObject3D): void;
-  remove(o: THREEObject3D): void;
-  visible: boolean;
-  type: string;
+  add(o: THREEObj3D): void; remove(o: THREEObj3D): void;
+  visible: boolean; type: string;
   userData: Record<string, unknown>;
-  children: THREEObject3D[];
+  children: THREEObj3D[];
 }
-interface THREEMesh extends THREEObject3D {
-  material: THREEMeshStdMaterial;
-}
-interface THREEScene  extends THREEObject3D {}
-interface THREEGroup  extends THREEObject3D {}
+interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat }
+interface THREEScene  extends THREEObj3D {}
+interface THREEGroup  extends THREEObj3D {}
 interface THREECamera { aspect?: number; updateProjectionMatrix?(): void }
-interface THREEWebGLRenderer {
+interface THREERenderer {
   domElement: HTMLCanvasElement;
-  setPixelRatio(r: number): void;
-  setSize(w: number, h: number): void;
-  setClearColor(color: number, alpha: number): void;
-  render(scene: THREEScene, camera: THREECamera): void;
-  dispose(): void;
+  setPixelRatio(r: number): void; setSize(w: number, h: number): void;
+  setClearColor(c: number, a: number): void;
+  render(s: THREEScene, c: THREECamera): void; dispose(): void;
 }
-interface THREERaycaster {
-  setFromCamera(pointer: THREEVector2, camera: THREECamera): void;
-  intersectObjects(objs: THREEMesh[]): Array<{ object: THREEObject3D }>;
+interface THREECaster {
+  setFromCamera(p: THREEVec2, c: THREECamera): void;
+  intersectObjects(o: THREEMesh[]): Array<{ object: THREEObj3D }>;
 }
-interface THREEConstructors {
-  WebGLRenderer: new (opts: { antialias: boolean; alpha: boolean }) => THREEWebGLRenderer;
-  PerspectiveCamera: new (fov: number, aspect: number, near: number, far: number) => THREECamera & { position: THREEVector3 };
-  Scene: new () => THREEScene;
-  Group: new () => THREEGroup;
-  AmbientLight: new (color: number, intensity: number) => THREEObject3D;
-  DirectionalLight: new (color: number, intensity: number) => THREEObject3D & { position: THREEVector3 };
-  Mesh: new (geo: THREEBufferGeometry, mat: THREEMeshStdMaterial) => THREEMesh;
-  MeshStandardMaterial: new (opts: {
-    color?: number;
-    roughness?: number;
-    metalness?: number;
-    emissive?: number;
-    emissiveIntensity?: number;
-  }) => THREEMeshStdMaterial;
-  SphereGeometry:   new (r: number, ws: number, hs: number) => THREEBufferGeometry;
-  CylinderGeometry: new (rt: number, rb: number, h: number, s: number) => THREEBufferGeometry;
-  BoxGeometry:      new (w: number, h: number, d: number) => THREEBufferGeometry;
-  Vector2: new () => THREEVector2;
-  Raycaster: new () => THREERaycaster;
+interface THREECtors {
+  WebGLRenderer: new (o: { antialias: boolean; alpha: boolean }) => THREERenderer;
+  PerspectiveCamera: new (fov: number, asp: number, n: number, f: number) => THREECamera & { position: THREEVec3 };
+  Scene: new () => THREEScene; Group: new () => THREEGroup;
+  AmbientLight: new (c: number, i: number) => THREEObj3D;
+  DirectionalLight: new (c: number, i: number) => THREEObj3D & { position: THREEVec3 };
+  Mesh: new (g: THREEGeo, m: THREEMeshStdMat) => THREEMesh;
+  MeshStandardMaterial: new (o: { color?: number; roughness?: number; metalness?: number; emissive?: number; emissiveIntensity?: number }) => THREEMeshStdMat;
+  SphereGeometry:   new (r: number, w: number, h: number) => THREEGeo;
+  CylinderGeometry: new (rt: number, rb: number, h: number, s: number) => THREEGeo;
+  BoxGeometry:      new (w: number, h: number, d: number) => THREEGeo;
+  Vector2: new () => THREEVec2;
+  Raycaster: new () => THREECaster;
 }
-interface WindowWithTHREE { THREE?: THREEConstructors }
-
+interface WindowWithTHREE { THREE?: THREECtors }
 interface SceneState {
-  renderer: THREEWebGLRenderer;
-  scene: THREEScene;
-  camera: THREECamera;
-  pivot: THREEGroup;
-  zoneToMeshes: Map<string, THREEMesh[]>;
-  fibroMeshes: THREEMesh[];
-  rafId: number;
-  ro: ResizeObserver;
-  cleanup(): void;
+  renderer: THREERenderer; scene: THREEScene; camera: THREECamera; pivot: THREEGroup;
+  zoneToMeshes: Map<string, THREEMesh[]>; fibroMeshes: THREEMesh[];
+  rafId: number; ro: ResizeObserver; cleanup(): void;
 }
