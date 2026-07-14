@@ -195,13 +195,13 @@ export default function BodyMap3D({
 
     // ── Scene & lights ────────────────────────────────────────────────────────
     const scene = new T.Scene();
-    scene.add(new T.AmbientLight(0xfff0e8, 0.70));
-    const key = new T.DirectionalLight(0xfff5ee, 1.2);
-    key.position.set(1.0, 2.8, 2.2); scene.add(key);
-    const fill = new T.DirectionalLight(0x9bb8d8, 0.40);
+    scene.add(new T.AmbientLight(0xffeedd, 0.85));
+    const key = new T.DirectionalLight(0xfff8f0, 1.4);
+    key.position.set(1.2, 3.0, 2.5); scene.add(key);
+    const fill = new T.DirectionalLight(0xaaccee, 0.50);
     fill.position.set(-2.5, 0.5, -1.0); scene.add(fill);
-    const rim = new T.DirectionalLight(0xc0d8ff, 0.30);
-    rim.position.set(0, -2.0, -3.0); scene.add(rim);
+    const rim = new T.DirectionalLight(0xffd0b0, 0.35);
+    rim.position.set(0.5, -1.5, -2.0); scene.add(rim);
 
     // ── Pivot for rotation ────────────────────────────────────────────────────
     // No offset — model is aligned to hit zones (center ~y=0.58)
@@ -290,11 +290,18 @@ export default function BodyMap3D({
           -center.y * scaleFactor + HIT_CENTER_Y,
           -center.z * scaleFactor,
         );
-        // Apply nice material to all meshes
+        // Apply smooth normals + material to all meshes
         model.traverse((child) => {
           const c = child as THREEMesh;
           if (c.isMesh) {
-            c.material = new T.MeshStandardMaterial({ color: 0xc8906a, roughness: 0.72, metalness: 0.0 }) as unknown as THREEMeshStdMat;
+            // Recompute smooth vertex normals — fixes the faceted/polygon look
+            // from the optimized GLB that lost shared vertex normals
+            c.geometry.computeVertexNormals();
+            c.material = new T.MeshStandardMaterial({
+              color: 0xd4956a,
+              roughness: 0.60,
+              metalness: 0.02,
+            }) as unknown as THREEMeshStdMat;
             c.castShadow    = false;
             c.receiveShadow = false;
           }
@@ -693,7 +700,7 @@ export default function BodyMap3D({
 interface THREEColor      { setHex(h: number): void }
 interface THREEVec2       { set(x: number, y: number): void }
 interface THREEVec3       { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
-interface THREEGeo        { dispose(): void }
+interface THREEGeo        { dispose(): void; computeVertexNormals(): void }
 interface THREEMeshStdMat { color: THREEColor; roughness: number; metalness: number; emissive?: THREEColor; emissiveIntensity?: number; transparent?: boolean; opacity?: number; dispose(): void }
 interface THREEObj3D {
   position: THREEVec3; rotation: { x: number; y: number; z: number };
@@ -702,7 +709,7 @@ interface THREEObj3D {
   userData: Record<string, unknown>; traverse(cb: (o: THREEObj3D) => void): void;
   castShadow: boolean; receiveShadow: boolean;
 }
-interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat }
+interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat; geometry: THREEGeo }
 interface THREEScene  extends THREEObj3D {}
 interface THREEGroup  extends THREEObj3D {}
 interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMatrix?(): void }
