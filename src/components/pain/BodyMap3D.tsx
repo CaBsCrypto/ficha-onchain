@@ -189,8 +189,9 @@ export default function BodyMap3D({
     container.appendChild(renderer.domElement);
 
     // ── Camera ────────────────────────────────────────────────────────────────
-    const camera = new T.PerspectiveCamera(38, w / h, 0.05, 200);
-    camera.position.set(0, 0.55, 3.2);
+    const camera = new T.PerspectiveCamera(42, w / h, 0.05, 200);
+    // Look slightly above center so the full head is always visible
+    camera.position.set(0, 0.35, 3.0);
 
     // ── Scene & lights ────────────────────────────────────────────────────────
     const scene = new T.Scene();
@@ -281,10 +282,10 @@ export default function BodyMap3D({
         const targetH = 2.20;
         const scaleFactor = targetH / maxDim;
         model.scale.setScalar(scaleFactor);
-        // Center horizontally, align feet to ~y=-0.98
+        // Center the model vertically — feet near bottom, head fully visible
         model.position.set(
           -center.x * scaleFactor,
-          -center.y * scaleFactor + (size.y * scaleFactor * 0.5) - 0.98,
+          -center.y * scaleFactor - 0.22,  // shift slightly down so head isn't cropped
           -center.z * scaleFactor,
         );
         // Apply nice material to all meshes

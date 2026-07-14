@@ -175,26 +175,29 @@ export default function PatientPortal() {
     }
 
     // Privy-authenticated user: fetch their real Stellar wallet
+    // Retry up to 3 times — new users need a moment for Privy to finish setup
     (async () => {
-      try {
-        const token = await getAccessToken();
-        const res = await fetch("/api/privy/stellar-wallet", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
+      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      let address: string | null = null;
 
-        if (data.address) {
-          setSession({
-            role: "patient",
-            address: data.address as string,
-            mock: false,
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const token = await getAccessToken();
+          const res = await fetch("/api/privy/stellar-wallet", {
+            headers: { Authorization: `Bearer ${token}` },
           });
-        } else {
-          throw new Error(data.error ?? "No address returned");
+          const data = await res.json() as { address?: string; error?: string };
+          if (data.address) { address = data.address; break; }
+          if (attempt < 2) await delay(2000);
+        } catch {
+          if (attempt < 2) await delay(2000);
         }
-      } catch (err) {
-        console.error("[PatientPortal] stellar wallet error:", err);
-        // Graceful fallback to demo mode
+      }
+
+      if (address) {
+        setSession({ role: "patient", address, mock: false });
+      } else {
+        console.warn("[PatientPortal] stellar wallet unavailable — demo mode");
         setSession({
           role: "patient",
           address:
@@ -202,9 +205,8 @@ export default function PatientPortal() {
             "GD7WGS7MACGCZCECTNO5V3CH3FORZ2JQYILB5VDCQOYYEAJQOS2V4ZFW",
           mock: true,
         });
-      } finally {
-        setReady(true);
       }
+      setReady(true);
     })();
   }, [authenticated, getAccessToken]);
 
