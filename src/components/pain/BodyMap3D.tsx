@@ -679,7 +679,7 @@ export default function BodyMap3D({
             const d = Math.hypot(px - zpos[0], py - zpos[1], pz - zpos[2]);
             if (d < minDist) { minDist = d; nearestZone = zid; }
           }
-          return { zone: nearestZone, pos: [p.x, p.y, p.z] as [number, number, number] };
+          return { zone: nearestZone, pos: [px, py, pz] as [number, number, number] };
         }
         // Fallback: invisible hit zones
         const hits = raycaster.intersectObjects([...hitMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])]);
