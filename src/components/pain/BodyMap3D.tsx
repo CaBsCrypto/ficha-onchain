@@ -195,13 +195,15 @@ export default function BodyMap3D({
 
     // ── Scene & lights ────────────────────────────────────────────────────────
     const scene = new T.Scene();
-    scene.add(new T.AmbientLight(0xffeedd, 0.85));
-    const key = new T.DirectionalLight(0xfff8f0, 1.4);
-    key.position.set(1.2, 3.0, 2.5); scene.add(key);
-    const fill = new T.DirectionalLight(0xaaccee, 0.50);
-    fill.position.set(-2.5, 0.5, -1.0); scene.add(fill);
-    const rim = new T.DirectionalLight(0xffd0b0, 0.35);
-    rim.position.set(0.5, -1.5, -2.0); scene.add(rim);
+    scene.add(new T.AmbientLight(0xffe8d8, 0.90));   // warm ambient
+    const key = new T.DirectionalLight(0xfff6ee, 1.6); // warm key light
+    key.position.set(1.5, 3.5, 3.0); scene.add(key);
+    const fill = new T.DirectionalLight(0x88aacc, 0.55); // cool fill (opposite)
+    fill.position.set(-2.5, 1.0, -1.5); scene.add(fill);
+    const back = new T.DirectionalLight(0xffe0c0, 0.40); // warm rim from behind
+    back.position.set(0.0, 1.0, -3.0); scene.add(back);
+    const top = new T.DirectionalLight(0xffffff, 0.25); // soft top
+    top.position.set(0, 4, 0); scene.add(top);
 
     // ── Pivot for rotation ────────────────────────────────────────────────────
     // No offset — model is aligned to hit zones (center ~y=0.58)
@@ -290,12 +292,19 @@ export default function BodyMap3D({
           -center.y * scaleFactor + HIT_CENTER_Y,
           -center.z * scaleFactor,
         );
-        // Keep original GLB material (textures) — only fix normals for smooth shading
+        // Apply skin material with smooth normals
         model.traverse((child) => {
           const c = child as THREEMesh;
           if (c.isMesh) {
-            // Recompute smooth vertex normals in case the GLB has flat normals
             c.geometry.computeVertexNormals();
+            // Warm skin tone — medical illustration style
+            c.material = new T.MeshStandardMaterial({
+              color: 0xdda882,      // warm natural skin
+              roughness: 0.55,
+              metalness: 0.0,
+              emissive: 0x3a1800,   // subtle warm glow in shadows
+              emissiveIntensity: 0.08,
+            }) as unknown as THREEMeshStdMat;
             c.castShadow    = false;
             c.receiveShadow = false;
           }
