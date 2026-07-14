@@ -16,6 +16,7 @@ import type { OnChainPrescription, WithExpiry } from "@/lib/stellar";
 import type { Consultation } from "@/lib/consultations/store";
 import { clearSession, loadSession, type PasskeySession } from "@/lib/passkey";
 import { usePrivy, useLogout } from "@privy-io/react-auth";
+import { usePrivyEmail } from "@/hooks/usePrivyEmail";
 import {
   HomeIcon,
   ChevronRightIcon,
@@ -207,11 +208,8 @@ export default function PatientPortal() {
     })();
   }, [authenticated, getAccessToken]);
 
-  // Extract display name from Privy user
-  const privyEmail =
-    user?.email?.address ??
-    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
-    null;
+  // Extract display email from Privy user
+  const privyEmail = usePrivyEmail();
 
   if (!ready) return null;
   // No session and not authenticated → go to landing
@@ -425,11 +423,7 @@ function InicioTab({
   onGoToRecetas: () => void;
   onGoToFicha: () => void;
 }) {
-  const { user } = usePrivy();
-  const privyEmail =
-    user?.email?.address ??
-    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
-    null;
+  const privyEmail = usePrivyEmail();
   const displayName = privyEmail ?? "Mi portal";
   const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
 
@@ -1111,11 +1105,7 @@ function MockRxCard({ rx }: { rx: MockRx }) {
 // ---------------------------------------------------------------------------
 function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const ficha = MOCK_FICHA;
-  const { user } = usePrivy();
-  const privyEmail =
-    user?.email?.address ??
-    (user?.linkedAccounts?.find((a) => a.type === "google_oauth") as { email?: string } | undefined)?.email ??
-    null;
+  const privyEmail = usePrivyEmail();
   const displayName = privyEmail ?? (mock ? "Mi Cuenta" : "Tu perfil");
   const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
 
@@ -1150,9 +1140,13 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
               {truncateHash(wallet, 6, 6)}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-2">
-              <Badge tone="mint">
-                <ShieldCheckIcon className="h-3 w-3" /> Verificada on-chain
-              </Badge>
+              {mock ? (
+                <Badge tone="muted">Demo · datos de ejemplo</Badge>
+              ) : (
+                <Badge tone="mint">
+                  <ShieldCheckIcon className="h-3 w-3" /> Wallet verificada
+                </Badge>
+              )}
               <Badge tone="muted">Testnet</Badge>
             </div>
           </div>

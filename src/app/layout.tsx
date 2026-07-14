@@ -20,7 +20,7 @@ const SITE_URL = "https://trustleaf-demo.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "TrustLeaf â€” Patient-owned health records on Stellar",
+  title: "TrustLeaf — Patient-owned health records on Stellar",
   description:
     "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
   keywords: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     "patient owned",
   ],
   openGraph: {
-    title: "TrustLeaf â€” Patient-owned health records on Stellar",
+    title: "TrustLeaf — Patient-owned health records on Stellar",
     description:
       "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
     url: SITE_URL,
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "TrustLeaf â€” Patient-owned health records on Stellar",
+    title: "TrustLeaf — Patient-owned health records on Stellar",
     description:
       "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
     images: ["/og-image.png"],

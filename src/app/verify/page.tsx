@@ -46,11 +46,7 @@ export default async function VerifyPage({
         </Link>
 
         {!token ? (
-          <StateCard
-            tone="muted"
-            title="Sin token de verificación"
-            body="Este enlace no incluye un token. Escanea el código QR desde la app del paciente."
-          />
+          <HowItWorks />
         ) : (
           <VerifiedContent token={token} />
         )}
@@ -255,5 +251,85 @@ function AlertIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      ),
+      title: "El médico emite una receta",
+      body: "La prescripción queda registrada en un contrato inteligente en Stellar Soroban — inmutable y verificable.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M13 17h2m4 0h-2m0 0v-4m0 4v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      ),
+      title: "El paciente genera un QR",
+      body: "Desde su portal, el paciente comparte un enlace de verificación con validez de 15 minutos.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "La farmacia verifica aquí",
+      body: "Esta página lee la receta directo desde la blockchain — sin intermediarios, sin bases de datos propietarias.",
+    },
+  ];
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Hero */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white/80 px-6 py-8 text-center shadow-sm backdrop-blur-sm">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-clinical/10 text-clinical">
+          <ShieldCheck />
+        </div>
+        <h1 className="text-2xl font-semibold text-ink">Verificador de recetas</h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">
+          Escanea el código QR del paciente para ver su prescripción verificada directamente desde Stellar Soroban.
+        </p>
+      </div>
+
+      {/* Steps */}
+      <div className="space-y-3">
+        {steps.map((step, i) => (
+          <div
+            key={i}
+            className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white/70 px-5 py-4"
+          >
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-clinical/10 text-clinical">
+              {step.icon}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-ink">{step.title}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted">{step.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <div className="rounded-2xl border border-clinical/20 bg-clinical/5 px-5 py-4 text-center">
+        <p className="text-xs text-muted">
+          ¿Eres farmacéutico?{" "}
+          <Link href="/pharmacy" className="font-medium text-clinical hover:underline">
+            Accede al portal de farmacia →
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }

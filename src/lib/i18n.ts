@@ -281,7 +281,7 @@ export const translations = {
       built: "Built on Stellar Soroban",
       rights: "All rights reserved.",
       columns: {
-        product: { title: "Product", links: ["Problem", "Solution", "How it works", "Roadmap", "Traction", "Verify"] },
+        product: { title: "Product", links: ["Problem", "Solution", "How it works", "Roadmap", "Verify"] },
         company: { title: "Company", links: ["About", "Contact", "Careers"] },
         legal: { title: "Legal", links: ["Privacy", "Terms", "Security"] },
       },
@@ -563,7 +563,7 @@ export const translations = {
       built: "Construido sobre Stellar Soroban",
       rights: "Todos los derechos reservados.",
       columns: {
-        product: { title: "Producto", links: ["Problema", "Solución", "Cómo funciona", "Roadmap", "Tracción", "Verificar"] },
+        product: { title: "Producto", links: ["Problema", "Solución", "Cómo funciona", "Roadmap", "Verificar"] },
         company: { title: "Empresa", links: ["Nosotros", "Contacto", "Trabaja con nosotros"] },
         legal: { title: "Legal", links: ["Privacidad", "Términos", "Seguridad"] },
       },
