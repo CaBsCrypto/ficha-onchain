@@ -117,6 +117,13 @@ function painHex(level: number | undefined): number {
   return 0xef4444;
 }
 
+function painHexNum(level: number): number {
+  if (level <= 3) return 0x4ade80;
+  if (level <= 6) return 0xfbbf24;
+  if (level <= 9) return 0xf97316;
+  return 0xef4444;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BodyMap3D({
@@ -139,13 +146,13 @@ export default function BodyMap3D({
   const [brush, setBrush] = useState<{ x: number; y: number; r: number } | null>(null);
   const brushRef = useRef<{ x: number; y: number; r: number } | null>(null);
 
-  // ── Drag-and-drop needle state ─────────────────────────────────────────────
+  // ── Needle placement state ─────────────────────────────────────────────────
   const [draggingNeedle, setDraggingNeedle] = useState(false);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
-  const [pendingZone, setPendingZone] = useState<string | null>(null);
-  const [pendingLevel, setPendingLevel] = useState(5);
-  const setPendingZoneRef = useRef<((z: string) => void) | null>(null);
-  useEffect(() => { setPendingZoneRef.current = setPendingZone; }, []);
+  const [pendingNeedles, setPendingNeedles] = useState<PendingNeedle[]>([]);
+  const [confirmingNeedle, setConfirmingNeedle] = useState<PendingNeedle | null>(null);
+  const [confirmLevel, setConfirmLevel] = useState(5);
+  const nextIdRef = useRef(0);
 
   // Drag pointer events (window-level, attached when dragging)
   useEffect(() => {
@@ -154,14 +161,19 @@ export default function BodyMap3D({
     function onUp(e: PointerEvent) {
       setDraggingNeedle(false); setDragPos(null);
       const container = containerRef.current;
-      if (!container) return;
+      const s = sceneRef.current;
+      if (!container || !s) return;
       const rect = container.getBoundingClientRect();
       if (e.clientX >= rect.left && e.clientX <= rect.right &&
           e.clientY >= rect.top  && e.clientY <= rect.bottom) {
         const nx = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
         const ny = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-        const zone = sceneRef.current?.raycastAt(nx, ny) ?? null;
-        if (zone) { setPendingZone(zone); setPendingLevel(5); }
+        const hit = s.raycastAt(nx, ny);
+        if (hit) {
+          const nid = `needle_${nextIdRef.current++}`;
+          s.addNeedle(nid, hit.pos, true);
+          setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
+        }
       }
     }
     window.addEventListener("pointermove", onMove);
@@ -175,13 +187,6 @@ export default function BodyMap3D({
     setDragPos({ x: e.clientX, y: e.clientY });
   }
 
-  function confirmNeedle() {
-    if (!pendingZone) return;
-    onNeedlePlaced?.(pendingZone, pendingLevel);
-    onZoneSelect?.(pendingZone);
-    setPendingZone(null);
-  }
-
   const onZoneSelectRef      = useRef(onZoneSelect);
   const onMultiZoneSelectRef = useRef(onMultiZoneSelect);
   useEffect(() => { onZoneSelectRef.current = onZoneSelect; },      [onZoneSelect]);
@@ -191,27 +196,18 @@ export default function BodyMap3D({
   useEffect(() => {
     painDataRef.current = painData;
     const s = sceneRef.current;
-    if (!s) return;
-    // Update acupuncture needle visibility + color
-    s.painIndicators.forEach((needle, id) => {
-      const lvl   = painData[id];
-      const color = painHex(lvl);
-      const needleObj = needle as unknown as THREEObj3D;
-      if (color === -1) {
-        needleObj.visible = false;
-      } else {
-        needleObj.visible = true;
-        // Update all child mesh materials
-        needleObj.traverse((child) => {
-          const c = child as THREEMesh;
-          if (c.isMesh) {
-            (c.material as THREEMeshStdMat).color.setHex(color);
-            (c.material as THREEMeshStdMat).emissive?.setHex(color);
-          }
-        });
+    if (!s || !readOnly) return;
+    // readOnly: create/update needles from painData at zone centers
+    Object.entries(painData).forEach(([zone, lvl]) => {
+      const pos = (ZONE_CENTERS[zone] ?? [0, 0.6, 0]) as [number, number, number];
+      const roId = `ro_${zone}`;
+      if (!s.dynamicNeedles.has(roId)) {
+        s.addNeedle(roId, pos, false);
       }
+      const color = painHex(lvl);
+      if (color !== -1) s.setNeedleColor(roId, color);
     });
-  }, [painData]);
+  }, [painData, readOnly]);
 
   useEffect(() => {
     const s = sceneRef.current;
@@ -261,6 +257,9 @@ export default function BodyMap3D({
     const pivot = new T.Group();
     scene.add(pivot);
 
+    // GLB meshes collected after load (for precise raycasting)
+    const glbMeshesArr: THREEMesh[] = [];
+
     // ── Invisible hit zones (procedural) ─────────────────────────────────────
     const hitMeshes: THREEMesh[] = [];
     const hitByZone = new Map<string, THREEMesh[]>();
@@ -286,52 +285,30 @@ export default function BodyMap3D({
       arr.push(m); hitByZone.set(def.id, arr);
     }
 
-    // ── Acupuncture needle indicators ────────────────────────────────────────
-    const painIndicators = new Map<string, THREEGroup>();
+    // ── Dynamic needle system ────────────────────────────────────────────────
+    const dynamicNeedles = new Map<string, THREEGroup>();
 
-    // Shared geometries for all needles (mobile-friendly: reuse)
-    const needleShaftGeo = new T.CylinderGeometry(0.0035, 0.0018, 0.22, 8);
-    const needleHeadGeo  = new T.SphereGeometry(0.014, 12, 12);
-    // Cone tip: CylinderGeometry with radiusTop=0
-    const needleTipGeo   = new T.CylinderGeometry(0, 0.0035, 0.030, 8);
+    const nShaftGeo = new T.CylinderGeometry(0.0035, 0.0018, 0.22, 8);
+    const nHeadGeo  = new T.SphereGeometry(0.014, 12, 12);
+    const nTipGeo   = new T.CylinderGeometry(0, 0.0035, 0.030, 8);
 
-    function makeNeedle(color: number): THREEGroup {
+    function makeNeedleGroup(color: number): THREEGroup {
       const group = new T.Group() as unknown as THREEGroup;
       const mat = new T.MeshStandardMaterial({
         color, roughness: 0.25, metalness: 0.65,
-        emissive: color, emissiveIntensity: 0.20,
+        emissive: color, emissiveIntensity: 0.35,
       }) as unknown as THREEMeshStdMat;
-
-      // Shaft — center at y=0.11 (so tip at y=0, head at y=0.22)
-      const shaft = new T.Mesh(needleShaftGeo, mat);
+      const shaft = new T.Mesh(nShaftGeo, mat);
       (shaft as unknown as THREEObj3D).position.set(0, 0.11, 0);
       (group as unknown as THREEObj3D).add(shaft as unknown as THREEObj3D);
-
-      // Head ball at top
-      const head = new T.Mesh(needleHeadGeo, mat);
+      const head = new T.Mesh(nHeadGeo, mat);
       (head as unknown as THREEObj3D).position.set(0, 0.235, 0);
       (group as unknown as THREEObj3D).add(head as unknown as THREEObj3D);
-
-      // Tip cone at bottom (points down into body)
-      const tip = new T.Mesh(needleTipGeo, mat);
+      const tip = new T.Mesh(nTipGeo, mat);
       (tip as unknown as THREEObj3D).position.set(0, -0.015, 0);
-      // Rotate 180° so the point faces down
       (tip as unknown as THREEObj3D).rotation.z = Math.PI;
       (group as unknown as THREEObj3D).add(tip as unknown as THREEObj3D);
-
       return group;
-    }
-
-    for (const [id, pos] of Object.entries(ZONE_CENTERS)) {
-      const needle = makeNeedle(0x4ade80); // default green; updated by painData
-      // Position at zone center, offset slightly outward (+z) so needle sticks out
-      (needle as unknown as THREEObj3D).position.set(pos[0], pos[1], pos[2] + 0.06);
-      // Tilt slightly outward based on x position (left/right zones lean outward)
-      (needle as unknown as THREEObj3D).rotation.z = pos[0] * -0.4; // lean left zones left, right zones right
-      (needle as unknown as THREEObj3D).rotation.x = -0.15; // slight forward tilt
-      (needle as unknown as THREEObj3D).visible = false;
-      pivot.add(needle as unknown as THREEObj3D);
-      painIndicators.set(id, needle);
     }
 
     // ── Fibromyalgia markers ──────────────────────────────────────────────────
@@ -382,6 +359,7 @@ export default function BodyMap3D({
             c.geometry.computeVertexNormals();
             c.castShadow    = false;
             c.receiveShadow = false;
+            glbMeshesArr.push(c);
           }
         });
         pivot.add(model);
@@ -520,11 +498,11 @@ export default function BodyMap3D({
         brushRef.current = null; setBrush(null); isAreaBrush = false;
       } else if (isDragging && dx < 6 && dy < 6 && toolRef.current === "pin" && !readOnly) {
         const { nx, ny } = screenToNDC(e);
-        pointer.set(nx, ny); raycaster.setFromCamera(pointer, camera);
-        const hits = raycaster.intersectObjects(getTargets());
-        if (hits[0]) {
-          const zoneId = (hits[0].object as THREEMesh).userData["id"] as string;
-          setPendingZoneRef.current?.(zoneId);
+        const hit = sceneRef.current?.raycastAt(nx, ny);
+        if (hit) {
+          const nid = `needle_${nextIdRef.current++}`;
+          sceneRef.current?.addNeedle(nid, hit.pos, true);
+          setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
         }
       }
       isDragging = false;
@@ -589,11 +567,11 @@ export default function BodyMap3D({
         brushRef.current = null; setBrush(null); isAreaBrush = false;
       } else if (dx < 10 && dy < 10 && toolRef.current === "pin" && !readOnly) {
         const { nx, ny } = screenToNDC(t);
-        pointer.set(nx, ny); raycaster.setFromCamera(pointer, camera);
-        const hits = raycaster.intersectObjects(getTargets());
-        if (hits[0]) {
-          const zoneId = (hits[0].object as THREEMesh).userData["id"] as string;
-          setPendingZoneRef.current?.(zoneId);
+        const hit = sceneRef.current?.raycastAt(nx, ny);
+        if (hit) {
+          const nid = `needle_${nextIdRef.current++}`;
+          sceneRef.current?.addNeedle(nid, hit.pos, true);
+          setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
         }
       }
       isDragging = false;
@@ -633,12 +611,12 @@ export default function BodyMap3D({
 
       // Needle quiver — tiny oscillation (acupuncture effect)
       let ni = 0;
-      painIndicators.forEach((needle, zoneId) => {
-        const needleObj = needle as unknown as THREEObj3D;
-        if (!needleObj.visible) { ni++; return; }
-        const baseZ = (ZONE_CENTERS[zoneId]?.[0] ?? 0) * -0.4;
-        needleObj.rotation.z = baseZ + 0.018 * Math.sin(time * 5.5 + ni * 1.3);
-        needleObj.rotation.x = -0.15  + 0.010 * Math.sin(time * 4.8 + ni * 0.9);
+      dynamicNeedles.forEach((needle) => {
+        const nObj = needle as unknown as THREEObj3D;
+        const baseZ = nObj.position.x * -0.35;
+        const baseX = -0.12;
+        nObj.rotation.z = baseZ + 0.015 * Math.sin(time * 5.5 + ni * 1.3);
+        nObj.rotation.x = baseX + 0.008 * Math.sin(time * 4.8 + ni * 0.9);
         ni++;
       });
 
@@ -655,12 +633,62 @@ export default function BodyMap3D({
 
     sceneRef.current = {
       renderer, scene, camera, pivot, hitMeshes, hitByZone,
-      painIndicators, fibroMeshes, rafId, ro,
+      glbMeshes: glbMeshesArr, dynamicNeedles, fibroMeshes, rafId, ro,
+      addNeedle(id: string, pos: [number, number, number], pending: boolean) {
+        const color = pending ? 0x38bdf8 : 0x4ade80;
+        const needle = makeNeedleGroup(color);
+        const nObj = needle as unknown as THREEObj3D;
+        nObj.position.set(pos[0], pos[1], pos[2] + 0.04);
+        nObj.rotation.z = pos[0] * -0.35;
+        nObj.rotation.x = -0.12;
+        pivot.add(nObj);
+        dynamicNeedles.set(id, needle);
+      },
+      removeNeedle(id: string) {
+        const n = dynamicNeedles.get(id);
+        if (n) { pivot.remove(n as unknown as THREEObj3D); dynamicNeedles.delete(id); }
+      },
+      setNeedleColor(id: string, color: number) {
+        const n = dynamicNeedles.get(id);
+        if (!n) return;
+        (n as unknown as THREEObj3D).traverse((child) => {
+          const c = child as THREEMesh;
+          if (c.isMesh) {
+            (c.material as THREEMeshStdMat).color.setHex(color);
+            (c.material as THREEMeshStdMat).emissive?.setHex(color);
+          }
+        });
+      },
       raycastAt(nx: number, ny: number) {
         pointer.set(nx, ny);
         raycaster.setFromCamera(pointer, camera);
+        // Precise free-form raycast against actual GLB mesh surface
+        const glbHits = raycaster.intersectObjects(glbMeshesArr, true);
+        if (glbHits[0]) {
+          const p = glbHits[0].point;
+          // Convert hit world position to pivot-local space (undo pivot rotation)
+          const cosY = Math.cos(-rotY), sinY = Math.sin(-rotY);
+          const cosX = Math.cos(-rotX), sinX = Math.sin(-rotX);
+          let px = p.x, py = p.y, pz = p.z;
+          const rx = px * cosY + pz * sinY; pz = -px * sinY + pz * cosY; px = rx;
+          const ry2 = py * cosX - pz * sinX; const rz2 = py * sinX + pz * cosX; py = ry2; pz = rz2;
+          // Find nearest zone by distance in pivot-local space
+          let nearestZone = "torso";
+          let minDist = Infinity;
+          for (const [zid, zpos] of Object.entries(ZONE_CENTERS)) {
+            const d = Math.hypot(px - zpos[0], py - zpos[1], pz - zpos[2]);
+            if (d < minDist) { minDist = d; nearestZone = zid; }
+          }
+          return { zone: nearestZone, pos: [p.x, p.y, p.z] as [number, number, number] };
+        }
+        // Fallback: invisible hit zones
         const hits = raycaster.intersectObjects([...hitMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])]);
-        return hits[0] ? ((hits[0].object as THREEMesh).userData["id"] as string) : null;
+        if (hits[0]) {
+          const zoneId = (hits[0].object as THREEMesh).userData["id"] as string;
+          const zp = ZONE_CENTERS[zoneId] ?? [0, 0.6, 0];
+          return { zone: zoneId, pos: zp as [number, number, number] };
+        }
+        return null;
       },
       cleanup() {
         cancelAnimationFrame(rafId); ro.disconnect();
@@ -747,47 +775,63 @@ export default function BodyMap3D({
           </svg>
         )}
 
-        {/* ── Pain level slider overlay ── */}
-        {pendingZone && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 rounded-xl">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 mx-4 w-full max-w-xs shadow-2xl">
-              <div className="flex items-center gap-2 mb-1">
-                {/* Mini needle icon */}
-                <svg viewBox="0 0 16 60" className="h-10 w-3 flex-shrink-0" style={{ color: levelColor(pendingLevel) }}>
+        {/* ── Pain slider for confirming needle level ── */}
+        {confirmingNeedle && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/65 rounded-xl">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 mx-4 w-full max-w-xs shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <svg viewBox="0 0 16 60" className="h-10 w-3 flex-shrink-0" style={{ color: levelColor(confirmLevel) }}>
                   <ellipse cx="8" cy="8" rx="6" ry="6" fill="currentColor" />
-                  <rect x="6.5" y="13" width="3" height="38" rx="1.5" fill="currentColor" opacity="0.85" />
-                  <polygon points="8,55 5.5,51 10.5,51" fill="currentColor" opacity="0.7" />
+                  <rect x="6.5" y="13" width="3" height="37" rx="1.5" fill="currentColor" opacity="0.85" />
+                  <polygon points="8,54 5.5,49 10.5,49" fill="currentColor" opacity="0.7" />
                 </svg>
                 <div>
-                  <h3 className="text-sm font-semibold text-white leading-tight">{ZONE_NAMES[pendingZone] ?? pendingZone}</h3>
-                  <p className="text-xs text-slate-400">¿Qué tan intenso es el dolor?</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-0.5">Nivel de dolor</p>
+                  <h3 className="text-sm font-semibold text-white">{ZONE_NAMES[confirmingNeedle.zone] ?? confirmingNeedle.zone}</h3>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 mt-4 mb-2">
-                <span className="text-3xl font-bold w-8 text-center" style={{ color: levelColor(pendingLevel) }}>
-                  {pendingLevel}
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl font-bold w-8 text-center tabular-nums" style={{ color: levelColor(confirmLevel) }}>
+                  {confirmLevel}
                 </span>
                 <input
-                  type="range" min={1} max={10} value={pendingLevel}
-                  onChange={(e) => setPendingLevel(Number(e.target.value))}
+                  type="range" min={1} max={10} value={confirmLevel}
+                  onChange={(e) => {
+                    const lvl = Number(e.target.value);
+                    setConfirmLevel(lvl);
+                    sceneRef.current?.setNeedleColor(confirmingNeedle.id, painHexNum(lvl));
+                  }}
                   className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
-                  style={{ accentColor: levelColor(pendingLevel) }}
+                  style={{ accentColor: levelColor(confirmLevel) }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-slate-500 mb-5 px-1">
-                <span>Sin dolor</span><span>Máximo dolor</span>
+                <span>Mínimo</span><span>Máximo</span>
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => setPendingZone(null)}
+                <button
+                  onClick={() => {
+                    sceneRef.current?.removeNeedle(confirmingNeedle.id);
+                    setPendingNeedles(prev => prev.filter(n => n.id !== confirmingNeedle.id));
+                    setConfirmingNeedle(null);
+                  }}
                   className="flex-1 rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-800 transition">
-                  Cancelar
+                  Quitar
                 </button>
-                <button onClick={confirmNeedle}
+                <button
+                  onClick={() => {
+                    onNeedlePlaced?.(confirmingNeedle.zone, confirmLevel);
+                    onZoneSelect?.(confirmingNeedle.zone);
+                    sceneRef.current?.setNeedleColor(confirmingNeedle.id, painHexNum(confirmLevel));
+                    setPendingNeedles(prev => prev.filter(n => n.id !== confirmingNeedle.id));
+                    setConfirmingNeedle(null);
+                    setConfirmLevel(5);
+                  }}
                   className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white shadow transition"
-                  style={{ backgroundColor: levelColor(pendingLevel) }}>
-                  Insertar aguja
+                  style={{ backgroundColor: levelColor(confirmLevel) }}>
+                  Confirmar
                 </button>
               </div>
             </div>
@@ -797,27 +841,47 @@ export default function BodyMap3D({
 
       {/* ── Needle sidebar ── */}
       {!readOnly && (
-        <div className="w-14 flex flex-col items-center gap-3 rounded-2xl bg-slate-900/90 border border-slate-700/60 py-4 px-2 backdrop-blur-sm">
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">Aguja</p>
+        <div className="w-16 flex flex-col items-center gap-3 rounded-2xl bg-slate-900/95 border border-slate-700/60 py-4 px-2 backdrop-blur-sm overflow-y-auto">
 
           {/* Draggable needle */}
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">Aguja</p>
           <div
-            className="touch-none cursor-grab active:cursor-grabbing flex flex-col items-center"
+            className="touch-none cursor-grab active:cursor-grabbing flex flex-col items-center group"
             onPointerDown={handleNeedlePointerDown}
             title="Arrastra al cuerpo"
           >
-            <svg viewBox="0 0 20 70" className="h-16 w-5 text-sky-400 hover:text-sky-300 transition-colors drop-shadow-[0_0_6px_rgba(56,189,248,0.6)]">
+            <svg viewBox="0 0 20 70" className="h-14 w-5 text-sky-400 group-hover:text-sky-300 transition-colors drop-shadow-[0_0_8px_rgba(56,189,248,0.7)]">
               <ellipse cx="10" cy="9" rx="8" ry="8" fill="currentColor" />
               <rect x="8.5" y="16" width="3" height="44" rx="1.5" fill="currentColor" opacity="0.8" />
               <polygon points="10,65 7,58 13,58" fill="currentColor" opacity="0.6" />
             </svg>
+            <p className="text-[9px] text-slate-500 text-center mt-1 leading-tight">Arrastra</p>
           </div>
 
-          <p className="text-[9px] text-slate-500 text-center leading-tight">Arrastra al cuerpo</p>
+          {/* Pending needles list */}
+          {pendingNeedles.length > 0 && (
+            <>
+              <div className="w-full h-px bg-slate-700/60 my-1" />
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-sky-500">
+                {pendingNeedles.length} {pendingNeedles.length === 1 ? "aguja" : "agujas"}
+              </p>
+              {pendingNeedles.map((pn) => (
+                <div key={pn.id} className="w-full flex flex-col items-center gap-1">
+                  <span className="text-[9px] text-slate-300 text-center leading-tight truncate w-full text-center">
+                    {ZONE_NAMES[pn.zone] ?? pn.zone}
+                  </span>
+                  <button
+                    onClick={() => { setConfirmingNeedle(pn); setConfirmLevel(5); sceneRef.current?.setNeedleColor(pn.id, painHexNum(5)); }}
+                    className="w-full rounded-lg bg-sky-600/80 hover:bg-sky-500 text-white text-[10px] font-semibold py-1 transition"
+                  >✓ Dolor</button>
+                </div>
+              ))}
+            </>
+          )}
 
           {/* Fibro legend */}
           {fibromyalgiaMode && (
-            <div className="mt-2 flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-violet-400 inline-block" />
               <span className="text-[9px] text-slate-500 text-center">Fibro</span>
             </div>
@@ -835,13 +899,13 @@ export default function BodyMap3D({
         </div>
       )}
 
-      {/* ── Drag ghost needle (follows cursor) ── */}
+      {/* ── Drag ghost needle ── */}
       {draggingNeedle && dragPos && (
         <div
           className="pointer-events-none fixed z-[9999]"
-          style={{ left: dragPos.x - 10, top: dragPos.y - 50, transform: "rotate(0deg)" }}
+          style={{ left: dragPos.x - 10, top: dragPos.y - 50 }}
         >
-          <svg viewBox="0 0 20 70" className="h-16 w-5 text-sky-300 drop-shadow-[0_0_10px_rgba(56,189,248,0.9)]">
+          <svg viewBox="0 0 20 70" className="h-16 w-5 text-sky-300 drop-shadow-[0_0_12px_rgba(56,189,248,0.95)]">
             <ellipse cx="10" cy="9" rx="8" ry="8" fill="currentColor" />
             <rect x="8.5" y="16" width="3" height="44" rx="1.5" fill="currentColor" opacity="0.9" />
             <polygon points="10,65 7,58 13,58" fill="currentColor" opacity="0.7" />
@@ -868,11 +932,11 @@ interface THREEObj3D {
 }
 interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat; geometry: THREEGeo }
 interface THREEScene  extends THREEObj3D {}
-interface THREEGroup  extends THREEObj3D {}
+interface THREEGroup  extends THREEObj3D { remove(o: THREEObj3D): void }
 interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMatrix?(): void }
 interface THREEBox3   { setFromObject(o: THREEObj3D): THREEBox3; getSize(v: THREEVec3): THREEVec3; getCenter(v: THREEVec3): THREEVec3 }
 interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void }
-interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[]): Array<{ object: THREEObj3D }> }
+interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[], recursive?: boolean): Array<{ object: THREEObj3D; point: THREEVec3 }> }
 interface GLTF         { scene: THREEGroup }
 interface THREECtors {
   WebGLRenderer: new (o: { antialias: boolean; alpha: boolean }) => THREERenderer;
@@ -892,11 +956,17 @@ interface THREECtors {
 }
 interface GLTFLoaderClass { load(url: string, onLoad: (g: GLTF) => void, onProgress: undefined, onError: (e: unknown) => void): void }
 interface WindowWithTHREE { THREE?: THREECtors; GLTFLoader?: new () => GLTFLoaderClass }
+interface PendingNeedle { id: string; zone: string; pos: [number, number, number] }
 interface SceneState {
   renderer: THREERenderer; scene: THREEScene; camera: THREECamera; pivot: THREEGroup;
   hitMeshes: THREEMesh[]; hitByZone: Map<string, THREEMesh[]>;
-  painIndicators: Map<string, THREEGroup>; fibroMeshes: THREEMesh[];
+  glbMeshes: THREEMesh[];
+  dynamicNeedles: Map<string, THREEGroup>;
+  fibroMeshes: THREEMesh[];
   rafId: number; ro: ResizeObserver;
-  raycastAt(nx: number, ny: number): string | null;
+  addNeedle(id: string, pos: [number, number, number], pending: boolean): void;
+  removeNeedle(id: string): void;
+  setNeedleColor(id: string, color: number): void;
+  raycastAt(nx: number, ny: number): { zone: string; pos: [number, number, number] } | null;
   cleanup(): void;
 }
