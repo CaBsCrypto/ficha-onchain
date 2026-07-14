@@ -609,14 +609,11 @@ export default function BodyMap3D({
       // Pulse hover ring
       if (hoverRing.visible) hoverRing.scale.setScalar(1 + 0.10 * Math.sin(time * 3));
 
-      // Needle quiver — tiny oscillation (acupuncture effect)
+      // Needle quiver — tiny scale pulse so orientation (quaternion) is preserved
       let ni = 0;
       dynamicNeedles.forEach((needle) => {
         const nObj = needle as unknown as THREEObj3D;
-        const baseZ = nObj.position.x * -0.35;
-        const baseX = -0.12;
-        nObj.rotation.z = baseZ + 0.015 * Math.sin(time * 5.5 + ni * 1.3);
-        nObj.rotation.x = baseX + 0.008 * Math.sin(time * 4.8 + ni * 0.9);
+        nObj.scale.setScalar(1 + 0.016 * Math.sin(time * 5.0 + ni * 1.2));
         ni++;
       });
 
@@ -638,9 +635,25 @@ export default function BodyMap3D({
         const color = pending ? 0x38bdf8 : 0x4ade80;
         const needle = makeNeedleGroup(color);
         const nObj = needle as unknown as THREEObj3D;
-        nObj.position.set(pos[0], pos[1], pos[2] + 0.04);
-        nObj.rotation.z = pos[0] * -0.35;
-        nObj.rotation.x = -0.12;
+
+        // Outward direction from body centre → hit point (pivot-local)
+        const BCY = 0.585;
+        let ox = pos[0], oy = pos[1] - BCY, oz = pos[2];
+        const olen = Math.sqrt(ox * ox + oy * oy + oz * oz);
+        if (olen > 0.01) { ox /= olen; oy /= olen; oz /= olen; }
+        else              { ox = 0; oy = 1; oz = 0; }
+
+        // Offset slightly outward so tip sits on surface, not inside
+        const OFF = 0.02;
+        nObj.position.set(pos[0] + ox * OFF, pos[1] + oy * OFF, pos[2] + oz * OFF);
+
+        // Rotate needle so +Y axis (shaft) aligns with outward normal
+        const outVec = new T.Vector3(); outVec.set(ox, oy, oz);
+        const upVec  = new T.Vector3(); upVec.set(0, 1, 0);
+        const quat   = new T.Quaternion();
+        quat.setFromUnitVectors(upVec, outVec);
+        nObj.quaternion.copy(quat);
+
         pivot.add(nObj);
         dynamicNeedles.set(id, needle);
       },
@@ -922,6 +935,7 @@ interface THREEMeshStdMat { color: THREEColor; roughness: number; metalness: num
 interface THREEObj3D {
   position: THREEVec3; rotation: { x: number; y: number; z: number };
   scale: { set(x: number, y: number, z: number): void; setScalar(s: number): void };
+  quaternion: THREEQuaternion;
   add(o: THREEObj3D): void; visible: boolean; isMesh?: boolean;
   userData: Record<string, unknown>; traverse(cb: (o: THREEObj3D) => void): void;
   castShadow: boolean; receiveShadow: boolean;
@@ -930,6 +944,7 @@ interface THREEMesh extends THREEObj3D { material: THREEMeshStdMat; geometry: TH
 interface THREEScene  extends THREEObj3D {}
 interface THREEGroup  extends THREEObj3D { remove(o: THREEObj3D): void; worldToLocal(v: THREEVec3): THREEVec3 }
 interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMatrix?(): void }
+interface THREEQuaternion { setFromUnitVectors(from: THREEVec3, to: THREEVec3): THREEQuaternion; copy(q: THREEQuaternion): void }
 interface THREEBox3   { setFromObject(o: THREEObj3D): THREEBox3; getSize(v: THREEVec3): THREEVec3; getCenter(v: THREEVec3): THREEVec3 }
 interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void }
 interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[], recursive?: boolean): Array<{ object: THREEObj3D; point: THREEVec3 }> }
@@ -946,8 +961,9 @@ interface THREECtors {
   CylinderGeometry: new (rt: number, rb: number, h: number, s: number) => THREEGeo;
   BoxGeometry:      new (w: number, h: number, d: number) => THREEGeo;
   Box3:             new () => THREEBox3;
-  Vector3:          new () => THREEVec3;
+  Vector3:          new (x?: number, y?: number, z?: number) => THREEVec3;
   Vector2:          new () => THREEVec2;
+  Quaternion:       new () => THREEQuaternion;
   Raycaster:        new () => THREECaster;
 }
 interface GLTFLoaderClass { load(url: string, onLoad: (g: GLTF) => void, onProgress: undefined, onError: (e: unknown) => void): void }
