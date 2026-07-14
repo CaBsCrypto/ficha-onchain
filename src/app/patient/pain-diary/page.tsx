@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { usePrivy } from "@privy-io/react-auth";
 import BodyMap, { type BodyZone, type PainEntry, ZONE_NAMES } from "@/components/pain/BodyMap";
 import BodyMap3D from "@/components/pain/BodyMap3D";
 import PainLogger from "@/components/pain/PainLogger";
@@ -52,7 +53,7 @@ interface HistoryDay {
   maxLevel: number;
 }
 
-function loadHistory(days = 30): HistoryDay[] {
+function loadHistoryFromLocal(days = 30): HistoryDay[] {
   const history: HistoryDay[] = [];
   const today = new Date();
   for (let i = 1; i <= days; i++) {
@@ -75,9 +76,18 @@ function loadHistory(days = 30): HistoryDay[] {
   return history;
 }
 
+function buildHistoryDay(dateStr: string, entries: PainEntry[]): HistoryDay {
+  const avg = entries.reduce((s, e) => s + e.level, 0) / entries.length;
+  const max = Math.max(...entries.map((e) => e.level));
+  return { dateStr, entries, avgLevel: avg, maxLevel: max };
+}
+
 type PageTab = "hoy" | "historial";
 
 export default function PainDiaryPage() {
+  const { user } = usePrivy();
+  const privyId = user?.id ?? null;
+
   const [entries, setEntries] = useState<PainEntry[]>([]);
   const [selectedZone, setSelectedZone] = useState<BodyZone | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -86,19 +96,45 @@ export default function PainDiaryPage() {
   const [pageTab, setPageTab] = useState<PageTab>("hoy");
   const [history, setHistory] = useState<HistoryDay[]>([]);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Load today's entries (localStorage first, then DB)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(getTodayKey());
       if (raw) setEntries(JSON.parse(raw) as PainEntry[]);
       const savedView = localStorage.getItem(VIEW_PREF_KEY);
       if (savedView === "3d") setView3D(true);
-      setHistory(loadHistory(30));
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     setHydrated(true);
   }, []);
+
+  // Load history from DB (falls back to localStorage)
+  useEffect(() => {
+    if (!privyId) {
+      setHistory(loadHistoryFromLocal(30));
+      return;
+    }
+    setHistoryLoading(true);
+    fetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`)
+      .then((r) => r.json())
+      .then((data: { days?: Array<{ date: string; entries: PainEntry[] }> }) => {
+        if (data.days && data.days.length > 0) {
+          const h: HistoryDay[] = data.days
+            .filter((d) => d.entries.length > 0)
+            .map((d) => buildHistoryDay(d.date, d.entries));
+          setHistory(h);
+        } else {
+          // fallback to localStorage
+          setHistory(loadHistoryFromLocal(30));
+        }
+        setHistoryLoading(false);
+      })
+      .catch(() => {
+        setHistory(loadHistoryFromLocal(30));
+        setHistoryLoading(false);
+      });
+  }, [privyId]);
 
   function toggleView() {
     setView3D((prev) => {
@@ -127,12 +163,35 @@ export default function PainDiaryPage() {
     toast.info(`Dolor en ${ZONE_NAMES[zone]} eliminado`);
   }
 
-  function handleSaveToday() {
+  async function handleSaveToday() {
+    const today = new Date().toISOString().split("T")[0];
+    // Always save to localStorage as cache
+    try { localStorage.setItem(getTodayKey(), JSON.stringify(entries)); } catch { /* ignore */ }
+
+    if (!privyId) {
+      toast.success("Registro guardado localmente ✓");
+      return;
+    }
+
     try {
-      localStorage.setItem(getTodayKey(), JSON.stringify(entries));
-      toast.success("Registro del día guardado ✓");
+      const res = await fetch("/api/pain-diary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privyId, date: today, entries }),
+      });
+      if (res.ok) {
+        toast.success("Registro guardado en tu historial ✓");
+        // Refresh history
+        const r = await fetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`);
+        const data = (await r.json()) as { days?: Array<{ date: string; entries: PainEntry[] }> };
+        if (data.days) {
+          setHistory(data.days.filter((d) => d.entries.length > 0).map((d) => buildHistoryDay(d.date, d.entries)));
+        }
+      } else {
+        toast.error("No se pudo guardar en la base de datos");
+      }
     } catch {
-      toast.error("No se pudo guardar el registro");
+      toast.error("Error de conexión al guardar");
     }
   }
 
@@ -194,7 +253,12 @@ export default function PainDiaryPage() {
       {/* HISTORIAL VIEW */}
       {pageTab === "historial" && (
         <div className="max-w-lg mx-auto px-4 space-y-3">
-          {history.length === 0 ? (
+          {historyLoading ? (
+            <div className="flex items-center justify-center gap-3 py-16 text-slate-400 text-sm">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+              Cargando historial…
+            </div>
+          ) : history.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
               <p className="text-gray-500 text-sm font-medium">Sin registros anteriores</p>
               <p className="text-gray-400 text-xs mt-1">
