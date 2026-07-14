@@ -189,9 +189,9 @@ export default function BodyMap3D({
     container.appendChild(renderer.domElement);
 
     // ── Camera ────────────────────────────────────────────────────────────────
-    const camera = new T.PerspectiveCamera(42, w / h, 0.05, 200);
-    // Look slightly above center so the full head is always visible
-    camera.position.set(0, 0.35, 3.0);
+    // FOV 50° gives a wider view; camera looks at body center (y≈0.58)
+    const camera = new T.PerspectiveCamera(50, w / h, 0.05, 200);
+    camera.position.set(0, 0.58, 2.8);
 
     // ── Scene & lights ────────────────────────────────────────────────────────
     const scene = new T.Scene();
@@ -204,8 +204,8 @@ export default function BodyMap3D({
     rim.position.set(0, -2.0, -3.0); scene.add(rim);
 
     // ── Pivot for rotation ────────────────────────────────────────────────────
+    // No offset — model is aligned to hit zones (center ~y=0.58)
     const pivot = new T.Group();
-    pivot.position.set(0, -0.5, 0);
     scene.add(pivot);
 
     // ── Invisible hit zones (procedural) ─────────────────────────────────────
@@ -282,10 +282,12 @@ export default function BodyMap3D({
         const targetH = 2.20;
         const scaleFactor = targetH / maxDim;
         model.scale.setScalar(scaleFactor);
-        // Center the model vertically — feet near bottom, head fully visible
+        // Align GLB center to match hit zone center (y≈0.58 in scene space)
+        // Hit zones span y=-0.43 (feet) to y=1.60 (head), midpoint = 0.585
+        const HIT_CENTER_Y = 0.585;
         model.position.set(
           -center.x * scaleFactor,
-          -center.y * scaleFactor - 0.22,  // shift slightly down so head isn't cropped
+          -center.y * scaleFactor + HIT_CENTER_Y,
           -center.z * scaleFactor,
         );
         // Apply nice material to all meshes
@@ -338,17 +340,18 @@ export default function BodyMap3D({
     function projectMeshToScreen(worldPos: THREEVec3): { x: number; y: number } {
       const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
       const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
-      let px = worldPos.x, py = worldPos.y - 0.5, pz = worldPos.z;
+      let px = worldPos.x, py = worldPos.y, pz = worldPos.z;
       const rx = px * cosY + pz * sinY; pz = -px * sinY + pz * cosY; px = rx;
       const ry2 = py * cosX - pz * sinX; const rz2 = py * sinX + pz * cosX; py = ry2; pz = rz2;
       const camZ = camera.position.z;
+      const camY = 0.58; // camera.position.y
       const d = camZ - pz;
       if (d <= 0) return { x: -9999, y: -9999 };
-      const fov = 38 * Math.PI / 180;
+      const fov = 50 * Math.PI / 180;
       const asp = (container?.clientWidth ?? 1) / (container?.clientHeight ?? 1);
       const scale = (1 / Math.tan(fov / 2)) / d;
       const sx = ((px * scale) / asp) * 0.5 + 0.5;
-      const sy = ((-py * scale) * 0.5 + 0.5) + 0.04;
+      const sy = (-(py - camY) * scale) * 0.5 + 0.5;
       return { x: sx * (container?.clientWidth ?? 1), y: sy * (container?.clientHeight ?? 1) };
     }
 
@@ -640,7 +643,7 @@ export default function BodyMap3D({
       </div>
 
       {/* Canvas */}
-      <div className="relative w-full rounded-xl overflow-hidden" style={{ height: "clamp(340px, 60vw, 480px)" }}>
+      <div className="relative w-full rounded-xl overflow-hidden" style={{ height: "clamp(420px, 85vw, 560px)" }}>
         {/* Loading spinner */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-10 rounded-xl">

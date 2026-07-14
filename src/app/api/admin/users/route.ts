@@ -82,3 +82,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
 }
+
+/**
+ * PATCH /api/admin/users  — update email or wallet for a user (admin only)
+ * Body: { token, privyId, email?, wallet? }
+ */
+export async function PATCH(request: Request) {
+  let body: { token?: unknown; privyId?: unknown; email?: unknown; wallet?: unknown };
+  try { body = (await request.json()) as typeof body; } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
+  if (!adminToken || body.token !== adminToken)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const privyId = String(body.privyId ?? "").trim();
+  if (!privyId) return NextResponse.json({ error: "privyId required" }, { status: 400 });
+
+  try {
+    const sql = getDb();
+    await ensureTable(sql);
+    if (body.email !== undefined) {
+      const email = body.email ? String(body.email).trim().toLowerCase() : null;
+      await sql`UPDATE registered_users SET email = ${email} WHERE privy_id = ${privyId}`;
+    }
+    if (body.wallet !== undefined) {
+      const wallet = body.wallet ? String(body.wallet).trim() : null;
+      await sql`UPDATE registered_users SET wallet = ${wallet} WHERE privy_id = ${privyId}`;
+    }
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[admin/users PATCH]", err);
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/admin/users  — remove a user from registered_users (admin only)
+ * Body: { token, privyId }
+ */
+export async function DELETE(request: Request) {
+  let body: { token?: unknown; privyId?: unknown };
+  try { body = (await request.json()) as typeof body; } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
+  if (!adminToken || body.token !== adminToken)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const privyId = String(body.privyId ?? "").trim();
+  if (!privyId) return NextResponse.json({ error: "privyId required" }, { status: 400 });
+
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM registered_users WHERE privy_id = ${privyId}`;
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[admin/users DELETE]", err);
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
+  }
+}

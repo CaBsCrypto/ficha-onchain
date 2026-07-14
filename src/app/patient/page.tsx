@@ -42,7 +42,7 @@ import {
 } from "@/components/icons/PatientIcons";
 
 type PatientRx = WithExpiry<OnChainPrescription>;
-type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos";
+type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
 
 // ---------------------------------------------------------------------------
 // Mock health record data (demo mode — labeled clearly in UI)
@@ -356,6 +356,7 @@ function PatientDashboardInner({
           authorizedDoctors={authorizedDoctors}
           onGoToRecetas={() => router.push("/patient?tab=recetas")}
           onGoToFicha={() => router.push("/patient?tab=ficha")}
+          onGoToConsultas={() => router.push("/patient?tab=consultas")}
         />
       )}
       {tab === "recetas" && (
@@ -376,6 +377,9 @@ function PatientDashboardInner({
       )}
       {tab === "accesos" && (
         <AccesosTab wallet={session.address} mock={session.mock} />
+      )}
+      {tab === "consultas" && (
+        <ConsultasTab wallet={session.address} mock={session.mock} />
       )}
 
       {share && (
@@ -418,12 +422,14 @@ function InicioTab({
   authorizedDoctors,
   onGoToRecetas,
   onGoToFicha,
+  onGoToConsultas,
 }: {
   session: PasskeySession;
   activeRxCount: number;
   authorizedDoctors: AuthorizedDoctor[];
   onGoToRecetas: () => void;
   onGoToFicha: () => void;
+  onGoToConsultas: () => void;
 }) {
   const privyEmail = usePrivyEmail();
   const displayName = privyEmail ?? "Mi portal";
@@ -510,6 +516,21 @@ function InicioTab({
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-ink">Mi ficha médica</p>
             <p className="text-sm text-muted">Historial, alergias, condiciones</p>
+          </div>
+          <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
+        </button>
+
+        {/* Consultas CTA */}
+        <button
+          onClick={onGoToConsultas}
+          className="flex w-full items-center gap-4 rounded-2xl border border-emerald-100 bg-white p-5 text-left shadow-sm transition-all active:scale-[0.98] hover:border-emerald-200 hover:shadow-md"
+        >
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+            <CalendarIcon className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-ink">Agendar consulta</p>
+            <p className="text-sm text-muted">Médico general, especialistas y más</p>
           </div>
           <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
         </button>
@@ -1752,6 +1773,243 @@ function EmptyRxState({ error, onRetry }: { error: string | null; onRetry: () =>
       {error && <p className="mt-3 text-xs text-amber-600">Detalle: {error}</p>}
       <Button variant="secondary" className="mt-5" onClick={onRetry}>Actualizar</Button>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab: Consultas — agendar y gestionar consultas médicas
+// ---------------------------------------------------------------------------
+
+const ESPECIALIDADES = [
+  { id: "general",       label: "Médico General",      emoji: "🩺" },
+  { id: "pediatria",     label: "Pediatría",            emoji: "👶" },
+  { id: "ginecologia",   label: "Ginecología",          emoji: "🌸" },
+  { id: "cardiologia",   label: "Cardiología",          emoji: "❤️" },
+  { id: "dermatologia",  label: "Dermatología",         emoji: "🔬" },
+  { id: "neurologia",    label: "Neurología",           emoji: "🧠" },
+  { id: "traumatologia", label: "Traumatología",        emoji: "🦴" },
+  { id: "psiquiatria",   label: "Psiquiatría",          emoji: "🧘" },
+  { id: "oftalmologia",  label: "Oftalmología",         emoji: "👁️" },
+  { id: "otorrino",      label: "Otorrinolaringología", emoji: "👂" },
+  { id: "endocrinologia",label: "Endocrinología",       emoji: "⚗️" },
+  { id: "oncologia",     label: "Oncología",            emoji: "🎗️" },
+];
+
+type BookingStep = "especialidad" | "fecha" | "hora" | "confirm" | "done";
+
+interface Booking {
+  especialidad: string;
+  fecha: string;
+  hora: string;
+  modalidad: "presencial" | "telemedicina";
+}
+
+function ConsultasTab({ wallet, mock }: { wallet: string; mock: boolean }) {
+  const [step, setStep] = useState<BookingStep>("especialidad");
+  const [booking, setBooking] = useState<Partial<Booking>>({});
+  const [saved, setSaved] = useState<Booking[]>([]);
+
+  // Helpers
+  const today = new Date();
+  const minDate = today.toISOString().slice(0, 10);
+  const maxDate = new Date(today.getTime() + 60 * 24 * 3600_000).toISOString().slice(0, 10);
+
+  const HORARIOS = ["08:30", "09:00", "09:30", "10:00", "10:30", "11:00",
+                    "11:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"];
+
+  function confirm() {
+    const b = booking as Booking;
+    setSaved((prev) => [b, ...prev]);
+    setStep("done");
+  }
+
+  function reset() {
+    setBooking({});
+    setStep("especialidad");
+  }
+
+  const esp = ESPECIALIDADES.find((e) => e.id === booking.especialidad);
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+          <CalendarIcon className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-ink">Agendar consulta</h1>
+          <p className="text-sm text-muted">Selecciona especialidad, fecha y horario</p>
+        </div>
+      </div>
+
+      {mock && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Modo demo — las consultas no se confirman con médicos reales.
+        </div>
+      )}
+
+      {/* ── Step: especialidad ── */}
+      {step === "especialidad" && (
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+            ¿Qué especialidad necesitas?
+          </h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {ESPECIALIDADES.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => { setBooking((b) => ({ ...b, especialidad: e.id })); setStep("fecha"); }}
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-medium text-ink shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md active:scale-95"
+              >
+                <span className="text-xl">{e.emoji}</span>
+                <span className="leading-tight">{e.label}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Step: fecha ── */}
+      {step === "fecha" && (
+        <Card>
+          <button onClick={() => setStep("especialidad")} className="mb-3 flex items-center gap-1 text-xs text-muted hover:text-ink">
+            ← {esp?.emoji} {esp?.label}
+          </button>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+            ¿Qué día prefieres?
+          </h2>
+          <div className="space-y-3">
+            <input
+              type="date"
+              min={minDate}
+              max={maxDate}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-ink focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              value={booking.fecha ?? ""}
+              onChange={(e) => setBooking((b) => ({ ...b, fecha: e.target.value }))}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setBooking((b) => ({ ...b, modalidad: "presencial" })); }}
+                className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-all ${booking.modalidad === "presencial" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-muted hover:border-emerald-200"}`}
+              >
+                🏥 Presencial
+              </button>
+              <button
+                onClick={() => { setBooking((b) => ({ ...b, modalidad: "telemedicina" })); }}
+                className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-all ${booking.modalidad === "telemedicina" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-muted hover:border-sky-200"}`}
+              >
+                💻 Telemedicina
+              </button>
+            </div>
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => { if (booking.fecha && booking.modalidad) setStep("hora"); }}
+            >
+              Continuar →
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Step: hora ── */}
+      {step === "hora" && (
+        <Card>
+          <button onClick={() => setStep("fecha")} className="mb-3 flex items-center gap-1 text-xs text-muted hover:text-ink">
+            ← {booking.fecha}
+          </button>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+            Elige un horario
+          </h2>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {HORARIOS.map((h) => (
+              <button
+                key={h}
+                onClick={() => { setBooking((b) => ({ ...b, hora: h })); setStep("confirm"); }}
+                className={`rounded-xl border py-2.5 text-sm font-medium transition-all ${booking.hora === h ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-ink hover:border-emerald-300 hover:bg-emerald-50"}`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Step: confirm ── */}
+      {step === "confirm" && (
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+            Confirmar reserva
+          </h2>
+          <div className="space-y-3 rounded-xl bg-slate-50 p-4">
+            <Row label="Especialidad" value={`${esp?.emoji} ${esp?.label}`} />
+            <Row label="Fecha" value={booking.fecha ?? ""} />
+            <Row label="Hora" value={booking.hora ?? ""} />
+            <Row label="Modalidad" value={booking.modalidad === "telemedicina" ? "💻 Telemedicina" : "🏥 Presencial"} />
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setStep("hora")}>
+              Cambiar
+            </Button>
+            <Button variant="primary" className="flex-1" onClick={confirm}>
+              Confirmar ✓
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Step: done ── */}
+      {step === "done" && (
+        <Card className="text-center">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-100 text-3xl">
+            ✅
+          </div>
+          <h2 className="text-lg font-semibold text-ink">¡Consulta agendada!</h2>
+          <p className="mt-1 text-sm text-muted">
+            Recibirás una confirmación en tu correo con los detalles.
+          </p>
+          <Button variant="secondary" className="mt-4 w-full" onClick={reset}>
+            Agendar otra consulta
+          </Button>
+        </Card>
+      )}
+
+      {/* ── Consultas previas ── */}
+      {saved.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Próximas consultas
+          </h2>
+          {saved.map((c, i) => {
+            const e = ESPECIALIDADES.find((x) => x.id === c.especialidad);
+            return (
+              <div key={i} className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-2xl">
+                  {e?.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-ink">{e?.label}</p>
+                  <p className="text-sm text-muted">{c.fecha} · {c.hora} · {c.modalidad === "telemedicina" ? "💻 Telemedicina" : "🏥 Presencial"}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Confirmada
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-ink">{value}</span>
+    </div>
   );
 }
 
