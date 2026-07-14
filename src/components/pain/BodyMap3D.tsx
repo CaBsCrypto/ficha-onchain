@@ -290,18 +290,12 @@ export default function BodyMap3D({
           -center.y * scaleFactor + HIT_CENTER_Y,
           -center.z * scaleFactor,
         );
-        // Apply smooth normals + material to all meshes
+        // Keep original GLB material (textures) — only fix normals for smooth shading
         model.traverse((child) => {
           const c = child as THREEMesh;
           if (c.isMesh) {
-            // Recompute smooth vertex normals — fixes the faceted/polygon look
-            // from the optimized GLB that lost shared vertex normals
+            // Recompute smooth vertex normals in case the GLB has flat normals
             c.geometry.computeVertexNormals();
-            c.material = new T.MeshStandardMaterial({
-              color: 0xd4956a,
-              roughness: 0.60,
-              metalness: 0.02,
-            }) as unknown as THREEMeshStdMat;
             c.castShadow    = false;
             c.receiveShadow = false;
           }
