@@ -1,203 +1,163 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useAdmin } from "../layout";
 
-interface Signup {
-  email: string;
-  role: string | null;
-  created_at: string;
+interface Signup { email: string; role: string | null; created_at: string; }
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString("es-CL", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 }
 
-interface ApiResponse {
-  count: number;
-  signups: Signup[];
-  error?: string;
+function fmtRelative(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `hace ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  return `hace ${Math.floor(hrs / 24)}d`;
 }
 
-export default function WaitlistAdminPage() {
-  const [token, setToken] = useState("");
-  const [data, setData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [authed, setAuthed] = useState(false);
+function InitialAvatar({ email }: { email: string }) {
+  const colors = [
+    "bg-sky-100 text-sky-600",
+    "bg-violet-100 text-violet-600",
+    "bg-emerald-100 text-emerald-600",
+    "bg-amber-100 text-amber-600",
+    "bg-rose-100 text-rose-600",
+  ];
+  const idx = email.charCodeAt(0) % colors.length;
+  return (
+    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${colors[idx]}`}>
+      {email[0].toUpperCase()}
+    </div>
+  );
+}
 
-  async function fetchSignups(t: string) {
+export default function WaitlistPage() {
+  const { token } = useAdmin();
+  const [signups, setSignups] = useState<Signup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  async function load() {
     setLoading(true);
-    try {
-      const res = await fetch(`/api/waitlist?token=${encodeURIComponent(t)}`);
-      const json = (await res.json()) as ApiResponse;
-      if (res.ok) {
-        setData(json);
-        setAuthed(true);
-      } else {
-        setData({ count: 0, signups: [], error: "Token incorrecto" });
-      }
-    } catch {
-      setData({ count: 0, signups: [], error: "Error de conexión" });
-    } finally {
-      setLoading(false);
+    const res = await fetch(`/api/waitlist?token=${encodeURIComponent(token)}`);
+    if (res.ok) {
+      const data = (await res.json()) as { signups: Signup[] };
+      setSignups(data.signups);
     }
+    setLoading(false);
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (token.trim()) fetchSignups(token.trim());
-  }
+  useEffect(() => { void load(); }, [token]);
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("es-CL", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
+  const filtered = signups.filter((s) =>
+    s.email.toLowerCase().includes(search.toLowerCase())
+  );
 
-  if (!authed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-full max-w-sm">
-          {/* Logo */}
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/30">
-              <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
-                <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-semibold text-slate-800">TrustLeaf Admin</h1>
-            <p className="mt-1 text-sm text-slate-500">Waitlist dashboard</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Token de acceso
-                </label>
-                <input
-                  type="password"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 placeholder-slate-300 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                  autoFocus
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !token.trim()}
-                className="w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50"
-              >
-                {loading ? "Verificando…" : "Entrar"}
-              </button>
-              {data?.error && (
-                <p className="text-center text-xs text-rose-500">{data.error}</p>
-              )}
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const signups = data?.signups ?? [];
+  const thisWeek = signups.filter(
+    (s) => Date.now() - new Date(s.created_at).getTime() < 7 * 86400000
+  ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="px-8 py-8 max-w-5xl">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white">
-              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
-                <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span className="font-semibold text-slate-800">Waitlist Admin</span>
-          </div>
-          <button
-            onClick={() => { setAuthed(false); setData(null); setToken(""); }}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition"
-          >
-            Salir
-          </button>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Waitlist</h1>
+          <p className="mt-0.5 text-sm text-slate-400">Personas esperando acceso a TrustLeaf</p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-6 py-8">
-        {/* Stats row */}
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total signups</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-800">{data?.count ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Último registro</p>
-            <p className="mt-1 text-sm font-medium text-slate-700">
-              {signups[0] ? formatDate(signups[0].created_at) : "—"}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Con rol</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-800">
-              {signups.filter((s) => s.role).length}
-            </p>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-6 py-4">
-            <h2 className="text-sm font-semibold text-slate-700">
-              Registros ({signups.length})
-            </h2>
-          </div>
-
-          {signups.length === 0 ? (
-            <div className="py-16 text-center text-sm text-slate-400">
-              Sin registros todavía.
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60 text-left">
-                  <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-slate-400">#</th>
-                  <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-slate-400">Email</th>
-                  <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-slate-400">Rol</th>
-                  <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-slate-400">Fecha</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {signups.map((s, i) => (
-                  <tr key={s.email} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-slate-400">{i + 1}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-800">{s.email}</td>
-                    <td className="px-6 py-4">
-                      {s.role ? (
-                        <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700">
-                          {s.role}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{formatDate(s.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <button
-          onClick={() => fetchSignups(token)}
-          className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm hover:bg-slate-50 transition"
-        >
-          ↻ Actualizar
+        <button onClick={load}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm hover:bg-slate-50 transition">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Actualizar
         </button>
-      </main>
+      </div>
+
+      {/* Stat pills */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="flex items-center gap-2 rounded-full bg-sky-50 border border-sky-200 px-4 py-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-500" />
+          </span>
+          <span className="text-sm font-semibold text-sky-700">{signups.length} registros</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-2">
+          <span className="text-sm font-semibold text-emerald-700">+{thisWeek} esta semana</span>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-4 relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Buscar por email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2.5 text-sm text-slate-800 placeholder-slate-300 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center gap-3 py-16 text-slate-400 text-sm">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+            Cargando…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-slate-300 text-4xl mb-3">📋</p>
+            <p className="text-sm text-slate-400">{search ? "Sin resultados" : "Sin registros todavía"}</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">#</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Email</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Rol</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Fecha</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Hace</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map((s, i) => (
+                <tr key={s.email} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-5 py-4 text-sm text-slate-300">{i + 1}</td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <InitialAvatar email={s.email} />
+                      <span className="text-sm font-medium text-slate-800">{s.email}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    {s.role ? (
+                      <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
+                        {s.role}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-slate-500">{fmt(s.created_at)}</td>
+                  <td className="px-5 py-4 text-xs text-slate-400">{fmtRelative(s.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

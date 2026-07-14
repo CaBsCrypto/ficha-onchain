@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useTrackUser } from '@/hooks/useTrackUser';
 
 // Nav icons (inline SVG to avoid import issues in layout)
 function IconHome({ className }: { className?: string }) {
@@ -150,6 +151,7 @@ function MobileBottomNav() {
 }
 
 function PatientShell({ children }: { children: React.ReactNode }) {
+  useTrackUser();
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       {/* ── Header ── */}
