@@ -61,7 +61,7 @@ export function WaitlistModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "error" | "submitting" | "done">("idle");
 
@@ -192,7 +192,7 @@ export function WaitlistModal({
             ) : (
               <>
                 <p className="mb-4 text-sm font-medium text-white/60">
-                  {t.lang === "es" ? "Ingresa tu correo para reservar tu lugar" : "Enter your email to reserve your spot"}
+                  {lang === "es" ? "Ingresa tu correo para reservar tu lugar" : "Enter your email to reserve your spot"}
                 </p>
                 <form onSubmit={onSubmit} className="space-y-3" noValidate>
                   <input
@@ -225,7 +225,7 @@ export function WaitlistModal({
                 </form>
 
                 <p className="mt-5 text-xs text-white/25 text-center">
-                  {t.lang === "es" ? "Sin spam. Te contactaremos cuando abramos." : "No spam. We'll reach out when we launch."}
+                  {lang === "es" ? "Sin spam. Te contactaremos cuando abramos." : "No spam. We'll reach out when we launch."}
                 </p>
               </>
             )}

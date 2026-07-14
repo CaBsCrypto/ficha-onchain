@@ -30,7 +30,7 @@ function LangSwitch() {
 
 // ── Verify modal (HowItWorks inline) ─────────────────────────────────────────
 function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   useEffect(() => {
     if (!open) return;
@@ -53,8 +53,8 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       ),
-      title: t.lang === "es" ? "El médico emite una receta" : "Doctor issues a prescription",
-      body: t.lang === "es"
+      title: lang === "es" ? "El médico emite una receta" : "Doctor issues a prescription",
+      body: lang === "es"
         ? "La prescripción queda registrada en un contrato inteligente en Stellar Soroban — inmutable y verificable."
         : "The prescription is recorded in a smart contract on Stellar Soroban — immutable and verifiable.",
     },
@@ -67,8 +67,8 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <path d="M13 17h2m4 0h-2m0 0v-4m0 4v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       ),
-      title: t.lang === "es" ? "El paciente genera un QR" : "Patient generates a QR",
-      body: t.lang === "es"
+      title: lang === "es" ? "El paciente genera un QR" : "Patient generates a QR",
+      body: lang === "es"
         ? "Desde su portal, el paciente comparte un enlace de verificación con validez de 15 minutos."
         : "From their portal, the patient shares a verification link valid for 15 minutes.",
     },
@@ -79,8 +79,8 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
-      title: t.lang === "es" ? "La farmacia verifica aquí" : "Pharmacy verifies here",
-      body: t.lang === "es"
+      title: lang === "es" ? "La farmacia verifica aquí" : "Pharmacy verifies here",
+      body: lang === "es"
         ? "Esta página lee la receta directo desde la blockchain — sin intermediarios, sin bases de datos propietarias."
         : "This page reads the prescription straight from the blockchain — no intermediaries, no proprietary databases.",
     },
@@ -131,15 +131,15 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           </div>
 
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-400">
-            {t.lang === "es" ? "Verificador de recetas" : "Prescription Verifier"}
+            {lang === "es" ? "Verificador de recetas" : "Prescription Verifier"}
           </p>
           <h2 className="mt-1 text-lg font-semibold text-white">
-            {t.lang === "es"
+            {lang === "es"
               ? "Verificación directa desde blockchain"
               : "Direct blockchain verification"}
           </h2>
           <p className="mt-1.5 text-sm text-white/50">
-            {t.lang === "es"
+            {lang === "es"
               ? "Escanea el QR del paciente para ver su receta verificada en Stellar Soroban."
               : "Scan the patient's QR to view their prescription verified on Stellar Soroban."}
           </p>
@@ -163,9 +163,9 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         {/* CTA */}
         <div className="border-t border-slate-100 bg-slate-50/80 px-6 py-4 text-center">
           <p className="text-xs text-slate-500">
-            {t.lang === "es" ? "¿Eres farmacéutico? " : "Are you a pharmacist? "}
+            {lang === "es" ? "¿Eres farmacéutico? " : "Are you a pharmacist? "}
             <a href="/pharmacy" className="font-medium text-sky-600 hover:underline">
-              {t.lang === "es" ? "Accede al portal →" : "Access the portal →"}
+              {lang === "es" ? "Accede al portal →" : "Access the portal →"}
             </a>
           </p>
         </div>
