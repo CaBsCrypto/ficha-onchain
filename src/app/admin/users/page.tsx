@@ -141,7 +141,7 @@ export default function UsersPage() {
               <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">#</th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Usuario</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Wallet</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Wallet Stellar</th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Privy ID</th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Registro</th>
               </tr>
@@ -164,11 +164,14 @@ export default function UsersPage() {
                     </td>
                     <td className="px-5 py-4">
                       {u.wallet ? (
-                        <span className="font-mono text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
-                          {shortWallet(u.wallet)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-sky-500 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">XLM</span>
+                          <span className="font-mono text-xs text-slate-500" title={u.wallet}>
+                            {shortWallet(u.wallet)}
+                          </span>
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-300">—</span>
+                        <span className="text-xs text-slate-300">Sin wallet</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
