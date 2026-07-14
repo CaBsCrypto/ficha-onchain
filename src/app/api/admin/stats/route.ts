@@ -35,6 +35,18 @@ async function ensureTables(sql: Sql) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS doctors (
+      id          SERIAL PRIMARY KEY,
+      name        TEXT NOT NULL,
+      email       TEXT NOT NULL UNIQUE,
+      specialty   TEXT,
+      license_num TEXT,
+      rut         TEXT,
+      status      TEXT NOT NULL DEFAULT 'active',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 }
 
 function unauthorized() {
@@ -56,6 +68,8 @@ export async function GET(request: Request) {
     const [waitlistWeek]  = await sql`SELECT COUNT(*)::int AS count FROM waitlist WHERE created_at > NOW() - INTERVAL '7 days'`;
     const [usersWeek]     = await sql`SELECT COUNT(*)::int AS count FROM registered_users WHERE created_at > NOW() - INTERVAL '7 days'`;
     const [waitlistToday] = await sql`SELECT COUNT(*)::int AS count FROM waitlist WHERE created_at > NOW() - INTERVAL '1 day'`;
+    const [doctorsTotal]  = await sql`SELECT COUNT(*)::int AS count FROM doctors WHERE status = 'active'`;
+    const [doctorsAll]    = await sql`SELECT COUNT(*)::int AS count FROM doctors`;
 
     return NextResponse.json({
       waitlist: {
@@ -66,6 +80,10 @@ export async function GET(request: Request) {
       users: {
         total: (usersTotal as { count: number }).count,
         thisWeek: (usersWeek as { count: number }).count,
+      },
+      doctors: {
+        active: (doctorsTotal as { count: number }).count,
+        total: (doctorsAll as { count: number }).count,
       },
     });
   } catch (err) {

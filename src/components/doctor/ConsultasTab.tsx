@@ -1,73 +1,130 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
-import { MOCK_CONSULTATIONS, MOCK_PATIENTS } from './types';
-import type { MockConsultation, ConsultationType } from './types';
+import type { ConsultationType } from './types';
 
-// ── Mock consultations state ──────────────────────────────────────────────────
+// ── DB types ──────────────────────────────────────────────────────────────────
+interface Appointment {
+  id: number;
+  doctor_email: string;
+  patient_email: string;
+  patient_name: string;
+  date: string;
+  time_slot: string;
+  type: ConsultationType;
+  motivo: string | null;
+  notes: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  created_at: string;
+}
 
+// ── Form ──────────────────────────────────────────────────────────────────────
 interface NewConsultaForm {
-  patientId: string;
+  patientEmail: string;
+  patientName: string;
   date: string;
   time: string;
   type: ConsultationType;
   motivo: string;
-  notasClinicas: string;
-  cie10: string;
+  notes: string;
 }
 
 const EMPTY_FORM: NewConsultaForm = {
-  patientId: '',
+  patientEmail: '',
+  patientName: '',
   date: '',
   time: '',
   type: 'Presencial',
   motivo: '',
-  notasClinicas: '',
-  cie10: '',
+  notes: '',
 };
 
+// ── Status badge ──────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: Appointment['status'] }) {
+  const map: Record<Appointment['status'], { label: string; cls: string }> = {
+    scheduled:  { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700' },
+    completed:  { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700' },
+    cancelled:  { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600' },
+  };
+  const { label, cls } = map[status] ?? map.scheduled;
+  return <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
+}
+
 // ── Nueva consulta modal ──────────────────────────────────────────────────────
-function NuevaConsultaModal({ onClose, onSave }: { onClose: () => void; onSave: (c: MockConsultation) => void }) {
+function NuevaConsultaModal({
+  doctorEmail,
+  onClose,
+  onSaved,
+}: {
+  doctorEmail: string;
+  onClose: () => void;
+  onSaved: (a: Appointment) => void;
+}) {
   const [form, setForm] = useState<NewConsultaForm>(EMPTY_FORM);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   function set<K extends keyof NewConsultaForm>(key: K, val: NewConsultaForm[K]) {
     setForm((prev) => ({ ...prev, [key]: val }));
+    setError('');
   }
 
-  const canSubmit = form.patientId && form.date && form.time && form.motivo;
+  const canSubmit = form.patientEmail && form.date && form.time && form.motivo;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    const patient = MOCK_PATIENTS.find((p) => p.id === form.patientId);
-    onSave({
-      id: `c_${Date.now()}`,
-      patientId: form.patientId,
-      patientName: patient?.name ?? '',
-      date: form.date,
-      time: form.time,
-      type: form.type,
-      motivo: form.motivo,
-    });
-    onClose();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctorEmail,
+          patientEmail: form.patientEmail,
+          patientName: form.patientName || form.patientEmail,
+          date: form.date,
+          timeSlot: form.time,
+          type: form.type,
+          motivo: form.motivo || null,
+          notes: form.notes || null,
+        }),
+      });
+      const data = (await res.json()) as { appointment?: Appointment; error?: string };
+      if (!res.ok) { setError(data.error ?? 'Error al guardar'); setLoading(false); return; }
+      onSaved(data.appointment!);
+      onClose();
+    } catch {
+      setError('Error de conexión');
+    }
+    setLoading(false);
   }
 
   return (
     <Modal title="Nueva consulta" onClose={onClose} width="max-w-xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Patient selector */}
-        <FormField label="Paciente" required>
-          <select
-            value={form.patientId}
-            onChange={(e) => set('patientId', e.target.value)}
-            className={selectCls}
-          >
-            <option value="">Seleccionar paciente…</option>
-            {MOCK_PATIENTS.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} — {p.rut}</option>
-            ))}
-          </select>
+        {/* Patient email */}
+        <FormField label="Email del paciente" required>
+          <input
+            type="email"
+            value={form.patientEmail}
+            onChange={(e) => set('patientEmail', e.target.value)}
+            placeholder="paciente@email.cl"
+            className={inputCls}
+          />
+        </FormField>
+
+        {/* Patient name */}
+        <FormField label="Nombre del paciente">
+          <input
+            type="text"
+            value={form.patientName}
+            onChange={(e) => set('patientName', e.target.value)}
+            placeholder="Ej: María González (opcional)"
+            className={inputCls}
+          />
         </FormField>
 
         {/* Date + Time */}
@@ -116,24 +173,15 @@ function NuevaConsultaModal({ onClose, onSave }: { onClose: () => void; onSave: 
         {/* Notas clínicas */}
         <FormField label="Notas clínicas">
           <textarea
-            value={form.notasClinicas}
-            onChange={(e) => set('notasClinicas', e.target.value)}
+            value={form.notes}
+            onChange={(e) => set('notes', e.target.value)}
             placeholder="Observaciones, anamnesis, examen físico…"
             rows={3}
             className={textareaCls}
           />
         </FormField>
 
-        {/* CIE-10 */}
-        <FormField label="Diagnóstico CIE-10">
-          <input
-            type="text"
-            value={form.cie10}
-            onChange={(e) => set('cie10', e.target.value)}
-            placeholder="Ej: I10 — Hipertensión esencial"
-            className={inputCls}
-          />
-        </FormField>
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
         {/* Actions */}
         <div className="flex gap-3 pt-1">
@@ -146,10 +194,10 @@ function NuevaConsultaModal({ onClose, onSave }: { onClose: () => void; onSave: 
           </button>
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || loading}
             className="flex-1 rounded-xl bg-sky-500 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Guardar consulta
+            {loading ? 'Guardando…' : 'Guardar consulta'}
           </button>
         </div>
       </form>
@@ -159,28 +207,69 @@ function NuevaConsultaModal({ onClose, onSave }: { onClose: () => void; onSave: 
 
 // ── ConsultasTab ──────────────────────────────────────────────────────────────
 export function ConsultasTab() {
-  const [consultas, setConsultas] = useState<MockConsultation[]>(MOCK_CONSULTATIONS);
-  const [showModal, setShowModal] = useState(false);
+  const { user } = usePrivy();
+  const doctorEmail = user?.email?.address ?? '';
 
-  function addConsulta(c: MockConsultation) {
-    setConsultas((prev) => [...prev, c]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    if (!doctorEmail) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+      const data = (await res.json()) as { appointments?: Appointment[] };
+      setAppointments(data.appointments ?? []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [doctorEmail]);
+
+  useEffect(() => { void fetchAppointments(); }, [fetchAppointments]);
+
+  async function updateStatus(id: number, status: Appointment['status']) {
+    setUpdatingId(id);
+    await fetch('/api/appointments', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    setAppointments((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+    setUpdatingId(null);
   }
 
-  const byDate = consultas.reduce<Record<string, MockConsultation[]>>((acc, c) => {
-    (acc[c.date] ??= []).push(c);
+  async function deleteAppointment(id: number) {
+    setUpdatingId(id);
+    await fetch('/api/appointments', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+    setUpdatingId(null);
+  }
+
+  // Group by date
+  const byDate = appointments.reduce<Record<string, Appointment[]>>((acc, a) => {
+    const dateKey = typeof a.date === 'string' ? a.date.slice(0, 10) : String(a.date);
+    (acc[dateKey] ??= []).push(a);
     return acc;
   }, {});
-
   const sortedDates = Object.keys(byDate).sort();
 
   return (
     <div className="space-y-4">
       {/* Header row */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800">Consultas</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Consultas</h2>
+          {doctorEmail && <p className="text-xs text-slate-400 mt-0.5">{doctorEmail}</p>}
+        </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-sky-600"
+          disabled={!doctorEmail}
+          className="flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-sky-600 disabled:opacity-40"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
@@ -189,49 +278,109 @@ export function ConsultasTab() {
         </button>
       </div>
 
-      {/* Day view */}
-      <div className="space-y-6">
-        {sortedDates.map((date) => {
-          const day = new Date(date + 'T00:00:00').toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-          return (
-            <div key={date}>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 capitalize">{day}</h3>
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
-                {byDate[date]
-                  ?.slice()
-                  .sort((a, b) => a.time.localeCompare(b.time))
-                  .map((c) => (
-                    <div key={c.id} className="flex items-center gap-4 px-5 py-4">
-                      <div className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 text-sky-700">
-                        <span className="text-xs font-bold">{c.time}</span>
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+        </div>
+      ) : (
+        /* Day view */
+        <div className="space-y-6">
+          {sortedDates.map((date) => {
+            const day = new Date(date + 'T00:00:00').toLocaleDateString('es-CL', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            });
+            return (
+              <div key={date}>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 capitalize">{day}</h3>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
+                  {byDate[date]
+                    ?.slice()
+                    .sort((a, b) => a.time_slot.localeCompare(b.time_slot))
+                    .map((a) => (
+                      <div key={a.id} className="flex items-center gap-4 px-5 py-4">
+                        {/* Time */}
+                        <div className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+                          <span className="text-xs font-bold">{a.time_slot}</span>
+                        </div>
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {a.patient_name || a.patient_email}
+                          </p>
+                          {a.patient_name && a.patient_name !== a.patient_email && (
+                            <p className="text-xs text-slate-400">{a.patient_email}</p>
+                          )}
+                          {a.motivo && <p className="text-xs text-slate-500">{a.motivo}</p>}
+                        </div>
+                        {/* Type badge */}
+                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          a.type === 'Presencial'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-violet-50 text-violet-700'
+                        }`}>
+                          {a.type}
+                        </span>
+                        {/* Status badge */}
+                        <StatusBadge status={a.status} />
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {a.status === 'scheduled' && (
+                            <button
+                              onClick={() => void updateStatus(a.id, 'completed')}
+                              disabled={updatingId === a.id}
+                              title="Marcar como completada"
+                              className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 disabled:opacity-40 transition"
+                            >
+                              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          )}
+                          {a.status === 'scheduled' && (
+                            <button
+                              onClick={() => void updateStatus(a.id, 'cancelled')}
+                              disabled={updatingId === a.id}
+                              title="Cancelar consulta"
+                              className="rounded-lg p-1.5 text-amber-400 hover:bg-amber-50 disabled:opacity-40 transition"
+                            >
+                              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                                <path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => void deleteAppointment(a.id)}
+                            disabled={updatingId === a.id}
+                            title="Eliminar"
+                            className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-50 disabled:opacity-40 transition"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-800">{c.patientName}</p>
-                        <p className="text-xs text-slate-500">{c.motivo}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        c.type === 'Presencial'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-violet-50 text-violet-700'
-                      }`}>
-                        {c.type}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
+            );
+          })}
+          {sortedDates.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
+              No hay consultas agendadas. ¡Crea la primera!
             </div>
-          );
-        })}
-        {sortedDates.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
-            No hay consultas agendadas. ¡Crea la primera!
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Modal */}
-      {showModal && (
-        <NuevaConsultaModal onClose={() => setShowModal(false)} onSave={addConsulta} />
+      {showModal && doctorEmail && (
+        <NuevaConsultaModal
+          doctorEmail={doctorEmail}
+          onClose={() => setShowModal(false)}
+          onSaved={(a) => setAppointments((prev) => [...prev, a])}
+        />
       )}
     </div>
   );

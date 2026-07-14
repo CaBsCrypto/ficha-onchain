@@ -6,6 +6,7 @@ import { useAdmin } from "./layout";
 interface Stats {
   waitlist: { total: number; thisWeek: number; today: number };
   users:    { total: number; thisWeek: number };
+  doctors?: { active: number; total: number };
 }
 
 function StatCard({
@@ -55,15 +56,15 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard label="Waitlist total"    value={stats.waitlist.total}   accent />
               <StatCard label="Esta semana"       value={stats.waitlist.thisWeek} sub="nuevos en waitlist" />
-              <StatCard label="Hoy"               value={stats.waitlist.today}    sub="registros hoy" />
               <StatCard label="Usuarios activos"  value={stats.users.total}       sub={`+${stats.users.thisWeek} esta semana`} />
+              <StatCard label="Médicos activos"   value={stats.doctors?.active ?? 0} sub={`${stats.doctors?.total ?? 0} registrados`} />
             </div>
           </section>
 
           {/* Quick links */}
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">Acceso rápido</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               <a href="/admin/waitlist"
                 className="group flex items-center gap-4 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 group-hover:bg-sky-100 transition">
@@ -86,6 +87,19 @@ export default function AdminDashboard() {
                 <div>
                   <p className="font-medium text-slate-800">Usuarios</p>
                   <p className="text-xs text-slate-400">{stats.users.total} registrados</p>
+                </div>
+              </a>
+              <a href="/admin/doctors"
+                className="group flex items-center gap-4 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <path d="M12 12c0 1.66-1.34 3-3 3" /><path d="M12 12V17" /><path d="M12 17h3" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800">Médicos</p>
+                  <p className="text-xs text-slate-400">{stats.doctors?.active ?? 0} activos</p>
                 </div>
               </a>
             </div>
