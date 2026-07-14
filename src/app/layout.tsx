@@ -4,7 +4,6 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppPrivyProvider } from "@/providers/PrivyProvider";
-import DemoSwitcher from "../components/DemoSwitcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

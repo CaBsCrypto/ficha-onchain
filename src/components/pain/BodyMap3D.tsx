@@ -292,19 +292,11 @@ export default function BodyMap3D({
           -center.y * scaleFactor + HIT_CENTER_Y,
           -center.z * scaleFactor,
         );
-        // Apply skin material with smooth normals
+        // Keep original GLB materials (textures from file) — only smooth normals
         model.traverse((child) => {
           const c = child as THREEMesh;
           if (c.isMesh) {
             c.geometry.computeVertexNormals();
-            // Warm skin tone — medical illustration style
-            c.material = new T.MeshStandardMaterial({
-              color: 0xdda882,      // warm natural skin
-              roughness: 0.55,
-              metalness: 0.0,
-              emissive: 0x3a1800,   // subtle warm glow in shadows
-              emissiveIntensity: 0.08,
-            }) as unknown as THREEMeshStdMat;
             c.castShadow    = false;
             c.receiveShadow = false;
           }
