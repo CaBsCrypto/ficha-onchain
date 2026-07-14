@@ -173,8 +173,11 @@ export default function BodyMap3D({
     if (!container || sceneRef.current) return;
     const win = window as WindowWithTHREE;
     const THREE = win.THREE;
-    const GLTFLoader = win.GLTFLoader;
-    if (!THREE || !GLTFLoader) return;
+    if (!THREE) return;
+    // GLTFLoader registers itself on THREE when loaded as a UMD script
+    const GLTFLoader = (THREE as unknown as Record<string, unknown>)["GLTFLoader"] as (new () => GLTFLoaderClass) | undefined
+      ?? win.GLTFLoader;
+    if (!GLTFLoader) return;
     const T: THREECtors = THREE;
 
     // ── Renderer ─────────────────────────────────────────────────────────────
@@ -267,7 +270,7 @@ export default function BodyMap3D({
     // ── Load GLB model ────────────────────────────────────────────────────────
     const loader = new GLTFLoader();
     loader.load(
-      "/models/body.glb",
+      "/models/body2.glb",
       (gltf) => {
         const model = gltf.scene;
         // Center and scale to fit
@@ -569,13 +572,18 @@ export default function BodyMap3D({
   }, [fibromyalgiaMode, readOnly]);
 
   useEffect(() => {
+    function hasGLTF() {
+      const w = window as WindowWithTHREE;
+      return !!(w.GLTFLoader ?? (w.THREE as unknown as Record<string,unknown>)?.["GLTFLoader"]);
+    }
     function loadScripts() {
       const win = window as WindowWithTHREE;
-      if (win.THREE && win.GLTFLoader) { initScene(); return; }
-      if (win.THREE && !win.GLTFLoader) {
+      if (win.THREE && hasGLTF()) { initScene(); return; }
+      if (win.THREE && !hasGLTF()) {
         const s = document.createElement("script");
         s.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
         s.onload = () => initScene();
+        s.onerror = () => initScene(); // fallback: try without GLB
         document.head.appendChild(s); return;
       }
       const s3 = document.createElement("script");
@@ -583,7 +591,8 @@ export default function BodyMap3D({
       s3.onload = () => {
         const sg = document.createElement("script");
         sg.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
-        sg.onload = () => initScene();
+        sg.onload  = () => initScene();
+        sg.onerror = () => initScene(); // fallback: show procedural body
         document.head.appendChild(sg);
       };
       document.head.appendChild(s3);
