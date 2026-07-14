@@ -28,10 +28,159 @@ function LangSwitch() {
   );
 }
 
+// ── Verify modal (HowItWorks inline) ─────────────────────────────────────────
+function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const steps = [
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      ),
+      title: t.lang === "es" ? "El médico emite una receta" : "Doctor issues a prescription",
+      body: t.lang === "es"
+        ? "La prescripción queda registrada en un contrato inteligente en Stellar Soroban — inmutable y verificable."
+        : "The prescription is recorded in a smart contract on Stellar Soroban — immutable and verifiable.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M13 17h2m4 0h-2m0 0v-4m0 4v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      ),
+      title: t.lang === "es" ? "El paciente genera un QR" : "Patient generates a QR",
+      body: t.lang === "es"
+        ? "Desde su portal, el paciente comparte un enlace de verificación con validez de 15 minutos."
+        : "From their portal, the patient shares a verification link valid for 15 minutes.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
+          <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: t.lang === "es" ? "La farmacia verifica aquí" : "Pharmacy verifies here",
+      body: t.lang === "es"
+        ? "Esta página lee la receta directo desde la blockchain — sin intermediarios, sin bases de datos propietarias."
+        : "This page reads the prescription straight from the blockchain — no intermediaries, no proprietary databases.",
+    },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="relative px-6 pt-8 pb-6 text-center"
+          style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)" }}
+        >
+          {/* Top accent */}
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, #818cf8, #38bdf8, transparent)" }}
+          />
+
+          {/* Close */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Shield icon */}
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/30">
+            <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
+              <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+              <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <p className="text-xs font-semibold uppercase tracking-widest text-sky-400">
+            {t.lang === "es" ? "Verificador de recetas" : "Prescription Verifier"}
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-white">
+            {t.lang === "es"
+              ? "Verificación directa desde blockchain"
+              : "Direct blockchain verification"}
+          </h2>
+          <p className="mt-1.5 text-sm text-white/50">
+            {t.lang === "es"
+              ? "Escanea el QR del paciente para ver su receta verificada en Stellar Soroban."
+              : "Scan the patient's QR to view their prescription verified on Stellar Soroban."}
+          </p>
+        </div>
+
+        {/* Steps */}
+        <div className="divide-y divide-slate-100 px-6 py-4">
+          {steps.map((step, i) => (
+            <div key={i} className="flex items-start gap-4 py-4 first:pt-2 last:pb-2">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                {step.icon}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">{step.title}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{step.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="border-t border-slate-100 bg-slate-50/80 px-6 py-4 text-center">
+          <p className="text-xs text-slate-500">
+            {t.lang === "es" ? "¿Eres farmacéutico? " : "Are you a pharmacist? "}
+            <a href="/pharmacy" className="font-medium text-sky-600 hover:underline">
+              {t.lang === "es" ? "Accede al portal →" : "Access the portal →"}
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function Navbar() {
   const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -48,7 +197,7 @@ export function Navbar() {
     { href: "#solution", label: t.nav.solution },
     { href: "#how", label: t.nav.how },
     { href: "#roadmap", label: t.nav.roadmap },
-    { href: "/verify", label: t.nav.verify },
+    { href: null, label: t.nav.verify, onClick: () => setVerifyOpen(true) },
     { href: "/pharmacy", label: t.nav.pharmacy },
   ];
 
@@ -81,23 +230,31 @@ export function Navbar() {
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-6 md:flex lg:gap-8">
-            {links.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted transition-colors hover:text-ink"
-              >
-                {link.label}
-              </a>
-            ))}
+            {links.map((link) =>
+              link.onClick ? (
+                <button
+                  key={link.label}
+                  type="button"
+                  onClick={link.onClick}
+                  className="text-sm font-medium text-muted transition-colors hover:text-ink"
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href!}
+                  className="text-sm font-medium text-muted transition-colors hover:text-ink"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </div>
 
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Login button — visible on ALL screen sizes */}
             <PrivyLoginButton />
-
-            {/* Lang toggle — far right, desktop only */}
             <div className="hidden sm:block">
               <LangSwitch />
             </div>
@@ -130,16 +287,27 @@ export function Navbar() {
           )}
         >
           <div className="border-t border-slate-100 bg-white/95 backdrop-blur-sm px-4 py-4 space-y-1">
-            {links.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-clinical"
-              >
-                {link.label}
-              </a>
-            ))}
+            {links.map((link) =>
+              link.onClick ? (
+                <button
+                  key={link.label}
+                  type="button"
+                  onClick={() => { link.onClick!(); setMobileOpen(false); }}
+                  className="block w-full text-left rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-clinical"
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href!}
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-clinical"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
               <LangSwitch />
             </div>
@@ -147,6 +315,7 @@ export function Navbar() {
         </div>
       </header>
 
+      <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
     </>
   );
 }
