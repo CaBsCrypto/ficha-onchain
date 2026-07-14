@@ -148,16 +148,23 @@ export default function BodyMap3D({
     painDataRef.current = painData;
     const s = sceneRef.current;
     if (!s) return;
-    // Update pain indicator spheres
-    s.painIndicators.forEach((mesh, id) => {
+    // Update acupuncture needle visibility + color
+    s.painIndicators.forEach((needle, id) => {
       const lvl   = painData[id];
       const color = painHex(lvl);
+      const needleObj = needle as unknown as THREEObj3D;
       if (color === -1) {
-        mesh.visible = false;
+        needleObj.visible = false;
       } else {
-        mesh.visible = true;
-        (mesh.material as THREEMeshStdMat).color.setHex(color);
-        (mesh.material as THREEMeshStdMat).emissive?.setHex(color);
+        needleObj.visible = true;
+        // Update all child mesh materials
+        needleObj.traverse((child) => {
+          const c = child as THREEMesh;
+          if (c.isMesh) {
+            (c.material as THREEMeshStdMat).color.setHex(color);
+            (c.material as THREEMeshStdMat).emissive?.setHex(color);
+          }
+        });
       }
     });
   }, [painData]);
@@ -235,20 +242,52 @@ export default function BodyMap3D({
       arr.push(m); hitByZone.set(def.id, arr);
     }
 
-    // ── Pain indicator spheres (visible overlay on model) ────────────────────
-    const painIndicators = new Map<string, THREEMesh>();
-    const indGeo = new T.SphereGeometry(0.055, 12, 12);
-    for (const [id, pos] of Object.entries(ZONE_CENTERS)) {
+    // ── Acupuncture needle indicators ────────────────────────────────────────
+    const painIndicators = new Map<string, THREEGroup>();
+
+    // Shared geometries for all needles (mobile-friendly: reuse)
+    const needleShaftGeo = new T.CylinderGeometry(0.0035, 0.0018, 0.22, 8);
+    const needleHeadGeo  = new T.SphereGeometry(0.014, 12, 12);
+    // Cone tip: CylinderGeometry with radiusTop=0
+    const needleTipGeo   = new T.CylinderGeometry(0, 0.0035, 0.030, 8);
+
+    function makeNeedle(color: number): THREEGroup {
+      const group = new T.Group() as unknown as THREEGroup;
       const mat = new T.MeshStandardMaterial({
-        color: 0xfbbf24, roughness: 0.3, metalness: 0.0,
-        emissive: 0xfbbf24, emissiveIntensity: 0.55,
-        transparent: true, opacity: 0.92,
-      });
-      const mesh = new T.Mesh(indGeo, mat as unknown as THREEMeshStdMat);
-      mesh.position.set(pos[0], pos[1], pos[2] + 0.09); // slightly in front of surface
-      mesh.visible = false;
-      pivot.add(mesh);
-      painIndicators.set(id, mesh);
+        color, roughness: 0.25, metalness: 0.65,
+        emissive: color, emissiveIntensity: 0.20,
+      }) as unknown as THREEMeshStdMat;
+
+      // Shaft — center at y=0.11 (so tip at y=0, head at y=0.22)
+      const shaft = new T.Mesh(needleShaftGeo, mat);
+      (shaft as unknown as THREEObj3D).position.set(0, 0.11, 0);
+      (group as unknown as THREEObj3D).add(shaft as unknown as THREEObj3D);
+
+      // Head ball at top
+      const head = new T.Mesh(needleHeadGeo, mat);
+      (head as unknown as THREEObj3D).position.set(0, 0.235, 0);
+      (group as unknown as THREEObj3D).add(head as unknown as THREEObj3D);
+
+      // Tip cone at bottom (points down into body)
+      const tip = new T.Mesh(needleTipGeo, mat);
+      (tip as unknown as THREEObj3D).position.set(0, -0.015, 0);
+      // Rotate 180° so the point faces down
+      (tip as unknown as THREEObj3D).rotation.z = Math.PI;
+      (group as unknown as THREEObj3D).add(tip as unknown as THREEObj3D);
+
+      return group;
+    }
+
+    for (const [id, pos] of Object.entries(ZONE_CENTERS)) {
+      const needle = makeNeedle(0x4ade80); // default green; updated by painData
+      // Position at zone center, offset slightly outward (+z) so needle sticks out
+      (needle as unknown as THREEObj3D).position.set(pos[0], pos[1], pos[2] + 0.06);
+      // Tilt slightly outward based on x position (left/right zones lean outward)
+      (needle as unknown as THREEObj3D).rotation.z = pos[0] * -0.4; // lean left zones left, right zones right
+      (needle as unknown as THREEObj3D).rotation.x = -0.15; // slight forward tilt
+      (needle as unknown as THREEObj3D).visible = false;
+      pivot.add(needle as unknown as THREEObj3D);
+      painIndicators.set(id, needle);
     }
 
     // ── Fibromyalgia markers ──────────────────────────────────────────────────
@@ -542,10 +581,15 @@ export default function BodyMap3D({
       // Pulse hover ring
       if (hoverRing.visible) hoverRing.scale.setScalar(1 + 0.10 * Math.sin(time * 3));
 
-      // Pulse pain indicators
-      painIndicators.forEach((mesh) => {
-        if (!mesh.visible) return;
-        mesh.scale.setScalar(1 + 0.18 * Math.sin(time * 2.2));
+      // Needle quiver — tiny oscillation (acupuncture effect)
+      let ni = 0;
+      painIndicators.forEach((needle, zoneId) => {
+        const needleObj = needle as unknown as THREEObj3D;
+        if (!needleObj.visible) { ni++; return; }
+        const baseZ = (ZONE_CENTERS[zoneId]?.[0] ?? 0) * -0.4;
+        needleObj.rotation.z = baseZ + 0.018 * Math.sin(time * 5.5 + ni * 1.3);
+        needleObj.rotation.x = -0.15  + 0.010 * Math.sin(time * 4.8 + ni * 0.9);
+        ni++;
       });
 
       // Pulse fibro markers
@@ -733,6 +777,6 @@ interface WindowWithTHREE { THREE?: THREECtors; GLTFLoader?: new () => GLTFLoade
 interface SceneState {
   renderer: THREERenderer; scene: THREEScene; camera: THREECamera; pivot: THREEGroup;
   hitMeshes: THREEMesh[]; hitByZone: Map<string, THREEMesh[]>;
-  painIndicators: Map<string, THREEMesh>; fibroMeshes: THREEMesh[];
+  painIndicators: Map<string, THREEGroup>; fibroMeshes: THREEMesh[];
   rafId: number; ro: ResizeObserver; cleanup(): void;
 }
