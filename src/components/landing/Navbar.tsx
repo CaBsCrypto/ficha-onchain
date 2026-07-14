@@ -49,7 +49,6 @@ export function Navbar() {
     { href: "#how", label: t.nav.how },
     { href: "#roadmap", label: t.nav.roadmap },
     { href: "/verify", label: t.nav.verify },
-    { href: "/legal", label: t.nav.legal },
     { href: "/pharmacy", label: t.nav.pharmacy },
   ];
 
