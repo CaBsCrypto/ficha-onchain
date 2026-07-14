@@ -84,24 +84,35 @@ function PatientNav() {
 function SidebarNav() {
   const { items, isActive } = PatientNav();
   return (
-    <aside className="hidden md:flex md:w-56 lg:w-64 md:flex-col md:shrink-0">
-      <nav className="sticky top-24 flex flex-col gap-1">
-        {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
-              isActive(item)
-                ? 'bg-[#0ea5e9]/10 text-[#0ea5e9]'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900',
-            )}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+    <aside className="hidden md:flex md:w-56 lg:w-60 md:flex-col md:shrink-0">
+      <div className="sticky top-24 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Sidebar header */}
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Mi portal</p>
+        </div>
+        <nav className="flex flex-col p-2">
+          {items.map((item) => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                  active
+                    ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/30'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                )}
+              >
+                <span className={cn('shrink-0', active ? 'text-white' : 'text-slate-400')}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </aside>
   );
 }
@@ -109,8 +120,8 @@ function SidebarNav() {
 function MobileBottomNav() {
   const { items, isActive } = PatientNav();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-sm md:hidden">
-      <div className="mx-auto flex max-w-3xl pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white shadow-[0_-1px_12px_rgba(0,0,0,0.06)] md:hidden">
+      <div className="mx-auto flex max-w-3xl">
         {items.map((item) => {
           const active = isActive(item);
           return (
@@ -118,15 +129,18 @@ function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors',
-                active ? 'text-[#0ea5e9]' : 'text-slate-500 hover:text-slate-900',
+                'relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
+                active ? 'text-sky-500' : 'text-slate-400 hover:text-slate-700',
               )}
             >
-              {item.icon}
-              <span>{item.label}</span>
+              {/* Active dot at top */}
               {active && (
-                <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#0ea5e9]" />
+                <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-sky-500" />
               )}
+              <span className={cn('flex h-8 w-8 items-center justify-center rounded-xl transition-all', active ? 'bg-sky-50' : '')}>
+                {item.icon}
+              </span>
+              <span className={active ? 'text-sky-500 font-semibold' : ''}>{item.label}</span>
             </Link>
           );
         })}

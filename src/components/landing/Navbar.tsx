@@ -95,36 +95,50 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+        className="relative w-full max-w-md overflow-hidden rounded-3xl shadow-2xl"
+        style={{
+          background: "linear-gradient(160deg, #04111f 0%, #062440 55%, #0c3a5e 100%)",
+          border: "1px solid rgba(14,165,233,0.2)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Glow */}
         <div
-          className="relative px-6 pt-8 pb-6 text-center"
-          style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)" }}
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(14,165,233,0.28) 0%, transparent 65%)" }}
+        />
+
+        {/* Top accent bar */}
+        <div
+          aria-hidden
+          className="h-px w-full"
+          style={{ background: "linear-gradient(90deg, transparent, #38bdf8, #0ea5e9, transparent)" }}
+        />
+
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-4 top-4 z-10 grid h-8 w-8 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white"
         >
-          {/* Top accent */}
-          <div
-            aria-hidden
-            className="absolute inset-x-0 top-0 h-px"
-            style={{ background: "linear-gradient(90deg, transparent, #818cf8, #38bdf8, transparent)" }}
-          />
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
 
-          {/* Close */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-
+        {/* Header */}
+        <div className="relative px-6 pt-8 pb-6 text-center">
           {/* Shield icon */}
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/30">
-            <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-white"
+            style={{
+              background: "linear-gradient(135deg, #0284c7, #0ea5e9)",
+              boxShadow: "0 0 32px rgba(14,165,233,0.45)",
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" aria-hidden>
               <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
               <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -133,38 +147,51 @@ function VerifyModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-400">
             {lang === "es" ? "Verificador de recetas" : "Prescription Verifier"}
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-white">
+          <h2 className="mt-1.5 text-xl font-semibold text-white">
             {lang === "es"
               ? "Verificación directa desde blockchain"
               : "Direct blockchain verification"}
           </h2>
-          <p className="mt-1.5 text-sm text-white/50">
+          <p className="mt-2 text-sm leading-relaxed text-white/50">
             {lang === "es"
               ? "Escanea el QR del paciente para ver su receta verificada en Stellar Soroban."
               : "Scan the patient's QR to view their prescription verified on Stellar Soroban."}
           </p>
         </div>
 
+        {/* Divider */}
+        <div
+          aria-hidden
+          className="mx-6 h-px"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.25), transparent)" }}
+        />
+
         {/* Steps */}
-        <div className="divide-y divide-slate-100 px-6 py-4">
+        <div className="px-6 py-4 space-y-1">
           {steps.map((step, i) => (
-            <div key={i} className="flex items-start gap-4 py-4 first:pt-2 last:pb-2">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+            <div key={i} className="flex items-start gap-4 rounded-2xl px-3 py-3.5 transition-colors hover:bg-white/5">
+              <div
+                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sky-300"
+                style={{ background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.2)" }}
+              >
                 {step.icon}
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-800">{step.title}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{step.body}</p>
+                <p className="text-sm font-medium text-white/90">{step.title}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-white/40">{step.body}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* CTA */}
-        <div className="border-t border-slate-100 bg-slate-50/80 px-6 py-4 text-center">
-          <p className="text-xs text-slate-500">
+        <div
+          className="mx-4 mb-4 mt-1 rounded-2xl px-5 py-3.5 text-center"
+          style={{ background: "rgba(14,165,233,0.08)", border: "1px solid rgba(14,165,233,0.15)" }}
+        >
+          <p className="text-xs text-white/40">
             {lang === "es" ? "¿Eres farmacéutico? " : "Are you a pharmacist? "}
-            <a href="/pharmacy" className="font-medium text-sky-600 hover:underline">
+            <a href="/pharmacy" className="font-medium text-sky-400 hover:text-sky-300 transition-colors">
               {lang === "es" ? "Accede al portal →" : "Access the portal →"}
             </a>
           </p>
