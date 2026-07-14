@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not sign token";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[share] error:", message);
+    return NextResponse.json({ error: "Could not generate share token" }, { status: 500 });
   }
 }

@@ -38,8 +38,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: { documents } });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error("[documents] error:", message);
     return NextResponse.json(
-      { error: `Failed to fetch documents: ${message}` },
+      { error: "Failed to fetch documents" },
       { status: 500 },
     );
   }

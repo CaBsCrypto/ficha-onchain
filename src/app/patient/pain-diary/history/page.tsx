@@ -159,7 +159,7 @@ export default function PainHistoryPage() {
                       contentStyle={{ background: "#0F172A", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }}
                       labelStyle={{ color: "#94A3B8" }}
                       itemStyle={{ color: "#10B981" }}
-                      formatter={(v: number) => [`${v}/10`, "Dolor promedio"]}
+                      formatter={((v: number) => [`${v}/10`, "Dolor promedio"]) as never}
                     />
                     <Area type="monotone" dataKey="avg" stroke="#10B981" strokeWidth={2} fill="url(#painGrad)" dot={{ fill: "#10B981", r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                   </AreaChart>

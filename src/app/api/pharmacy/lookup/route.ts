@@ -109,8 +109,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ data });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error("[pharmacy/lookup] error:", message);
     return NextResponse.json(
-      { error: `Lookup failed: ${message}` },
+      { error: "Lookup failed" },
       { status: 500 },
     );
   }

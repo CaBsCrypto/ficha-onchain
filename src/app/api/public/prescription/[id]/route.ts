@@ -78,8 +78,9 @@ export async function GET(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error("[public/prescription] error:", message);
     return NextResponse.json(
-      { error: `Failed to fetch prescription: ${message}` },
+      { error: "Failed to fetch prescription" },
       { status: 500 },
     );
   }

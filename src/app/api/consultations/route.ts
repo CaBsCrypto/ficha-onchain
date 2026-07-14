@@ -114,7 +114,8 @@ async function handleCreateConsultation(request: Request) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to create consultation";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[consultations] error:", message);
+    return NextResponse.json({ error: "Failed to create consultation" }, { status: 500 });
   }
 }
 
