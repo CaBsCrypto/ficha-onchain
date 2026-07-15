@@ -529,8 +529,8 @@ function InicioTab({
             <CalendarIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-ink">Agendar consulta</p>
-            <p className="text-sm text-muted">Médico general, especialistas y más</p>
+            <p className="font-semibold text-ink">Mis consultas</p>
+            <p className="text-sm text-muted">Citas agendadas y próximas visitas</p>
           </div>
           <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
         </button>
@@ -1126,11 +1126,176 @@ function MockRxCard({ rx }: { rx: MockRx }) {
 // ---------------------------------------------------------------------------
 // Tab: Mi Ficha Médica (mejorada)
 // ---------------------------------------------------------------------------
+// ── FichaTab helpers ──────────────────────────────────────────────────────────
+interface HealthRecord {
+  patient_email:            string;
+  blood_type:               string | null;
+  height_cm:                string | null;
+  weight_kg:                string | null;
+  bmi:                      string | null;
+  allergies:                string[];
+  conditions:               { label: string; since?: string; controlled?: boolean }[];
+  vaccinations:             { name: string; date: string }[];
+  primary_doctor:           string | null;
+  primary_doctor_specialty: string | null;
+  notes:                    string | null;
+  updated_at:               string;
+}
+
+const EMPTY_RECORD: Omit<HealthRecord, 'patient_email' | 'updated_at'> = {
+  blood_type: null, height_cm: null, weight_kg: null, bmi: null,
+  allergies: [], conditions: [], vaccinations: [],
+  primary_doctor: null, primary_doctor_specialty: null, notes: null,
+};
+
+// ── Edit modal for ficha ──────────────────────────────────────────────────────
+function EditFichaModal({
+  record,
+  email,
+  onClose,
+  onSaved,
+}: {
+  record: HealthRecord | null;
+  email: string;
+  onClose: () => void;
+  onSaved: (r: HealthRecord) => void;
+}) {
+  const [bloodType,   setBloodType]   = useState(record?.blood_type               ?? '');
+  const [height,      setHeight]      = useState(record?.height_cm                ?? '');
+  const [weight,      setWeight]      = useState(record?.weight_kg                ?? '');
+  const [bmi,         setBmi]         = useState(record?.bmi                      ?? '');
+  const [allergyText, setAllergyText] = useState((record?.allergies ?? []).join(', '));
+  const [docName,     setDocName]     = useState(record?.primary_doctor           ?? '');
+  const [docSpec,     setDocSpec]     = useState(record?.primary_doctor_specialty ?? '');
+  const [notes,       setNotes]       = useState(record?.notes                    ?? '');
+  const [saving,      setSaving]      = useState(false);
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100';
+  const labelCls = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500';
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const allergies = allergyText.split(',').map(s => s.trim()).filter(Boolean);
+      const bmiCalc   = height && weight
+        ? (parseFloat(weight) / ((parseFloat(height) / 100) ** 2)).toFixed(1)
+        : bmi || null;
+      const res  = await fetch('/api/patient/ficha', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_email:             email,
+          blood_type:                bloodType || null,
+          height_cm:                 height ? `${height} cm` : null,
+          weight_kg:                 weight ? `${weight} kg` : null,
+          bmi:                       bmiCalc,
+          allergies,
+          conditions:                record?.conditions   ?? [],
+          vaccinations:              record?.vaccinations ?? [],
+          primary_doctor:            docName  || null,
+          primary_doctor_specialty:  docSpec  || null,
+          notes:                     notes    || null,
+        }),
+      });
+      const json = await res.json() as { data?: HealthRecord };
+      if (json.data) { onSaved(json.data); onClose(); }
+    } catch (err) {
+      console.error('[EditFicha]', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h3 className="font-semibold text-slate-800">Editar ficha médica</h3>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <form onSubmit={handleSave} className="max-h-[75vh] overflow-y-auto p-6 space-y-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Datos básicos</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Grupo sanguíneo</label>
+              <select className={inputCls} value={bloodType} onChange={e => setBloodType(e.target.value)}>
+                <option value="">—</option>
+                {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Talla (cm)</label>
+              <input type="number" className={inputCls} value={height} onChange={e => setHeight(e.target.value)} placeholder="165" />
+            </div>
+            <div>
+              <label className={labelCls}>Peso (kg)</label>
+              <input type="number" className={inputCls} value={weight} onChange={e => setWeight(e.target.value)} placeholder="68" />
+            </div>
+            <div>
+              <label className={labelCls}>IMC (auto)</label>
+              <input readOnly className={`${inputCls} cursor-not-allowed opacity-60`}
+                value={height && weight ? (parseFloat(weight) / ((parseFloat(height) / 100) ** 2)).toFixed(1) : bmi ?? ''} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Alergias (separadas por coma)</label>
+            <input className={inputCls} value={allergyText} onChange={e => setAllergyText(e.target.value)} placeholder="Penicilina, Ibuprofeno…" />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 pt-2">Médico de cabecera</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Nombre</label>
+              <input className={inputCls} value={docName} onChange={e => setDocName(e.target.value)} placeholder="Dr. Valentina Reyes" />
+            </div>
+            <div>
+              <label className={labelCls}>Especialidad</label>
+              <input className={inputCls} value={docSpec} onChange={e => setDocSpec(e.target.value)} placeholder="Medicina Interna" />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Notas personales</label>
+            <textarea rows={3} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100"
+              value={notes} onChange={e => setNotes(e.target.value)} placeholder="Alergias específicas, observaciones…" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-sky-500 py-2.5 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50">
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
-  const ficha = MOCK_FICHA;
-  const privyEmail = usePrivyEmail();
-  const displayName = privyEmail ?? (mock ? "Mi Cuenta" : "Tu perfil");
+  const privyEmail   = usePrivyEmail();
+  const displayName  = privyEmail ?? (mock ? "Mi Cuenta" : "Tu perfil");
   const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
+
+  const [record,    setRecord]    = useState<HealthRecord | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [showEdit,  setShowEdit]  = useState(false);
+
+  useEffect(() => {
+    if (!privyEmail) { setLoading(false); return; }
+    fetch(`/api/patient/ficha?email=${encodeURIComponent(privyEmail)}`)
+      .then(r => r.json() as Promise<{ data: HealthRecord | null }>)
+      .then(j => setRecord(j.data))
+      .catch(err => console.error('[FichaTab]', err))
+      .finally(() => setLoading(false));
+  }, [privyEmail]);
+
+  // Fallback values from MOCK_FICHA when no real data yet (keeps UI populated for demo)
+  const ficha = record ?? {
+    ...EMPTY_RECORD,
+    patient_email: privyEmail ?? '',
+    updated_at: new Date().toISOString(),
+  };
 
   return (
     <div className="space-y-5">
@@ -1184,14 +1349,14 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
             </p>
             <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 ring-1 ring-inset ring-rose-200">
               <span className="text-base font-bold text-rose-600">
-                {ficha.bloodType}
+                {ficha.blood_type ?? "—"}
               </span>
             </div>
           </div>
           {[
-            { label: "Talla", value: ficha.height },
-            { label: "Peso", value: ficha.weight },
-            { label: "IMC", value: ficha.bmi },
+            { label: "Talla", value: ficha.height_cm ?? "—" },
+            { label: "Peso", value: ficha.weight_kg ?? "—" },
+            { label: "IMC", value: ficha.bmi ?? "—" },
           ].map((kv) => (
             <div key={kv.label} className="bg-white px-5 py-4">
               <p className="text-[10px] uppercase tracking-wide text-muted">
@@ -1299,25 +1464,9 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
         />
         <div className="px-6 py-4">
           <p className="text-sm font-semibold text-ink">
-            {ficha.primaryDoctor}
+            {ficha.primary_doctor ?? "—"}
           </p>
-          <p className="text-xs text-muted">{ficha.primaryDoctorSpecialty}</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted">
-                Última visita
-              </p>
-              <p className="mt-0.5 font-medium text-ink">{ficha.lastVisit}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted">
-                Próxima cita
-              </p>
-              <p className="mt-0.5 font-medium text-clinical">
-                {ficha.nextAppointment}
-              </p>
-            </div>
-          </div>
+          <p className="text-xs text-muted">{ficha.primary_doctor_specialty ?? ""}</p>
         </div>
       </Card>
 
@@ -1344,10 +1493,56 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab: Mis Licencias Médicas
+// Tab: Mis Licencias Médicas — real DB
 // ---------------------------------------------------------------------------
+interface PatientDBLicense {
+  id: number;
+  doctor_email: string;
+  patient_email: string | null;
+  patient_name: string;
+  patient_rut: string | null;
+  fecha_inicio: string;
+  dias: number;
+  cie10: string;
+  tipo: string;
+  diagnostico: string | null;
+  observaciones: string | null;
+  status: 'draft' | 'signed' | 'expired';
+  tx_hash: string | null;
+  doc_hash: string | null;
+  doc_id: number | null;
+  mode: 'onchain' | 'simulated' | null;
+  created_at: string;
+}
+
+function addDaysPatient(iso: string, n: number): string {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDatePatient(iso: string): string {
+  const d = new Date(iso + (iso.includes('T') ? '' : 'T12:00:00'));
+  return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function LicenciasTab() {
-  const licenses = MOCK_LICENSES;
+  const privyEmail = usePrivyEmail();
+  const [licencias, setLicencias] = useState<PatientDBLicense[]>([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!privyEmail) { setLoading(false); return; }
+    setLoading(true);
+    fetch(`/api/licenses?patientEmail=${encodeURIComponent(privyEmail)}`)
+      .then(r => r.json() as Promise<{ data?: PatientDBLicense[] }>)
+      .then(json => { if (json.data) setLicencias(json.data); })
+      .catch(err => console.error('[LicenciasTab patient]', err))
+      .finally(() => setLoading(false));
+  }, [privyEmail]);
+
+  const active  = licencias.filter(l => l.status === 'signed' && new Date(addDaysPatient(l.fecha_inicio, l.dias) + 'T23:59:59') >= new Date());
+  const past    = licencias.filter(l => l.status !== 'signed' || new Date(addDaysPatient(l.fecha_inicio, l.dias) + 'T23:59:59') < new Date());
 
   return (
     <div className="space-y-4">
@@ -1358,107 +1553,133 @@ function LicenciasTab() {
           <span className="font-semibold">Licencias médicas on-chain.</span>{" "}
           Cada licencia emitida por tu médico queda registrada en Stellar
           Soroban — verificable por empleadores e instituciones de salud.
-          Datos de demostración.
         </p>
       </div>
 
-      {licenses.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-10">
+          <div className="h-6 w-6 animate-spin rounded-full border-4 border-slate-200 border-t-violet-500" />
+        </div>
+      ) : licencias.length === 0 ? (
         <div className="rounded-2xl border border-slate-200/70 bg-white p-8 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-muted">
             <ClipboardCheckIcon className="h-7 w-7" />
           </div>
-          <p className="text-sm font-medium text-ink">
-            Sin licencias registradas
-          </p>
+          <p className="text-sm font-medium text-ink">Sin licencias registradas</p>
           <p className="mt-1 text-xs text-muted">
-            Tus licencias médicas aparecerán aquí cuando un médico las emita
-            on-chain.
+            Tus licencias médicas aparecerán aquí cuando un médico las emita on-chain.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {licenses.map((lic) => (
-            <LicenseCard key={lic.id} license={lic} />
-          ))}
+        <div className="space-y-4">
+          {active.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Vigentes</p>
+              <div className="space-y-3">
+                {active.map(lic => <PatientLicCard key={lic.id} lic={lic} />)}
+              </div>
+            </div>
+          )}
+          {past.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Historial</p>
+              <div className="space-y-3">
+                {past.map(lic => <PatientLicCard key={lic.id} lic={lic} />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function LicenseCard({ license }: { license: MockLicense }) {
-  const cfg =
-    LICENSE_STATUS_CONFIG[license.status] ?? LICENSE_STATUS_CONFIG["Vencida"];
-  const shortHash = `${license.hash.slice(0, 8)}...${license.hash.slice(-4)}`;
+function PatientLicCard({ lic }: { lic: PatientDBLicense }) {
+  const fechaFin   = addDaysPatient(lic.fecha_inicio, lic.dias);
+  const isActive   = lic.status === 'signed' && new Date(fechaFin + 'T23:59:59') >= new Date();
+  const isOnChain  = lic.mode === 'onchain';
+  const displayHash = lic.tx_hash ?? lic.doc_hash;
+  const shortHash  = displayHash ? `${displayHash.slice(0, 8)}...${displayHash.slice(-6)}` : null;
+
+  const TIPO_DOT: Record<string, string> = {
+    Enfermedad: 'bg-sky-400',
+    Accidente:  'bg-orange-400',
+    Maternidad: 'bg-pink-400',
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      {/* ── Status bar ── */}
-      <div
-        className={cn(
-          "flex items-center gap-2 border-b px-4 py-2.5",
-          cfg.bg,
-          cfg.border,
+      {/* Status bar */}
+      <div className={cn(
+        "flex items-center gap-2 border-b px-4 py-2.5",
+        isActive ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50",
+      )}>
+        <span className={cn("h-2 w-2 rounded-full", isActive ? "bg-emerald-500" : "bg-slate-400")} />
+        <span className={cn("text-xs font-semibold", isActive ? "text-emerald-700" : "text-slate-500")}>
+          {isActive ? "Vigente" : lic.status === 'draft' ? "Borrador" : "Vencida"}
+        </span>
+        {lic.status === 'signed' && (
+          <span className={cn(
+            "ml-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            isOnChain ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700",
+          )}>
+            {isOnChain ? "⚡ On-chain" : "📋 Demo"}
+          </span>
         )}
-      >
-        <span className={cn("h-2 w-2 rounded-full", cfg.dot)} />
-        <span className={cn("text-xs font-semibold", cfg.text)}>
-          {cfg.label}
-        </span>
-        <span className="ml-auto text-[10px] font-medium text-muted">
-          {license.days} días
-        </span>
+        <span className="ml-auto text-[10px] font-medium text-muted">{lic.dias} días</span>
       </div>
 
       <div className="space-y-3 p-4">
-        {/* ── Type + doctor ── */}
         <div>
-          <h3 className="text-base font-semibold text-ink">{license.type}</h3>
-          <p className="mt-0.5 text-sm text-muted">{license.doctor}</p>
+          <div className="flex items-center gap-2">
+            <span className={cn("h-2 w-2 rounded-full", TIPO_DOT[lic.tipo] ?? "bg-slate-400")} />
+            <h3 className="text-base font-semibold text-ink">{lic.tipo}</h3>
+          </div>
+          <p className="mt-0.5 text-sm text-muted">{lic.doctor_email}</p>
+          {lic.diagnostico && <p className="mt-0.5 text-xs text-slate-400">{lic.diagnostico} · CIE-10: {lic.cie10}</p>}
         </div>
 
-        {/* ── Duration pill ── */}
         <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5">
           <ClockIcon className="h-4 w-4 shrink-0 text-muted" />
           <p className="text-sm">
-            <span className="font-semibold text-ink">{license.days} días</span>
+            <span className="font-semibold text-ink">{lic.dias} días</span>
             <span className="text-muted"> de reposo médico</span>
           </p>
         </div>
 
-        {/* ── Date range ── */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Inicio
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Inicio</p>
             <div className="mt-1 flex items-center gap-1.5">
               <CalendarIcon className="h-3.5 w-3.5 text-muted" />
-              <span className="text-sm font-semibold text-ink">
-                {license.start}
-              </span>
+              <span className="text-sm font-semibold text-ink">{fmtDatePatient(lic.fecha_inicio)}</span>
             </div>
           </div>
           <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Fin
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Fin</p>
             <div className="mt-1 flex items-center gap-1.5">
               <CalendarIcon className="h-3.5 w-3.5 text-muted" />
-              <span className="text-sm font-semibold text-ink">
-                {license.end}
-              </span>
+              <span className="text-sm font-semibold text-ink">{fmtDatePatient(fechaFin)}</span>
             </div>
           </div>
         </div>
 
-        {/* ── On-chain hash ── */}
-        <div className="flex items-center gap-1.5 border-t border-slate-100 pt-2">
-          <LockIcon className="h-3.5 w-3.5 text-muted/60" />
-          <span className="font-mono text-[10px] text-muted/70">
-            {shortHash}
-          </span>
-        </div>
+        {shortHash && (
+          <div className="flex items-center gap-1.5 border-t border-slate-100 pt-2">
+            <LockIcon className="h-3.5 w-3.5 text-muted/60" />
+            <span className="font-mono text-[10px] text-muted/70">{shortHash}</span>
+            {isOnChain && lic.tx_hash && (
+              <a
+                href={`https://stellar.expert/explorer/testnet/tx/${lic.tx_hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto text-[10px] font-medium text-violet-600 hover:underline"
+              >
+                Ver →
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1777,238 +1998,320 @@ function EmptyRxState({ error, onRetry }: { error: string | null; onRetry: () =>
 }
 
 // ---------------------------------------------------------------------------
-// Tab: Consultas — agendar y gestionar consultas médicas
+// Tab: Mis Consultas — citas reales desde la BD
 // ---------------------------------------------------------------------------
 
-const ESPECIALIDADES = [
-  { id: "general",       label: "Médico General",      emoji: "🩺" },
-  { id: "pediatria",     label: "Pediatría",            emoji: "👶" },
-  { id: "ginecologia",   label: "Ginecología",          emoji: "🌸" },
-  { id: "cardiologia",   label: "Cardiología",          emoji: "❤️" },
-  { id: "dermatologia",  label: "Dermatología",         emoji: "🔬" },
-  { id: "neurologia",    label: "Neurología",           emoji: "🧠" },
-  { id: "traumatologia", label: "Traumatología",        emoji: "🦴" },
-  { id: "psiquiatria",   label: "Psiquiatría",          emoji: "🧘" },
-  { id: "oftalmologia",  label: "Oftalmología",         emoji: "👁️" },
-  { id: "otorrino",      label: "Otorrinolaringología", emoji: "👂" },
-  { id: "endocrinologia",label: "Endocrinología",       emoji: "⚗️" },
-  { id: "oncologia",     label: "Oncología",            emoji: "🎗️" },
-];
-
-type BookingStep = "especialidad" | "fecha" | "hora" | "confirm" | "done";
-
-interface Booking {
-  especialidad: string;
-  fecha: string;
-  hora: string;
-  modalidad: "presencial" | "telemedicina";
+interface DBAppointment {
+  id: number;
+  doctor_email: string;
+  patient_email: string;
+  patient_name: string;
+  date: string;
+  time_slot: string;
+  type: 'Presencial' | 'Telemedicina';
+  motivo: string | null;
+  notes: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  created_at: string;
 }
 
-function ConsultasTab({ wallet, mock }: { wallet: string; mock: boolean }) {
-  const [step, setStep] = useState<BookingStep>("especialidad");
-  const [booking, setBooking] = useState<Partial<Booking>>({});
-  const [saved, setSaved] = useState<Booking[]>([]);
+function AppointmentStatusBadge({ status }: { status: DBAppointment['status'] }) {
+  const map: Record<DBAppointment['status'], { label: string; cls: string }> = {
+    scheduled:  { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
+    completed:  { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    cancelled:  { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600 ring-rose-200' },
+  };
+  const { label, cls } = map[status] ?? map.scheduled;
+  return (
+    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${cls}`}>
+      {label}
+    </span>
+  );
+}
 
-  // Helpers
-  const today = new Date();
-  const minDate = today.toISOString().slice(0, 10);
-  const maxDate = new Date(today.getTime() + 60 * 24 * 3600_000).toISOString().slice(0, 10);
+function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean }) {
+  const privyEmail = usePrivyEmail();
+  const [appointments, setAppointments] = useState<DBAppointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
-  const HORARIOS = ["08:30", "09:00", "09:30", "10:00", "10:30", "11:00",
-                    "11:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"];
+  // Fetch real appointments by patient email
+  useEffect(() => {
+    if (!privyEmail) { setLoading(false); return; }
+    fetch(`/api/appointments?patientEmail=${encodeURIComponent(privyEmail)}`)
+      .then((r) => r.json())
+      .then((data: { appointments?: DBAppointment[] }) => {
+        setAppointments(data.appointments ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [privyEmail]);
 
-  function confirm() {
-    const b = booking as Booking;
-    setSaved((prev) => [b, ...prev]);
-    setStep("done");
-  }
+  const todayISO = new Date().toISOString().slice(0, 10);
 
-  function reset() {
-    setBooking({});
-    setStep("especialidad");
-  }
+  const upcoming = appointments.filter(
+    (a) => a.date.slice(0, 10) >= todayISO && a.status === 'scheduled'
+  ).sort((a, b) => a.date.localeCompare(b.date) || a.time_slot.localeCompare(b.time_slot));
 
-  const esp = ESPECIALIDADES.find((e) => e.id === booking.especialidad);
+  const past = appointments.filter(
+    (a) => a.date.slice(0, 10) < todayISO || a.status !== 'scheduled'
+  ).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
-          <CalendarIcon className="h-6 w-6" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+            <CalendarIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-ink">Mis consultas</h1>
+            <p className="text-sm text-muted">
+              {privyEmail ?? 'Cargando…'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-ink">Agendar consulta</h1>
-          <p className="text-sm text-muted">Selecciona especialidad, fecha y horario</p>
-        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-600"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Solicitar
+        </button>
       </div>
 
       {mock && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          Modo demo — las consultas no se confirman con médicos reales.
+          Modo demo — las citas de tu médico asignado aparecerán aquí cuando se conecte una cuenta real.
         </div>
       )}
 
-      {/* ── Step: especialidad ── */}
-      {step === "especialidad" && (
-        <Card>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
-            ¿Qué especialidad necesitas?
-          </h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {ESPECIALIDADES.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => { setBooking((b) => ({ ...b, especialidad: e.id })); setStep("fecha"); }}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-medium text-ink shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md active:scale-95"
-              >
-                <span className="text-xl">{e.emoji}</span>
-                <span className="leading-tight">{e.label}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+      {/* Request form (inline) */}
+      {showForm && privyEmail && (
+        <RequestAppointmentForm
+          patientEmail={privyEmail}
+          onSaved={(a) => {
+            setAppointments((prev) => [...prev, a]);
+            setShowForm(false);
+          }}
+          onClose={() => setShowForm(false)}
+        />
       )}
 
-      {/* ── Step: fecha ── */}
-      {step === "fecha" && (
-        <Card>
-          <button onClick={() => setStep("especialidad")} className="mb-3 flex items-center gap-1 text-xs text-muted hover:text-ink">
-            ← {esp?.emoji} {esp?.label}
-          </button>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
-            ¿Qué día prefieres?
-          </h2>
-          <div className="space-y-3">
-            <input
-              type="date"
-              min={minDate}
-              max={maxDate}
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-ink focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-              value={booking.fecha ?? ""}
-              onChange={(e) => setBooking((b) => ({ ...b, fecha: e.target.value }))}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setBooking((b) => ({ ...b, modalidad: "presencial" })); }}
-                className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-all ${booking.modalidad === "presencial" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-muted hover:border-emerald-200"}`}
-              >
-                🏥 Presencial
-              </button>
-              <button
-                onClick={() => { setBooking((b) => ({ ...b, modalidad: "telemedicina" })); }}
-                className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-all ${booking.modalidad === "telemedicina" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-muted hover:border-sky-200"}`}
-              >
-                💻 Telemedicina
-              </button>
-            </div>
-            <Button
-              variant="primary"
-              className="w-full"
-              onClick={() => { if (booking.fecha && booking.modalidad) setStep("hora"); }}
-            >
-              Continuar →
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Step: hora ── */}
-      {step === "hora" && (
-        <Card>
-          <button onClick={() => setStep("fecha")} className="mb-3 flex items-center gap-1 text-xs text-muted hover:text-ink">
-            ← {booking.fecha}
-          </button>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
-            Elige un horario
-          </h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {HORARIOS.map((h) => (
-              <button
-                key={h}
-                onClick={() => { setBooking((b) => ({ ...b, hora: h })); setStep("confirm"); }}
-                className={`rounded-xl border py-2.5 text-sm font-medium transition-all ${booking.hora === h ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-ink hover:border-emerald-300 hover:bg-emerald-50"}`}
-              >
-                {h}
-              </button>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* ── Step: confirm ── */}
-      {step === "confirm" && (
-        <Card>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
-            Confirmar reserva
-          </h2>
-          <div className="space-y-3 rounded-xl bg-slate-50 p-4">
-            <Row label="Especialidad" value={`${esp?.emoji} ${esp?.label}`} />
-            <Row label="Fecha" value={booking.fecha ?? ""} />
-            <Row label="Hora" value={booking.hora ?? ""} />
-            <Row label="Modalidad" value={booking.modalidad === "telemedicina" ? "💻 Telemedicina" : "🏥 Presencial"} />
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setStep("hora")}>
-              Cambiar
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={confirm}>
-              Confirmar ✓
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Step: done ── */}
-      {step === "done" && (
-        <Card className="text-center">
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-100 text-3xl">
-            ✅
-          </div>
-          <h2 className="text-lg font-semibold text-ink">¡Consulta agendada!</h2>
-          <p className="mt-1 text-sm text-muted">
-            Recibirás una confirmación en tu correo con los detalles.
-          </p>
-          <Button variant="secondary" className="mt-4 w-full" onClick={reset}>
-            Agendar otra consulta
-          </Button>
-        </Card>
-      )}
-
-      {/* ── Consultas previas ── */}
-      {saved.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Próximas consultas
-          </h2>
-          {saved.map((c, i) => {
-            const e = ESPECIALIDADES.find((x) => x.id === c.especialidad);
-            return (
-              <div key={i} className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-2xl">
-                  {e?.emoji}
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Upcoming */}
+          <section>
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+              Próximas citas ({upcoming.length})
+            </h2>
+            {upcoming.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+                <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-muted">
+                  <CalendarIcon className="h-6 w-6" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-ink">{e?.label}</p>
-                  <p className="text-sm text-muted">{c.fecha} · {c.hora} · {c.modalidad === "telemedicina" ? "💻 Telemedicina" : "🏥 Presencial"}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                  Confirmada
-                </span>
+                <p className="text-sm font-medium text-ink">Sin citas próximas</p>
+                <p className="mt-1 text-xs text-muted">
+                  Cuando un médico te agende una consulta, aparecerá aquí.
+                </p>
               </div>
-            );
-          })}
+            ) : (
+              <div className="space-y-3">
+                {upcoming.map((a) => (
+                  <AppointmentCard key={a.id} appt={a} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Past */}
+          {past.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                Historial ({past.length})
+              </h2>
+              <div className="space-y-3">
+                {past.map((a) => (
+                  <AppointmentCard key={a.id} appt={a} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function AppointmentCard({ appt }: { appt: DBAppointment }) {
+  const dateLabel = new Date(appt.date + 'T00:00:00').toLocaleDateString('es-CL', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted">{label}</span>
-      <span className="font-medium text-ink">{value}</span>
+    <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      {/* Top band */}
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+        <span className="text-xs font-semibold capitalize text-slate-500">{dateLabel}</span>
+        <span className="ml-auto text-xs font-bold text-slate-700">{appt.time_slot}</span>
+      </div>
+      <div className="flex items-center gap-4 p-4">
+        {/* Time chip */}
+        <div className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+          <span className="text-xs font-bold">{appt.time_slot}</span>
+        </div>
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-ink">{appt.doctor_email}</p>
+          {appt.motivo && (
+            <p className="text-xs text-muted">{appt.motivo}</p>
+          )}
+          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+            appt.type === 'Presencial'
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-violet-50 text-violet-700'
+          }`}>
+            {appt.type}
+          </span>
+        </div>
+        <AppointmentStatusBadge status={appt.status} />
+      </div>
+    </div>
+  );
+}
+
+// Simple inline form to request an appointment with a known doctor
+function RequestAppointmentForm({
+  patientEmail,
+  onSaved,
+  onClose,
+}: {
+  patientEmail: string;
+  onSaved: (a: DBAppointment) => void;
+  onClose: () => void;
+}) {
+  const [doctorEmail, setDoctorEmail] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [type, setType] = useState<'Presencial' | 'Telemedicina'>('Presencial');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const canSubmit = doctorEmail && date && time && motivo;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctorEmail,
+          patientEmail,
+          patientName: patientEmail,
+          date,
+          timeSlot: time,
+          type,
+          motivo,
+        }),
+      });
+      const data = await res.json() as { appointment?: DBAppointment; error?: string };
+      if (!res.ok) { setError(data.error ?? 'Error'); setLoading(false); return; }
+      onSaved(data.appointment!);
+    } catch {
+      setError('Error de conexión');
+    }
+    setLoading(false);
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-ink focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100';
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-ink">Solicitar consulta</h3>
+        <button onClick={onClose} className="text-xs text-muted hover:text-ink">✕</button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Email del médico *</label>
+          <input
+            type="email"
+            value={doctorEmail}
+            onChange={(e) => setDoctorEmail(e.target.value)}
+            placeholder="doctor@clinica.cl"
+            className={inputCls}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Fecha *</label>
+            <input
+              type="date"
+              min={todayISO}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Hora *</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Motivo *</label>
+          <input
+            type="text"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ej: Control de presión arterial"
+            className={inputCls}
+          />
+        </div>
+        <div className="flex gap-2">
+          {(['Presencial', 'Telemedicina'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`flex-1 rounded-xl border py-2 text-xs font-medium transition-all ${
+                type === t
+                  ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
+                  : 'border-slate-200 text-muted hover:border-emerald-200'
+              }`}
+            >
+              {t === 'Presencial' ? '🏥 Presencial' : '💻 Telemedicina'}
+            </button>
+          ))}
+        </div>
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={!canSubmit || loading}
+          className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40"
+        >
+          {loading ? 'Enviando…' : 'Enviar solicitud'}
+        </button>
+      </form>
     </div>
   );
 }
