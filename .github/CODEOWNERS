@@ -1,0 +1,55 @@
+# Who reviews what.
+#
+# GitHub assigns reviewers automatically from the paths a PR touches. The rules
+# mirror the lane table in AGENTS.md — the same boundaries the parallel agents
+# work inside, enforced at review time instead of by convention.
+#
+# Last match wins, so the shared-foundation block at the bottom overrides the
+# lane rules above it: a PR touching both a lane and src/lib/ still needs the
+# foundation owner.
+#
+# Everything points at @CaBsCrypto today. As people join, swap the owner on the
+# lane they take over — that is the only edit needed.
+
+# Default owner for anything not matched below
+*                           @CaBsCrypto
+
+# ── Lanes ──────────────────────────────────────────────────────────────────
+/src/app/doctor/            @CaBsCrypto
+/src/components/doctor/     @CaBsCrypto
+/src/app/api/doctor/        @CaBsCrypto
+
+/src/app/admin/             @CaBsCrypto
+/src/app/api/admin/         @CaBsCrypto
+
+/src/app/patient/           @CaBsCrypto
+/src/components/patient/    @CaBsCrypto
+
+/src/app/patient/ficha/     @CaBsCrypto
+/src/lib/fhir/              @CaBsCrypto
+/src/app/api/documents/     @CaBsCrypto
+
+/src/components/pain/       @CaBsCrypto
+/src/app/patient/pain-diary/ @CaBsCrypto
+/src/app/api/pain-diary/    @CaBsCrypto
+/public/models/             @CaBsCrypto
+
+/contracts/                 @CaBsCrypto
+
+# ── Shared foundation — always reviewed, never owned by a lane ─────────────
+# This repo already grew five drifted copies of getDb(), each with its own
+# error string for the same failure, because the shared thing was easy to copy
+# and nobody owned it. These paths are where that happens again.
+/src/lib/                   @CaBsCrypto
+/src/types/                 @CaBsCrypto
+/src/components/ui/         @CaBsCrypto
+/scripts/                   @CaBsCrypto
+/package.json               @CaBsCrypto
+/package-lock.json          @CaBsCrypto
+
+# ── Anything that changes how the project is built or governed ─────────────
+/.github/                   @CaBsCrypto
+/AGENTS.md                  @CaBsCrypto
+/CLAUDE.md                  @CaBsCrypto
+/next.config.ts             @CaBsCrypto
+/tsconfig.json              @CaBsCrypto
