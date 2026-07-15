@@ -112,16 +112,21 @@ const addr = (a: string) => new Address(a).toScVal();
 
 // --- DoctorRegistry ---------------------------------------------------------
 
+/**
+ * Asks DoctorRegistry whether this wallet may issue prescriptions.
+ *
+ * Throws if the chain cannot be reached. It used to swallow every error and
+ * return false, which made "the network is unreachable" indistinguishable from
+ * "this doctor is not registered" — an SDK too old to parse the ledger's XDR
+ * silently downgraded every mint to a simulated one, and the UI reported
+ * success. Callers must decide what an unreachable chain means for them.
+ */
 export async function isDoctorAuthorized(wallet: string): Promise<boolean> {
-  try {
-    return await callRead<boolean>(
-      CONTRACT_IDS.doctorRegistry,
-      "is_authorized",
-      [addr(wallet)],
-    );
-  } catch {
-    return false;
-  }
+  return callRead<boolean>(
+    CONTRACT_IDS.doctorRegistry,
+    "is_authorized",
+    [addr(wallet)],
+  );
 }
 
 export interface DoctorRecord {
@@ -288,18 +293,20 @@ async function findPrescriptionIds(
   let cursor: string | undefined;
   // Page through results (RPC caps ~ per-page); cap total pages defensively.
   for (let page = 0; page < 20; page += 1) {
-    const res: rpc.Api.GetEventsResponse = await server.getEvents({
-      startLedger: cursor ? undefined : startLedger,
-      cursor,
-      filters: [
-        {
-          type: "contract",
-          contractIds: [CONTRACT_IDS.prescriptionSoulbound],
-          topics: [topicFilter],
-        },
-      ],
-      limit: 100,
-    });
+    // getEvents takes either a ledger range or a cursor, never both — SDK v14
+    // types them as mutually exclusive rather than accepting an ambiguous mix.
+    const filters: rpc.Api.EventFilter[] = [
+      {
+        type: "contract",
+        contractIds: [CONTRACT_IDS.prescriptionSoulbound],
+        topics: [topicFilter],
+      },
+    ];
+    const res: rpc.Api.GetEventsResponse = await server.getEvents(
+      cursor
+        ? { filters, cursor, limit: 100 }
+        : { filters, startLedger, limit: 100 },
+    );
     for (const ev of res.events ?? []) {
       try {
         ids.add(String(scValToNative(ev.value)));
