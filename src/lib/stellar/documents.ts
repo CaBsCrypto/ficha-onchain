@@ -219,18 +219,19 @@ async function findDocumentIds(
   const ids = new Set<string>();
   let cursor: string | undefined;
   for (let page = 0; page < 20; page += 1) {
-    const res: rpc.Api.GetEventsResponse = await server.getEvents({
-      startLedger: cursor ? undefined : startLedger,
-      cursor,
-      filters: [
-        {
-          type: "contract",
-          contractIds: [contractId],
-          topics: [topicFilter],
-        },
-      ],
-      limit: 100,
-    });
+    // Ledger range and cursor are mutually exclusive in SDK v14.
+    const filters: rpc.Api.EventFilter[] = [
+      {
+        type: "contract",
+        contractIds: [contractId],
+        topics: [topicFilter],
+      },
+    ];
+    const res: rpc.Api.GetEventsResponse = await server.getEvents(
+      cursor
+        ? { filters, cursor, limit: 100 }
+        : { filters, startLedger, limit: 100 },
+    );
     for (const ev of res.events ?? []) {
       try {
         ids.add(String(scValToNative(ev.value)));
