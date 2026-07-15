@@ -16,6 +16,7 @@ branch. `main` is the shared trunk and the only place foundations change.
 | `Dev/tl-admin`        | `feat/admin`   | 3002 | `app/admin/**`, `app/api/admin/**`                           |
 | `Dev/tl-patient`      | `feat/patient` | 3003 | `app/patient/**`, `components/patient/**`, `components/pain/**`, `app/api/patient*/**` |
 | `Dev/tl-ficha`        | `feat/ficha`   | 3004 | `app/patient/ficha/**`, `lib/fhir/**`, `app/api/documents/**` |
+| `Dev/tl-contracts`    | `feat/smart-contracts` | 3005 | `contracts/**`, `.github/workflows/contracts.yml` |
 
 ## Stay inside your lane
 
@@ -68,7 +69,13 @@ Rebase often. A branch that sits for days is a merge conflict with a due date.
 ## Facts worth knowing
 
 - **Contracts do not build locally.** WDAC blocks the Rust toolchain (os error
-  4551). Soroban work goes through CI (`.github/workflows/contracts.yml`).
+  4551). Soroban work goes through CI (`.github/workflows/contracts.yml`), which
+  only runs `cargo test` on three crates — `doctor-registry`,
+  `prescription-soulbound`, `trustleaf-e2e` — deliberately, so an unfinished
+  contract elsewhere in the workspace cannot redden the badge. It does not deploy.
+- **Contract IDs live in `src/lib/stellar/config.ts` and `.env.local`**, both
+  outside the contracts lane. A newly deployed contract needs its ID wired in on
+  `main`.
 - **`@stellar/stellar-sdk` is pinned to v14.** v13 cannot parse protocol 27 —
   every on-chain read throws. v16 breaks `passkey-kit`, which needs `^14.2.0`.
 - **`DoctorRegistry`'s admin secret is not in the repo.** `register_doctor`
