@@ -14,9 +14,10 @@ branch. `main` is the shared trunk and the only place foundations change.
 | `Dev/ficha-onchain`   | `main`         | 3000 | trunk — foundations, merges                                  |
 | `Dev/tl-doctor`       | `feat/doctor`  | 3001 | `app/doctor/**`, `components/doctor/**`, `app/api/doctor/**` |
 | `Dev/tl-admin`        | `feat/admin`   | 3002 | `app/admin/**`, `app/api/admin/**`                           |
-| `Dev/tl-patient`      | `feat/patient` | 3003 | `app/patient/**`, `components/patient/**`, `components/pain/**`, `app/api/patient*/**` |
+| `Dev/tl-patient`      | `feat/patient` | 3003 | `app/patient/**` *(except `pain-diary/`)*, `components/patient/**`, `app/api/patient*/**` |
 | `Dev/tl-ficha`        | `feat/ficha`   | 3004 | `app/patient/ficha/**`, `lib/fhir/**`, `app/api/documents/**` |
 | `Dev/tl-contracts`    | `feat/smart-contracts` | 3005 | `contracts/**`, `.github/workflows/contracts.yml` |
+| `Dev/tl-diario`       | `feat/diario-de-dolor` | 3006 | `components/pain/**`, `app/patient/pain-diary/**`, `app/api/pain-diary/**`, `public/models/**` |
 
 ## Stay inside your lane
 
@@ -85,6 +86,12 @@ Rebase often. A branch that sits for days is a merge conflict with a due date.
   connection strings from the Neon console, not from Vercel.
 - **Tests do not run.** `vitest.config.ts` and four suites under `src/__tests__/`
   exist, but vitest is not installed and there is no `test` script.
+- **The 3D body map loads THREE r128 from a CDN**, not from npm, as UMD scripts.
+  `BodyMap3D.tsx` hand-rolls its own THREE type declarations because of it.
+- **`public/models/` holds five GLBs, only `body_1k.glb` is used.** The other
+  four are ~18 MB of dead weight; `body_final.glb` and `body_opt.glb` are
+  smaller only because their textures were stripped, so they are not drop-in
+  replacements.
 
 ## Do not
 
