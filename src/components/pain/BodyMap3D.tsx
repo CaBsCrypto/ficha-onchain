@@ -154,6 +154,14 @@ export default function BodyMap3D({
   const [confirmLevel, setConfirmLevel] = useState(5);
   const nextIdRef = useRef(0);
 
+  // Auto-rotate pauses while the user is engaged and resumes after a idle beat,
+  // so it signals "this is 3D, you can spin it" without fighting precise aiming.
+  const IDLE_RESUME_MS = 5000;
+  const lastInteractionRef = useRef(0); // 0 = untouched → spins right away on load
+  // Mirrors of React state the render loop closure can't see directly.
+  const draggingNeedleRef = useRef(false);
+  const confirmingRef     = useRef(false);
+
   // Drag pointer events (window-level, attached when dragging)
   useEffect(() => {
     if (!draggingNeedle) return;
@@ -171,7 +179,7 @@ export default function BodyMap3D({
         const hit = s.raycastAt(nx, ny);
         if (hit) {
           const nid = `needle_${nextIdRef.current++}`;
-          s.addNeedle(nid, hit.pos, true);
+          s.addNeedle(nid, hit.pos, true, hit.normal);
           setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
         }
       }
@@ -183,9 +191,13 @@ export default function BodyMap3D({
 
   function handleNeedlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
+    lastInteractionRef.current = performance.now(); // don't let the body spin away mid-drop
     setDraggingNeedle(true);
     setDragPos({ x: e.clientX, y: e.clientY });
   }
+
+  useEffect(() => { draggingNeedleRef.current = draggingNeedle; }, [draggingNeedle]);
+  useEffect(() => { confirmingRef.current = confirmingNeedle !== null; }, [confirmingNeedle]);
 
   const onZoneSelectRef      = useRef(onZoneSelect);
   const onMultiZoneSelectRef = useRef(onMultiZoneSelect);
@@ -323,17 +335,12 @@ export default function BodyMap3D({
       fibroMeshes.push(m); pivot.add(m);
     }
 
-    // ── Hover indicator ring ──────────────────────────────────────────────────
-    const hoverRingGeo = new T.SphereGeometry(0.072, 16, 16);
-    const hoverRingMat = new T.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, metalness: 0, transparent: true, opacity: 0.55, emissive: 0x38bdf8, emissiveIntensity: 0.50 });
-    const hoverRing    = new T.Mesh(hoverRingGeo, hoverRingMat as unknown as THREEMeshStdMat);
-    hoverRing.visible  = false;
-    pivot.add(hoverRing);
-
     // ── Load GLB model ────────────────────────────────────────────────────────
     const loader = new GLTFLoader();
     loader.load(
-      "/models/body2.glb",
+      // body2.glb downscaled to 1K textures: same mesh + materials, but 16 MiB
+      // of VRAM instead of 256 MiB (4K maps were ~8 texels per screen pixel).
+      "/models/body_1k.glb",
       (gltf) => {
         const model = gltf.scene;
         // Center and scale to fit
@@ -383,6 +390,41 @@ export default function BodyMap3D({
     const ROT_X_MIN = -Math.PI / 4, ROT_X_MAX = Math.PI / 3;
     const ZOOM_MIN = 1.2, ZOOM_MAX = 6.0;
 
+    // ── Zoom toward the cursor ────────────────────────────────────────────────
+    // The camera has no rotation and looks down -Z, so pushing it along Z alone
+    // always closes in on the body centre (y≈0.58) — zooming the head straight
+    // out of frame. Instead, keep whatever is under the cursor pinned in place
+    // by shifting the camera on X/Y as the distance changes.
+    // Rotation drag scales with distance: at ZOOM_MIN a small mouse move must
+    // nudge, not swing the body across the viewport.
+    const ROT_BASE_Z = 2.8; // the default camera distance = full drag speed
+    const rotSpeed = () => camera.position.z / ROT_BASE_Z;
+
+    // Focus animation target — set by focusOn(), cleared by any manual input.
+    let camAnim: { x: number; y: number; z: number } | null = null;
+
+    const FOV_RAD  = (50 * Math.PI) / 180;
+    const CAM_Y_MIN = -0.30, CAM_Y_MAX = 1.90; // feet ≈ -0.43, top of head ≈ 1.75
+    const CAM_X_MIN = -0.85, CAM_X_MAX = 0.85;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+    function zoomToward(nx: number, ny: number, newZ: number) {
+      const el = renderer.domElement;
+      const aspect = el.clientWidth / Math.max(1, el.clientHeight);
+      const tan = Math.tan(FOV_RAD / 2);
+      // Half-extents of the view at the body plane (z≈0), before and after.
+      const hOld = tan * camera.position.z, wOld = hOld * aspect;
+      const hNew = tan * newZ,              wNew = hNew * aspect;
+      // The point under the cursor, then re-solve the camera so it stays there.
+      const worldY = camera.position.y + ny * hOld;
+      const worldX = camera.position.x + nx * wOld;
+      camera.position.set(
+        clamp(worldX - nx * wNew, CAM_X_MIN, CAM_X_MAX),
+        clamp(worldY - ny * hNew, CAM_Y_MIN, CAM_Y_MAX),
+        newZ,
+      );
+    }
+
     // ── Raycasting ────────────────────────────────────────────────────────────
     const raycaster = new T.Raycaster();
     const pointer   = new T.Vector2();
@@ -430,7 +472,7 @@ export default function BodyMap3D({
     }
 
     function updateHover(nx: number, ny: number) {
-      if (toolRef.current === "area") { hoverRing.visible = false; hoveredZone = null; return; }
+      if (toolRef.current === "area") { hoveredZone = null; return; }
       pointer.set(nx, ny);
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(getTargets());
@@ -438,14 +480,10 @@ export default function BodyMap3D({
       if (hit) {
         const id   = hit.userData["id"] as string;
         hoveredZone = id;
-        // Move hover ring to hit zone center
-        const center = ZONE_CENTERS[id];
-        if (center) { hoverRing.position.set(center[0], center[1], center[2] + 0.08); hoverRing.visible = true; }
         renderer.domElement.style.cursor = "pointer";
         showTip(id, hit.userData["name"] as string);
       } else {
         hoveredZone = null;
-        hoverRing.visible = false;
         renderer.domElement.style.cursor = "grab";
         hideTip();
       }
@@ -458,6 +496,8 @@ export default function BodyMap3D({
 
     function onMouseDown(e: MouseEvent) {
       const { nx, ny, px, py } = screenToNDC(e);
+      lastInteractionRef.current = performance.now();
+      camAnim = null;
       isDragging = true;
       prevX = dragStartX = e.clientX; prevY = dragStartY = e.clientY;
       if (toolRef.current === "area" && !readOnly) {
@@ -477,8 +517,9 @@ export default function BodyMap3D({
         brushRef.current = b; setBrush({ ...b }); return;
       }
       if (isDragging) {
-        rotY += (e.clientX - prevX) * 0.007;
-        rotX += (e.clientY - prevY) * 0.007;
+        const s = rotSpeed();
+        rotY += (e.clientX - prevX) * 0.007 * s;
+        rotX += (e.clientY - prevY) * 0.007 * s;
         rotX  = Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, rotX));
       } else { updateHover(nx, ny); }
       prevX = e.clientX; prevY = e.clientY;
@@ -501,7 +542,7 @@ export default function BodyMap3D({
         const hit = sceneRef.current?.raycastAt(nx, ny);
         if (hit) {
           const nid = `needle_${nextIdRef.current++}`;
-          sceneRef.current?.addNeedle(nid, hit.pos, true);
+          sceneRef.current?.addNeedle(nid, hit.pos, true, hit.normal);
           setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
         }
       }
@@ -511,12 +552,20 @@ export default function BodyMap3D({
 
     function onWheel(e: WheelEvent) {
       e.preventDefault();
-      camera.position.z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.position.z + e.deltaY * 0.004));
+      lastInteractionRef.current = performance.now();
+      camAnim = null; // manual zoom cancels any focus animation
+      const { nx, ny } = screenToNDC(e);
+      // Multiplicative: each notch changes distance by a percentage, so steps
+      // shrink as you close in instead of overshooting past the skin.
+      const newZ = clamp(camera.position.z * Math.exp(e.deltaY * 0.0016), ZOOM_MIN, ZOOM_MAX);
+      zoomToward(nx, ny, newZ);
     }
 
     // Touch
     let touchStartX = 0, touchStartY = 0, pinchDist0 = 0, camZ0 = 0;
     function onTouchStart(e: TouchEvent) {
+      lastInteractionRef.current = performance.now();
+      camAnim = null;
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -539,7 +588,13 @@ export default function BodyMap3D({
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        camera.position.z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camZ0 * (pinchDist0 / dist))); return;
+        const newZ = clamp(camZ0 * (pinchDist0 / dist), ZOOM_MIN, ZOOM_MAX);
+        // Pinch zooms toward the midpoint between the two fingers
+        const r = renderer.domElement.getBoundingClientRect();
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        zoomToward(((mx - r.left) / r.width) * 2 - 1, -((my - r.top) / r.height) * 2 + 1, newZ);
+        return;
       }
       const t = e.touches[0];
       const { px, py } = screenToNDC(t);
@@ -548,8 +603,9 @@ export default function BodyMap3D({
         const b = { x: areaCX, y: areaCY, r: Math.sqrt(ddx * ddx + ddy * ddy) };
         brushRef.current = b; setBrush({ ...b }); return;
       }
-      rotY += (t.clientX - prevX) * 0.010;
-      rotX += (t.clientY - prevY) * 0.010;
+      const s = rotSpeed();
+      rotY += (t.clientX - prevX) * 0.010 * s;
+      rotX += (t.clientY - prevY) * 0.010 * s;
       rotX = Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, rotX));
       prevX = t.clientX; prevY = t.clientY;
     }
@@ -570,7 +626,7 @@ export default function BodyMap3D({
         const hit = sceneRef.current?.raycastAt(nx, ny);
         if (hit) {
           const nid = `needle_${nextIdRef.current++}`;
-          sceneRef.current?.addNeedle(nid, hit.pos, true);
+          sceneRef.current?.addNeedle(nid, hit.pos, true, hit.normal);
           setPendingNeedles(prev => [...prev, { id: nid, zone: hit.zone, pos: hit.pos }]);
         }
       }
@@ -603,11 +659,23 @@ export default function BodyMap3D({
       rafId = requestAnimationFrame(animate);
       time += 0.020;
 
-      // Slow auto-rotate when not interacting
-      if (!isDragging) rotY += 0.003;
+      // Slow auto-rotate, suspended while the user is engaged and for a beat
+      // afterwards. hoveredZone !== null means the cursor is resting on the
+      // body — they're aiming, so don't spin the target out from under them.
+      // Ease the camera toward a focus preset
+      if (camAnim) {
+        const p = camera.position;
+        p.set(p.x + (camAnim.x - p.x) * 0.15, p.y + (camAnim.y - p.y) * 0.15, p.z + (camAnim.z - p.z) * 0.15);
+        if (Math.abs(p.x - camAnim.x) < 0.002 && Math.abs(p.y - camAnim.y) < 0.002 && Math.abs(p.z - camAnim.z) < 0.002) {
+          p.set(camAnim.x, camAnim.y, camAnim.z);
+          camAnim = null;
+        }
+      }
 
-      // Pulse hover ring
-      if (hoverRing.visible) hoverRing.scale.setScalar(1 + 0.10 * Math.sin(time * 3));
+      const idle = performance.now() - lastInteractionRef.current > IDLE_RESUME_MS;
+      if (idle && !isDragging && !draggingNeedleRef.current && !confirmingRef.current && hoveredZone === null) {
+        rotY += 0.003;
+      }
 
       // Needle quiver — tiny scale pulse so orientation (quaternion) is preserved
       let ni = 0;
@@ -631,17 +699,26 @@ export default function BodyMap3D({
     sceneRef.current = {
       renderer, scene, camera, pivot, hitMeshes, hitByZone,
       glbMeshes: glbMeshesArr, dynamicNeedles, fibroMeshes, rafId, ro,
-      addNeedle(id: string, pos: [number, number, number], pending: boolean) {
+      addNeedle(id: string, pos: [number, number, number], pending: boolean, normal?: [number, number, number]) {
         const color = pending ? 0x38bdf8 : 0x4ade80;
         const needle = makeNeedleGroup(color);
         const nObj = needle as unknown as THREEObj3D;
 
-        // Outward direction from body centre → hit point (pivot-local)
-        const BCY = 0.585;
-        let ox = pos[0], oy = pos[1] - BCY, oz = pos[2];
-        const olen = Math.sqrt(ox * ox + oy * oy + oz * oz);
-        if (olen > 0.01) { ox /= olen; oy /= olen; oz /= olen; }
-        else              { ox = 0; oy = 1; oz = 0; }
+        let ox: number, oy: number, oz: number;
+        if (normal) {
+          // True surface normal from the raycast — perpendicular to the skin.
+          [ox, oy, oz] = normal;
+        } else {
+          // Fallback for needles placed at zone centres (readOnly mode), where
+          // there is no raycast hit: radial direction from the body centre.
+          // This treats the body as a sphere, so it is only a rough guess —
+          // fine for limbs, wrong around the neck/jaw. Never used for drops.
+          const BCY = 0.585;
+          ox = pos[0]; oy = pos[1] - BCY; oz = pos[2];
+          const olen = Math.sqrt(ox * ox + oy * oy + oz * oz);
+          if (olen > 0.01) { ox /= olen; oy /= olen; oz /= olen; }
+          else             { ox = 0; oy = 1; oz = 0; }
+        }
 
         // Offset slightly outward so tip sits on surface, not inside
         const OFF = 0.02;
@@ -656,6 +733,10 @@ export default function BodyMap3D({
 
         pivot.add(nObj);
         dynamicNeedles.set(id, needle);
+      },
+      focusOn(x: number, y: number, z: number) {
+        camAnim = { x: clamp(x, CAM_X_MIN, CAM_X_MAX), y: clamp(y, CAM_Y_MIN, CAM_Y_MAX), z: clamp(z, ZOOM_MIN, ZOOM_MAX) };
+        lastInteractionRef.current = performance.now(); // don't auto-spin on arrival
       },
       removeNeedle(id: string) {
         const n = dynamicNeedles.get(id);
@@ -678,8 +759,42 @@ export default function BodyMap3D({
         // Precise free-form raycast against actual GLB mesh surface
         const glbHits = raycaster.intersectObjects(glbMeshesArr, true);
         if (glbHits[0]) {
+          const hit = glbHits[0];
+
+          // ── True surface normal (pivot-local) ────────────────────────────
+          // face.normal is local to the intersected mesh, so it has to be
+          // transformed out of that mesh's space and back into pivot space.
+          // Must run BEFORE hit.point is mutated to pivot-local below.
+          let normal: [number, number, number] | undefined;
+          if (hit.face) {
+            // Local → world direction. Two-point trick: the model is uniformly
+            // scaled, so translation cancels and normalize() absorbs the scale.
+            const o = new T.Vector3(0, 0, 0);
+            const e = new T.Vector3(hit.face.normal.x, hit.face.normal.y, hit.face.normal.z);
+            hit.object.localToWorld(o);
+            hit.object.localToWorld(e);
+            const wn = e.sub(o).normalize();
+
+            // The ray lands on the surface facing the camera — if the winding
+            // gives us the back-facing normal, flip it so the needle sticks out.
+            const view = new T.Vector3(
+              hit.point.x - camera.position.x,
+              hit.point.y - camera.position.y,
+              hit.point.z - camera.position.z,
+            );
+            if (wn.dot(view) > 0) wn.set(-wn.x, -wn.y, -wn.z);
+
+            // World → pivot-local direction (pivot rotates as the user spins).
+            const a = new T.Vector3(hit.point.x, hit.point.y, hit.point.z);
+            const b = new T.Vector3(hit.point.x + wn.x, hit.point.y + wn.y, hit.point.z + wn.z);
+            pivot.worldToLocal(a);
+            pivot.worldToLocal(b);
+            const ln = b.sub(a).normalize();
+            normal = [ln.x, ln.y, ln.z];
+          }
+
           // p is in world space — convert to pivot-local using Three.js built-in
-          const p = glbHits[0].point;
+          const p = hit.point;
           pivot.worldToLocal(p); // mutates p to pivot-local coords
           // Find nearest zone
           let nearestZone = "torso";
@@ -688,7 +803,7 @@ export default function BodyMap3D({
             const d = Math.hypot(p.x - zpos[0], p.y - zpos[1], p.z - zpos[2]);
             if (d < minDist) { minDist = d; nearestZone = zid; }
           }
-          return { zone: nearestZone, pos: [p.x, p.y, p.z] as [number, number, number] };
+          return { zone: nearestZone, pos: [p.x, p.y, p.z] as [number, number, number], normal };
         }
         // Fallback: invisible hit zones
         const hits = raycaster.intersectObjects([...hitMeshes, ...(fibromyalgiaMode ? fibroMeshes : [])]);
@@ -756,7 +871,12 @@ export default function BodyMap3D({
     <div className="select-none w-full flex gap-2" style={{ height: "clamp(420px, 85vw, 560px)" }}>
 
       {/* ── 3D Canvas ── */}
-      <div className="relative flex-1 rounded-xl overflow-hidden">
+      {/* The renderer clears to transparent, so this gradient IS the backdrop.
+          Vignette centred slightly high, where the body reads. */}
+      <div
+        className="relative flex-1 overflow-hidden rounded-xl ring-1 ring-slate-800/80"
+        style={{ background: "radial-gradient(ellipse at 50% 35%, #1e293b 0%, #0f172a 55%, #020617 100%)" }}
+      >
         {/* Loading spinner */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-10 rounded-xl">
@@ -768,6 +888,25 @@ export default function BodyMap3D({
         )}
         {/* Three.js canvas */}
         <div ref={containerRef} className="absolute inset-0" />
+
+        {/* Focus presets — camera y/z framing each region head-on */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+          {([
+            ["Cabeza",  0, 1.52, 1.45],
+            ["Torso",   0, 1.02, 2.10],
+            ["Piernas", 0, 0.18, 2.30],
+            ["Reset",   0, 0.58, 2.80],
+          ] as const).map(([label, x, y, z]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => sceneRef.current?.focusOn(x, y, z)}
+              className="rounded-md border border-slate-600/70 bg-slate-900/80 px-2 py-1 text-[10px] font-medium text-slate-300 backdrop-blur-sm transition-colors hover:bg-slate-800 hover:text-white"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* Tooltip (zone name on hover) */}
         <span ref={tooltipRef} className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 text-sm font-medium text-white bg-slate-900/90 border border-slate-600 px-3 py-1 rounded-full hidden z-10" />
@@ -929,7 +1068,7 @@ export default function BodyMap3D({
 
 interface THREEColor      { setHex(h: number): void }
 interface THREEVec2       { set(x: number, y: number): void }
-interface THREEVec3       { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
+interface THREEVec3       { x: number; y: number; z: number; set(x: number, y: number, z: number): void; sub(v: THREEVec3): THREEVec3; normalize(): THREEVec3; dot(v: THREEVec3): number }
 interface THREEGeo        { dispose(): void; computeVertexNormals(): void }
 interface THREEMeshStdMat { color: THREEColor; roughness: number; metalness: number; emissive?: THREEColor; emissiveIntensity?: number; transparent?: boolean; opacity?: number; dispose(): void }
 interface THREEObj3D {
@@ -937,6 +1076,7 @@ interface THREEObj3D {
   scale: { set(x: number, y: number, z: number): void; setScalar(s: number): void };
   quaternion: THREEQuaternion;
   add(o: THREEObj3D): void; visible: boolean; isMesh?: boolean;
+  localToWorld(v: THREEVec3): THREEVec3;
   userData: Record<string, unknown>; traverse(cb: (o: THREEObj3D) => void): void;
   castShadow: boolean; receiveShadow: boolean;
 }
@@ -947,7 +1087,7 @@ interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMa
 interface THREEQuaternion { setFromUnitVectors(from: THREEVec3, to: THREEVec3): THREEQuaternion; copy(q: THREEQuaternion): void }
 interface THREEBox3   { setFromObject(o: THREEObj3D): THREEBox3; getSize(v: THREEVec3): THREEVec3; getCenter(v: THREEVec3): THREEVec3 }
 interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void }
-interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[], recursive?: boolean): Array<{ object: THREEObj3D; point: THREEVec3 }> }
+interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[], recursive?: boolean): Array<{ object: THREEObj3D; point: THREEVec3; face?: { normal: THREEVec3 } | null }> }
 interface GLTF         { scene: THREEGroup }
 interface THREECtors {
   WebGLRenderer: new (o: { antialias: boolean; alpha: boolean }) => THREERenderer;
@@ -976,9 +1116,10 @@ interface SceneState {
   dynamicNeedles: Map<string, THREEGroup>;
   fibroMeshes: THREEMesh[];
   rafId: number; ro: ResizeObserver;
-  addNeedle(id: string, pos: [number, number, number], pending: boolean): void;
+  focusOn(x: number, y: number, z: number): void;
+  addNeedle(id: string, pos: [number, number, number], pending: boolean, normal?: [number, number, number]): void;
   removeNeedle(id: string): void;
   setNeedleColor(id: string, color: number): void;
-  raycastAt(nx: number, ny: number): { zone: string; pos: [number, number, number] } | null;
+  raycastAt(nx: number, ny: number): { zone: string; pos: [number, number, number]; normal?: [number, number, number] } | null;
   cleanup(): void;
 }
