@@ -1,14 +1,15 @@
 name: contracts
 
-# Green CI proving the Soroban contract test suite passes, plus the compiled
+# Green CI proving the Soroban contract test suite passes, plus a deployable
 # WASM as a downloadable artifact.
 #
-# The build job exists because the contracts cannot be compiled on the maintainer's
-# machine: WDAC blocks rustc from loading proc-macro DLLs (os error 4551), and
-# soroban-sdk's macro chain makes that unavoidable. Under the release profile the
-# failure disguises itself as "can't find crate for serde_with_macros"; the dev
-# profile shows the real 4551. So CI is the only place a deployable WASM can be
-# produced — download the artifact from a run, then deploy it with the Stellar CLI.
+# The build job exists because the contracts cannot be compiled on the
+# maintainer's machine: WDAC blocks rustc from loading proc-macro DLLs (os error
+# 4551), and soroban-sdk's macro chain makes that unavoidable. Under the release
+# profile the failure disguises itself as "can't find crate for
+# serde_with_macros"; only the dev profile shows the real 4551. So CI is the only
+# place a deployable WASM comes from — download the artifact from a run, then
+# `stellar contract deploy --wasm` it.
 
 on:
   push:
@@ -55,38 +56,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Pinned to 1.81, the last release before wasm32 got reference-types and
-      # multivalue by default. Soroban's VM rejects both, and `-C target-feature`
-      # does not undo them — they are baked into the target spec, so a 1.96 build
-      # produces a WASM that deploys with Error(WasmVm, InvalidAction) no matter
-      # what flags are passed. Verified: the artifact came back byte-identical
-      # with the flags on and off.
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.81
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      # Deliberately uncached. A warm target/ served a byte-identical WASM back
-      # after the rustflags changed, so the fix silently did nothing twice. A
-      # cold ~2min build is worth knowing the artifact matches the source.
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+          # The optimize step below reads target/, and a restored one already
+          # served a stale artifact once — a build whose flags had changed came
+          # back byte-identical. Keyed per job so that cannot repeat.
+          key: wasm
 
-      # The -reference-types/-multivalue flags Soroban needs live in
-      # contracts/.cargo/config.toml, so they apply here and locally alike.
       - name: Build contracts
         run: |
-          cargo build --target wasm32-unknown-unknown --release \
+          cargo build --locked --target wasm32-unknown-unknown --release \
             -p doctor-registry -p prescription-soulbound
 
-      # Not optimised through `stellar contract optimize`: these are small enough
-      # that the extra tool is not worth the moving part. Revisit if a deploy
-      # ever hits a size limit.
-      - name: Report sizes
-        run: ls -lh target/wasm32-unknown-unknown/release/*.wasm
+      - name: Install Stellar CLI
+        run: cargo install --locked stellar-cli --version 22.8.1
 
+      # Required, not cosmetic. A modern toolchain emits reference-types and
+      # multivalue, which Soroban's VM rejects: deploying a raw artifact fails
+      # with Error(WasmVm, InvalidAction) — "reference-types not enabled".
+      # `optimize` strips them.
+      #
+      # This cannot be fixed with -C target-feature: since 1.82 those live in the
+      # wasm32 target spec rather than being opt-in features, and passing the
+      # flags produces a byte-identical binary. Pinning to 1.81 instead breaks on
+      # transitive deps needing edition2024.
+      #
+      # The trap: a contract simple enough never to emit those instructions
+      # deploys fine either way. doctor-registry did, prescription-soulbound did
+      # not — so it reads as a bug in one contract rather than a toolchain issue.
+      - name: Optimize for Soroban
+        run: |
+          for w in target/wasm32-unknown-unknown/release/*.wasm; do
+            stellar contract optimize --wasm "$w"
+          done
+          ls -lh target/wasm32-unknown-unknown/release/*.wasm
+
+      # Only the optimized binaries: they are the ones that deploy. Shipping the
+      # raw build alongside them invites deploying the wrong file.
       - name: Upload WASM
         uses: actions/upload-artifact@v4
         with:
           name: contracts-wasm
-          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
+          path: contracts/target/wasm32-unknown-unknown/release/*.optimized.wasm
           retention-days: 30
           if-no-files-found: error
