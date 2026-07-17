@@ -17,6 +17,7 @@ import type { Consultation } from "@/lib/consultations/store";
 import { clearSession, loadSession, type PasskeySession } from "@/lib/passkey";
 import { usePrivy, useLogout } from "@privy-io/react-auth";
 import { usePrivyEmail } from "@/hooks/usePrivyEmail";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import {
   HomeIcon,
   ChevronRightIcon,
@@ -1181,11 +1182,11 @@ function EditFichaModal({
       const bmiCalc   = height && weight
         ? (parseFloat(weight) / ((parseFloat(height) / 100) ** 2)).toFixed(1)
         : bmi || null;
-      const res  = await fetch('/api/patient/ficha', {
+      // patient_email is no longer sent — the server writes the token's own row.
+      const res  = await authedFetch('/api/patient/ficha', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patient_email:             email,
           blood_type:                bloodType || null,
           height_cm:                 height ? `${height} cm` : null,
           weight_kg:                 weight ? `${weight} kg` : null,
@@ -1283,7 +1284,8 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
 
   useEffect(() => {
     if (!privyEmail) { setLoading(false); return; }
-    fetch(`/api/patient/ficha?email=${encodeURIComponent(privyEmail)}`)
+    // No email param — the server returns whatever record the token owns.
+    authedFetch('/api/patient/ficha')
       .then(r => r.json() as Promise<{ data: HealthRecord | null }>)
       .then(j => setRecord(j.data))
       .catch(err => console.error('[FichaTab]', err))
