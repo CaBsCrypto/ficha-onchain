@@ -1,9 +1,14 @@
 name: contracts
 
-# D1 deliverable: green CI proving the Soroban contract test suite passes.
-# Scoped to the two contracts under test (DoctorRegistry, PrescriptionSoulbound)
-# plus the cross-contract end-to-end crate, so an in-progress contract elsewhere
-# in the workspace can't turn the badge red.
+# Green CI proving the Soroban contract test suite passes, plus the compiled
+# WASM as a downloadable artifact.
+#
+# The build job exists because the contracts cannot be compiled on the maintainer's
+# machine: WDAC blocks rustc from loading proc-macro DLLs (os error 4551), and
+# soroban-sdk's macro chain makes that unavoidable. Under the release profile the
+# failure disguises itself as "can't find crate for serde_with_macros"; the dev
+# profile shows the real 4551. So CI is the only place a deployable WASM can be
+# produced — download the artifact from a run, then deploy it with the Stellar CLI.
 
 on:
   push:
@@ -15,6 +20,8 @@ on:
     paths:
       - "contracts/**"
       - ".github/workflows/contracts.yml"
+  # Lets a WASM be built on demand from any branch, without a contract change.
+  workflow_dispatch:
 
 jobs:
   test:
@@ -34,5 +41,45 @@ jobs:
         with:
           workspaces: contracts
 
+      # Scoped to the three crates under test so an unfinished contract elsewhere
+      # in the workspace cannot redden the badge.
       - name: Run test suite
         run: cargo test -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
+
+  build:
+    name: build WASM
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+
+      - name: Build contracts
+        run: |
+          cargo build --target wasm32-unknown-unknown --release \
+            -p doctor-registry -p prescription-soulbound
+
+      # Not optimised through `stellar contract optimize`: these are small enough
+      # that the extra tool is not worth the moving part. Revisit if a deploy
+      # ever hits a size limit.
+      - name: Report sizes
+        run: ls -lh target/wasm32-unknown-unknown/release/*.wasm
+
+      - name: Upload WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-wasm
+          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
+          retention-days: 30
+          if-no-files-found: error
