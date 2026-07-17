@@ -263,7 +263,7 @@ function PatientDashboardInner({
     setItems(null);
     setRxError(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/prescriptions?role=patient&wallet=${session.address}`,
       );
       const data = await res.json();
@@ -880,6 +880,7 @@ function RecetasTab({
               rx={rx}
               onShowPharmacy={onShowPharmacy}
               onShare={onShare}
+              onReload={onReload}
             />
           ))}
         </div>
@@ -895,14 +896,44 @@ function RxCard({
   rx,
   onShowPharmacy,
   onShare,
+  onReload,
 }: {
   rx: PatientRx;
   onShowPharmacy: (rx: PatientRx) => void;
   onShare: (rx: OnChainPrescription) => void;
+  onReload: () => void;
 }) {
   const pct = rx.unitsTotal > 0 ? (rx.balance / rx.unitsTotal) * 100 : 0;
   const barColor =
     pct > 50 ? "bg-emerald-500" : pct > 20 ? "bg-amber-400" : "bg-rose-500";
+
+  // A prescription that is still "Registrada" (and not expired) can be
+  // activated by the patient — this flips it to "Activa" on-chain.
+  const canActivate = rx.status === "Registrada" && !rx.expired;
+  const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
+
+  async function handleActivate() {
+    setActivating(true);
+    setActivateError(null);
+    try {
+      const res = await authedFetch("/api/prescriptions/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rxId: rx.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setActivateError(data.error ?? "No se pudo activar la receta");
+        return;
+      }
+      onReload();
+    } catch {
+      setActivateError("No se pudo activar la receta");
+    } finally {
+      setActivating(false);
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
@@ -1010,15 +1041,29 @@ function RxCard({
             >
               <ShareIcon /> Compartir
             </button>
-            <button
-              onClick={() => onShowPharmacy(rx)}
-              disabled={rx.expired}
-              className="flex items-center gap-1 rounded-lg bg-clinical/10 px-2.5 py-1.5 text-xs font-semibold text-clinical transition-colors hover:bg-clinical/20 disabled:pointer-events-none disabled:opacity-40"
-            >
-              <QrIcon /> Ver QR
-            </button>
+            {canActivate ? (
+              <button
+                onClick={handleActivate}
+                disabled={activating}
+                className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:pointer-events-none disabled:opacity-50"
+              >
+                <LockOpenIcon className="h-3.5 w-3.5" />
+                {activating ? "Activando…" : "Activar"}
+              </button>
+            ) : (
+              <button
+                onClick={() => onShowPharmacy(rx)}
+                disabled={rx.expired}
+                className="flex items-center gap-1 rounded-lg bg-clinical/10 px-2.5 py-1.5 text-xs font-semibold text-clinical transition-colors hover:bg-clinical/20 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <QrIcon /> Ver QR
+              </button>
+            )}
           </div>
         </div>
+        {activateError && (
+          <p className="text-right text-[11px] text-rose-500">{activateError}</p>
+        )}
       </div>
     </div>
   );

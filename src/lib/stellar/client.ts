@@ -231,6 +231,22 @@ function toHex(bytes: unknown): string {
   return String(bytes ?? "");
 }
 
+/** Map a raw scValToNative `Prescription` struct into our camelCase shape. */
+function mapPrescription(raw: Record<string, unknown>): OnChainPrescription {
+  return {
+    id: String(raw.id),
+    doctorWallet: String(raw.doctor_wallet),
+    patientWallet: String(raw.patient_wallet),
+    rxHash: toHex(raw.rx_hash),
+    medication: String(raw.medication),
+    dosage: String(raw.dosage),
+    unitsTotal: Number(raw.units_total),
+    balance: Number(raw.balance),
+    timestamp: Number(raw.timestamp),
+    status: decodeStatus(raw.status),
+  };
+}
+
 export async function getPrescription(
   id: string | number | bigint,
 ): Promise<OnChainPrescription | null> {
@@ -240,21 +256,33 @@ export async function getPrescription(
       "get_prescription",
       [nativeToScVal(BigInt(id), { type: "u64" })],
     );
-    return {
-      id: String(raw.id),
-      doctorWallet: String(raw.doctor_wallet),
-      patientWallet: String(raw.patient_wallet),
-      rxHash: toHex(raw.rx_hash),
-      medication: String(raw.medication),
-      dosage: String(raw.dosage),
-      unitsTotal: Number(raw.units_total),
-      balance: Number(raw.balance),
-      timestamp: Number(raw.timestamp),
-      status: decodeStatus(raw.status),
-    };
+    return mapPrescription(raw);
   } catch {
     return null; // NotFound
   }
+}
+
+/**
+ * Enumerate a patient's prescriptions via the contract's direct getter
+ * `get_prescriptions_by_patient(patient) -> Vec<Prescription>`.
+ *
+ * This is preferred over {@link listPrescriptions}' `rx_mint` event scan: it is a
+ * single read backed by the contract's own per-patient index, so it does not
+ * depend on the RPC node's ~7-day event retention window (which silently drops
+ * older prescriptions once the window rolls over). Returns newest-first.
+ */
+export async function getPrescriptionsByPatient(
+  patient: string,
+): Promise<OnChainPrescription[]> {
+  const raw = await callRead<unknown>(
+    CONTRACT_IDS.prescriptionSoulbound,
+    "get_prescriptions_by_patient",
+    [addr(patient)],
+  );
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r) => mapPrescription(r as Record<string, unknown>))
+    .sort((a, b) => Number(b.id) - Number(a.id));
 }
 
 /**
