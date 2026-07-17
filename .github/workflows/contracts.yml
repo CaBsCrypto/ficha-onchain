@@ -55,8 +55,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned to 1.81, the last release before wasm32 got reference-types and
+      # multivalue by default. Soroban's VM rejects both, and `-C target-feature`
+      # does not undo them — they are baked into the target spec, so a 1.96 build
+      # produces a WASM that deploys with Error(WasmVm, InvalidAction) no matter
+      # what flags are passed. Verified: the artifact came back byte-identical
+      # with the flags on and off.
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.81
         with:
           targets: wasm32-unknown-unknown
 
