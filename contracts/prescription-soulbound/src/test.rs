@@ -15,6 +15,7 @@
 //! 10. Farmacia intenta dispensar receta bloqueada → `Error::InvalidStatus`
 
 use super::{Error, PrescriptionSoulbound, PrescriptionSoulboundClient, Status};
+use doctor_registry::{DoctorRegistry, DoctorRegistryClient};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
 
 // --- helpers -----------------------------------------------------------------
@@ -32,22 +33,49 @@ fn dosage(env: &Env) -> String {
     String::from_str(env, "500mg capsulas")
 }
 
-/// Despliega el contrato y retorna `(client, admin, dispensary)`.
+/// Despliega el contrato junto a un DoctorRegistry real y retorna
+/// `(client, admin, dispensary, registry)`.
 ///
-/// `doctor_registry` y `dispensary_registry` se fijan con addresses generadas;
-/// la validación cross-contract aún no está implementada (TODO en lib.rs),
-/// por lo que `mock_all_auths` es suficiente para los tests actuales.
-fn setup(env: &Env) -> (PrescriptionSoulboundClient, Address, Address) {
+/// El registry se despliega de verdad — no una address generada — porque
+/// `mint_prescription` lo consulta via cross-contract. Un doctor sólo puede
+/// emitir si está registrado ahí: ver `authorized_doctor`.
+fn setup(
+    env: &Env,
+) -> (
+    PrescriptionSoulboundClient,
+    Address,
+    Address,
+    DoctorRegistryClient,
+) {
     let admin = Address::generate(env);
-    let doctor_registry = Address::generate(env);
+
+    let registry_id = env.register(DoctorRegistry, ());
+    let registry = DoctorRegistryClient::new(env, &registry_id);
+    registry.init(&admin);
+
     let dispensary_registry = Address::generate(env);
     let contract_id = env.register(
         PrescriptionSoulbound,
-        (admin.clone(), doctor_registry, dispensary_registry),
+        (admin.clone(), registry_id, dispensary_registry),
     );
     let client = PrescriptionSoulboundClient::new(env, &contract_id);
     let dispensary = Address::generate(env);
-    (client, admin, dispensary)
+    (client, admin, dispensary, registry)
+}
+
+/// Genera un médico y lo registra, de modo que pueda emitir recetas.
+///
+/// Un `Address::generate` a secas ya no sirve para mintear: el contrato lo
+/// rechaza con `Unauthorized`, que es justamente lo que prueba
+/// `test_mint_rejects_unregistered_doctor`.
+fn authorized_doctor(env: &Env, registry: &DoctorRegistryClient) -> Address {
+    let doctor = Address::generate(env);
+    registry.register_doctor(
+        &doctor,
+        &String::from_str(env, "Dra. Ana Rojas"),
+        &String::from_str(env, "12345-CL"),
+    );
+    doctor
 }
 
 /// Emite una receta con valores por defecto: 10 unidades, vence en el futuro lejano.
@@ -75,9 +103,9 @@ fn mint_rx(
 fn test_mint_sets_registered_status() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -101,9 +129,9 @@ fn test_mint_sets_registered_status() {
 fn test_patient_activates_prescription() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -118,9 +146,9 @@ fn test_patient_activates_prescription() {
 fn test_partial_dispense() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -138,9 +166,9 @@ fn test_partial_dispense() {
 fn test_full_dispense_burns() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -158,9 +186,9 @@ fn test_full_dispense_burns() {
 fn test_doctor_revokes_prescription() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -176,9 +204,9 @@ fn test_doctor_revokes_prescription() {
 fn test_dispense_revoked_returns_invalid_status() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -197,9 +225,9 @@ fn test_dispense_revoked_returns_invalid_status() {
 fn test_dispense_expired_returns_expired() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     // Emitir con expiración en timestamp 1_000 (el ledger comienza en 0)
@@ -230,9 +258,9 @@ fn test_dispense_expired_returns_expired() {
 fn test_mint_without_auth_fails() {
     let env = Env::default();
     // Sin mock_all_auths: doctor_wallet.require_auth() fallará a nivel de host
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     assert!(
@@ -258,7 +286,7 @@ fn test_admin_blocks_prescription() {
     env.mock_all_auths();
     let (client, _admin, _) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -274,9 +302,9 @@ fn test_admin_blocks_prescription() {
 fn test_dispense_blocked_returns_invalid_status() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -297,9 +325,9 @@ fn test_dispense_blocked_returns_invalid_status() {
 fn test_doctor_can_also_activate() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -312,9 +340,9 @@ fn test_doctor_can_also_activate() {
 fn test_activate_already_active_fails() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -331,9 +359,9 @@ fn test_activate_already_active_fails() {
 fn test_revoke_already_revoked_fails() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -350,9 +378,9 @@ fn test_revoke_already_revoked_fails() {
 fn test_is_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, dispensary) = setup(&env);
+    let (client, _, dispensary, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
 
     let id = mint_rx(&env, &client, &doctor, &patient);
@@ -374,9 +402,9 @@ fn test_is_valid() {
 fn test_get_prescriptions_by_patient() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, _, _, registry) = setup(&env);
 
-    let doctor = Address::generate(&env);
+    let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
     let other_patient = Address::generate(&env);
 
@@ -389,4 +417,61 @@ fn test_get_prescriptions_by_patient() {
 
     let other_rxs = client.get_prescriptions_by_patient(&other_patient);
     assert_eq!(other_rxs.len(), 1);
+}
+
+/// Un médico que no está en el DoctorRegistry no puede emitir recetas.
+///
+/// Este es el control que separa una receta de un papel cualquiera: la firma
+/// sólo prueba quién llama, no que tenga habilitación para prescribir. La
+/// validación cross-contract vivió comentada como un TODO mientras el registry
+/// existía y no lo consultaba nadie.
+#[test]
+fn test_mint_rejects_unregistered_doctor() {
+    let env = Env::default();
+    env.mock_all_auths(); // la firma es válida — igual debe rechazar
+    let (client, _, _, _registry) = setup(&env);
+
+    let impostor = Address::generate(&env); // firma bien, no está registrado
+    let patient = Address::generate(&env);
+
+    let res = client.try_mint_prescription(
+        &impostor,
+        &patient,
+        &rx_hash(&env),
+        &medication(&env),
+        &dosage(&env),
+        &10u32,
+        &999_999_999u64,
+    );
+    assert_eq!(res, Err(Ok(Error::Unauthorized)));
+}
+
+/// Un médico revocado deja de poder emitir.
+///
+/// Registrar no es permanente: revoke_doctor tiene que cortar la emisión de
+/// inmediato, o revocar a alguien no significaría nada.
+#[test]
+fn test_mint_rejects_revoked_doctor() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _, registry) = setup(&env);
+
+    let doctor = authorized_doctor(&env, &registry);
+    let patient = Address::generate(&env);
+
+    // Emite bien mientras está autorizado.
+    mint_rx(&env, &client, &doctor, &patient);
+
+    registry.revoke_doctor(&doctor);
+
+    let res = client.try_mint_prescription(
+        &doctor,
+        &patient,
+        &rx_hash(&env),
+        &medication(&env),
+        &dosage(&env),
+        &10u32,
+        &999_999_999u64,
+    );
+    assert_eq!(res, Err(Ok(Error::Unauthorized)));
 }

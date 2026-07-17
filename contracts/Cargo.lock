@@ -956,6 +956,7 @@ dependencies = [
 name = "prescription-soulbound"
 version = "0.1.0"
 dependencies = [
+ "doctor-registry",
  "soroban-sdk",
 ]
 
