@@ -217,6 +217,11 @@ async function realMint(args: {
     );
   }
 
+  // Chile's Decreto 41 gives a prescription a validity window rather than the
+  // contract deriving one, so expiry is computed here and stored on-chain.
+  const validityDays = Number(process.env.NEXT_PUBLIC_RX_VALIDITY_DAYS ?? 30);
+  const expiresAt = Math.floor(Date.now() / 1000) + validityDays * 24 * 60 * 60;
+
   const contract = new Contract(CONTRACT_IDS.prescriptionSoulbound);
   const op = contract.call(
     "mint_prescription",
@@ -226,6 +231,7 @@ async function realMint(args: {
     nativeToScVal(args.medication, { type: "string" }),
     nativeToScVal(args.dosage, { type: "string" }),
     nativeToScVal(args.units, { type: "u32" }),
+    nativeToScVal(expiresAt, { type: "u64" }),
   );
 
   const source = await server.getAccount(doctor.publicKey());

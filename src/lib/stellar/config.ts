@@ -22,10 +22,10 @@ export const NETWORK_PASSPHRASE =
 export const CONTRACT_IDS = {
   doctorRegistry:
     process.env.NEXT_PUBLIC_DOCTOR_REGISTRY_ID ??
-    "CAQZWTOY5L7SN6IJIO5R23DAOIK7UQDM6YSRRXE3B5XQNXDM2Q4W4ICJ",
+    "CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O",
   prescriptionSoulbound:
     process.env.NEXT_PUBLIC_PRESCRIPTION_ID ??
-    "CCACCU7JGNRL3RQGMNNM5LK27PQEDUOLJQ73QSQR5NTNJGYKOJSQFNIA",
+    "CB44AUXYV7HGMH4VEYVKPBTNMZAWL7RNQEJHRZ3MYCS2AJ3N5KARVGRJ",
   /**
    * Phase 1 contracts — set these env vars when the contracts are deployed.
    * Leaving them undefined puts dispense/pharmacy endpoints in simulated mode.
