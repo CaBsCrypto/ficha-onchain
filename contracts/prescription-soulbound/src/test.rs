@@ -16,7 +16,10 @@
 
 use super::{Error, PrescriptionSoulbound, PrescriptionSoulboundClient, Status};
 use doctor_registry::{DoctorRegistry, DoctorRegistryClient};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, BytesN, Env, String,
+};
 
 // --- helpers -----------------------------------------------------------------
 
@@ -284,7 +287,7 @@ fn test_mint_without_auth_fails() {
 fn test_admin_blocks_prescription() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _admin, _) = setup(&env);
+    let (client, _admin, _, registry) = setup(&env);
 
     let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
