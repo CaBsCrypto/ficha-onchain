@@ -65,7 +65,14 @@ jobs:
         with:
           workspaces: contracts
 
+      # reference-types and multivalue are on by default for wasm32 since Rust
+      # 1.82, and Soroban's VM rejects both: a deploy fails with
+      # Error(WasmVm, InvalidAction) — "reference-types not enabled: zero byte
+      # expected". Simple contracts can slip through by never emitting the
+      # instructions, so this shows up as one contract deploying and another not.
       - name: Build contracts
+        env:
+          RUSTFLAGS: "-C target-feature=-reference-types,-multivalue"
         run: |
           cargo build --target wasm32-unknown-unknown --release \
             -p doctor-registry -p prescription-soulbound
