@@ -25,9 +25,19 @@
 //! SHA-256 (`rx_hash`) que permite verificar integridad sin revelar PII.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short,
+    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short,
     Address, BytesN, Env, String, Vec,
 };
+
+/// Interfaz mínima del DoctorRegistry hermano.
+///
+/// Declarada a mano en vez de `contractimport!` del WASM: sólo se necesita
+/// `is_authorized`, y depender del binario obligaría a compilar el registry
+/// antes que este contrato.
+#[contractclient(name = "DoctorRegistryClient")]
+pub trait DoctorRegistryTrait {
+    fn is_authorized(env: Env, wallet: Address) -> bool;
+}
 
 #[cfg(test)]
 mod test;
@@ -212,10 +222,12 @@ impl PrescriptionSoulbound {
     // Emisión — mint_prescription
     // -------------------------------------------------------------------------
 
-    /// Emite una receta soulbound. Solo el médico firmante puede llamar.
+    /// Emite una receta soulbound. Solo un médico autorizado puede llamar.
     ///
-    /// El médico debe tener firma válida (`require_auth`). La validación contra
-    /// el DoctorRegistry se implementará via cross-contract en una versión futura.
+    /// Dos controles, y hacen falta los dos: `require_auth` prueba que el médico
+    /// firmó, y el DoctorRegistry prueba que ese médico está habilitado para
+    /// prescribir. Sin el segundo, cualquier wallet con firma válida podía
+    /// emitir recetas — que es exactamente lo que una receta no debe permitir.
     ///
     /// Status inicial: `Registered` (requiere activación explícita).
     ///
@@ -232,13 +244,14 @@ impl PrescriptionSoulbound {
     ) -> Result<u64, Error> {
         doctor_wallet.require_auth();
 
-        // TODO: validate doctor_wallet via doctor-registry (cross-contract call)
-        // let registry: Address = env.storage().instance()
-        //     .get(&DataKey::DoctorRegistry).ok_or(Error::NotInitialized)?;
-        // let client = DoctorRegistryClient::new(&env, &registry);
-        // if !client.is_authorized(&doctor_wallet) {
-        //     return Err(Error::Unauthorized);
-        // }
+        let registry: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::DoctorRegistry)
+            .ok_or(Error::NotInitialized)?;
+        if !DoctorRegistryClient::new(&env, &registry).is_authorized(&doctor_wallet) {
+            return Err(Error::Unauthorized);
+        }
 
         let mut counter: u64 = env
             .storage()

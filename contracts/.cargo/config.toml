@@ -1,0 +1,16 @@
+# Soroban's VM rejects the wasm reference-types and multivalue proposals, which
+# Rust enables by default for wasm32 since 1.82. Without this, `stellar contract
+# deploy` fails with:
+#
+#   Error(WasmVm, InvalidAction)
+#   "reference-types not enabled: zero byte expected"
+#
+# It lives here rather than in a CI env var so it applies to every build — CI,
+# local, anyone's machine — and cannot be lost to a restored build cache.
+#
+# The trap: a contract simple enough never to emit those instructions deploys
+# fine anyway. doctor-registry did; prescription-soulbound did not. So this
+# looks like a per-contract bug rather than a toolchain setting.
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=-reference-types,-multivalue"]

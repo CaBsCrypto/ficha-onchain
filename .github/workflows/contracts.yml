@@ -1,9 +1,15 @@
 name: contracts
 
-# D1 deliverable: green CI proving the Soroban contract test suite passes.
-# Scoped to the two contracts under test (DoctorRegistry, PrescriptionSoulbound)
-# plus the cross-contract end-to-end crate, so an in-progress contract elsewhere
-# in the workspace can't turn the badge red.
+# Green CI proving the Soroban contract test suite passes, plus a deployable
+# WASM as a downloadable artifact.
+#
+# The build job exists because the contracts cannot be compiled on the
+# maintainer's machine: WDAC blocks rustc from loading proc-macro DLLs (os error
+# 4551), and soroban-sdk's macro chain makes that unavoidable. Under the release
+# profile the failure disguises itself as "can't find crate for
+# serde_with_macros"; only the dev profile shows the real 4551. So CI is the only
+# place a deployable WASM comes from — download the artifact from a run, then
+# `stellar contract deploy --wasm` it.
 
 on:
   push:
@@ -15,6 +21,8 @@ on:
     paths:
       - "contracts/**"
       - ".github/workflows/contracts.yml"
+  # Lets a WASM be built on demand from any branch, without a contract change.
+  workflow_dispatch:
 
 jobs:
   test:
@@ -34,5 +42,74 @@ jobs:
         with:
           workspaces: contracts
 
+      # Scoped to the three crates under test so an unfinished contract elsewhere
+      # in the workspace cannot redden the badge.
       - name: Run test suite
-        run: cargo test -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
+        run: cargo test --locked -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
+
+  build:
+    name: build WASM
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+          # The optimize step below reads target/, and a restored one already
+          # served a stale artifact once — a build whose flags had changed came
+          # back byte-identical. Keyed per job so that cannot repeat.
+          key: wasm
+
+      - name: Build contracts
+        run: |
+          cargo build --locked --target wasm32-unknown-unknown --release \
+            -p doctor-registry -p prescription-soulbound
+
+      # Prebuilt binary, not `cargo install`: this step runs inside contracts/,
+      # so cargo would resolve against the workspace's lockfile and fail. Also
+      # saves several minutes of compiling the CLI from source.
+      - name: Install Stellar CLI
+        run: |
+          curl -sSL https://github.com/stellar/stellar-cli/releases/download/v27.0.0/stellar-cli-27.0.0-x86_64-unknown-linux-gnu.tar.gz             | tar xz -C /tmp
+          sudo mv /tmp/stellar /usr/local/bin/
+          stellar --version
+
+      # Required, not cosmetic. A modern toolchain emits reference-types and
+      # multivalue, which Soroban's VM rejects: deploying a raw artifact fails
+      # with Error(WasmVm, InvalidAction) — "reference-types not enabled".
+      # `optimize` strips them.
+      #
+      # This cannot be fixed with -C target-feature: since 1.82 those live in the
+      # wasm32 target spec rather than being opt-in features, and passing the
+      # flags produces a byte-identical binary. Pinning to 1.81 instead breaks on
+      # transitive deps needing edition2024.
+      #
+      # The trap: a contract simple enough never to emit those instructions
+      # deploys fine either way. doctor-registry did, prescription-soulbound did
+      # not — so it reads as a bug in one contract rather than a toolchain issue.
+      - name: Optimize for Soroban
+        run: |
+          for w in target/wasm32-unknown-unknown/release/*.wasm; do
+            stellar contract optimize --wasm "$w"
+          done
+          ls -lh target/wasm32-unknown-unknown/release/*.wasm
+
+      # Only the optimized binaries: they are the ones that deploy. Shipping the
+      # raw build alongside them invites deploying the wrong file.
+      - name: Upload WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-wasm
+          path: contracts/target/wasm32-unknown-unknown/release/*.optimized.wasm
+          retention-days: 30
+          if-no-files-found: error

@@ -133,6 +133,24 @@ step("medical_licenses", async () => {
     )`;
 });
 
+step("patient_health_records", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS patient_health_records (
+      patient_email            TEXT PRIMARY KEY,
+      blood_type               TEXT,
+      height_cm                TEXT,
+      weight_kg                TEXT,
+      bmi                      TEXT,
+      allergies                JSONB DEFAULT '[]',
+      conditions               JSONB DEFAULT '[]',
+      vaccinations             JSONB DEFAULT '[]',
+      primary_doctor           TEXT,
+      primary_doctor_specialty TEXT,
+      notes                    TEXT,
+      updated_at               TIMESTAMPTZ DEFAULT NOW()
+    )`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

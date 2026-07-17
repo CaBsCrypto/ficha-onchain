@@ -15,6 +15,9 @@ soroban-sdk = "22.0.0"
 
 [dev-dependencies]
 soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+# mint_prescription calls the registry to check the doctor is authorized, so the
+# tests need a real one deployed rather than a generated address.
+doctor-registry = { path = "../doctor-registry", features = ["testutils"] }
 
 [features]
 # Lets a downstream test crate build this contract against Soroban's test host

@@ -1,7 +1,27 @@
+/**
+ * GET   /api/patient/ficha        — the caller's own health record
+ * PATCH /api/patient/ficha        — update it
+ *
+ * The record is the patient's: blood type, allergies, chronic conditions,
+ * vaccination history, clinical notes.
+ *
+ * Identity comes from the caller's verified Privy token, never from a
+ * parameter. This route used to take `?email=` and trust it, so anyone who
+ * could guess an address read the full record — and PATCH let them overwrite
+ * someone else's allergy list, which is a patient-safety problem, not just a
+ * privacy one.
+ *
+ * There is deliberately no way to ask for someone else's record. Doctors will
+ * need patient records eventually; that needs a treating-relationship check,
+ * and bolting it on here as a parameter would reopen exactly the hole this
+ * closes.
+ */
 import { NextResponse } from "next/server";
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { requireUser, unauthorized } from "@/lib/auth/privy-auth";
 
-type Sql = NeonQueryFunction<any, any>;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 interface HealthRecord {
   patient_email: string;
@@ -18,117 +38,76 @@ interface HealthRecord {
   updated_at: string;
 }
 
-function getDb(): Sql {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-  return neon(url);
-}
-
-async function ensureTable(sql: Sql): Promise<void> {
-  await sql`
-    CREATE TABLE IF NOT EXISTS patient_health_records (
-      patient_email TEXT PRIMARY KEY,
-      blood_type TEXT,
-      height_cm TEXT,
-      weight_kg TEXT,
-      bmi TEXT,
-      allergies JSONB DEFAULT '[]',
-      conditions JSONB DEFAULT '[]',
-      vaccinations JSONB DEFAULT '[]',
-      primary_doctor TEXT,
-      primary_doctor_specialty TEXT,
-      notes TEXT,
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
+function fail(err: unknown, where: string) {
+  if (err instanceof DbNotConfiguredError) {
+    return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
+  }
+  console.error(`[${where} /api/patient/ficha]`, err);
+  return NextResponse.json({ error: "db_error" }, { status: 500 });
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const user = await requireUser(request);
+  if (!user) return unauthorized();
+  if (!user.email) {
+    return NextResponse.json({ error: "account has no email" }, { status: 403 });
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-
-    if (!email) {
-      return NextResponse.json({ error: "email is required" }, { status: 400 });
-    }
-
     const sql = getDb();
-    await ensureTable(sql);
-
-    const rows = (await sql`
+    const rows = await sql<HealthRecord>`
       SELECT * FROM patient_health_records
-      WHERE patient_email = ${email}
-      LIMIT 1
-    `) as HealthRecord[];
-
+      WHERE LOWER(patient_email) = ${user.email}
+      LIMIT 1`;
     return NextResponse.json({ data: rows[0] ?? null });
   } catch (err) {
-    console.error("[GET /api/patient/ficha]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return fail(err, "GET");
   }
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const user = await requireUser(request);
+  if (!user) return unauthorized();
+  if (!user.email) {
+    return NextResponse.json({ error: "account has no email" }, { status: 403 });
+  }
+
+  let body: Partial<HealthRecord>;
   try {
-    const body = (await request.json()) as Partial<HealthRecord> & {
-      patient_email: string;
-    };
+    body = (await request.json()) as Partial<HealthRecord>;
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
 
-    const {
-      patient_email,
-      blood_type = null,
-      height_cm = null,
-      weight_kg = null,
-      bmi = null,
-      allergies = [] as string[],
-      conditions = [] as { label: string; since?: string; controlled?: boolean }[],
-      vaccinations = [] as { name: string; date: string }[],
-      primary_doctor = null,
-      primary_doctor_specialty = null,
-      notes = null,
-    } = body;
+  const {
+    blood_type = null,
+    height_cm = null,
+    weight_kg = null,
+    bmi = null,
+    allergies = [] as string[],
+    conditions = [] as { label: string; since?: string; controlled?: boolean }[],
+    vaccinations = [] as { name: string; date: string }[],
+    primary_doctor = null,
+    primary_doctor_specialty = null,
+    notes = null,
+  } = body;
 
-    if (!patient_email) {
-      return NextResponse.json(
-        { error: "patient_email is required" },
-        { status: 400 }
-      );
-    }
+  // patient_email is ignored if sent: the row written is always the caller's.
+  const email = user.email;
 
+  try {
     const sql = getDb();
-    await ensureTable(sql);
-
-    const allergiesJson = JSON.stringify(allergies);
-    const conditionsJson = JSON.stringify(conditions);
-    const vaccinationsJson = JSON.stringify(vaccinations);
-
-    const [row] = (await sql`
+    const rows = await sql<HealthRecord>`
       INSERT INTO patient_health_records (
-        patient_email,
-        blood_type,
-        height_cm,
-        weight_kg,
-        bmi,
-        allergies,
-        conditions,
-        vaccinations,
-        primary_doctor,
-        primary_doctor_specialty,
-        notes,
-        updated_at
+        patient_email, blood_type, height_cm, weight_kg, bmi,
+        allergies, conditions, vaccinations,
+        primary_doctor, primary_doctor_specialty, notes, updated_at
       ) VALUES (
-        ${patient_email},
-        ${blood_type},
-        ${height_cm},
-        ${weight_kg},
-        ${bmi},
-        ${allergiesJson}::jsonb,
-        ${conditionsJson}::jsonb,
-        ${vaccinationsJson}::jsonb,
-        ${primary_doctor},
-        ${primary_doctor_specialty},
-        ${notes},
-        NOW()
+        ${email}, ${blood_type}, ${height_cm}, ${weight_kg}, ${bmi},
+        ${JSON.stringify(allergies)}::jsonb,
+        ${JSON.stringify(conditions)}::jsonb,
+        ${JSON.stringify(vaccinations)}::jsonb,
+        ${primary_doctor}, ${primary_doctor_specialty}, ${notes}, NOW()
       )
       ON CONFLICT (patient_email) DO UPDATE SET
         blood_type = EXCLUDED.blood_type,
@@ -142,12 +121,9 @@ export async function PATCH(request: Request): Promise<NextResponse> {
         primary_doctor_specialty = EXCLUDED.primary_doctor_specialty,
         notes = EXCLUDED.notes,
         updated_at = NOW()
-      RETURNING *
-    `) as Record<string, unknown>[];
-
-    return NextResponse.json({ data: row });
+      RETURNING *`;
+    return NextResponse.json({ data: rows[0] });
   } catch (err) {
-    console.error("[PATCH /api/patient/ficha]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return fail(err, "PATCH");
   }
 }
