@@ -257,14 +257,23 @@ fn test_dispense_expired_returns_expired() {
 }
 
 /// Test 8: Llamada a mint sin firma del médico → falla por require_auth (error de host).
+///
+/// Un médico registrado y todo: estar en el registry no reemplaza a la firma,
+/// igual que la firma no reemplaza al registry (ver
+/// `test_mint_rejects_unregistered_doctor`). Hacen falta las dos.
 #[test]
 fn test_mint_without_auth_fails() {
     let env = Env::default();
-    // Sin mock_all_auths: doctor_wallet.require_auth() fallará a nivel de host
+    // El setup necesita firmas (register_doctor exige admin), así que se mockean
+    // para armar el escenario y se retiran justo antes de lo que se prueba.
+    env.mock_all_auths();
     let (client, _, _, registry) = setup(&env);
 
     let doctor = authorized_doctor(&env, &registry);
     let patient = Address::generate(&env);
+
+    // Sin firmas: doctor_wallet.require_auth() debe fallar a nivel de host.
+    env.set_auths(&[]);
 
     assert!(
         client
