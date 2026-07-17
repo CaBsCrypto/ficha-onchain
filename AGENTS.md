@@ -4,27 +4,43 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Working in parallel
+# How work lands here
 
-Several agents work this repo at once, each in its own git worktree on its own
-branch. `main` is the shared trunk and the only place foundations change.
+One branch per feature, one PR per branch. `main` is protected: direct pushes
+are rejected, the Vercel build must pass, and it applies to admins too.
 
-| Worktree              | Branch         | Port | Owns                                                        |
-| --------------------- | -------------- | ---- | ----------------------------------------------------------- |
-| `Dev/ficha-onchain`   | `main`         | 3000 | trunk — foundations, merges                                  |
-| `Dev/tl-doctor`       | `feat/doctor`  | 3001 | `app/doctor/**`, `components/doctor/**`, `app/api/doctor/**` |
-| `Dev/tl-admin`        | `feat/admin`   | 3002 | `app/admin/**`, `app/api/admin/**`                           |
-| `Dev/tl-patient`      | `feat/patient` | 3003 | `app/patient/**` *(except `pain-diary/`)*, `components/patient/**`, `app/api/patient*/**` |
-| `Dev/tl-ficha`        | `feat/ficha`   | 3004 | `app/patient/ficha/**`, `lib/fhir/**`, `app/api/documents/**` |
-| `Dev/tl-contracts`    | `feat/smart-contracts` | 3005 | `contracts/**`, `.github/workflows/contracts.yml` |
-| `Dev/tl-diario`       | `feat/diario-de-dolor` | 3006 | `components/pain/**`, `app/patient/pain-diary/**`, `app/api/pain-diary/**`, `public/models/**` |
+```
+git checkout -b feat/whatever
+# work
+gh pr create            # preview builds automatically, with its own URL
+# merge from the PR
+```
 
-## Stay inside your lane
+Nothing else. No worktrees, no staging branch — every PR already gets an
+isolated preview deploy, which is what a staging environment would have been
+for.
 
-Edit only what your branch owns. If you need something outside it, say so and
-let it land on `main` first — do not reach across.
+Branches that exist but are unstarted: `feat/doctor`, `feat/admin`,
+`feat/patient`, `feat/ficha`, `feat/smart-contracts`, `feat/diario-de-dolor`.
 
-**Shared, `main` only — never edit from a feature branch:**
+## If several sessions run at once
+
+A checkout can only be on one branch, so two sessions in this folder will fight:
+one runs `git checkout`, and the other's commits silently land on the wrong
+branch. That already happened once here.
+
+Only then, give each session its own worktree:
+
+```
+git worktree add ../tl-doctor feat/doctor
+```
+
+Costs ~1.5 GB (its own `node_modules`), needs `.env.local` copied in — it is
+gitignored and does not travel — and a distinct port in `.claude/launch.json`.
+Remove it when done: `git worktree remove ../tl-doctor`. Create on demand, not
+in advance.
+
+## Shared code
 
 ```
 src/lib/db.ts          src/lib/stellar/**     src/types/**
@@ -32,58 +48,64 @@ src/components/ui/**   scripts/**             package.json
 src/lib/auth/**        AGENTS.md              CLAUDE.md
 ```
 
-This is not bureaucracy. This repo already carried five drifted copies of
-`getDb()`, each with its own error string for the same failure, because the
-function was convenient to copy and nobody owned it. Four agents working at once
-turn that into four copies a day. If a shared thing is wrong, fix it once on
-`main`.
+Changing shared code is fine — just do it deliberately, in its own commit, and
+know that everything depends on it.
+
+This repo already carried five drifted copies of `getDb()`, each with its own
+error string for the same failure, because the function was convenient to copy
+and nobody looked for the original. Before writing a helper, check whether
+`src/lib/` already has it.
 
 ## Database
 
-Every agent gets **its own Neon branch** — never share one. A migration or test
-row from one agent otherwise corrupts everyone else's run.
+`DATABASE_URL` in `.env.local` points at a Neon **dev branch**
+(`ep-lingering-water-ahzh89z5`), not the one Vercel deploys from. Keep it that
+way.
 
-Create it in the Neon console (Branches → New Branch, parent `main`,
-**auto-delete: Never**), then put its connection string in your worktree's
-`.env.local` as `DATABASE_URL`. `.env.local` is gitignored, so it does not
-travel with the worktree — it must be copied and then pointed at your own branch.
+Apply schema with `node scripts/migrate.mjs` — idempotent, safe to re-run. The
+schema lives there and nowhere else. Do not add `CREATE TABLE` to a route
+handler: that is where it used to live, and every request paid a round-trip to
+re-check tables that already existed.
 
-Apply schema with `node scripts/migrate.mjs`. It is idempotent. Never point it
-at the Neon branch Vercel deploys from.
+Need a new Neon branch (parallel sessions, throwaway data)? Neon console →
+Branches → New Branch, parent `main`, **auto-delete: Never**.
 
-## Schema changes
-
-`scripts/migrate.mjs` is shared and lives on `main`. Need a table or a column?
-Ask; it lands on `main` and everyone rebases. Do not add `CREATE TABLE` inside a
-route handler — that is where the schema used to live, and every request paid a
-round-trip to re-check tables that already existed.
-
-## Before you push
+## Before opening a PR
 
 ```
 npx tsc --noEmit          # must be 0 errors under src/
 git fetch && git rebase origin/main
 ```
 
-Rebase often. A branch that sits for days is a merge conflict with a due date.
+The Vercel build runs `tsc` too, so a type error blocks the merge either way.
 
 ## Facts worth knowing
 
 - **Contracts do not build locally.** WDAC blocks the Rust toolchain (os error
   4551). Soroban work goes through CI (`.github/workflows/contracts.yml`), which
-  only runs `cargo test` on three crates — `doctor-registry`,
+  runs `cargo test` on three crates only — `doctor-registry`,
   `prescription-soulbound`, `trustleaf-e2e` — deliberately, so an unfinished
-  contract elsewhere in the workspace cannot redden the badge. It does not deploy.
-- **Contract IDs live in `src/lib/stellar/config.ts` and `.env.local`**, both
-  outside the contracts lane. A newly deployed contract needs its ID wired in on
-  `main`.
+  contract elsewhere cannot redden the badge. It does not deploy.
 - **`@stellar/stellar-sdk` is pinned to v14.** v13 cannot parse protocol 27 —
-  every on-chain read throws. v16 breaks `passkey-kit`, which needs `^14.2.0`.
-- **`DoctorRegistry`'s admin secret is not in the repo.** `register_doctor`
+  every on-chain read throws `Bad union switch: 1`. v16 breaks `passkey-kit`,
+  which needs `^14.2.0`.
+- **`DoctorRegistry`'s admin secret is not in the repo.** Its admin is
+  `GB2PFKB24QPIEB3VIKYTIEG7M4KRH5I4KBPV26LUC6KOE2YAWSCPXKZ6`. `register_doctor`
   cannot be called, so `is_authorized` is false for everyone and `/api/mint`
-  degrades to `mode:"simulated"`. Real minting is blocked on this.
+  degrades to `mode:"simulated"`. **Real minting is blocked on this** — the fix
+  is redeploying the registry with an admin whose key we hold.
+- **Contract IDs live in `src/lib/stellar/config.ts` and `.env.local`.** A newly
+  deployed contract needs its ID wired in.
+- **Production's Neon branch has not been migrated.** `doctor_availability`,
+  `doctor_time_off` and the Meet columns on `appointments` do not exist there,
+  so those routes 500 in production. No UI calls them yet.
+- **Previews share production's `DATABASE_URL`.** A preview that writes, writes
+  to production.
 - **Vercel env vars are sensitive** — `vercel env pull` returns them empty. Get
   connection strings from the Neon console, not from Vercel.
+- **Privy app is `ficha-onchain` (`cmrix722m…`)**, not `SalesAgent` — that one
+  is a different project of the owner's. `allowed_domains` is deliberately empty:
+  filling it in breaks preview deploys, whose URL changes every build.
 - **Tests do not run.** `vitest.config.ts` and four suites under `src/__tests__/`
   exist, but vitest is not installed and there is no `test` script.
 - **The 3D body map loads THREE r128 from a CDN**, not from npm, as UMD scripts.
@@ -95,7 +117,7 @@ Rebase often. A branch that sits for days is a merge conflict with a due date.
 
 ## Do not
 
-- Push to `main` directly — open a PR.
+- Push to `main` — it is protected and will reject you. Open a PR.
 - Commit a `.env*` file, a connection string, or a secret key.
 - Point local dev at the production Neon branch.
 - Add a second copy of something that already exists in `src/lib/`.
