@@ -75,8 +75,14 @@ jobs:
           cargo build --locked --target wasm32-unknown-unknown --release \
             -p doctor-registry -p prescription-soulbound
 
+      # Prebuilt binary, not `cargo install`: this step runs inside contracts/,
+      # so cargo would resolve against the workspace's lockfile and fail. Also
+      # saves several minutes of compiling the CLI from source.
       - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli --version 22.8.1
+        run: |
+          curl -sSL https://github.com/stellar/stellar-cli/releases/download/v27.0.0/stellar-cli-27.0.0-x86_64-unknown-linux-gnu.tar.gz             | tar xz -C /tmp
+          sudo mv /tmp/stellar /usr/local/bin/
+          stellar --version
 
       # Required, not cosmetic. A modern toolchain emits reference-types and
       # multivalue, which Soroban's VM rejects: deploying a raw artifact fails
