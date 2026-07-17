@@ -60,10 +60,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: contracts
+      # Deliberately uncached. A warm target/ served a byte-identical WASM back
+      # after the rustflags changed, so the fix silently did nothing twice. A
+      # cold ~2min build is worth knowing the artifact matches the source.
 
       # The -reference-types/-multivalue flags Soroban needs live in
       # contracts/.cargo/config.toml, so they apply here and locally alike.
