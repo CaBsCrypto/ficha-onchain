@@ -44,7 +44,7 @@ jobs:
       # Scoped to the three crates under test so an unfinished contract elsewhere
       # in the workspace cannot redden the badge.
       - name: Run test suite
-        run: cargo test -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
+        run: cargo test --locked -p doctor-registry -p prescription-soulbound -p trustleaf-e2e --verbose
 
   build:
     name: build WASM

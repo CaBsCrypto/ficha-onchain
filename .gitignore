@@ -39,7 +39,10 @@ yarn-error.log*
 
 # rust / soroban contract build artifacts
 /contracts/**/target/
-/contracts/**/Cargo.lock
+# Cargo.lock IS committed: these contracts are binaries that get deployed on
+# chain, not libraries. Without it CI re-resolves every dependency to latest and
+# builds something that is not what was tested — which is how a 1.81 build broke
+# on a transitive dep needing edition2024.
 
 # typescript
 *.tsbuildinfo
