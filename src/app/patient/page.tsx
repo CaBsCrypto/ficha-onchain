@@ -2150,6 +2150,19 @@ interface DBAppointment {
   created_at: string;
 }
 
+interface PublicDoctor {
+  name: string;
+  email: string;
+  specialty: string | null;
+  telemedicine: boolean;
+  center_name: string | null;
+}
+
+interface BookingSlot {
+  time: string;
+  available: boolean;
+}
+
 function AppointmentStatusBadge({ status }: { status: DBAppointment['status'] }) {
   const map: Record<DBAppointment['status'], { label: string; cls: string }> = {
     scheduled:  { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
@@ -2333,8 +2346,11 @@ function RequestAppointmentForm({
   onSaved: (a: DBAppointment) => void;
   onClose: () => void;
 }) {
+  const [doctors, setDoctors] = useState<PublicDoctor[]>([]);
   const [doctorEmail, setDoctorEmail] = useState('');
   const [date, setDate] = useState('');
+  const [slots, setSlots] = useState<BookingSlot[] | null>(null);
+  const [slotsMsg, setSlotsMsg] = useState('');
   const [time, setTime] = useState('');
   const [motivo, setMotivo] = useState('');
   const [type, setType] = useState<'Presencial' | 'Telemedicina'>('Presencial');
@@ -2343,6 +2359,37 @@ function RequestAppointmentForm({
 
   const todayISO = new Date().toISOString().slice(0, 10);
   const canSubmit = doctorEmail && date && time && motivo;
+
+  // Load the bookable doctors once.
+  useEffect(() => {
+    fetch('/api/doctors')
+      .then((r) => r.json())
+      .then((d: { doctors?: PublicDoctor[] }) => setDoctors(d.doctors ?? []))
+      .catch(() => setDoctors([]));
+  }, []);
+
+  // Whenever doctor + date are chosen, fetch that day's free slots. The API
+  // already subtracts days off, taken slots and past times — we just render.
+  useEffect(() => {
+    setTime('');
+    if (!doctorEmail || !date) { setSlots(null); setSlotsMsg(''); return; }
+    let cancelled = false;
+    setSlots(null);
+    setSlotsMsg('');
+    fetch(`/api/doctor/slots?doctorEmail=${encodeURIComponent(doctorEmail)}&date=${date}`)
+      .then((r) => r.json())
+      .then((d: { data?: { slots?: BookingSlot[]; time_off?: string | null }; error?: string }) => {
+        if (cancelled) return;
+        if (d.error) { setSlots([]); setSlotsMsg('No se pudo cargar la disponibilidad'); return; }
+        const free = (d.data?.slots ?? []).filter((s) => s.available);
+        setSlots(free);
+        if (d.data?.time_off) setSlotsMsg(`El médico no atiende ese día (${d.data.time_off}).`);
+        else if (free.length === 0) setSlotsMsg('No hay horas libres ese día. Prueba otra fecha.');
+        else setSlotsMsg('');
+      })
+      .catch(() => { if (!cancelled) { setSlots([]); setSlotsMsg('Error de conexión'); } });
+    return () => { cancelled = true; };
+  }, [doctorEmail, date]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -2382,36 +2429,67 @@ function RequestAppointmentForm({
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted">Email del médico *</label>
-          <input
-            type="email"
+          <label className="mb-1 block text-xs font-medium text-muted">Médico *</label>
+          <select
             value={doctorEmail}
             onChange={(e) => setDoctorEmail(e.target.value)}
-            placeholder="doctor@clinica.cl"
+            className={inputCls}
+          >
+            <option value="">Selecciona un médico…</option>
+            {doctors.map((d) => (
+              <option key={d.email} value={d.email}>
+                {d.name}{d.specialty ? ` · ${d.specialty}` : ''}
+              </option>
+            ))}
+          </select>
+          {doctors.length === 0 && (
+            <p className="mt-1 text-xs text-muted">No hay médicos disponibles aún.</p>
+          )}
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Fecha *</label>
+          <input
+            type="date"
+            min={todayISO}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             className={inputCls}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Free slots — derived from the doctor's grid, minus taken/past/off */}
+        {doctorEmail && date && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Fecha *</label>
-            <input
-              type="date"
-              min={todayISO}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={inputCls}
-            />
+            <label className="mb-1 block text-xs font-medium text-muted">Hora disponible *</label>
+            {slots === null ? (
+              <div className="flex items-center gap-2 py-2 text-xs text-muted">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                Buscando horas libres…
+              </div>
+            ) : slots.length === 0 ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                {slotsMsg || 'No hay horas libres ese día.'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                {slots.map((s) => (
+                  <button
+                    key={s.time}
+                    type="button"
+                    onClick={() => setTime(s.time)}
+                    className={`rounded-xl border py-2 text-xs font-semibold transition-all ${
+                      time === s.time
+                        ? 'border-emerald-400 bg-emerald-500 text-white'
+                        : 'border-slate-200 text-ink hover:border-emerald-300 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {s.time}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Hora *</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-        </div>
+        )}
         <div>
           <label className="mb-1 block text-xs font-medium text-muted">Motivo *</label>
           <input

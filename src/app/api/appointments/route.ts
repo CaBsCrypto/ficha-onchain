@@ -106,6 +106,15 @@ export async function POST(request: Request) {
     `;
     return NextResponse.json({ success: true, appointment: row }, { status: 201 });
   } catch (err) {
+    // uniq_appt_slot (migrate.mjs) rejects a second booking for the same
+    // doctor/date/time. Postgres raises 23505 (unique_violation); surface it as
+    // a 409 with a clear message instead of a generic 500 the UI can't explain.
+    if ((err as { code?: string })?.code === "23505") {
+      return NextResponse.json(
+        { error: "Ese horario ya fue reservado. Elige otro." },
+        { status: 409 },
+      );
+    }
     console.error("[appointments POST]", err);
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
