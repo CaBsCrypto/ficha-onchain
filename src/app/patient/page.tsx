@@ -1185,6 +1185,13 @@ interface HealthRecord {
   primary_doctor:           string | null;
   primary_doctor_specialty: string | null;
   notes:                    string | null;
+  full_name:                string | null;
+  rut:                      string | null;
+  birthdate:                string | null;
+  phone:                    string | null;
+  address:                  string | null;
+  prevision:                string | null;
+  emergency_contact:        string | null;
   updated_at:               string;
 }
 
@@ -1192,6 +1199,8 @@ const EMPTY_RECORD: Omit<HealthRecord, 'patient_email' | 'updated_at'> = {
   blood_type: null, height_cm: null, weight_kg: null, bmi: null,
   allergies: [], conditions: [], vaccinations: [],
   primary_doctor: null, primary_doctor_specialty: null, notes: null,
+  full_name: null, rut: null, birthdate: null, phone: null,
+  address: null, prevision: null, emergency_contact: null,
 };
 
 // ── Edit modal for ficha ──────────────────────────────────────────────────────
@@ -1214,6 +1223,14 @@ function EditFichaModal({
   const [docName,     setDocName]     = useState(record?.primary_doctor           ?? '');
   const [docSpec,     setDocSpec]     = useState(record?.primary_doctor_specialty ?? '');
   const [notes,       setNotes]       = useState(record?.notes                    ?? '');
+  // Identidad legal (Decreto 41)
+  const [fullName,    setFullName]    = useState(record?.full_name                ?? '');
+  const [rut,         setRut]         = useState(record?.rut                      ?? '');
+  const [birthdate,   setBirthdate]   = useState(record?.birthdate?.slice(0, 10)  ?? '');
+  const [phone,       setPhone]       = useState(record?.phone                    ?? '');
+  const [address,     setAddress]     = useState(record?.address                  ?? '');
+  const [prevision,   setPrevision]   = useState(record?.prevision                ?? '');
+  const [emergency,   setEmergency]   = useState(record?.emergency_contact        ?? '');
   const [saving,      setSaving]      = useState(false);
 
   const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100';
@@ -1242,6 +1259,13 @@ function EditFichaModal({
           primary_doctor:            docName  || null,
           primary_doctor_specialty:  docSpec  || null,
           notes:                     notes    || null,
+          full_name:                 fullName  || null,
+          rut:                       rut       || null,
+          birthdate:                 birthdate || null,
+          phone:                     phone     || null,
+          address:                   address   || null,
+          prevision:                 prevision || null,
+          emergency_contact:         emergency || null,
         }),
       });
       const json = await res.json() as { data?: HealthRecord };
@@ -1263,7 +1287,41 @@ function EditFichaModal({
           </button>
         </div>
         <form onSubmit={handleSave} className="max-h-[75vh] overflow-y-auto p-6 space-y-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Datos básicos</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Datos personales</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className={labelCls}>Nombre completo</label>
+              <input className={inputCls} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="María Paz Torres Fuentes" />
+            </div>
+            <div>
+              <label className={labelCls}>RUT</label>
+              <input className={inputCls} value={rut} onChange={e => setRut(e.target.value)} placeholder="12.345.678-9" />
+            </div>
+            <div>
+              <label className={labelCls}>Fecha de nacimiento</label>
+              <input type="date" className={inputCls} value={birthdate} onChange={e => setBirthdate(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}>Teléfono</label>
+              <input className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+56 9 1234 5678" />
+            </div>
+            <div>
+              <label className={labelCls}>Previsión</label>
+              <select className={inputCls} value={prevision} onChange={e => setPrevision(e.target.value)}>
+                <option value="">—</option>
+                {['Fonasa A','Fonasa B','Fonasa C','Fonasa D','Isapre','Particular','Otra'].map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Dirección</label>
+              <input className={inputCls} value={address} onChange={e => setAddress(e.target.value)} placeholder="Av. Siempre Viva 742, Santiago" />
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Contacto de emergencia</label>
+              <input className={inputCls} value={emergency} onChange={e => setEmergency(e.target.value)} placeholder="Roberto Torres · +56 9 8765 4321" />
+            </div>
+          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 pt-2">Datos básicos</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Grupo sanguíneo</label>
@@ -1369,8 +1427,11 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink">
-              {displayName}
+              {ficha.full_name || displayName}
             </h2>
+            {ficha.rut && (
+              <p className="text-xs text-muted">RUT {ficha.rut}</p>
+            )}
             <p className="font-mono text-xs text-muted">
               {truncateHash(wallet, 6, 6)}
             </p>
@@ -1416,6 +1477,33 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           ))}
         </div>
       </Card>
+
+      {/* ── Datos personales ── */}
+      {(ficha.birthdate || ficha.phone || ficha.address || ficha.prevision || ficha.emergency_contact) && (
+        <Card className="p-0">
+          <SectionHeader
+            icon={<UserIcon className="h-5 w-5 text-clinical" />}
+            title="Datos personales"
+            bg="bg-clinical-50"
+          />
+          <dl className="grid grid-cols-2 gap-px bg-slate-100/80 sm:grid-cols-3">
+            {[
+              { label: "Fecha de nacimiento", value: ficha.birthdate?.slice(0, 10) },
+              { label: "Previsión", value: ficha.prevision },
+              { label: "Teléfono", value: ficha.phone },
+              { label: "Dirección", value: ficha.address },
+              { label: "Contacto de emergencia", value: ficha.emergency_contact },
+            ]
+              .filter((kv) => kv.value)
+              .map((kv) => (
+                <div key={kv.label} className="bg-white px-5 py-4">
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">{kv.label}</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-ink">{kv.value}</dd>
+                </div>
+              ))}
+          </dl>
+        </Card>
+      )}
 
       {/* ── Alergias ── */}
       <Card className="p-0">
