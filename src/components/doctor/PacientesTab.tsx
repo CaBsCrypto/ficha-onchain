@@ -83,7 +83,18 @@ function avatarColor(name: string): string {
 }
 
 // ── Patient detail modal ──────────────────────────────────────────────────────
-type DetailTab = 'resumen' | 'citas' | 'recetas' | 'licencias';
+type DetailTab = 'resumen' | 'citas' | 'recetas' | 'ficha' | 'licencias';
+
+interface FichaEntry {
+  id: number;
+  kind: string;
+  summary: string;
+  detail: string | null;
+  content_hash: string;
+  tx_hash: string | null;
+  mode: string;
+  created_at: string;
+}
 
 function PatientDetailModal({
   patient,
@@ -98,7 +109,18 @@ function PatientDetailModal({
   const [appts,   setAppts]   = useState<DBAppointment[]>([]);
   const [lics,    setLics]    = useState<DBLicense[]>([]);
   const [rx,      setRx]      = useState<RxItem[]>([]);
+  const [ficha,   setFicha]   = useState<FichaEntry[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const loadFicha = useCallback(() => {
+    if (!patient.patient_email) return;
+    fetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(patient.patient_email)}`)
+      .then(r => r.json() as Promise<{ entries?: FichaEntry[] }>)
+      .then(j => setFicha(j.entries ?? []))
+      .catch(() => setFicha([]));
+  }, [patient.patient_email]);
+
+  useEffect(() => { loadFicha(); }, [loadFicha]);
 
   useEffect(() => {
     if (!patient.patient_email) return;
@@ -131,6 +153,7 @@ function PatientDetailModal({
     { id: 'resumen',   label: 'Resumen' },
     { id: 'citas',     label: 'Citas',     count: appts.length },
     { id: 'recetas',   label: 'Recetas',   count: rx.length },
+    { id: 'ficha',     label: 'Ficha',     count: ficha.length },
     { id: 'licencias', label: 'Licencias', count: lics.length },
   ];
 
@@ -254,6 +277,15 @@ function PatientDetailModal({
                 </div>
               ))}
             </div>
+          )}
+
+          {!loading && tab === 'ficha' && (
+            <FichaEntries
+              entries={ficha}
+              patient={patient}
+              doctorEmail={doctorEmail}
+              onAdded={loadFicha}
+            />
           )}
 
           {!loading && tab === 'licencias' && (
@@ -441,6 +473,112 @@ export function PacientesTab() {
           onClose={() => setSelected(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Ficha on-chain: history + append form ──────────────────────────────────────
+const FICHA_KINDS = ['Condition', 'Observation', 'DiagnosticReport', 'Procedure', 'Note'] as const;
+
+function FichaEntries({
+  entries,
+  patient,
+  doctorEmail,
+  onAdded,
+}: {
+  entries: FichaEntry[];
+  patient: PatientSummary;
+  doctorEmail: string;
+  onAdded: () => void;
+}) {
+  const [kind,    setKind]    = useState<typeof FICHA_KINDS[number]>('Condition');
+  const [summary, setSummary] = useState('');
+  const [detail,  setDetail]  = useState('');
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState('');
+  const [result,  setResult]  = useState<string>('');
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!summary.trim() || !patient.patient_email) return;
+    setSaving(true);
+    setError('');
+    setResult('');
+    try {
+      // Resolve the patient's wallet so the entry anchors under their record.
+      let wallet: string | undefined;
+      try {
+        const wr = await fetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`);
+        if (wr.ok) wallet = ((await wr.json()) as { wallet?: string }).wallet;
+      } catch { /* wallet optional */ }
+
+      const res = await authedFetch('/api/ficha/entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientEmail: patient.patient_email,
+          patientWallet: wallet,
+          kind, summary, detail: detail || undefined, doctorEmail,
+        }),
+      });
+      const data = (await res.json()) as { mode?: string; error?: string; reason?: string };
+      if (!res.ok) { setError(data.error ?? 'No se pudo agregar la entrada'); return; }
+      setResult(data.mode === 'onchain' ? '⚡ Anclada on-chain' : `📋 Registrada (${data.reason ?? 'simulada'})`);
+      setSummary(''); setDetail('');
+      onAdded();
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100';
+
+  return (
+    <div className="space-y-4">
+      {/* Append form */}
+      <form onSubmit={handleAdd} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agregar a la ficha on-chain</p>
+        <div className="grid grid-cols-3 gap-2">
+          <select value={kind} onChange={e => setKind(e.target.value as typeof FICHA_KINDS[number])} className={inputCls}>
+            {FICHA_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <input value={summary} onChange={e => setSummary(e.target.value)} placeholder="Resumen (ej: Hipertensión I10)"
+            className={`${inputCls} col-span-2`} />
+        </div>
+        <input value={detail} onChange={e => setDetail(e.target.value)} placeholder="Detalle (opcional)" className={inputCls} />
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+        {result && <p className="text-xs text-emerald-600">{result}</p>}
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving || !summary.trim() || !patient.patient_email}
+            className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40">
+            {saving ? 'Anclando…' : 'Agregar entrada'}
+          </button>
+        </div>
+        {!patient.patient_email && (
+          <p className="text-[11px] text-amber-600">Este paciente no tiene email — no se puede anclar su ficha.</p>
+        )}
+      </form>
+
+      {/* History */}
+      {entries.length === 0 ? (
+        <p className="py-4 text-center text-sm text-slate-400">Sin entradas en la ficha aún.</p>
+      ) : entries.map(en => (
+        <div key={en.id} className="rounded-xl border border-slate-100 bg-white px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-slate-700">{en.summary}</p>
+            <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+              en.mode === 'onchain' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700')}>
+              {en.mode === 'onchain' ? '⚡ On-chain' : '📋 Demo'}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-500">{en.kind}{en.detail ? ` · ${en.detail}` : ''}</p>
+          <p className="mt-1 truncate font-mono text-[9px] text-slate-400" title={en.content_hash}>
+            hash: {en.content_hash}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

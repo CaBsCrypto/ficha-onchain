@@ -301,6 +301,44 @@ export async function listPrescriptions(
     .sort((a, b) => Number(b.id) - Number(a.id));
 }
 
+// --- ClinicalRecord (ficha) -------------------------------------------------
+
+export interface ClinicalEntryOnChain {
+  kind: string;
+  contentHash: string; // hex
+  author: string;
+  timestamp: number;
+}
+
+/** Read the append-only history from a patient's ClinicalRecord contract. */
+export async function getClinicalEntries(
+  contractId: string,
+): Promise<ClinicalEntryOnChain[]> {
+  const raw = await callRead<unknown>(contractId, "get_entries", []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e) => {
+    const r = e as Record<string, unknown>;
+    return {
+      kind: String(r.kind),
+      contentHash: toHex(r.content_hash),
+      author: String(r.author),
+      timestamp: Number(r.timestamp),
+    };
+  });
+}
+
+/** Whether a wallet may currently append to the given record. */
+export async function hasClinicalWriteAccess(
+  contractId: string,
+  who: string,
+): Promise<boolean> {
+  try {
+    return await callRead<boolean>(contractId, "has_write_access", [addr(who)]);
+  } catch {
+    return false;
+  }
+}
+
 async function findPrescriptionIds(
   wallet: string,
   role: "doctor" | "patient",

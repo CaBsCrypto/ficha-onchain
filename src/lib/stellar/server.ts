@@ -4,11 +4,16 @@
  * (Only imported from API route handlers.)
  */
 import {
+  Address,
+  BASE_FEE,
+  Contract,
   FeeBumpTransaction,
   Keypair,
+  nativeToScVal,
   Transaction,
   TransactionBuilder,
   rpc,
+  xdr,
 } from "@stellar/stellar-sdk";
 import { NETWORK_PASSPHRASE } from "./config";
 import { server } from "./client";
@@ -74,4 +79,42 @@ export async function feeBumpAndSend(innerXdr: string): Promise<SubmitResult> {
   );
   feeBump.sign(relayer);
   return sendAndConfirm(feeBump);
+}
+
+/**
+ * Append a clinical entry to a patient's ClinicalRecord, signed by the doctor
+ * and fee-bumped by the relayer (gasless for the doctor). The doctor wallet must
+ * already hold write access on the record (the patient granted it); otherwise
+ * the contract rejects the invoke with Unauthorized.
+ *
+ * `contentHash` is the 32-byte SHA-256 anchor of the off-chain encrypted FHIR
+ * payload — the plaintext never touches the chain.
+ */
+export async function appendClinicalEntry(args: {
+  doctorSecret: string;
+  contractId: string;
+  kind: string;
+  contentHash: Buffer; // 32 bytes
+}): Promise<SubmitResult> {
+  const doctor = Keypair.fromSecret(args.doctorSecret);
+  const contract = new Contract(args.contractId);
+  const op = contract.call(
+    "append_entry",
+    new Address(doctor.publicKey()).toScVal(),
+    nativeToScVal(args.kind, { type: "string" }),
+    xdr.ScVal.scvBytes(args.contentHash),
+  );
+
+  const source = await server.getAccount(doctor.publicKey());
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(op)
+    .setTimeout(60)
+    .build();
+
+  const prepared = await server.prepareTransaction(tx);
+  prepared.sign(doctor);
+  return feeBumpAndSend(prepared.toXDR());
 }

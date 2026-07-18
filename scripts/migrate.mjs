@@ -167,6 +167,31 @@ step("patient_health_records", async () => {
   await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS emergency_contact TEXT`;
 });
 
+// ── Clinical record entries (off-chain mirror of the on-chain ficha) ────────
+step("clinical_entries", async () => {
+  // Each row mirrors one on-chain ClinicalRecord entry. The chain stores only
+  // the SHA-256 anchor (content_hash) + author + timestamp; the human-readable
+  // kind/summary live here so the UI can render the history without decrypting
+  // anything. tx_hash + mode record whether the anchor made it on-chain.
+  await sql`
+    CREATE TABLE IF NOT EXISTS clinical_entries (
+      id            SERIAL PRIMARY KEY,
+      patient_email TEXT NOT NULL,
+      patient_wallet TEXT,
+      kind          TEXT NOT NULL,
+      summary       TEXT NOT NULL,
+      detail        TEXT,
+      content_hash  TEXT NOT NULL,          -- hex SHA-256 anchored on-chain
+      tx_hash       TEXT,                   -- on-chain tx (null when simulated)
+      mode          TEXT NOT NULL DEFAULT 'simulated', -- 'onchain' | 'simulated'
+      author_wallet TEXT,
+      doctor_email  TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_clinical_entries_patient
+              ON clinical_entries (patient_email, created_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);
