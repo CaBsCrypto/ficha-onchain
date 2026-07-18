@@ -2,21 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
-import { FormField, inputCls, selectCls, textareaCls } from './Modal';
+import { FormField, inputCls, selectCls } from './Modal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface DoctorProfile {
-  id: string;
-  name: string;
-  email: string;
-  specialty: string | null;
-  bio: string | null;
-  telemedicine: boolean;
-  license_num: string | null;
-  status: string;
-  created_at: string;
-}
-
 interface AvailabilityBlock {
   weekday: number;      // 0=Sunday .. 6=Saturday
   start_time: string;   // "HH:MM"
@@ -45,15 +33,6 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 export function DisponibilidadTab() {
   const doctorEmail = usePrivyEmail() ?? '';
 
-  // Profile state
-  const [specialty, setSpecialty] = useState('');
-  const [bio, setBio] = useState('');
-  const [telemedicine, setTelemedicine] = useState(false);
-  const [profileMissing, setProfileMissing] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [profileSaved, setProfileSaved] = useState(false);
-
   // Availability state
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
   const [savingGrid, setSavingGrid] = useState(false);
@@ -68,33 +47,13 @@ export function DisponibilidadTab() {
 
   const [loading, setLoading] = useState(true);
 
-  // ── Load profile + availability ──────────────────────────────────────────────
+  // ── Load availability ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!doctorEmail) return;
     setLoading(true);
-    setProfileError('');
     setGridError('');
     try {
-      const [pRes, aRes] = await Promise.all([
-        fetch(`/api/doctor/profile?doctorEmail=${encodeURIComponent(doctorEmail)}`),
-        fetch(`/api/doctor/availability?doctorEmail=${encodeURIComponent(doctorEmail)}`),
-      ]);
-
-      const pData = await pRes.json() as { data?: DoctorProfile | null; error?: string };
-      if (pRes.ok) {
-        const p = pData.data;
-        if (p) {
-          setSpecialty(p.specialty ?? '');
-          setBio(p.bio ?? '');
-          setTelemedicine(Boolean(p.telemedicine));
-          setProfileMissing(false);
-        } else {
-          setProfileMissing(true);
-        }
-      } else {
-        setProfileError(pData.error ?? 'No se pudo cargar el perfil');
-      }
-
+      const aRes = await fetch(`/api/doctor/availability?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const aData = await aRes.json() as { data?: AvailabilityBlock[]; error?: string };
       if (aRes.ok) {
         setBlocks((aData.data ?? []).map((b) => ({
@@ -107,43 +66,12 @@ export function DisponibilidadTab() {
         setGridError(aData.error ?? 'No se pudo cargar la disponibilidad');
       }
     } catch {
-      setProfileError('Error de conexión — revisa tu red');
+      setGridError('Error de conexión — revisa tu red');
     }
     setLoading(false);
   }, [doctorEmail]);
 
   useEffect(() => { void load(); }, [load]);
-
-  // ── Save profile ─────────────────────────────────────────────────────────────
-  async function handleSaveProfile(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingProfile(true);
-    setProfileError('');
-    setProfileSaved(false);
-    try {
-      const res = await fetch('/api/doctor/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          doctorEmail,
-          specialty,
-          bio,
-          telemedicine,
-        }),
-      });
-      const data = await res.json() as { data?: DoctorProfile; error?: string };
-      if (!res.ok) {
-        setProfileError(data.error ?? 'No se pudo guardar el perfil');
-        setSavingProfile(false);
-        return;
-      }
-      setProfileSaved(true);
-      setProfileMissing(false);
-    } catch {
-      setProfileError('Error de conexión — revisa tu red');
-    }
-    setSavingProfile(false);
-  }
 
   // ── Availability grid helpers ────────────────────────────────────────────────
   function addBlock() {
@@ -242,93 +170,6 @@ export function DisponibilidadTab() {
         </div>
       ) : (
         <>
-          {profileMissing && (
-            <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200">
-              Tu cuenta médica aún no está registrada por el administrador. Podrás guardar tu
-              perfil una vez que sea habilitada.
-            </div>
-          )}
-
-          {/* ── Profile card ── */}
-          <form
-            onSubmit={handleSaveProfile}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Perfil profesional
-            </p>
-            <div className="space-y-4">
-              <FormField label="Especialidad">
-                <input
-                  type="text"
-                  value={specialty}
-                  onChange={(e) => { setSpecialty(e.target.value); setProfileSaved(false); }}
-                  placeholder="Ej: Medicina General"
-                  className={inputCls}
-                />
-              </FormField>
-
-              <FormField label="Biografía / presentación">
-                <textarea
-                  value={bio}
-                  onChange={(e) => { setBio(e.target.value); setProfileSaved(false); }}
-                  placeholder="Breve descripción para tus pacientes."
-                  rows={4}
-                  maxLength={2000}
-                  className={textareaCls}
-                />
-                <span className="mt-1 block text-right text-[10px] text-slate-400">
-                  {bio.length}/2000
-                </span>
-              </FormField>
-
-              <label className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
-                <span>
-                  <span className="block text-sm font-medium text-slate-700">Telemedicina</span>
-                  <span className="block text-xs text-slate-400">
-                    Habilita consultas por videollamada
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={telemedicine}
-                  onClick={() => { setTelemedicine((v) => !v); setProfileSaved(false); }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                    telemedicine ? 'bg-sky-500' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      telemedicine ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </label>
-            </div>
-
-            {profileError && (
-              <div className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{profileError}</div>
-            )}
-            {profileSaved && (
-              <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                Perfil guardado.
-              </div>
-            )}
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingProfile ? (
-                  <span className="flex items-center justify-center gap-2"><Spinner /> Guardando…</span>
-                ) : 'Guardar perfil'}
-              </button>
-            </div>
-          </form>
-
           {/* ── Availability card ── */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">

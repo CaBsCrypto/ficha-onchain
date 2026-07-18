@@ -8,6 +8,7 @@ import { ConsultasTab } from '@/components/doctor/ConsultasTab';
 import { RecetasTab } from '@/components/doctor/RecetasTab';
 import { LicenciasTab } from '@/components/doctor/LicenciasTab';
 import { DisponibilidadTab } from '@/components/doctor/DisponibilidadTab';
+import { PerfilTab } from '@/components/doctor/PerfilTab';
 
 // ── Inner content (uses useSearchParams → must be inside Suspense) ────────────
 function DoctorPageContent() {
@@ -22,8 +23,9 @@ function DoctorPageContent() {
       {tab === 'recetas'   && <RecetasTab />}
       {tab === 'licencias' && <LicenciasTab />}
       {tab === 'disponibilidad' && <DisponibilidadTab />}
+      {tab === 'perfil'    && <PerfilTab />}
       {/* Fallback for unknown tabs */}
-      {!['inicio', 'pacientes', 'consultas', 'recetas', 'licencias', 'disponibilidad'].includes(tab) && <InicioTab />}
+      {!['inicio', 'pacientes', 'consultas', 'recetas', 'licencias', 'disponibilidad', 'perfil'].includes(tab) && <InicioTab />}
     </>
   );
 }

@@ -185,13 +185,20 @@ function DoctorShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          {/* Right side: email + logout */}
-          <div className="flex items-center gap-4">
-            {email !== null && (
-              <span className="hidden max-w-[180px] truncate text-sm text-slate-500 lg:block">
-                {email}
+          {/* Right side: profile link + logout */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/doctor?tab=perfil"
+              className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+              title="Mi perfil"
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-600">
+                {(email ?? '?').charAt(0).toUpperCase()}
               </span>
-            )}
+              {email !== null && (
+                <span className="hidden max-w-[160px] truncate lg:block">{email}</span>
+              )}
+            </Link>
             <button
               onClick={() => void logout()}
               className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"

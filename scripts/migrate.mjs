@@ -44,6 +44,12 @@ step("doctors", async () => {
   await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS bio TEXT`;
   await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS telemedicine BOOLEAN NOT NULL DEFAULT TRUE`;
   await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`;
+  // Legal identity around the prescription (Ley 20.724 / SNRE): contact +
+  // membrete of the receta + the digital signature/seal that gets stamped on it.
+  await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS phone          TEXT`;
+  await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS center_name    TEXT`;
+  await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS center_address TEXT`;
+  await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS signature_url  TEXT`;
 });
 
 // ── Appointments — now also the consultation record ─────────────────────────
@@ -149,6 +155,16 @@ step("patient_health_records", async () => {
       notes                    TEXT,
       updated_at               TIMESTAMPTZ DEFAULT NOW()
     )`;
+  // Legal identity the ficha clínica requires (Ley 20.584 / Decreto 41):
+  // nombre, RUT, fecha nac., teléfono, dirección, previsión, contacto de
+  // emergencia. All NULL-able so existing rows keep working.
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS full_name         TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS rut               TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS birthdate         DATE`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS phone             TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS address           TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS prevision         TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS emergency_contact TEXT`;
 });
 
 // ── Run ─────────────────────────────────────────────────────────────────────
