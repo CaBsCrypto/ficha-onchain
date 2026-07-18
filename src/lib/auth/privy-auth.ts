@@ -85,6 +85,49 @@ export function unauthorized() {
   return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 }
 
+/**
+ * True when authentication must be strictly enforced. Off by default so the
+ * demo (and the HTTP flow tests) work token-less; flip TRUSTLEAF_REQUIRE_AUTH
+ * (or enable passkeys) in production to lock every guarded route down.
+ */
+export function authEnforced(): boolean {
+  return (
+    process.env.TRUSTLEAF_REQUIRE_AUTH === "true" ||
+    process.env.NEXT_PUBLIC_PASSKEY_ENABLED === "true"
+  );
+}
+
+/**
+ * Ownership guard for routes that act on a single actor's own data
+ * (a doctor's availability, their patient roster, …).
+ *
+ * Resolves the email the request is allowed to act as:
+ *   - a valid token whose email matches `claimedEmail`  → { email } (own email)
+ *   - a valid token whose email does NOT match          → { error: 403 }
+ *   - no/invalid token AND auth is enforced             → { error: 401 }
+ *   - no/invalid token AND not enforced (demo)          → { email: claimedEmail }
+ *
+ * This closes the IDOR where a logged-in user reads/writes someone else's data
+ * by swapping the `?email=` param, while keeping the token-less demo working.
+ * Turn on enforcement in prod to reject anonymous callers outright.
+ */
+export async function resolveOwnerEmail(
+  request: Request,
+  claimedEmail: string | null | undefined,
+): Promise<{ email: string } | { error: NextResponse }> {
+  const wanted = claimedEmail?.trim().toLowerCase() || "";
+  const user = await requireUser(request);
+
+  if (user?.email) {
+    if (wanted && !ownsEmail(user, wanted)) return { error: forbidden() };
+    return { email: user.email };
+  }
+
+  if (authEnforced()) return { error: unauthorized() };
+  if (!wanted) return { error: unauthorized() };
+  return { email: wanted };
+}
+
 export function forbidden() {
   return NextResponse.json({ error: "forbidden" }, { status: 403 });
 }

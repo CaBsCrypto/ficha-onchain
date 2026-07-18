@@ -18,6 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,10 +48,11 @@ function toMinutes(hhmm: string): number {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const doctorEmail = searchParams.get("doctorEmail")?.trim().toLowerCase();
-  if (!doctorEmail) {
-    return NextResponse.json({ error: "doctorEmail required" }, { status: 400 });
-  }
+  // Identity comes from the token when present; the param is only trusted in
+  // demo mode. A logged-in doctor can only read their own grid.
+  const owner = await resolveOwnerEmail(request, searchParams.get("doctorEmail"));
+  if ("error" in owner) return owner.error;
+  const doctorEmail = owner.email;
 
   try {
     const sql = getDb();
@@ -74,10 +76,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const doctorEmail = String(body.doctorEmail ?? "").trim().toLowerCase();
-  if (!doctorEmail) {
-    return NextResponse.json({ error: "doctorEmail required" }, { status: 400 });
-  }
+  const owner = await resolveOwnerEmail(request, body.doctorEmail);
+  if ("error" in owner) return owner.error;
+  const doctorEmail = owner.email;
   if (!Array.isArray(body.blocks)) {
     return NextResponse.json({ error: "blocks must be an array" }, { status: 400 });
   }
