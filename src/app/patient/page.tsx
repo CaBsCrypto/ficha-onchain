@@ -1195,6 +1195,17 @@ interface HealthRecord {
   updated_at:               string;
 }
 
+interface ClinicalEntry {
+  id: number;
+  kind: string;
+  summary: string;
+  detail: string | null;
+  content_hash: string;
+  tx_hash: string | null;
+  mode: string;
+  created_at: string;
+}
+
 const EMPTY_RECORD: Omit<HealthRecord, 'patient_email' | 'updated_at'> = {
   blood_type: null, height_cm: null, weight_kg: null, bmi: null,
   allergies: [], conditions: [], vaccinations: [],
@@ -1382,6 +1393,7 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const avatarLetter = privyEmail ? privyEmail[0].toUpperCase() : "P";
 
   const [record,    setRecord]    = useState<HealthRecord | null>(null);
+  const [entries,   setEntries]   = useState<ClinicalEntry[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [showEdit,  setShowEdit]  = useState(false);
 
@@ -1393,6 +1405,11 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       .then(j => setRecord(j.data))
       .catch(err => console.error('[FichaTab]', err))
       .finally(() => setLoading(false));
+    // On-chain clinical history (anchored by the patient's doctors).
+    fetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(privyEmail)}`)
+      .then(r => r.json() as Promise<{ entries?: ClinicalEntry[] }>)
+      .then(j => setEntries(j.entries ?? []))
+      .catch(() => setEntries([]));
   }, [privyEmail]);
 
   // Fallback values from MOCK_FICHA when no real data yet (keeps UI populated for demo)
@@ -1477,6 +1494,35 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           ))}
         </div>
       </Card>
+
+      {/* ── Historial clínico on-chain ── */}
+      {entries.length > 0 && (
+        <Card className="p-0">
+          <SectionHeader
+            icon={<ShieldCheckIcon className="h-5 w-5 text-clinical" />}
+            title="Historial clínico on-chain"
+            bg="bg-clinical-50"
+          />
+          <div className="divide-y divide-slate-100">
+            {entries.map((en) => (
+              <div key={en.id} className="px-6 py-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-ink">{en.summary}</p>
+                  <Badge tone={en.mode === 'onchain' ? 'clinical' : 'muted'}>
+                    {en.mode === 'onchain' ? '⚡ On-chain' : '📋 Demo'}
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted">
+                  {en.kind}{en.detail ? ` · ${en.detail}` : ''}
+                </p>
+                <p className="mt-1 truncate font-mono text-[10px] text-muted/70" title={en.content_hash}>
+                  hash: {en.content_hash}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* ── Datos personales ── */}
       {(ficha.birthdate || ficha.phone || ficha.address || ficha.prevision || ficha.emergency_contact) && (
