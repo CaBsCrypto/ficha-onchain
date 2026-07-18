@@ -54,6 +54,15 @@ function IconDoc({ className }: { className?: string }) {
   );
 }
 
+function IconClock({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 // ── Nav item type ─────────────────────────────────────────────────────────────
 interface NavItem {
   href: string;
@@ -72,6 +81,7 @@ function useDoctorNav() {
     { href: '/doctor?tab=inicio',    label: 'Inicio',    icon: <IconHome className="h-5 w-5" />,     tab: 'inicio'    },
     { href: '/doctor?tab=pacientes', label: 'Pacientes', icon: <IconUsers className="h-5 w-5" />,    tab: 'pacientes' },
     { href: '/doctor?tab=consultas', label: 'Consultas', icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
+    { href: '/doctor?tab=disponibilidad', label: 'Disponibilidad', icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
     { href: '/doctor?tab=recetas',   label: 'Recetas',   icon: <IconRx className="h-5 w-5" />,       tab: 'recetas'   },
     { href: '/doctor?tab=licencias', label: 'Licencias', icon: <IconDoc className="h-5 w-5" />,      tab: 'licencias' },
   ];
