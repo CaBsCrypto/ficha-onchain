@@ -37,6 +37,15 @@ export const CONTRACT_IDS = {
    * licenses, and mental health certificates. Set env var when deployed.
    */
   documentSoulbound: process.env.DOCUMENT_SOULBOUND_ID as string | undefined,
+  /**
+   * Patient-owned clinical record (the on-chain ficha). One contract PER
+   * patient — the owner is fixed at deploy — so this is not a single global ID
+   * but a per-patient lookup. The env var below holds only the DEMO patient's
+   * record; production resolves a patient's record contract from a directory.
+   */
+  clinicalRecordDemo:
+    process.env.NEXT_PUBLIC_DEMO_CLINICAL_RECORD_ID ??
+    "CCYDJJOA4AYDEDP6XBHXBZ6OAGRPDAUZRF23M3FMP6CO5L7SJ6YOSWSA",
 } as const;
 
 export const STELLAR_EXPERT_TX = (hash: string) =>
