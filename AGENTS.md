@@ -96,9 +96,18 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
   is redeploying the registry with an admin whose key we hold.
 - **Contract IDs live in `src/lib/stellar/config.ts` and `.env.local`.** A newly
   deployed contract needs its ID wired in.
-- **Production's Neon branch has not been migrated.** `doctor_availability`,
-  `doctor_time_off` and the Meet columns on `appointments` do not exist there,
-  so those routes 500 in production. No UI calls them yet.
+- **Production's Neon branch is migrated** (as of the profiles/booking/ficha
+  work). `scripts/migrate.mjs` was run against the prod branch
+  (`ep-rapid-shadow-ahq94785`), so `doctor_availability`, `doctor_time_off`, the
+  Meet columns, the profile columns and `clinical_entries` all exist there. The
+  script is idempotent — re-run it after adding schema.
+- **Auth enforcement is a flag.** Guarded routes (the `withAuth` ones and the
+  `resolveOwnerEmail` ones — `doctor/availability`, `doctor/patients`) accept
+  token-less calls in demo mode so the flow tests and demo work. Set
+  `TRUSTLEAF_REQUIRE_AUTH=true` (or `NEXT_PUBLIC_PASSKEY_ENABLED=true`) in prod to
+  reject anonymous callers; with a token they already enforce owner-only access.
+  `DEMO_DOCTOR_SECRET` + `RELAYER_SECRET` are NOT in Vercel, so on-chain mint /
+  ficha-append degrade to simulated in the deploy until they are added.
 - **Previews share production's `DATABASE_URL`.** A preview that writes, writes
   to production.
 - **Vercel env vars are sensitive** — `vercel env pull` returns them empty. Get

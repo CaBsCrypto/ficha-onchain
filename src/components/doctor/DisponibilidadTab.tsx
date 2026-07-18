@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 import { FormField, inputCls, selectCls } from './Modal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ export function DisponibilidadTab() {
     setLoading(true);
     setGridError('');
     try {
-      const aRes = await fetch(`/api/doctor/availability?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+      const aRes = await authedFetch(`/api/doctor/availability?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const aData = await aRes.json() as { data?: AvailabilityBlock[]; error?: string };
       if (aRes.ok) {
         setBlocks((aData.data ?? []).map((b) => ({
@@ -111,7 +112,7 @@ export function DisponibilidadTab() {
     setGridError('');
     setGridSaved(false);
     try {
-      const res = await fetch('/api/doctor/availability', {
+      const res = await authedFetch('/api/doctor/availability', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doctorEmail, blocks }),

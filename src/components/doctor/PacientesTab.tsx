@@ -349,7 +349,7 @@ export function PacientesTab() {
     if (!doctorEmail) return;
     setLoading(true);
     try {
-      const res  = await fetch(`/api/doctor/patients?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+      const res  = await authedFetch(`/api/doctor/patients?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const json = await res.json() as { data?: PatientSummary[] };
       if (json.data) setPatients(json.data);
     } catch (err) {

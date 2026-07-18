@@ -21,6 +21,7 @@
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,11 +36,11 @@ function getDb(): Sql {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const doctorEmail = searchParams.get("doctorEmail")?.trim().toLowerCase();
-
-  if (!doctorEmail) {
-    return NextResponse.json({ error: "doctorEmail required" }, { status: 400 });
-  }
+  // A doctor's patient roster is PII; a logged-in doctor may only see their own.
+  // The param is trusted only in demo mode (no token, enforcement off).
+  const owner = await resolveOwnerEmail(request, searchParams.get("doctorEmail"));
+  if ("error" in owner) return owner.error;
+  const doctorEmail = owner.email;
 
   try {
     const sql = getDb();
