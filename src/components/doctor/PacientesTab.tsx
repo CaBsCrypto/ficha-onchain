@@ -12,7 +12,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 import { cn } from '@/lib/utils';
+
+interface RxItem {
+  id: string;
+  medication: string;
+  dosage: string;
+  status: string; // Registrada | Activa | Revocada | ...
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface PatientSummary {
@@ -75,7 +83,7 @@ function avatarColor(name: string): string {
 }
 
 // ── Patient detail modal ──────────────────────────────────────────────────────
-type DetailTab = 'resumen' | 'citas' | 'licencias';
+type DetailTab = 'resumen' | 'citas' | 'recetas' | 'licencias';
 
 function PatientDetailModal({
   patient,
@@ -89,6 +97,7 @@ function PatientDetailModal({
   const [tab,     setTab]     = useState<DetailTab>('resumen');
   const [appts,   setAppts]   = useState<DBAppointment[]>([]);
   const [lics,    setLics]    = useState<DBLicense[]>([]);
+  const [rx,      setRx]      = useState<RxItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -101,8 +110,19 @@ function PatientDetailModal({
       fetch(`/api/licenses?patientEmail=${encodeURIComponent(patient.patient_email)}`)
         .then(r => r.json() as Promise<{ data?: DBLicense[] }>)
         .then(j => j.data ?? []),
+      // Prescriptions are on-chain, keyed by wallet — resolve the patient's
+      // wallet from their email first, then read the chain. authedFetch carries
+      // the doctor's token past the /api/prescriptions guard.
+      fetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`)
+        .then(r => (r.ok ? r.json() as Promise<{ wallet?: string }> : { wallet: undefined }))
+        .then(async ({ wallet }) => {
+          if (!wallet) return [] as RxItem[];
+          const res = await authedFetch(`/api/prescriptions?role=patient&wallet=${wallet}`);
+          const j = await res.json() as { prescriptions?: RxItem[] };
+          return j.prescriptions ?? [];
+        }),
     ])
-      .then(([a, l]) => { setAppts(a); setLics(l); })
+      .then(([a, l, r]) => { setAppts(a); setLics(l); setRx(r); })
       .catch(err => console.error('[PatientDetail]', err))
       .finally(() => setLoading(false));
   }, [patient.patient_email, doctorEmail]);
@@ -110,8 +130,15 @@ function PatientDetailModal({
   const tabs: { id: DetailTab; label: string; count?: number }[] = [
     { id: 'resumen',   label: 'Resumen' },
     { id: 'citas',     label: 'Citas',     count: appts.length },
+    { id: 'recetas',   label: 'Recetas',   count: rx.length },
     { id: 'licencias', label: 'Licencias', count: lics.length },
   ];
+
+  const rxBadge = (status: string) =>
+    status === 'Activa'      ? 'bg-emerald-100 text-emerald-700'
+    : status === 'Revocada'  ? 'bg-rose-100 text-rose-700'
+    : status === 'Registrada'? 'bg-sky-100 text-sky-700'
+    : 'bg-slate-100 text-slate-600';
 
   return (
     <div
@@ -206,6 +233,24 @@ function PatientDetailModal({
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{a.type}{a.motivo ? ` · ${a.motivo}` : ''}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && tab === 'recetas' && (
+            <div className="space-y-2">
+              {rx.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-400">Sin recetas on-chain</p>
+              ) : rx.map(r => (
+                <div key={r.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-700">{r.medication}</p>
+                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', rxBadge(r.status))}>
+                      {r.status}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{r.dosage} · receta #{r.id}</p>
                 </div>
               ))}
             </div>
