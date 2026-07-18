@@ -153,6 +153,20 @@ export function DisponibilidadTab() {
       setGridError('La hora de término debe ser posterior a la de inicio');
       return;
     }
+    // Reject a block that overlaps an existing one on the same day, so the
+    // doctor gets the feedback here instead of on save. "HH:MM" strings compare
+    // correctly, so start < otherEnd && otherStart < end means they collide.
+    // The API enforces the same rule server-side — this just surfaces it early.
+    const clash = blocks.some(
+      (b) =>
+        b.weekday === draftWeekday &&
+        draftStart < b.end_time &&
+        b.start_time < draftEnd,
+    );
+    if (clash) {
+      setGridError(`Ese horario se cruza con un bloque que ya tienes el ${WEEKDAYS[draftWeekday]}`);
+      return;
+    }
     setBlocks((prev) => [
       ...prev,
       { weekday: draftWeekday, start_time: draftStart, end_time: draftEnd, slot_minutes: draftSlot },
@@ -381,15 +395,15 @@ export function DisponibilidadTab() {
             </div>
 
             {/* Grouped grid */}
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {grouped.length === 0 ? (
-                <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
+                <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400 sm:col-span-2 lg:col-span-3">
                   Aún no has agregado bloques de disponibilidad.
                 </p>
               ) : (
                 grouped.map((g) => (
-                  <div key={g.weekday}>
-                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div key={g.weekday} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {WEEKDAYS[g.weekday]}
                     </p>
                     <div className="flex flex-wrap gap-2">

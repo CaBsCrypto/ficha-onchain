@@ -79,11 +79,9 @@ function useDoctorNav() {
 
   const items: NavItem[] = [
     { href: '/doctor?tab=inicio',    label: 'Inicio',    icon: <IconHome className="h-5 w-5" />,     tab: 'inicio'    },
-    { href: '/doctor?tab=pacientes', label: 'Pacientes', icon: <IconUsers className="h-5 w-5" />,    tab: 'pacientes' },
     { href: '/doctor?tab=consultas', label: 'Consultas', icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
     { href: '/doctor?tab=disponibilidad', label: 'Disponibilidad', icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
-    { href: '/doctor?tab=recetas',   label: 'Recetas',   icon: <IconRx className="h-5 w-5" />,       tab: 'recetas'   },
-    { href: '/doctor?tab=licencias', label: 'Licencias', icon: <IconDoc className="h-5 w-5" />,      tab: 'licencias' },
+    { href: '/doctor?tab=pacientes', label: 'Pacientes', icon: <IconUsers className="h-5 w-5" />,    tab: 'pacientes' },
   ];
 
   function isActive(item: NavItem): boolean {
