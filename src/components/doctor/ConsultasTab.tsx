@@ -17,6 +17,7 @@ interface Appointment {
   motivo: string | null;
   notes: string | null;
   status: 'scheduled' | 'completed' | 'cancelled';
+  meet_link: string | null;
   created_at: string;
 }
 
@@ -323,6 +324,21 @@ export function ConsultasTab() {
                         </span>
                         {/* Status badge */}
                         <StatusBadge status={a.status} />
+                        {/* Join video call — telemedicine only */}
+                        {a.type === 'Telemedicina' && a.meet_link && a.status === 'scheduled' && (
+                          <a
+                            href={a.meet_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Entrar a la videollamada"
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-600"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M23 7l-7 5 7 5V7zM1 5h15v14H1z" />
+                            </svg>
+                            Entrar
+                          </a>
+                        )}
                         {/* Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           {a.status === 'scheduled' && (
