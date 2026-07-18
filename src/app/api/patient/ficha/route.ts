@@ -35,6 +35,14 @@ interface HealthRecord {
   primary_doctor: string | null;
   primary_doctor_specialty: string | null;
   notes: string | null;
+  // Legal identity the ficha clínica requires (Ley 20.584 / Decreto 41).
+  full_name: string | null;
+  rut: string | null;
+  birthdate: string | null;
+  phone: string | null;
+  address: string | null;
+  prevision: string | null;
+  emergency_contact: string | null;
   updated_at: string;
 }
 
@@ -90,6 +98,13 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     primary_doctor = null,
     primary_doctor_specialty = null,
     notes = null,
+    full_name = null,
+    rut = null,
+    birthdate = null,
+    phone = null,
+    address = null,
+    prevision = null,
+    emergency_contact = null,
   } = body;
 
   // patient_email is ignored if sent: the row written is always the caller's.
@@ -97,17 +112,23 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
   try {
     const sql = getDb();
+    // birthdate is a DATE column; an empty string would error, so normalise to null.
+    const birth = birthdate ? String(birthdate) : null;
     const rows = await sql<HealthRecord>`
       INSERT INTO patient_health_records (
         patient_email, blood_type, height_cm, weight_kg, bmi,
         allergies, conditions, vaccinations,
-        primary_doctor, primary_doctor_specialty, notes, updated_at
+        primary_doctor, primary_doctor_specialty, notes,
+        full_name, rut, birthdate, phone, address, prevision, emergency_contact,
+        updated_at
       ) VALUES (
         ${email}, ${blood_type}, ${height_cm}, ${weight_kg}, ${bmi},
         ${JSON.stringify(allergies)}::jsonb,
         ${JSON.stringify(conditions)}::jsonb,
         ${JSON.stringify(vaccinations)}::jsonb,
-        ${primary_doctor}, ${primary_doctor_specialty}, ${notes}, NOW()
+        ${primary_doctor}, ${primary_doctor_specialty}, ${notes},
+        ${full_name}, ${rut}, ${birth}, ${phone}, ${address}, ${prevision}, ${emergency_contact},
+        NOW()
       )
       ON CONFLICT (patient_email) DO UPDATE SET
         blood_type = EXCLUDED.blood_type,
@@ -120,6 +141,13 @@ export async function PATCH(request: Request): Promise<NextResponse> {
         primary_doctor = EXCLUDED.primary_doctor,
         primary_doctor_specialty = EXCLUDED.primary_doctor_specialty,
         notes = EXCLUDED.notes,
+        full_name = EXCLUDED.full_name,
+        rut = EXCLUDED.rut,
+        birthdate = EXCLUDED.birthdate,
+        phone = EXCLUDED.phone,
+        address = EXCLUDED.address,
+        prevision = EXCLUDED.prevision,
+        emergency_contact = EXCLUDED.emergency_contact,
         updated_at = NOW()
       RETURNING *`;
     return NextResponse.json({ data: rows[0] });
