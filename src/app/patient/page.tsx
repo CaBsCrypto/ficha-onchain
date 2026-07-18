@@ -2147,6 +2147,7 @@ interface DBAppointment {
   motivo: string | null;
   notes: string | null;
   status: 'scheduled' | 'completed' | 'cancelled';
+  meet_link: string | null;
   created_at: string;
 }
 
@@ -2332,6 +2333,20 @@ function AppointmentCard({ appt }: { appt: DBAppointment }) {
         </div>
         <AppointmentStatusBadge status={appt.status} />
       </div>
+      {/* Join video call — telemedicine only, while still scheduled */}
+      {appt.type === 'Telemedicina' && appt.meet_link && appt.status === 'scheduled' && (
+        <a
+          href={appt.meet_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 border-t border-slate-100 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 7l-7 5 7 5V7zM1 5h15v14H1z" />
+          </svg>
+          Entrar a la consulta
+        </a>
+      )}
     </div>
   );
 }

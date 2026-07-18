@@ -7,6 +7,7 @@
  */
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = NeonQueryFunction<any, any>;
@@ -54,13 +55,13 @@ export async function GET(request: Request) {
 
     const rows = doctorEmail
       ? await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, created_at
+          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link, created_at
           FROM appointments
           WHERE doctor_email = ${doctorEmail}
           ORDER BY date ASC, time_slot ASC
         `
       : await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, created_at
+          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link, created_at
           FROM appointments
           WHERE patient_email = ${patientEmail}
           ORDER BY date ASC, time_slot ASC
@@ -96,12 +97,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "doctorEmail, patientEmail, date, timeSlot required" }, { status: 400 });
   }
 
+  // A telemedicine appointment gets its own video room, stored on the row so it
+  // survives restarts and both portals read the same link. Jitsi rooms need no
+  // account or API — the random suffix keeps the URL unguessable.
+  const meetLink =
+    type === "Telemedicina"
+      ? `https://meet.jit.si/trustleaf-${randomUUID()}`
+      : null;
+
   try {
     const sql = getDb();
     await ensureTable(sql);
     const [row] = await sql`
-      INSERT INTO appointments (doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes)
-      VALUES (${doctorEmail}, ${patientEmail}, ${patientName}, ${date}, ${timeSlot}, ${type}, ${motivo}, ${notes})
+      INSERT INTO appointments (doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, meet_link)
+      VALUES (${doctorEmail}, ${patientEmail}, ${patientName}, ${date}, ${timeSlot}, ${type}, ${motivo}, ${notes}, ${meetLink})
       RETURNING *
     `;
     return NextResponse.json({ success: true, appointment: row }, { status: 201 });
