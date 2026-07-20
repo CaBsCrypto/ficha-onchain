@@ -278,6 +278,31 @@ step("clinical_entries", async () => {
               ON clinical_entries (patient_email, created_at DESC)`;
 });
 
+// ── Clinical documents (exams / labs / imaging attached to the ficha) ───────
+step("clinical_documents", async () => {
+  // A doctor attaches an exam file (PDF/image). The file bytes are stored here
+  // (base64) so both portals can view it; its SHA-256 is anchored on-chain as a
+  // DiagnosticReport entry — the chain proves integrity, the file itself never
+  // touches the chain. tx_hash + mode record whether the anchor made it on-chain.
+  await sql`
+    CREATE TABLE IF NOT EXISTS clinical_documents (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      doctor_email   TEXT,
+      category       TEXT NOT NULL DEFAULT 'Examen',  -- Laboratorio | Imagenología | Informe | Examen
+      title          TEXT NOT NULL,
+      file_name      TEXT,
+      mime_type      TEXT,
+      content_base64 TEXT NOT NULL,          -- the file, base64-encoded
+      content_hash   TEXT NOT NULL,          -- hex SHA-256 anchored on-chain
+      tx_hash        TEXT,
+      mode           TEXT NOT NULL DEFAULT 'simulated',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_clinical_documents_patient
+              ON clinical_documents (patient_email, created_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

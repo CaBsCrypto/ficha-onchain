@@ -289,6 +289,11 @@ function PatientDetailModal({
                 patientEmail={patient.patient_email ?? ''}
                 authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
               />
+              <ExamUploader
+                patientEmail={patient.patient_email ?? ''}
+                doctorEmail={doctorEmail}
+                authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
+              />
               <FichaEntries
                 entries={ficha}
                 patient={patient}
@@ -601,6 +606,113 @@ function AntecedentesEditor({
         <button type="submit" disabled={saving || !patientEmail || !authorized}
           className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40">
           {saving ? 'Guardando…' : 'Guardar antecedentes'}
+        </button>
+      </div>
+      {!authorized && (
+        <p className="text-[11px] text-amber-600">Requiere que el paciente haya autorizado el acceso (consentimiento).</p>
+      )}
+    </form>
+  );
+}
+
+const EXAM_CATEGORIES = ['Laboratorio', 'Imagenología', 'Informe', 'Examen'] as const;
+const MAX_EXAM_BYTES = 3.5 * 1024 * 1024; // ~3.5MB
+
+/**
+ * ExamUploader — the treating doctor attaches a PDF/image (lab result, imaging
+ * report, etc.) to the patient's ficha. The file is anchored on-chain via
+ * /api/ficha/document (treating-relationship gated) and stored server-side.
+ */
+function ExamUploader({
+  patientEmail,
+  doctorEmail,
+  authorized,
+}: {
+  patientEmail: string;
+  doctorEmail: string;
+  authorized: boolean;
+}) {
+  const [category, setCategory] = useState<typeof EXAM_CATEGORIES[number]>('Laboratorio');
+  const [title,    setTitle]    = useState('');
+  const [file,     setFile]     = useState<File | null>(null);
+  const [fileKey,  setFileKey]  = useState(0); // bump to reset the file input
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState('');
+  const [result,   setResult]   = useState('');
+
+  function readAsBase64(f: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result);
+        const comma = dataUrl.indexOf(',');
+        resolve(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('read error'));
+      reader.readAsDataURL(f);
+    });
+  }
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!patientEmail || !authorized || !title.trim() || !file) return;
+    if (file.size > MAX_EXAM_BYTES) {
+      setError('Archivo demasiado grande (máx ~3.5MB)');
+      return;
+    }
+    setSaving(true); setError(''); setResult('');
+    try {
+      const base64 = await readAsBase64(file);
+      const res = await authedFetch('/api/ficha/document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientEmail, doctorEmail, category, title,
+          fileName: file.name, mimeType: file.type || 'application/octet-stream',
+          base64,
+        }),
+      });
+      const data = (await res.json()) as { mode?: string; error?: string; reason?: string };
+      if (!res.ok) {
+        setError(data.error === 'forbidden' ? 'Sin autorización del paciente.' : (data.error ?? 'No se pudo adjuntar el examen'));
+        return;
+      }
+      setResult(data.mode === 'onchain' ? '⚡ Examen anclado on-chain' : '📋 Examen guardado (simulado)');
+      setTitle('');
+      setFile(null);
+      setFileKey(k => k + 1);
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100';
+
+  return (
+    <form onSubmit={handleUpload} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Adjuntar examen / laboratorio</p>
+      <div className="grid grid-cols-3 gap-2">
+        <select value={category} onChange={e => { setCategory(e.target.value as typeof EXAM_CATEGORIES[number]); setResult(''); }} className={inputCls}>
+          {EXAM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input value={title} onChange={e => { setTitle(e.target.value); setResult(''); }} placeholder="Ej: Hemograma completo"
+          className={`${inputCls} col-span-2`} />
+      </div>
+      <input
+        key={fileKey}
+        type="file"
+        accept="application/pdf,image/*"
+        onChange={e => { setFile(e.target.files?.[0] ?? null); setResult(''); setError(''); }}
+        className={inputCls}
+      />
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {result && <p className="text-xs text-emerald-600">{result}</p>}
+      <div className="flex justify-end">
+        <button type="submit" disabled={saving || !authorized || !patientEmail || !title.trim() || !file}
+          className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40">
+          {saving ? 'Subiendo…' : 'Adjuntar examen'}
         </button>
       </div>
       {!authorized && (

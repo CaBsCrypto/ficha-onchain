@@ -20,53 +20,24 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
-import { requireUser, authEnforced, unauthorized, forbidden } from "@/lib/auth/privy-auth";
+import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** True when the doctor has a consented appointment with this patient. */
-async function hasTreatingRelationship(
-  sql: ReturnType<typeof getDb>,
-  doctorEmail: string,
-  patientEmail: string,
-): Promise<boolean> {
-  const rows = await sql<{ n: number }>`
-    SELECT COUNT(*)::int AS n
-    FROM appointments
-    WHERE LOWER(doctor_email)  = ${doctorEmail}
-      AND LOWER(patient_email) = ${patientEmail}
-      AND consent_mode IS NOT NULL`;
-  return (rows[0]?.n ?? 0) > 0;
-}
-
 /**
- * Resolve the doctor identity + authorise the treating relationship.
- * Returns the lowercased patientEmail to act on, or an error response.
+ * Resolve + authorise the treating relationship. This route is doctor-facing,
+ * but resolveOwnerOrTreating also allows the patient themselves — harmless here,
+ * since the patient editing their own record is exactly what /api/patient/ficha
+ * already permits.
  */
 async function gate(
   request: Request,
   patientEmailRaw: string | null,
 ): Promise<{ patientEmail: string; doctorEmail: string | null } | { error: NextResponse }> {
-  const patientEmail = patientEmailRaw?.trim().toLowerCase() || "";
-  if (!patientEmail) {
-    return { error: NextResponse.json({ error: "patientEmail required" }, { status: 400 }) };
-  }
-
-  const user = await requireUser(request);
-
-  // No token: enforced → 401; demo → passthrough (param trusted).
-  if (!user?.email) {
-    if (authEnforced()) return { error: unauthorized() };
-    return { patientEmail, doctorEmail: null };
-  }
-
-  const doctorEmail = user.email;
-  const sql = getDb();
-  if (!(await hasTreatingRelationship(sql, doctorEmail, patientEmail))) {
-    return { error: forbidden() };
-  }
-  return { patientEmail, doctorEmail };
+  const r = await resolveOwnerOrTreating(request, patientEmailRaw);
+  if ("error" in r) return r;
+  return { patientEmail: r.patientEmail, doctorEmail: r.doctorEmail };
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
