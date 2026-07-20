@@ -13,23 +13,14 @@
  *   400 { error }   — malformed / missing email
  *   500 { error }   — database error
  */
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { getDb, type Sql } from "@/lib/db";
 import { NextResponse } from "next/server";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Sql = NeonQueryFunction<any, any>;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LEN = 254;
-
-function getDb() {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set. Link a Neon database in Vercel → Storage.");
-  return neon(url);
-}
 
 async function ensureTable(sql: Sql) {
   await sql`

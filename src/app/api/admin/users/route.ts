@@ -2,20 +2,11 @@
  * GET  /api/admin/users?token=X  — list registered users
  * POST /api/admin/users           — track user login (called from client on auth)
  */
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { getDb, type Sql } from "@/lib/db";
 import { NextResponse } from "next/server";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Sql = NeonQueryFunction<any, any>;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getDb() {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set.");
-  return neon(url);
-}
 
 async function ensureTable(sql: Sql) {
   await sql`

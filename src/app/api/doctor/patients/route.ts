@@ -19,20 +19,12 @@
  * }
  */
 
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type Sql = NeonQueryFunction<any, any>;
-
-function getDb(): Sql {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-  return neon(url);
-}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

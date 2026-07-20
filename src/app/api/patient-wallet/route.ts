@@ -12,18 +12,12 @@
  * Response 404: { error: "not_found" }
  * Response 400: { error: "email_required" }
  */
-import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getDb() {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-  return neon(url);
-}
 
 export async function GET(request: Request) {
   // A logged-in user (doctor resolving a patient's wallet) is required under
