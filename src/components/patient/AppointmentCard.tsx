@@ -15,7 +15,10 @@ export function AppointmentCard({
   patientEmail: string;
   onReload: () => void;
 }) {
-  const dateLabel = new Date(appt.date + 'T00:00:00').toLocaleDateString('es-CL', {
+  // appt.date may arrive as a plain "YYYY-MM-DD" or a full ISO timestamp
+  // (Neon serialises DATE columns with a time part); take the date portion so
+  // appending 'T00:00:00' never yields "Invalid Date".
+  const dateLabel = new Date((appt.date ?? '').slice(0, 10) + 'T00:00:00').toLocaleDateString('es-CL', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
 
