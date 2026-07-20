@@ -27,20 +27,12 @@
  * DELETE /api/licenses?id=N&token=ADMIN_TOKEN → hard delete (admin)
  */
 
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { getDb, type Sql } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
 
-type Sql = NeonQueryFunction<any, any>;
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getDb(): Sql {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-  return neon(url);
-}
 
 async function ensureTable(sql: Sql) {
   await sql`

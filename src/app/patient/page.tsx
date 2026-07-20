@@ -46,30 +46,6 @@ type PatientRx = WithExpiry<OnChainPrescription>;
 type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
 
 // ---------------------------------------------------------------------------
-// Mock health record data (demo mode — labeled clearly in UI)
-// ---------------------------------------------------------------------------
-const MOCK_FICHA = {
-  bloodType: "A+",
-  allergies: ["Penicilina", "AINES (ibuprofeno)"],
-  conditions: [
-    { label: "Hipertensión arterial", since: "2021", controlled: true },
-    { label: "Hipotiroidismo", since: "2019", controlled: true },
-  ],
-  lastVisit: "2026-06-18",
-  nextAppointment: "2026-07-22",
-  primaryDoctor: "Dra. Valentina Reyes",
-  primaryDoctorSpecialty: "Medicina Interna",
-  height: "165 cm",
-  weight: "68 kg",
-  bmi: "25.0",
-  vaccinations: [
-    { name: "COVID-19 (bivalente)", date: "2025-10" },
-    { name: "Influenza", date: "2026-04" },
-    { name: "Hepatitis B", date: "2022-08" },
-  ],
-};
-
-// ---------------------------------------------------------------------------
 // Mock Rx data (demo mode — no contract connected)
 // ---------------------------------------------------------------------------
 type MockRx = {
@@ -92,25 +68,6 @@ const MOCK_RX: MockRx[] = [
   { id: 3, medication: "Metformina", dosage: "850mg", form: "Comprimidos", units_total: 90, balance: 45, status: "PartiallyDispensed", issued: "2026-06-01", expires: "2026-09-01", rx_hash: "f1e4a8b3c2d7e9f0", doctor: "Dr. Ramírez" },
 ];
 
-// ---------------------------------------------------------------------------
-// Mock License data (demo mode)
-// ---------------------------------------------------------------------------
-type MockLicense = {
-  id: number;
-  type: string;
-  days: number;
-  start: string;
-  end: string;
-  status: string;
-  doctor: string;
-  hash: string;
-};
-
-const MOCK_LICENSES: MockLicense[] = [
-  { id: 1, type: "Enfermedad común", days: 7, start: "2026-06-10", end: "2026-06-17", status: "Vencida", doctor: "Dr. Ramírez", hash: "b2c5f8a1d3e6f9c2" },
-  { id: 2, type: "Accidente laboral", days: 14, start: "2026-07-01", end: "2026-07-15", status: "Activa", doctor: "Dra. Chen", hash: "e7d3a9c4f2b1e8a5" },
-];
-
 const MOCK_RX_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
   Active: { label: "Activa", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
   PartiallyDispensed: { label: "Parcialmente dispensada", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
@@ -118,12 +75,6 @@ const MOCK_RX_STATUS_CONFIG: Record<string, { label: string; bg: string; text: s
   Revoked: { label: "Revocada", bg: "bg-red-50", text: "text-red-600", border: "border-red-200", dot: "bg-red-500" },
   Blocked: { label: "Bloqueada", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-500" },
   Registered: { label: "Registrada", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
-};
-
-const LICENSE_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
-  Activa: { label: "Activa", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  Vencida: { label: "Vencida", bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
-  "En revisión": { label: "En revisión", bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", dot: "bg-yellow-400" },
 };
 
 interface AuthorizedDoctor {
@@ -1412,7 +1363,7 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       .catch(() => setEntries([]));
   }, [privyEmail]);
 
-  // Fallback values from MOCK_FICHA when no real data yet (keeps UI populated for demo)
+  // Fallback to an empty record when there's no real data yet.
   const ficha = record ?? {
     ...EMPTY_RECORD,
     patient_email: privyEmail ?? '',
