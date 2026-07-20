@@ -11,7 +11,7 @@ interface Doctor {
   specialty: string | null;
   license_num: string | null;
   rut: string | null;
-  status: "active" | "blocked";
+  status: "active" | "blocked" | "pending";
   created_at: string;
 }
 
@@ -154,6 +154,17 @@ export default function AdminDoctorsPage() {
     setActionLoading(null);
   }
 
+  async function approveDoctor(doctor: Doctor) {
+    setActionLoading(doctor.id);
+    await fetch("/api/admin/doctors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, id: doctor.id, status: "active" }),
+    });
+    setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, status: "active" } : d));
+    setActionLoading(null);
+  }
+
   async function deleteDoctor(doctor: Doctor) {
     setActionLoading(doctor.id);
     await fetch("/api/admin/doctors", {
@@ -173,6 +184,7 @@ export default function AdminDoctorsPage() {
 
   const activeCount = doctors.filter((d) => d.status === "active").length;
   const blockedCount = doctors.filter((d) => d.status === "blocked").length;
+  const pendingCount = doctors.filter((d) => d.status === "pending").length;
 
   return (
     <div className="p-6 space-y-6">
@@ -180,7 +192,7 @@ export default function AdminDoctorsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Médicos</h1>
-          <p className="mt-0.5 text-sm text-slate-500">{doctors.length} registrados · {activeCount} activos · {blockedCount} bloqueados</p>
+          <p className="mt-0.5 text-sm text-slate-500">{doctors.length} registrados · {pendingCount} pendientes · {activeCount} activos · {blockedCount} bloqueados</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -195,6 +207,7 @@ export default function AdminDoctorsPage() {
       <div className="flex gap-3">
         {[
           { label: "Total", value: doctors.length, color: "bg-slate-100 text-slate-700" },
+          { label: "Pendientes", value: pendingCount, color: "bg-amber-100 text-amber-700" },
           { label: "Activos", value: activeCount, color: "bg-emerald-100 text-emerald-700" },
           { label: "Bloqueados", value: blockedCount, color: "bg-rose-100 text-rose-700" },
         ].map((s) => (
@@ -251,12 +264,25 @@ export default function AdminDoctorsPage() {
                 <p className="text-sm text-slate-500">{d.specialty ?? "—"}</p>
                 {/* Status badge */}
                 <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  d.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"
+                  d.status === "active" ? "bg-emerald-100 text-emerald-700"
+                    : d.status === "pending" ? "bg-amber-100 text-amber-700"
+                    : "bg-rose-100 text-rose-600"
                 }`}>
-                  {d.status === "active" ? "Activo" : "Bloqueado"}
+                  {d.status === "active" ? "Activo" : d.status === "pending" ? "Pendiente" : "Bloqueado"}
                 </span>
                 {/* Actions */}
                 <div className="flex items-center gap-1.5">
+                  {d.status === "pending" && (
+                    <button
+                      onClick={() => void approveDoctor(d)}
+                      disabled={actionLoading === d.id}
+                      title="Aprobar médico"
+                      className="rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40"
+                    >
+                      Aprobar
+                    </button>
+                  )}
+                  {d.status !== "pending" && (
                   <button
                     onClick={() => void toggleStatus(d)}
                     disabled={actionLoading === d.id}
@@ -277,6 +303,7 @@ export default function AdminDoctorsPage() {
                       </svg>
                     )}
                   </button>
+                  )}
                   <button
                     onClick={() => setConfirmDelete(d)}
                     disabled={actionLoading === d.id}
