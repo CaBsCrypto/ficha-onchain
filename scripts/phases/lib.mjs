@@ -63,13 +63,18 @@ export function nextWeekday(offset = 1) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Seed the demo doctor's weekly availability (idempotent, replace-all). */
+/** Seed the demo doctor's weekly availability (idempotent, replace-all).
+ *  The availability route is PUT (replace-all), not POST — POST 405s. */
 export async function seedAvailability() {
-  return post("/api/doctor/availability", {
-    doctorEmail: DOCTOR_EMAIL,
-    blocks: [1, 2, 3, 4, 5].map((weekday) => ({
-      weekday, start_time: "09:00", end_time: "13:00", slot_minutes: 30,
-    })),
+  return fetch(`${BASE}/api/doctor/availability`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      doctorEmail: DOCTOR_EMAIL,
+      blocks: [1, 2, 3, 4, 5].map((weekday) => ({
+        weekday, start_time: "09:00", end_time: "13:00", slot_minutes: 30,
+      })),
+    }),
   }).then(j);
 }
 
