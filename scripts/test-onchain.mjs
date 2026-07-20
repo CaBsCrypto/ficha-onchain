@@ -14,7 +14,7 @@
  */
 import { readFileSync } from "node:fs";
 import {
-  Account, Address, BASE_FEE, Contract, Networks, rpc, scValToNative, TransactionBuilder, nativeToScVal,
+  Account, Address, BASE_FEE, Contract, Keypair, Networks, rpc, scValToNative, TransactionBuilder, nativeToScVal,
 } from "@stellar/stellar-sdk";
 
 for (const l of readFileSync(".env.local", "utf8").split("\n")) {
@@ -88,6 +88,14 @@ console.log("\n\x1b[1mClinicalRecord (ficha)\x1b[0m");
   // demo doctor write access, so entries can be appended for real on-chain.
   const owner = await read(FICHA, "get_owner");
   check("ficha tiene owner (inicializada)", /^G[A-Z2-7]{55}$/.test(owner.value ?? ""), `owner=${owner.value ?? owner.error}`);
+
+  // The ficha owner must be the wallet whose secret we hold (DEMO_PATIENT_SECRET),
+  // so the server-side grant (signed by the owner) can actually execute.
+  if (process.env.DEMO_PATIENT_SECRET) {
+    let ownerPub = null;
+    try { ownerPub = Keypair.fromSecret(process.env.DEMO_PATIENT_SECRET).publicKey(); } catch { /* bad secret */ }
+    check("el owner de la ficha es firmable (grant server-side)", Boolean(ownerPub) && owner.value === ownerPub, `owner=${owner.value}`);
+  }
 
   const entries = await read(FICHA, "get_entries");
   check("get_entries responde (lista)", Array.isArray(entries.value), `count=${Array.isArray(entries.value) ? entries.value.length : "n/a"}`);

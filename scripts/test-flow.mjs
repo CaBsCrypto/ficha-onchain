@@ -105,8 +105,21 @@ async function main() {
   const stillFree = (slotsAfter.data?.slots ?? []).some((s) => s.available && s.time === slot);
   ok("el slot reservado desaparece de los libres", !stillFree, `slot=${slot}`);
 
+  // 6b ── Consentimiento: el paciente inicia la consulta y autoriza al médico.
+  console.log("\n\x1b[1m6. Consentimiento paciente→médico (iniciar consulta)\x1b[0m");
+  const grant = await j(await fetch(`${BASE}/api/ficha/grant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ appointmentId: apptId, patientEmail: PATIENT_EMAIL }),
+  }));
+  ok("POST /api/ficha/grant autoriza al médico", grant.mode === "onchain" || grant.mode === "simulated", `mode=${grant.mode}${grant.reason ? ` (${grant.reason})` : ""}`);
+  const afterGrant = await j(await fetch(`${BASE}/api/appointments?patientEmail=${encodeURIComponent(PATIENT_EMAIL)}`));
+  const appt2 = (afterGrant.appointments ?? []).find((a) => a.id === apptId);
+  ok("la cita queda 'in_progress' tras iniciar consulta", appt2?.status === "in_progress", `status=${appt2?.status}`);
+  ok("la cita expone el consentimiento", Boolean(appt2?.consent_mode) && (appt2?.consent_mode !== "onchain" || /^[0-9a-f]{64}$/.test(appt2?.consent_tx ?? "")), `consent=${appt2?.consent_mode}`);
+
   // 7 ── Ficha on-chain: el médico ancla una entrada (nueva feature).
-  console.log("\n\x1b[1m6. Ficha on-chain (append)\x1b[0m");
+  console.log("\n\x1b[1m7. Ficha on-chain (append)\x1b[0m");
   const entryRes = await j(await fetch(`${BASE}/api/ficha/entry`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

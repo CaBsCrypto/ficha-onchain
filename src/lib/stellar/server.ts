@@ -118,3 +118,39 @@ export async function appendClinicalEntry(args: {
   prepared.sign(doctor);
   return feeBumpAndSend(prepared.toXDR());
 }
+
+/**
+ * Grant a doctor write access to a patient's ClinicalRecord, signed by the
+ * OWNER (the patient) and fee-bumped by the relayer. The contract's
+ * `grant_write_access` calls `require_owner()`, so only the owner's signature is
+ * accepted — the relayer fee-bump does NOT count as that inner signature.
+ *
+ * Takes a single Address (the grantee); the contract sets the flag to true. The
+ * grantee MUST be the same wallet that later signs `append_entry`, or the append
+ * reverts Unauthorized.
+ */
+export async function grantWriteAccess(args: {
+  ownerSecret: string;
+  contractId: string;
+  grantee: string;
+}): Promise<SubmitResult> {
+  const owner = Keypair.fromSecret(args.ownerSecret);
+  const contract = new Contract(args.contractId);
+  const op = contract.call(
+    "grant_write_access",
+    new Address(args.grantee).toScVal(),
+  );
+
+  const source = await server.getAccount(owner.publicKey());
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(op)
+    .setTimeout(60)
+    .build();
+
+  const prepared = await server.prepareTransaction(tx);
+  prepared.sign(owner);
+  return feeBumpAndSend(prepared.toXDR());
+}

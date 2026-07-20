@@ -2192,8 +2192,12 @@ interface DBAppointment {
   type: 'Presencial' | 'Telemedicina';
   motivo: string | null;
   notes: string | null;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   meet_link: string | null;
+  started_at?: string | null;
+  consent_tx?: string | null;
+  consent_mode?: string | null;
+  consent_wallet?: string | null;
   created_at: string;
 }
 
@@ -2212,9 +2216,10 @@ interface BookingSlot {
 
 function AppointmentStatusBadge({ status }: { status: DBAppointment['status'] }) {
   const map: Record<DBAppointment['status'], { label: string; cls: string }> = {
-    scheduled:  { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
-    completed:  { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-    cancelled:  { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600 ring-rose-200' },
+    scheduled:   { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
+    in_progress: { label: 'En curso',   cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
+    completed:   { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    cancelled:   { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600 ring-rose-200' },
   };
   const { label, cls } = map[status] ?? map.scheduled;
   return (
@@ -2231,7 +2236,7 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
   const [showForm, setShowForm] = useState(false);
 
   // Fetch real appointments by patient email
-  useEffect(() => {
+  const loadAppts = useCallback(() => {
     if (!privyEmail) { setLoading(false); return; }
     authedFetch(`/api/appointments?patientEmail=${encodeURIComponent(privyEmail)}`)
       .then((r) => r.json())
@@ -2242,14 +2247,17 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
       .catch(() => setLoading(false));
   }, [privyEmail]);
 
+  useEffect(() => { loadAppts(); }, [loadAppts]);
+
   const todayISO = new Date().toISOString().slice(0, 10);
+  const isUpcoming = (s: DBAppointment['status']) => s === 'scheduled' || s === 'in_progress';
 
   const upcoming = appointments.filter(
-    (a) => a.date.slice(0, 10) >= todayISO && a.status === 'scheduled'
+    (a) => a.date.slice(0, 10) >= todayISO && isUpcoming(a.status)
   ).sort((a, b) => a.date.localeCompare(b.date) || a.time_slot.localeCompare(b.time_slot));
 
   const past = appointments.filter(
-    (a) => a.date.slice(0, 10) < todayISO || a.status !== 'scheduled'
+    (a) => a.date.slice(0, 10) < todayISO || !isUpcoming(a.status)
   ).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
@@ -2321,7 +2329,7 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
             ) : (
               <div className="space-y-3">
                 {upcoming.map((a) => (
-                  <AppointmentCard key={a.id} appt={a} />
+                  <AppointmentCard key={a.id} appt={a} patientEmail={privyEmail ?? ''} onReload={loadAppts} />
                 ))}
               </div>
             )}
@@ -2335,7 +2343,7 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
               </h2>
               <div className="space-y-3">
                 {past.map((a) => (
-                  <AppointmentCard key={a.id} appt={a} />
+                  <AppointmentCard key={a.id} appt={a} patientEmail={privyEmail ?? ''} onReload={loadAppts} />
                 ))}
               </div>
             </section>
@@ -2346,10 +2354,45 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
   );
 }
 
-function AppointmentCard({ appt }: { appt: DBAppointment }) {
+function AppointmentCard({
+  appt,
+  patientEmail,
+  onReload,
+}: {
+  appt: DBAppointment;
+  patientEmail: string;
+  onReload: () => void;
+}) {
   const dateLabel = new Date(appt.date + 'T00:00:00').toLocaleDateString('es-CL', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
+
+  const consented = Boolean(appt.consent_mode) || appt.status === 'in_progress';
+  const [granting, setGranting] = useState(false);
+  const [grantErr, setGrantErr] = useState('');
+
+  async function startConsultation() {
+    setGranting(true);
+    setGrantErr('');
+    try {
+      const res = await authedFetch('/api/ficha/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId: appt.id, patientEmail }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) { setGrantErr(data.error ?? 'No se pudo autorizar'); return; }
+      onReload();
+    } catch {
+      setGrantErr('Error de conexión');
+    } finally {
+      setGranting(false);
+    }
+  }
+
+  const videoVisible =
+    appt.type === 'Telemedicina' && appt.meet_link &&
+    (appt.status === 'scheduled' || appt.status === 'in_progress');
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
@@ -2379,10 +2422,10 @@ function AppointmentCard({ appt }: { appt: DBAppointment }) {
         </div>
         <AppointmentStatusBadge status={appt.status} />
       </div>
-      {/* Join video call — telemedicine only, while still scheduled */}
-      {appt.type === 'Telemedicina' && appt.meet_link && appt.status === 'scheduled' && (
+      {/* Join video call — telemedicine, while scheduled or in progress */}
+      {videoVisible && (
         <a
-          href={appt.meet_link}
+          href={appt.meet_link!}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 border-t border-slate-100 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
@@ -2393,6 +2436,28 @@ function AppointmentCard({ appt }: { appt: DBAppointment }) {
           Entrar a la consulta
         </a>
       )}
+
+      {/* Consent: start the consultation → authorize the doctor on the ficha */}
+      {consented ? (
+        <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-mint-50 px-4 py-2.5 text-sm font-semibold text-mint">
+          <ShieldCheckIcon className="h-4 w-4" />
+          Acceso otorgado a tu médico
+        </div>
+      ) : appt.status === 'scheduled' ? (
+        <button
+          onClick={startConsultation}
+          disabled={granting}
+          className="flex w-full items-center justify-center gap-2 border-t border-slate-100 bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+        >
+          {granting ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <ShieldCheckIcon className="h-4 w-4" />
+          )}
+          {granting ? 'Autorizando…' : 'Iniciar consulta · Autorizar a mi médico'}
+        </button>
+      ) : null}
+      {grantErr && <p className="border-t border-slate-100 px-4 py-2 text-xs text-rose-600">{grantErr}</p>}
     </div>
   );
 }

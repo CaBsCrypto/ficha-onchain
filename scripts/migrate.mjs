@@ -73,6 +73,13 @@ step("appointments", async () => {
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS meet_link    TEXT`;
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS meeting_code TEXT`;
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_name   TEXT`;
+  // Consent event: the patient authorizes their doctor to write their on-chain
+  // ficha when the consultation starts. status flips to 'in_progress'; the grant
+  // tx + grantee wallet are recorded so both portals can show "acceso otorgado".
+  await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS started_at     TIMESTAMPTZ`;
+  await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_tx     TEXT`;
+  await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_mode   TEXT`;
+  await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_wallet TEXT`;
 });
 
 step("appointments: no double-booking", async () => {

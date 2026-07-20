@@ -42,6 +42,7 @@ interface DBAppointment {
   motivo: string | null;
   notes: string | null;
   status: string;
+  consent_mode?: string | null;
   created_at: string;
 }
 
@@ -284,6 +285,7 @@ function PatientDetailModal({
               entries={ficha}
               patient={patient}
               doctorEmail={doctorEmail}
+              authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
               onAdded={loadFicha}
             />
           )}
@@ -484,11 +486,13 @@ function FichaEntries({
   entries,
   patient,
   doctorEmail,
+  authorized,
   onAdded,
 }: {
   entries: FichaEntry[];
   patient: PatientSummary;
   doctorEmail: string;
+  authorized: boolean;
   onAdded: () => void;
 }) {
   const [kind,    setKind]    = useState<typeof FICHA_KINDS[number]>('Condition');
@@ -551,13 +555,17 @@ function FichaEntries({
         {error && <p className="text-xs text-rose-600">{error}</p>}
         {result && <p className="text-xs text-emerald-600">{result}</p>}
         <div className="flex justify-end">
-          <button type="submit" disabled={saving || !summary.trim() || !patient.patient_email}
+          <button type="submit" disabled={saving || !summary.trim() || !patient.patient_email || !authorized}
             className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40">
             {saving ? 'Anclando…' : 'Agregar entrada'}
           </button>
         </div>
-        {!patient.patient_email && (
+        {!patient.patient_email ? (
           <p className="text-[11px] text-amber-600">Este paciente no tiene email — no se puede anclar su ficha.</p>
+        ) : !authorized && (
+          <p className="text-[11px] text-amber-600">
+            Esperando autorización del paciente — cuando inicie la consulta y te dé acceso, podrás anclar su ficha.
+          </p>
         )}
       </form>
 
