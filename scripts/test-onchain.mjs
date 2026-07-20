@@ -96,5 +96,15 @@ console.log("\n\x1b[1mClinicalRecord (ficha)\x1b[0m");
   check("médico demo tiene write access (grant)", access.value === true, `has_write_access=${access.value}`);
 }
 
+// ── DocumentSoulbound (licencias / documentos médicos) ─────────────────────
+const DOC = process.env.DOCUMENT_SOULBOUND_ID;
+if (DOC) {
+  console.log("\n\x1b[1mDocumentSoulbound (licencias)\x1b[0m");
+  const doc = await read(DOC, "get_document", [nativeToScVal(1n, { type: "u64" })]);
+  // A minted document #1 exists → struct returned; if none yet, NotFound error.
+  const exists = doc.value && typeof doc.value === "object";
+  check("hay al menos un documento on-chain (#1)", exists, exists ? `type=${doc.value.doc_type?.tag ?? doc.value.doc_type}` : (doc.error ?? "vacío"));
+}
+
 console.log(`\n  \x1b[1m${pass} PASS · ${fail} FAIL\x1b[0m\n`);
 process.exit(fail ? 1 : 0);

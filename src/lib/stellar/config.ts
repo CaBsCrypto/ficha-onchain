@@ -36,7 +36,9 @@ export const CONTRACT_IDS = {
    * Phase 2 — document-soulbound contract for medical certs, professional
    * licenses, and mental health certificates. Set env var when deployed.
    */
-  documentSoulbound: process.env.DOCUMENT_SOULBOUND_ID as string | undefined,
+  documentSoulbound:
+    process.env.DOCUMENT_SOULBOUND_ID ??
+    "CBNX6WYTQUWTKKJSDLKARXQHONUW6H435CSZ4VA6O4U7TGI5E2IVCMON",
   /**
    * Patient-owned clinical record (the on-chain ficha). One contract PER
    * patient — the owner is fixed at deploy — so this is not a single global ID
