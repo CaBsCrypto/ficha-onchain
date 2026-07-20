@@ -68,6 +68,7 @@ interface RecetaForm {
   patientRut:    string;
   patientSex:    'MASCULINO' | 'FEMENINO' | 'NO_ESPECIFICADO';
   patientDob:    string;   // YYYY-MM-DD
+  patientAddress: string;  // domicilio — required by Decreto 41
   // Prescriptor
   doctorName:    string;
   doctorRut:     string;
@@ -93,6 +94,7 @@ const EMPTY_FORM: RecetaForm = {
   patientRut:      '',
   patientSex:      'NO_ESPECIFICADO',
   patientDob:      '',
+  patientAddress:  '',
   doctorName:      '',
   doctorRut:       '',
   doctorSpecialty: '',
@@ -187,7 +189,7 @@ function NuevaRecetaModal({
     setError('');
     try {
       const patient = form.patientWallet.startsWith('G') ? form.patientWallet : (form.patientEmail || form.patientName);
-      const res = await fetch('/api/mint', {
+      const res = await authedFetch('/api/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,6 +200,7 @@ function NuevaRecetaModal({
           patientDocNumber:  form.patientRut,
           patientSex:        form.patientSex,
           patientBirthDate:  form.patientDob,
+          patientAddress:    form.patientAddress,
           patientEmail:      form.patientEmail || undefined,
           healthSystem:      'FONASA',
           // Prescriber
@@ -354,6 +357,15 @@ function NuevaRecetaModal({
                 />
               </FormField>
             </div>
+            <FormField label="Domicilio del paciente">
+              <input
+                type="text"
+                value={form.patientAddress}
+                onChange={(e) => set('patientAddress', e.target.value)}
+                placeholder="Calle 123, Comuna, Ciudad"
+                className={inputCls}
+              />
+            </FormField>
             <FormField label="Wallet Stellar (G…) — se autocompleta si el paciente usa TrustLeaf">
               <div className="relative">
                 <input

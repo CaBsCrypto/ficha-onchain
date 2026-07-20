@@ -202,7 +202,7 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
         ? Math.floor(new Date(fechaFin + 'T23:59:59').getTime() / 1000)
         : 0;
 
-      const mintResponse = await fetch('/api/documents/mint', {
+      const mintResponse = await authedFetch('/api/documents/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
