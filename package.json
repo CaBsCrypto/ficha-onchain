@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test:flow": "node scripts/test-flow.mjs",
-    "test:onchain": "node scripts/test-onchain.mjs"
+    "test:onchain": "node scripts/test-onchain.mjs",
+    "test:phases": "node scripts/phases/run.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

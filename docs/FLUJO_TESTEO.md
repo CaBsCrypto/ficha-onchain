@@ -129,8 +129,11 @@ falta la **UI/registro** del consentimiento para que se vea en cámara.
 
 ## Cómo se valida hoy (automático)
 
-- `npm run test:flow` — recorre HTTP: médicos → disponibilidad → slots → reserva → Meet → ficha on-chain. **10/10**
-- `npm run test:onchain` — lee los contratos: registry, recetas, ficha, documentos. **10/10**
+- **`npm run test:phases`** — un script por fase (`scripts/phases/pN-*.mjs`), cada uno
+  autocontenido (siembra prerrequisitos, valida, limpia). Corré una sola con
+  `node scripts/phases/run.mjs 5`. Cubre las fases 1–8. **23/23**
+- `npm run test:flow` — recorrido HTTP integrado de punta a punta. **13/13**
+- `npm run test:onchain` — lee los contratos: registry, recetas, ficha, documentos. **11/11**
 
-Lo que estos scripts **no** cubren (requiere login real del owner): activar receta,
-consentimiento del paciente, y el recorrido visual en el navegador.
+Los pasos marcados **MANUAL** en el harness (activar receta, editar perfil) requieren
+login real del owner y se prueban en el navegador; el recorrido visual también.
