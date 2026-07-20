@@ -877,6 +877,18 @@ function MockRxCard({ rx }: { rx: MockRx }) {
 // ---------------------------------------------------------------------------
 // Tab: Mi Ficha Médica (mejorada)
 // ---------------------------------------------------------------------------
+interface ClinicalDoc {
+  id: number;
+  category: string;
+  title: string;
+  file_name: string | null;
+  mime_type: string | null;
+  content_hash: string;
+  tx_hash: string | null;
+  mode: string;
+  created_at: string;
+}
+
 function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const privyEmail   = usePrivyEmail();
   const displayName  = privyEmail ?? (mock ? "Mi Cuenta" : "Tu perfil");
@@ -884,8 +896,17 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
 
   const [record,    setRecord]    = useState<HealthRecord | null>(null);
   const [entries,   setEntries]   = useState<ClinicalEntry[]>([]);
+  const [docs,      setDocs]      = useState<ClinicalDoc[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [showEdit,  setShowEdit]  = useState(false);
+
+  async function viewDoc(id: number) {
+    const res = await authedFetch(`/api/ficha/document/${id}`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  }
 
   useEffect(() => {
     if (!privyEmail) { setLoading(false); return; }
@@ -900,6 +921,11 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       .then(r => r.json() as Promise<{ entries?: ClinicalEntry[] }>)
       .then(j => setEntries(j.entries ?? []))
       .catch(() => setEntries([]));
+    // Exam / lab documents attached by the patient's doctors.
+    authedFetch(`/api/ficha/document?patientEmail=${encodeURIComponent(privyEmail)}`)
+      .then(r => r.ok ? r.json() : { documents: [] })
+      .then((j: { documents?: ClinicalDoc[] }) => setDocs(j.documents ?? []))
+      .catch(() => setDocs([]));
   }, [privyEmail]);
 
   // Fallback to an empty record when there's no real data yet.
@@ -1008,6 +1034,61 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
                 <p className="mt-1 truncate font-mono text-[10px] text-muted/70" title={en.content_hash}>
                   hash: {en.content_hash}
                 </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Exámenes y laboratorios ── */}
+      {docs.length > 0 && (
+        <Card className="p-0">
+          <SectionHeader
+            icon={<ClipboardCheckIcon className="h-5 w-5 text-clinical" />}
+            title="Exámenes y laboratorios"
+            bg="bg-clinical-50"
+          />
+          <div className="divide-y divide-slate-100">
+            {docs.map((doc) => (
+              <div key={doc.id} className="px-6 py-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                        {doc.category}
+                      </span>
+                      <p className="text-sm font-semibold text-ink">{doc.title}</p>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-muted">
+                        {new Date(doc.created_at).toLocaleDateString('es-CL', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <Badge tone={doc.mode === 'onchain' ? 'clinical' : 'muted'}>
+                        {doc.mode === 'onchain' ? '⚡ On-chain' : '📋 Demo'}
+                      </Badge>
+                      {doc.tx_hash && (
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${doc.tx_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-[10px] text-clinical hover:underline"
+                        >
+                          tx {truncateHash(doc.tx_hash, 4, 4)}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => void viewDoc(doc.id)}
+                    className="shrink-0 rounded-lg bg-clinical/10 px-3 py-1.5 text-xs font-semibold text-clinical transition-colors hover:bg-clinical/20"
+                  >
+                    Ver
+                  </button>
+                </div>
               </div>
             ))}
           </div>
