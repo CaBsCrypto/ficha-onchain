@@ -65,14 +65,18 @@ export async function requireUser(request: Request): Promise<AuthedUser | null> 
     const claims = await privy.verifyAuthToken(token);
     const user = await privy.getUser(claims.userId);
 
-    const emailAccount = (user.linkedAccounts ?? []).find((a) => a.type === "email") as
-      | { address?: string }
-      | undefined;
+    // Resolve the user's email across login methods. Email-OTP accounts store it
+    // under `.address`; OAuth accounts (Google, etc.) under `.email`. Looking
+    // only at type==="email" rejected every Google-only user once enforcement
+    // was on, because their linkedAccounts hold a `google_oauth` account instead.
+    const accounts = (user.linkedAccounts ?? []) as Array<{
+      type?: string; address?: string; email?: string;
+    }>;
+    const emailAccount = accounts.find((a) => a.type === "email" && a.address);
+    const oauthEmail = accounts.find((a) => a.email)?.email;
+    const email = (emailAccount?.address ?? oauthEmail ?? null)?.trim().toLowerCase() ?? null;
 
-    return {
-      userId: claims.userId,
-      email: emailAccount?.address?.trim().toLowerCase() ?? null,
-    };
+    return { userId: claims.userId, email };
   } catch (err) {
     // Includes an unreachable Privy. Failing closed is deliberate: a network
     // problem must not read as "this request is fine".

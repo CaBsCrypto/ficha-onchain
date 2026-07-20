@@ -115,20 +115,46 @@ async function signInvokeAndSubmit(args: {
 }): Promise<SubmitResult> {
   const signer = Keypair.fromSecret(args.signerSecret);
   const contract = new Contract(args.contractId);
-  const op = contract.call(args.method, ...args.args);
 
-  const source = await server.getAccount(signer.publicKey());
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(op)
-    .setTimeout(60)
-    .build();
+  // One full build→prepare→sign→submit cycle. The account is fetched HERE (not
+  // once outside) so each retry picks up a fresh sequence number.
+  const attempt = async (): Promise<SubmitResult> => {
+    const op = contract.call(args.method, ...args.args);
+    const source = await server.getAccount(signer.publicKey());
+    const tx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(op)
+      .setTimeout(60)
+      .build();
 
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(signer);
-  return feeBumpAndSend(prepared.toXDR());
+    const prepared = await server.prepareTransaction(tx);
+    prepared.sign(signer);
+    return feeBumpAndSend(prepared.toXDR());
+  };
+
+  // Back-to-back invokes from the same demo signer collide on the account
+  // sequence (txBadSeq): the prepare/submit throws or returns a non-SUCCESS
+  // status, and without a retry the caller silently degrades to "simulated".
+  // Re-fetch the account (fresh sequence) and retry a few times before giving up.
+  const MAX_ATTEMPTS = 3;
+  let lastResult: SubmitResult | undefined;
+  let lastError: unknown;
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    try {
+      const res = await attempt();
+      if (res.status === "SUCCESS") return res;
+      lastResult = res;
+    } catch (err) {
+      lastError = err;
+    }
+    if (i < MAX_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, 1500));
+  }
+  // Persistent failure: hand back the last real status so the caller can degrade
+  // with an accurate reason, or rethrow if we never got a result at all.
+  if (lastResult) return lastResult;
+  throw lastError;
 }
 
 /**

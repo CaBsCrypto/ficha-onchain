@@ -98,6 +98,10 @@ export async function POST(request: Request) {
       reason = "sin firmante del paciente (DEMO_PATIENT_SECRET/RELAYER_SECRET)";
     }
 
+    if (mode === "simulated") {
+      console.warn(`[ficha/grant] degraded to simulated — reason: ${reason ?? "unknown"}`);
+    }
+
     // Persist the consent + start the consultation, even when simulated, so the
     // demo flow (and both portals' "acceso otorgado") stay consistent.
     const [updated] = await sql`
