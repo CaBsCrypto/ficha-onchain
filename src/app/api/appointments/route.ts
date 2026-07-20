@@ -63,13 +63,15 @@ export async function GET(request: Request) {
 
     const rows = doctorEmail
       ? await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link, created_at
+          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link,
+                 started_at, consent_tx, consent_mode, consent_wallet, created_at
           FROM appointments
           WHERE doctor_email = ${doctorEmail}
           ORDER BY date ASC, time_slot ASC
         `
       : await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link, created_at
+          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link,
+                 started_at, consent_tx, consent_mode, consent_wallet, created_at
           FROM appointments
           WHERE patient_email = ${patientEmail}
           ORDER BY date ASC, time_slot ASC

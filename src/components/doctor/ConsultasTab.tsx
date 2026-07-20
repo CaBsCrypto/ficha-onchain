@@ -17,8 +17,11 @@ interface Appointment {
   type: ConsultationType;
   motivo: string | null;
   notes: string | null;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   meet_link: string | null;
+  consent_mode?: string | null;
+  consent_tx?: string | null;
+  consent_wallet?: string | null;
   created_at: string;
 }
 
@@ -46,9 +49,10 @@ const EMPTY_FORM: NewConsultaForm = {
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Appointment['status'] }) {
   const map: Record<Appointment['status'], { label: string; cls: string }> = {
-    scheduled:  { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700' },
-    completed:  { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700' },
-    cancelled:  { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600' },
+    scheduled:   { label: 'Agendada',   cls: 'bg-sky-50 text-sky-700' },
+    in_progress: { label: 'En curso',   cls: 'bg-amber-50 text-amber-700' },
+    completed:   { label: 'Completada', cls: 'bg-emerald-50 text-emerald-700' },
+    cancelled:   { label: 'Cancelada',  cls: 'bg-rose-50 text-rose-600' },
   };
   const { label, cls } = map[status] ?? map.scheduled;
   return <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
@@ -325,8 +329,20 @@ export function ConsultasTab() {
                         </span>
                         {/* Status badge */}
                         <StatusBadge status={a.status} />
-                        {/* Join video call — telemedicine only */}
-                        {a.type === 'Telemedicina' && a.meet_link && a.status === 'scheduled' && (
+                        {/* Ficha authorized — the patient granted write access */}
+                        {(a.consent_mode || a.status === 'in_progress') && (
+                          <span
+                            title="El paciente autorizó su ficha on-chain"
+                            className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" /><path d="M9 12l2 2 4-4" />
+                            </svg>
+                            Ficha autorizada
+                          </span>
+                        )}
+                        {/* Join video call — telemedicine, scheduled or in progress */}
+                        {a.type === 'Telemedicina' && a.meet_link && (a.status === 'scheduled' || a.status === 'in_progress') && (
                           <a
                             href={a.meet_link}
                             target="_blank"
@@ -342,7 +358,7 @@ export function ConsultasTab() {
                         )}
                         {/* Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {a.status === 'scheduled' && (
+                          {(a.status === 'scheduled' || a.status === 'in_progress') && (
                             <button
                               onClick={() => void updateStatus(a.id, 'completed')}
                               disabled={updatingId === a.id}
@@ -354,7 +370,7 @@ export function ConsultasTab() {
                               </svg>
                             </button>
                           )}
-                          {a.status === 'scheduled' && (
+                          {(a.status === 'scheduled' || a.status === 'in_progress') && (
                             <button
                               onClick={() => void updateStatus(a.id, 'cancelled')}
                               disabled={updatingId === a.id}

@@ -42,6 +42,7 @@ interface DBAppointment {
   motivo: string | null;
   notes: string | null;
   status: string;
+  consent_mode?: string | null;
   created_at: string;
 }
 
@@ -248,11 +249,14 @@ function PatientDetailModal({
                     <p className="text-sm font-medium text-slate-700">{a.date} · {a.time_slot}</p>
                     <span className={cn(
                       'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-                      a.status === 'scheduled'  ? 'bg-sky-50 text-sky-700'
+                      a.status === 'scheduled'   ? 'bg-sky-50 text-sky-700'
+                      : a.status === 'in_progress' ? 'bg-amber-50 text-amber-700'
                       : a.status === 'completed' ? 'bg-emerald-50 text-emerald-700'
                       : 'bg-slate-100 text-slate-500',
                     )}>
-                      {a.status === 'scheduled' ? 'Agendada' : a.status === 'completed' ? 'Completada' : 'Cancelada'}
+                      {a.status === 'scheduled' ? 'Agendada'
+                        : a.status === 'in_progress' ? 'En curso'
+                        : a.status === 'completed' ? 'Completada' : 'Cancelada'}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{a.type}{a.motivo ? ` · ${a.motivo}` : ''}</p>
@@ -284,6 +288,7 @@ function PatientDetailModal({
               entries={ficha}
               patient={patient}
               doctorEmail={doctorEmail}
+              authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
               onAdded={loadFicha}
             />
           )}
@@ -484,11 +489,13 @@ function FichaEntries({
   entries,
   patient,
   doctorEmail,
+  authorized,
   onAdded,
 }: {
   entries: FichaEntry[];
   patient: PatientSummary;
   doctorEmail: string;
+  authorized: boolean;
   onAdded: () => void;
 }) {
   const [kind,    setKind]    = useState<typeof FICHA_KINDS[number]>('Condition');
@@ -551,13 +558,17 @@ function FichaEntries({
         {error && <p className="text-xs text-rose-600">{error}</p>}
         {result && <p className="text-xs text-emerald-600">{result}</p>}
         <div className="flex justify-end">
-          <button type="submit" disabled={saving || !summary.trim() || !patient.patient_email}
+          <button type="submit" disabled={saving || !summary.trim() || !patient.patient_email || !authorized}
             className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40">
             {saving ? 'Anclando…' : 'Agregar entrada'}
           </button>
         </div>
-        {!patient.patient_email && (
+        {!patient.patient_email ? (
           <p className="text-[11px] text-amber-600">Este paciente no tiene email — no se puede anclar su ficha.</p>
+        ) : !authorized && (
+          <p className="text-[11px] text-amber-600">
+            Esperando autorización del paciente — cuando inicie la consulta y te dé acceso, podrás anclar su ficha.
+          </p>
         )}
       </form>
 
