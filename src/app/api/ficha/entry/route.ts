@@ -20,7 +20,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
-import { appendClinicalEntry } from "@/lib/stellar/server";
+import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { withAuth } from "@/lib/auth/withAuth";
 
 export const runtime = "nodejs";
@@ -63,9 +63,7 @@ async function handleAppend(request: Request) {
   const contentHash = createHash("sha256").update(payload).digest(); // Buffer(32)
 
   // Attempt a real on-chain append when we have a signer.
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const doctorSecret = getDemoDoctorSecret();
 
   let mode: "onchain" | "simulated" = "simulated";
   let txHash: string | null = null;

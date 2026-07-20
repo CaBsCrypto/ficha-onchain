@@ -13,6 +13,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDoctor, isDoctorAuthorized } from "@/lib/stellar/client";
+import { isStellarAddress } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "wallet is required" }, { status: 400 });
   }
 
-  const validG = /^G[A-Z2-7]{55}$/.test(wallet);
+  const validG = isStellarAddress(wallet);
   if (!validG) {
     return NextResponse.json(
       { authorized: false, source: "invalid", doctor: null },

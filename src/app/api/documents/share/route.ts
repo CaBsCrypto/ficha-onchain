@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { getDocument } from "@/lib/stellar/documents";
+import { isStellarAddress } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   if (!docId || isNaN(Number(docId))) {
     return NextResponse.json({ error: "docId must be a numeric string" }, { status: 400 });
   }
-  if (!recipient || !/^G[A-Z2-7]{55}$/.test(recipient)) {
+  if (!recipient || !isStellarAddress(recipient)) {
     return NextResponse.json(
       { error: "recipient must be a valid Stellar G-address" },
       { status: 400 },

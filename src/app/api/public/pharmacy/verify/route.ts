@@ -18,11 +18,10 @@
  */
 import { NextResponse } from "next/server";
 import { isPharmacyAuthorized } from "@/lib/stellar/pharmacy";
+import { isStellarAddress } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const G_ADDRESS = /^G[A-Z2-7]{55}$/;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!G_ADDRESS.test(wallet)) {
+  if (!isStellarAddress(wallet)) {
     return NextResponse.json(
       { error: "Invalid wallet address (expected a Stellar G-address)" },
       { status: 400 },

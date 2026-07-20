@@ -16,7 +16,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { server, getPrescription } from "@/lib/stellar/client";
-import { feeBumpAndSend } from "@/lib/stellar/server";
+import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { withAuth } from "@/lib/auth/withAuth";
 
 export const runtime = "nodejs";
@@ -34,9 +34,7 @@ async function handleRevoke(request: Request) {
     return NextResponse.json({ error: "rxId is required" }, { status: 400 });
   }
 
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const doctorSecret = getDemoDoctorSecret();
 
   if (doctorSecret) {
     try {

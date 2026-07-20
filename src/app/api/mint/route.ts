@@ -31,9 +31,9 @@ import {
   BASE_FEE,
   xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
+import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { server, isDoctorAuthorized } from "@/lib/stellar/client";
-import { feeBumpAndSend } from "@/lib/stellar/server";
+import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
 import { withAuth } from "@/lib/auth/withAuth";
@@ -167,10 +167,8 @@ async function handleMint(request: Request) {
   const payload = canonicalize(bundle);
   const rxHash = createHash("sha256").update(payload).digest(); // Buffer(32)
 
-  const patientIsG = /^G[A-Z2-7]{55}$/.test(patient);
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const patientIsG = isStellarAddress(patient);
+  const doctorSecret = getDemoDoctorSecret();
 
   // 2. Attempt a real on-chain mint when we have a signer + a valid patient addr.
   if (doctorSecret && patientIsG) {
