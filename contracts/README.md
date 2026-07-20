@@ -1,9 +1,14 @@
 # TrustLeaf — Soroban Contracts
 
-Smart contracts powering verifiable medical records on **Stellar Soroban**.
+Smart contracts powering patient-owned, verifiable medical records on
+**Stellar Soroban**.
 
-These are **scaffolds** — function signatures, storage layout and documented
-intent. Business logic bodies are marked `TODO` and will land in Phase 0/1.
+`clinical-record`, `prescription-soulbound`, `document-soulbound` and
+`doctor-registry` are **implemented and deployed to testnet**. For the full
+reference — every method, deployed contract ID, and what is stored on-chain —
+see **[../docs/CONTRACTS.md](../docs/CONTRACTS.md)**. The functional spec lives
+in [../docs/contracts-spec.md](../docs/contracts-spec.md). The pharmacy contracts
+(`dispensary-registry`, `dispense-record`) remain scaffolds pending deployment.
 
 ## Architecture
 
