@@ -15,6 +15,7 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,14 +57,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   // Simple admin endpoint — list all signups.
-  // Protect with a secret token: GET /api/waitlist?token=<WAITLIST_ADMIN_TOKEN>
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-
-  if (!adminToken || token !== adminToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   try {
     const sql = getDb();

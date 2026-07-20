@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn } from "@/lib/utils";
 
 // ── Auth context ──────────────────────────────────────────────────────────────
-interface AdminCtx { token: string; logout: () => void; }
-const AdminContext = createContext<AdminCtx>({ token: "", logout: () => {} });
+// The admin is a real Privy user whose email is on the ADMIN_EMAILS allowlist —
+// same identity model as doctors and patients. `useAdmin()` exposes the admin's
+// email (for display / accountability) and a logout.
+interface AdminCtx { email: string; logout: () => void; }
+const AdminContext = createContext<AdminCtx>({ email: "", logout: () => {} });
 export function useAdmin() { return useContext(AdminContext); }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -21,26 +26,12 @@ function Icon({ d, className }: { d: string | string[]; className?: string }) {
   );
 }
 
-// ── Login screen ──────────────────────────────────────────────────────────────
-function LoginScreen({ onAuth }: { onAuth: (t: string) => void }) {
-  const [token, setToken] = useState("");
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true); setError(false);
-    const res = await fetch(`/api/admin/stats?token=${encodeURIComponent(token)}`);
-    setLoading(false);
-    if (res.ok) { onAuth(token); }
-    else { setError(true); }
-  }
-
+// ── Shared dark shell for the pre-panel screens ────────────────────────────────
+function Gate({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex items-center justify-center"
       style={{ background: "linear-gradient(135deg, #04111f 0%, #0c2440 100%)" }}>
       <div className="w-full max-w-sm px-4">
-        {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-white"
             style={{ background: "linear-gradient(135deg,#0284c7,#0ea5e9)", boxShadow: "0 0 32px rgba(14,165,233,0.4)" }}>
@@ -52,41 +43,69 @@ function LoginScreen({ onAuth }: { onAuth: (t: string) => void }) {
           <h1 className="text-xl font-semibold text-white">TrustLeaf Admin</h1>
           <p className="mt-1 text-sm text-white/40">Panel de administración</p>
         </div>
-
         <div className="overflow-hidden rounded-2xl"
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(14,165,233,0.15)" }}>
           <div className="h-px w-full" style={{ background: "linear-gradient(90deg,transparent,#0ea5e9,transparent)" }} />
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wider">
-                Token de acceso
-              </label>
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => { setToken(e.target.value); setError(false); }}
-                placeholder="••••••••••••••••"
-                autoFocus
-                className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition"
-                style={{
-                  background: "rgba(14,165,233,0.07)",
-                  border: error ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(14,165,233,0.2)",
-                }}
-              />
-              {error && <p className="mt-1.5 text-xs text-rose-400">Token incorrecto</p>}
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !token}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg,#0284c7,#0ea5e9)", boxShadow: "0 0 20px rgba(14,165,233,0.3)" }}
-            >
-              {loading ? "Verificando…" : "Entrar al panel"}
-            </button>
-          </form>
+          <div className="p-6">{children}</div>
         </div>
       </div>
     </div>
+  );
+}
+
+const primaryBtn =
+  "w-full rounded-xl py-3 text-sm font-semibold text-white transition disabled:opacity-40";
+const primaryBtnStyle = {
+  background: "linear-gradient(135deg,#0284c7,#0ea5e9)",
+  boxShadow: "0 0 20px rgba(14,165,233,0.3)",
+} as const;
+
+// ── Login (Privy) ──────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  return (
+    <Gate>
+      <p className="mb-4 text-sm text-white/60">
+        Ingresa con tu cuenta. Solo los administradores autorizados pueden entrar al panel.
+      </p>
+      <button onClick={onLogin} className={primaryBtn} style={primaryBtnStyle}>
+        Entrar con mi cuenta
+      </button>
+    </Gate>
+  );
+}
+
+// ── Access denied (logged in, not on the allowlist) ────────────────────────────
+function DeniedScreen({ onLogout }: { onLogout: () => void }) {
+  return (
+    <Gate>
+      <div className="space-y-4 text-center">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-rose-500/15">
+          <Icon d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            className="h-5 w-5 text-rose-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">Acceso denegado</p>
+          <p className="mt-1 text-xs text-white/50">
+            Tu cuenta no está autorizada como administrador.
+          </p>
+        </div>
+        <button onClick={onLogout}
+          className="w-full rounded-xl border border-white/15 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/5">
+          Cerrar sesión
+        </button>
+      </div>
+    </Gate>
+  );
+}
+
+function Loading() {
+  return (
+    <Gate>
+      <div className="flex items-center justify-center gap-3 py-2 text-sm text-white/50">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+        Verificando acceso…
+      </div>
+    </Gate>
   );
 }
 
@@ -100,7 +119,7 @@ const NAV = [
   { href: "/admin/doctors", label: "Médicos",    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M12 12c1.1.5 2 1.7 2 3M12 12c-1.1.5-2 1.7-2 3m2-3v5" },
 ];
 
-function AdminSidebar({ token, logout }: { token: string; logout: () => void }) {
+function AdminSidebar({ email, logout }: { email: string; logout: () => void }) {
   const pathname = usePathname();
   return (
     <aside className="flex h-screen w-56 flex-col"
@@ -143,6 +162,11 @@ function AdminSidebar({ token, logout }: { token: string; logout: () => void }) 
 
       {/* Footer */}
       <div className="px-3 py-4 border-t" style={{ borderColor: "rgba(14,165,233,0.1)" }}>
+        {email && (
+          <p className="px-3 pb-2 text-[10px] text-white/30 truncate" title={email}>
+            {email}
+          </p>
+        )}
         <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/30 hover:text-white/60 transition">
           <Icon d="M10 19l-7-7m0 0l7-7m-7 7h18" className="h-3.5 w-3.5" />
           Volver al sitio
@@ -158,11 +182,11 @@ function AdminSidebar({ token, logout }: { token: string; logout: () => void }) 
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-function AdminShell({ token, logout, children }: { token: string; logout: () => void; children: React.ReactNode }) {
+function AdminShell({ email, logout, children }: { email: string; logout: () => void; children: React.ReactNode }) {
   return (
-    <AdminContext.Provider value={{ token, logout }}>
+    <AdminContext.Provider value={{ email, logout }}>
       <div className="flex h-screen overflow-hidden bg-slate-50">
-        <AdminSidebar token={token} logout={logout} />
+        <AdminSidebar email={email} logout={logout} />
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
@@ -172,25 +196,38 @@ function AdminShell({ token, logout, children }: { token: string; logout: () => 
 }
 
 // ── Root layout ───────────────────────────────────────────────────────────────
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+type Phase = "checking" | "anon" | "admin" | "denied";
 
-  // Persist token in sessionStorage
-  useEffect(() => {
-    const saved = sessionStorage.getItem("admin_token");
-    if (saved) setToken(saved);
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { ready, authenticated, login, logout } = usePrivy();
+  const [phase, setPhase] = useState<Phase>("checking");
+  const [email, setEmail] = useState("");
+
+  // Ask the server whether the logged-in Privy user is on the admin allowlist.
+  const verify = useCallback(async () => {
+    try {
+      const res = await authedFetch("/api/admin/whoami");
+      if (res.ok) {
+        const j = (await res.json()) as { email?: string };
+        setEmail(j.email ?? "");
+        setPhase("admin");
+      } else {
+        setPhase("denied");
+      }
+    } catch {
+      setPhase("denied");
+    }
   }, []);
 
-  function handleAuth(t: string) {
-    sessionStorage.setItem("admin_token", t);
-    setToken(t);
-  }
+  useEffect(() => {
+    if (!ready) return;
+    if (!authenticated) { setPhase("anon"); return; }
+    setPhase("checking");
+    void verify();
+  }, [ready, authenticated, verify]);
 
-  function handleLogout() {
-    sessionStorage.removeItem("admin_token");
-    setToken(null);
-  }
-
-  if (!token) return <LoginScreen onAuth={handleAuth} />;
-  return <AdminShell token={token} logout={handleLogout}>{children}</AdminShell>;
+  if (!ready || phase === "checking") return <Loading />;
+  if (phase === "anon") return <LoginScreen onLogin={() => void login()} />;
+  if (phase === "denied") return <DeniedScreen onLogout={() => void logout()} />;
+  return <AdminShell email={email} logout={() => void logout()}>{children}</AdminShell>;
 }

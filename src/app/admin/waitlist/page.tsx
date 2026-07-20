@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAdmin } from "../layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 interface Signup { email: string; role: string | null; created_at: string; }
 
@@ -37,14 +37,13 @@ function InitialAvatar({ email }: { email: string }) {
 }
 
 export default function WaitlistPage() {
-  const { token } = useAdmin();
   const [signups, setSignups] = useState<Signup[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
-    const res = await fetch(`/api/waitlist?token=${encodeURIComponent(token)}`);
+    const res = await authedFetch(`/api/waitlist`);
     if (res.ok) {
       const data = (await res.json()) as { signups: Signup[] };
       setSignups(data.signups);
@@ -52,7 +51,7 @@ export default function WaitlistPage() {
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, [token]);
+  useEffect(() => { void load(); }, []);
 
   const filtered = signups.filter((s) =>
     s.email.toLowerCase().includes(search.toLowerCase())

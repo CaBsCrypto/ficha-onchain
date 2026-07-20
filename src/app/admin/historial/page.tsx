@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useAdmin } from "../layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ActivityEvent {
@@ -39,7 +39,6 @@ function trunc(s?: string) {
 }
 
 export default function AdminHistorialPage() {
-  const { token } = useAdmin();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -48,13 +47,13 @@ export default function AdminHistorialPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/activity?token=${encodeURIComponent(token)}`);
+      const res = await authedFetch(`/api/admin/activity`);
       const data = (await res.json()) as { events?: ActivityEvent[]; generatedAt?: string };
       setEvents(data.events ?? []);
       setGeneratedAt(data.generatedAt ?? "");
     } catch { /* ignore */ }
     setLoading(false);
-  }, [token]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 

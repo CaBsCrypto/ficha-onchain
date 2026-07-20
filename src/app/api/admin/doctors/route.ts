@@ -6,23 +6,15 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function unauthorized() {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
-
-function checkToken(token: string | null) {
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  return adminToken && token === adminToken;
-}
-
 // ── GET: list all doctors ─────────────────────────────────────────────────────
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  if (!checkToken(url.searchParams.get("token"))) return unauthorized();
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   try {
     const sql = getDb();
@@ -40,11 +32,13 @@ export async function GET(request: Request) {
 
 // ── POST: create doctor ───────────────────────────────────────────────────────
 export async function POST(request: Request) {
-  let body: { token?: unknown; name?: unknown; email?: unknown; specialty?: unknown; licenseNum?: unknown; rut?: unknown };
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { name?: unknown; email?: unknown; specialty?: unknown; licenseNum?: unknown; rut?: unknown };
   try { body = (await request.json()) as typeof body; } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!checkToken(String(body.token ?? ""))) return unauthorized();
 
   const name  = String(body.name  ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
@@ -73,11 +67,13 @@ export async function POST(request: Request) {
 
 // ── PATCH: update / block ─────────────────────────────────────────────────────
 export async function PATCH(request: Request) {
-  let body: { token?: unknown; id?: unknown; name?: unknown; email?: unknown; specialty?: unknown; licenseNum?: unknown; rut?: unknown; status?: unknown };
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { id?: unknown; name?: unknown; email?: unknown; specialty?: unknown; licenseNum?: unknown; rut?: unknown; status?: unknown };
   try { body = (await request.json()) as typeof body; } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!checkToken(String(body.token ?? ""))) return unauthorized();
 
   const id = Number(body.id);
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -99,11 +95,13 @@ export async function PATCH(request: Request) {
 
 // ── DELETE: remove doctor ─────────────────────────────────────────────────────
 export async function DELETE(request: Request) {
-  let body: { token?: unknown; id?: unknown };
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { id?: unknown };
   try { body = (await request.json()) as typeof body; } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!checkToken(String(body.token ?? ""))) return unauthorized();
 
   const id = Number(body.id);
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });

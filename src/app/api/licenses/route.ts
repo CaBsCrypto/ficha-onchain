@@ -30,6 +30,7 @@
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,13 +186,12 @@ export async function PATCH(request: Request) {
 
 // ── DELETE (admin) ────────────────────────────────────────────────────────────
 export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id    = searchParams.get("id");
-  const token = searchParams.get("token");
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
-  if (token !== process.env.WAITLIST_ADMIN_TOKEN) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
   if (!id || isNaN(Number(id))) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
   }

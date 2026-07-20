@@ -4,17 +4,14 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || token !== adminToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   try {
     const sql = getDb();
@@ -65,13 +62,13 @@ export async function POST(request: Request) {
  * Body: { token, privyId, email?, wallet? }
  */
 export async function PATCH(request: Request) {
-  let body: { token?: unknown; privyId?: unknown; email?: unknown; wallet?: unknown };
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { privyId?: unknown; email?: unknown; wallet?: unknown };
   try { body = (await request.json()) as typeof body; } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || body.token !== adminToken)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const privyId = String(body.privyId ?? "").trim();
   if (!privyId) return NextResponse.json({ error: "privyId required" }, { status: 400 });
@@ -98,13 +95,13 @@ export async function PATCH(request: Request) {
  * Body: { token, privyId }
  */
 export async function DELETE(request: Request) {
-  let body: { token?: unknown; privyId?: unknown };
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { privyId?: unknown };
   try { body = (await request.json()) as typeof body; } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || body.token !== adminToken)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const privyId = String(body.privyId ?? "").trim();
   if (!privyId) return NextResponse.json({ error: "privyId required" }, { status: 400 });

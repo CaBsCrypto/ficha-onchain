@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAdmin } from "@/app/admin/layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Doctor {
@@ -37,8 +37,7 @@ function inputCls(err?: boolean) {
 }
 
 // ── Add Doctor Modal ──────────────────────────────────────────────────────────
-function AddDoctorModal({ token, onClose, onCreated }: {
-  token: string;
+function AddDoctorModal({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: (d: Doctor) => void;
 }) {
@@ -56,10 +55,10 @@ function AddDoctorModal({ token, onClose, onCreated }: {
     if (!form.name.trim() || !form.email.trim()) { setError("Nombre y email son obligatorios"); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/doctors", {
+      const res = await authedFetch("/api/admin/doctors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, ...form }),
+        body: JSON.stringify({ ...form }),
       });
       const data = (await res.json()) as { doctor?: Doctor; error?: string };
       if (!res.ok) { setError(data.error ?? "Error al crear"); setLoading(false); return; }
@@ -122,7 +121,6 @@ function AddDoctorModal({ token, onClose, onCreated }: {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminDoctorsPage() {
-  const { token } = useAdmin();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -133,22 +131,22 @@ export default function AdminDoctorsPage() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/doctors?token=${encodeURIComponent(token)}`);
+      const res = await authedFetch(`/api/admin/doctors`);
       const data = (await res.json()) as { doctors?: Doctor[] };
       setDoctors(data.doctors ?? []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [token]);
+  }, []);
 
   useEffect(() => { void fetchDoctors(); }, [fetchDoctors]);
 
   async function toggleStatus(doctor: Doctor) {
     const newStatus = doctor.status === "active" ? "blocked" : "active";
     setActionLoading(doctor.id);
-    await fetch("/api/admin/doctors", {
+    await authedFetch("/api/admin/doctors", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, id: doctor.id, status: newStatus }),
+      body: JSON.stringify({ id: doctor.id, status: newStatus }),
     });
     setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, status: newStatus } : d));
     setActionLoading(null);
@@ -156,10 +154,10 @@ export default function AdminDoctorsPage() {
 
   async function approveDoctor(doctor: Doctor) {
     setActionLoading(doctor.id);
-    await fetch("/api/admin/doctors", {
+    await authedFetch("/api/admin/doctors", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, id: doctor.id, status: "active" }),
+      body: JSON.stringify({ id: doctor.id, status: "active" }),
     });
     setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, status: "active" } : d));
     setActionLoading(null);
@@ -167,10 +165,10 @@ export default function AdminDoctorsPage() {
 
   async function deleteDoctor(doctor: Doctor) {
     setActionLoading(doctor.id);
-    await fetch("/api/admin/doctors", {
+    await authedFetch("/api/admin/doctors", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, id: doctor.id }),
+      body: JSON.stringify({ id: doctor.id }),
     });
     setDoctors((prev) => prev.filter((d) => d.id !== doctor.id));
     setConfirmDelete(null);
@@ -324,7 +322,6 @@ export default function AdminDoctorsPage() {
       {/* Add doctor modal */}
       {showAdd && (
         <AddDoctorModal
-          token={token}
           onClose={() => setShowAdd(false)}
           onCreated={(d) => setDoctors((prev) => [d, ...prev])}
         />
