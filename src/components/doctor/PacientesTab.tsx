@@ -249,11 +249,14 @@ function PatientDetailModal({
                     <p className="text-sm font-medium text-slate-700">{a.date} · {a.time_slot}</p>
                     <span className={cn(
                       'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-                      a.status === 'scheduled'  ? 'bg-sky-50 text-sky-700'
+                      a.status === 'scheduled'   ? 'bg-sky-50 text-sky-700'
+                      : a.status === 'in_progress' ? 'bg-amber-50 text-amber-700'
                       : a.status === 'completed' ? 'bg-emerald-50 text-emerald-700'
                       : 'bg-slate-100 text-slate-500',
                     )}>
-                      {a.status === 'scheduled' ? 'Agendada' : a.status === 'completed' ? 'Completada' : 'Cancelada'}
+                      {a.status === 'scheduled' ? 'Agendada'
+                        : a.status === 'in_progress' ? 'En curso'
+                        : a.status === 'completed' ? 'Completada' : 'Cancelada'}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{a.type}{a.motivo ? ` · ${a.motivo}` : ''}</p>

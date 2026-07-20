@@ -47,24 +47,28 @@ export async function POST(request: Request) {
 
     // The appointment must exist and belong to the resolved patient.
     const [appt] = await sql`
-      SELECT id, doctor_email, patient_email
+      SELECT id, doctor_email, patient_email, status
       FROM appointments WHERE id = ${appointmentId}`;
     if (!appt) return NextResponse.json({ error: "not_found" }, { status: 404 });
     if (String(appt.patient_email).toLowerCase() !== owner.email) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
+    // Only a scheduled consultation can be started. Without this, a cancelled or
+    // completed appointment could be resurrected to 'in_progress' and the doctor
+    // re-authorized after the fact.
+    if (appt.status !== "scheduled") {
+      return NextResponse.json(
+        { error: `la consulta no está agendada (estado: ${appt.status})` },
+        { status: 409 },
+      );
+    }
 
-    // Grantee = the doctor's wallet. It MUST be the wallet that later signs
-    // append_entry (in demo, the demo doctor wallet), or the append reverts.
-    const doctorEmail = String(appt.doctor_email).toLowerCase();
-    const rows = await sql`
-      SELECT wallet FROM registered_users
-      WHERE LOWER(email) = ${doctorEmail} AND wallet IS NOT NULL AND wallet <> ''
-      LIMIT 1`;
-    const grantee =
-      (rows[0]?.wallet as string | undefined) ??
-      process.env.NEXT_PUBLIC_DEMO_DOCTOR_WALLET ??
-      "";
+    // Grantee = the wallet that later signs append_entry. On the demo ficha,
+    // /api/ficha/entry always signs with DEMO_DOCTOR_SECRET, so the grant MUST go
+    // to that exact wallet (NEXT_PUBLIC_DEMO_DOCTOR_WALLET) or the append reverts
+    // Unauthorized. (In prod each patient has their own record and the doctor's
+    // real passkey wallet signs — a different path, not this demo endpoint.)
+    const grantee = process.env.NEXT_PUBLIC_DEMO_DOCTOR_WALLET ?? "";
     if (!G_ADDR.test(grantee)) {
       return NextResponse.json({ error: "doctor_wallet_not_found" }, { status: 404 });
     }

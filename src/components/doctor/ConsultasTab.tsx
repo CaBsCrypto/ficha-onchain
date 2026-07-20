@@ -358,7 +358,7 @@ export function ConsultasTab() {
                         )}
                         {/* Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {a.status === 'scheduled' && (
+                          {(a.status === 'scheduled' || a.status === 'in_progress') && (
                             <button
                               onClick={() => void updateStatus(a.id, 'completed')}
                               disabled={updatingId === a.id}
@@ -370,7 +370,7 @@ export function ConsultasTab() {
                               </svg>
                             </button>
                           )}
-                          {a.status === 'scheduled' && (
+                          {(a.status === 'scheduled' || a.status === 'in_progress') && (
                             <button
                               onClick={() => void updateStatus(a.id, 'cancelled')}
                               disabled={updatingId === a.id}
