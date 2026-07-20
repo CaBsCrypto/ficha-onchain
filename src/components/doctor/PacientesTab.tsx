@@ -284,13 +284,19 @@ function PatientDetailModal({
           )}
 
           {!loading && tab === 'ficha' && (
-            <FichaEntries
-              entries={ficha}
-              patient={patient}
-              doctorEmail={doctorEmail}
-              authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
-              onAdded={loadFicha}
-            />
+            <div className="space-y-4">
+              <AntecedentesEditor
+                patientEmail={patient.patient_email ?? ''}
+                authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
+              />
+              <FichaEntries
+                entries={ficha}
+                patient={patient}
+                doctorEmail={doctorEmail}
+                authorized={appts.some(a => Boolean(a.consent_mode) || a.status === 'in_progress')}
+                onAdded={loadFicha}
+              />
+            </div>
           )}
 
           {!loading && tab === 'licencias' && (
@@ -484,6 +490,125 @@ export function PacientesTab() {
 
 // ── Ficha on-chain: history + append form ──────────────────────────────────────
 const FICHA_KINDS = ['Condition', 'Observation', 'DiagnosticReport', 'Procedure', 'Note'] as const;
+
+const BLOOD_TYPES = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+/**
+ * Structured antecedentes: the treating doctor sets the patient's vitals,
+ * allergies and chronic conditions, which populate the patient's "Mi Ficha".
+ * Writes go through /api/doctor/patient-record (treating-relationship gated).
+ */
+function AntecedentesEditor({
+  patientEmail,
+  authorized,
+}: {
+  patientEmail: string;
+  authorized: boolean;
+}) {
+  const [blood, setBlood]         = useState('');
+  const [height, setHeight]       = useState('');
+  const [weight, setWeight]       = useState('');
+  const [allergies, setAllergies] = useState('');   // comma-separated
+  const [conditions, setConditions] = useState(''); // comma-separated
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [error, setError]         = useState('');
+
+  useEffect(() => {
+    if (!patientEmail) return;
+    authedFetch(`/api/doctor/patient-record?patientEmail=${encodeURIComponent(patientEmail)}`)
+      .then(r => (r.ok ? r.json() : { data: null }))
+      .then((j: { data?: {
+        blood_type?: string | null; height_cm?: string | null; weight_kg?: string | null;
+        allergies?: string[]; conditions?: { label: string }[];
+      } | null }) => {
+        const d = j.data;
+        if (!d) return;
+        setBlood(d.blood_type ?? '');
+        setHeight(d.height_cm ?? '');
+        setWeight(d.weight_kg ?? '');
+        setAllergies((d.allergies ?? []).join(', '));
+        setConditions((d.conditions ?? []).map(c => c.label).join(', '));
+      })
+      .catch(() => { /* new patient — leave blank */ });
+  }, [patientEmail]);
+
+  const bmi = (() => {
+    const h = parseFloat(height) / 100, w = parseFloat(weight);
+    return h > 0 && w > 0 ? (w / (h * h)).toFixed(1) : '—';
+  })();
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!patientEmail || !authorized) return;
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      const res = await authedFetch('/api/doctor/patient-record', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientEmail,
+          blood_type: blood || null,
+          height_cm: height || null,
+          weight_kg: weight || null,
+          allergies: allergies.split(',').map(s => s.trim()).filter(Boolean),
+          conditions: conditions.split(',').map(s => s.trim()).filter(Boolean).map(label => ({ label })),
+        }),
+      });
+      if (!res.ok) {
+        const d = (await res.json()) as { error?: string };
+        setError(d.error === 'forbidden' ? 'Sin autorización del paciente para editar su ficha.' : (d.error ?? 'No se pudo guardar'));
+        return;
+      }
+      setSaved(true);
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100';
+
+  return (
+    <form onSubmit={handleSave} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Antecedentes y signos vitales</p>
+      <div className="grid grid-cols-4 gap-2">
+        <label className="text-[10px] uppercase tracking-wide text-slate-400">Grupo sang.
+          <select value={blood} onChange={e => { setBlood(e.target.value); setSaved(false); }} className={inputCls}>
+            {BLOOD_TYPES.map(b => <option key={b} value={b}>{b || '—'}</option>)}
+          </select>
+        </label>
+        <label className="text-[10px] uppercase tracking-wide text-slate-400">Talla (cm)
+          <input value={height} onChange={e => { setHeight(e.target.value); setSaved(false); }} placeholder="170" className={inputCls} />
+        </label>
+        <label className="text-[10px] uppercase tracking-wide text-slate-400">Peso (kg)
+          <input value={weight} onChange={e => { setWeight(e.target.value); setSaved(false); }} placeholder="72" className={inputCls} />
+        </label>
+        <div className="text-[10px] uppercase tracking-wide text-slate-400">IMC
+          <p className="mt-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">{bmi}</p>
+        </div>
+      </div>
+      <label className="block text-[10px] uppercase tracking-wide text-slate-400">Alergias (separadas por coma)
+        <input value={allergies} onChange={e => { setAllergies(e.target.value); setSaved(false); }} placeholder="Penicilina, AINEs" className={inputCls} />
+      </label>
+      <label className="block text-[10px] uppercase tracking-wide text-slate-400">Condiciones crónicas (separadas por coma)
+        <input value={conditions} onChange={e => { setConditions(e.target.value); setSaved(false); }} placeholder="Hipertensión, Diabetes tipo 2" className={inputCls} />
+      </label>
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {saved && <p className="text-xs text-emerald-600">✓ Antecedentes guardados en la ficha del paciente</p>}
+      <div className="flex justify-end">
+        <button type="submit" disabled={saving || !patientEmail || !authorized}
+          className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40">
+          {saving ? 'Guardando…' : 'Guardar antecedentes'}
+        </button>
+      </div>
+      {!authorized && (
+        <p className="text-[11px] text-amber-600">Requiere que el paciente haya autorizado el acceso (consentimiento).</p>
+      )}
+    </form>
+  );
+}
 
 function FichaEntries({
   entries,
