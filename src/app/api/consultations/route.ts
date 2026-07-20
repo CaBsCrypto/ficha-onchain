@@ -26,7 +26,7 @@ import {
   listConsultationsByDoctor,
   listConsultationsByPatient,
 } from "@/lib/consultations/store";
-import { withAuth } from "@/lib/auth/withAuth";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
 }
 
 async function handleCreateConsultation(request: Request) {
+  // Creating a Meet consultation is a doctor action — guard it (demo passes through).
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: ConsultationBody;
   try {
     body = (await request.json()) as ConsultationBody;
@@ -119,5 +123,4 @@ async function handleCreateConsultation(request: Request) {
   }
 }
 
-// Creating a Meet consultation is a doctor action — guard it (demo passes through).
-export const POST = withAuth(handleCreateConsultation, { role: "doctor" });
+export const POST = handleCreateConsultation;

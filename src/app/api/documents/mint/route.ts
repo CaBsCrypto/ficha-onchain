@@ -28,7 +28,7 @@ import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress }
 import { server } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { hashDocumentContent, DOC_LABEL } from "@/lib/fhir/documents";
-import { withAuth } from "@/lib/auth/withAuth";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 import type { DocumentType, DocumentContent } from "@/types";
 
 export const runtime = "nodejs";
@@ -55,6 +55,10 @@ const VALID_DOC_TYPES = new Set<DocumentType>([
 ]);
 
 async function handleMintDocument(request: Request) {
+  // Issuing a document is an issuer (doctor/institution) action — guard it.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: MintDocBody;
   try {
     body = await request.json();
@@ -115,8 +119,7 @@ async function handleMintDocument(request: Request) {
   return NextResponse.json({ data: simulated(contentHash, docType, reason) });
 }
 
-// Issuing a document is an issuer (doctor/institution) action — guard it.
-export const POST = withAuth(handleMintDocument, { role: "doctor" });
+export const POST = handleMintDocument;
 
 // ---------------------------------------------------------------------------
 // Helpers

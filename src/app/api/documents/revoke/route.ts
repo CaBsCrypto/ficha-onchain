@@ -22,7 +22,7 @@ import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stell
 import { server } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { getDocument } from "@/lib/stellar/documents";
-import { withAuth } from "@/lib/auth/withAuth";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,10 @@ interface RevokeBody {
 }
 
 async function handleRevokeDocument(request: Request) {
+  // Revoking a document is an issuer action — guard it (demo mode passes through).
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: RevokeBody;
   try {
     body = await request.json();
@@ -64,8 +68,7 @@ async function handleRevokeDocument(request: Request) {
   return NextResponse.json({ data: simulated(docId, reason) });
 }
 
-// Revoking a document is an issuer action — guard it (demo mode passes through).
-export const POST = withAuth(handleRevokeDocument, { role: "doctor" });
+export const POST = handleRevokeDocument;
 
 async function realRevoke(args: { doctorSecret: string; docId: string }) {
   const issuer = Keypair.fromSecret(args.doctorSecret);

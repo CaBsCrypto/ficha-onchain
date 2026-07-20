@@ -21,7 +21,7 @@ import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
-import { withAuth } from "@/lib/auth/withAuth";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +36,10 @@ interface EntryBody {
 }
 
 async function handleAppend(request: Request) {
+  // Appending to a ficha is a doctor action — guard it (demo mode passes through).
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: EntryBody;
   try {
     body = (await request.json()) as EntryBody;
@@ -118,5 +122,4 @@ async function handleAppend(request: Request) {
   }
 }
 
-// Appending to a ficha is a doctor action — guard it (demo mode passes through).
-export const POST = withAuth(handleAppend, { role: "doctor" });
+export const POST = handleAppend;

@@ -36,7 +36,7 @@ import { server, isDoctorAuthorized } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
-import { withAuth } from "@/lib/auth/withAuth";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 import type {
   Decreto41Prescription,
   PatientDocType,
@@ -85,6 +85,10 @@ interface MintBody {
 }
 
 async function handleMint(request: Request) {
+  // Issuing a prescription is a doctor action — guard it (demo mode passes through).
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: MintBody;
   try {
     body = await request.json();
@@ -195,8 +199,7 @@ async function handleMint(request: Request) {
   return NextResponse.json(simulated(rxHash, reason));
 }
 
-// Issuing a prescription is a doctor action — guard it (demo mode passes through).
-export const POST = withAuth(handleMint, { role: "doctor" });
+export const POST = handleMint;
 
 async function realMint(args: {
   doctorSecret: string;
