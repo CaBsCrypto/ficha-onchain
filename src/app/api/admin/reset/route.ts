@@ -8,9 +8,10 @@
  * calling — running this against production erases live data.
  *
  * Body JSON: { token, confirm: "RESET", scope?: "transactional" | "all" }
- *   - "transactional" (default): per-run flow tables only; doctors,
- *     registered_users and waitlist are PRESERVED.
- *   - "all": additionally clears doctors, registered_users, waitlist.
+ *   - "transactional" (default): per-run flow tables only; doctors and
+ *     registered_users are PRESERVED.
+ *   - "all": additionally clears doctors and registered_users.
+ *   - The `waitlist` (landing-page leads) is NEVER wiped by either scope.
  *
  * Table names are interpolated into raw SQL, so they come ONLY from the
  * hardcoded whitelists below — never from the request body — to avoid
@@ -28,17 +29,18 @@ const TRANSACTIONAL_TABLES = [
   "appointments",
   "medical_licenses",
   "clinical_entries",
+  "clinical_documents",
   "doctor_availability",
   "doctor_time_off",
   "pain_diary",
   "patient_health_records",
 ] as const;
 
-// Only cleared additionally when scope === "all".
+// Only cleared additionally when scope === "all". `waitlist` is deliberately
+// NOT here — landing-page leads are real, not test data.
 const ALL_EXTRA_TABLES = [
   "doctors",
   "registered_users",
-  "waitlist",
 ] as const;
 
 export async function POST(request: Request) {
