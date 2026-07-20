@@ -156,6 +156,37 @@ step("medical_licenses", async () => {
       mode          TEXT,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+
+  // Reconcile a LEGACY shape that predates the Spanish columns the /api/licenses
+  // route reads and writes. On dev/prod the table was first created by an old
+  // route ensureTable with start_date/days/diagnosis/rest_type and
+  // patient_email NOT NULL, so CREATE TABLE IF NOT EXISTS above is a no-op and
+  // the real columns were never added. Add them and relax the legacy NOT NULLs
+  // so the route's INSERT (fecha_inicio/dias/cie10/tipo/…) succeeds. All
+  // statements are idempotent; the legacy-only ones no-op on a fresh branch.
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS fecha_inicio  DATE`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS dias          INTEGER`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS cie10         TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS tipo          TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS diagnostico   TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS observaciones TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS tx_hash       TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS doc_hash      TEXT`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS doc_id        INTEGER`;
+  await sql`ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS mode          TEXT`;
+
+  // Backfill new columns from legacy ones (no-ops if the legacy column is
+  // absent, hence the per-statement catch).
+  await sql`UPDATE medical_licenses
+              SET fecha_inicio = COALESCE(fecha_inicio, start_date),
+                  dias         = COALESCE(dias, days),
+                  diagnostico  = COALESCE(diagnostico, diagnosis),
+                  tipo         = COALESCE(tipo, rest_type)`.catch(() => {});
+
+  // Relax legacy NOT NULLs so inserts that omit those columns are accepted.
+  for (const col of ["patient_email", "start_date", "days", "diagnosis", "rest_type"]) {
+    await sql.query(`ALTER TABLE medical_licenses ALTER COLUMN ${col} DROP NOT NULL`).catch(() => {});
+  }
 });
 
 // ── Waitlist signups (landing page) ─────────────────────────────────────────
