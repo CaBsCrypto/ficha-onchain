@@ -4,19 +4,14 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function unauthorized() {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
-
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || token !== adminToken) return unauthorized();
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   try {
     const sql = getDb();

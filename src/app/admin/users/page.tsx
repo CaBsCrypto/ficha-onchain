@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAdmin } from "../layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 interface User { privy_id: string; email: string | null; wallet: string | null; created_at: string; }
 
@@ -62,7 +62,6 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 }
 
 export default function UsersPage() {
-  const { token } = useAdmin();
   const [users, setUsers]     = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
@@ -78,7 +77,7 @@ export default function UsersPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch(`/api/admin/users?token=${encodeURIComponent(token)}`);
+    const res = await authedFetch(`/api/admin/users`);
     if (res.ok) {
       const data = (await res.json()) as { users: User[] };
       setUsers(data.users);
@@ -86,16 +85,15 @@ export default function UsersPage() {
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, [token]);
+  useEffect(() => { void load(); }, []);
 
   async function saveEdit() {
     if (!editUser) return;
     setSaving(true);
-    await fetch("/api/admin/users", {
+    await authedFetch("/api/admin/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        token,
         privyId: editUser.privy_id,
         email:  editEmail  || null,
         wallet: editWallet || null,
@@ -109,10 +107,10 @@ export default function UsersPage() {
   async function confirmDelete() {
     if (!deleteUser) return;
     setDeleting(true);
-    await fetch("/api/admin/users", {
+    await authedFetch("/api/admin/users", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, privyId: deleteUser.privy_id }),
+      body: JSON.stringify({ privyId: deleteUser.privy_id }),
     });
     setDeleting(false);
     setDeleteUser(null);

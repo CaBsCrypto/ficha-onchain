@@ -50,7 +50,7 @@ if (ADMIN) {
   const docs = await get(`/api/admin/doctors?token=${ADMIN}`);
   const pending = (docs.doctors ?? []).filter((d) => d.status === "pending");
   for (const p of pending) {
-    await patch("/api/admin/doctors", { token: ADMIN, id: p.id, status: "active" });
+    await patch(`/api/admin/doctors?token=${encodeURIComponent(ADMIN)}`, { id: p.id, status: "active" });
     ok(`Aprobado médico pendiente: ${p.name}`, true);
   }
   if (!pending.length) ok("No hay médicos pendientes por aprobar", true);

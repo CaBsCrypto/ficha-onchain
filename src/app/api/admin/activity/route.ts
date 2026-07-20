@@ -24,6 +24,7 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,11 +46,8 @@ const iso = (v: unknown): string | null => {
 };
 
 export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get("token");
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || token !== adminToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   // Per-source LIMIT keeps any single table from flooding the feed; the merged
   // result is re-capped below. Tune with ?limit= (default 200 total).

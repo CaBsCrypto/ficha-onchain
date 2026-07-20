@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAdmin } from "./layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 interface Stats {
   waitlist: { total: number; thisWeek: number; today: number };
@@ -22,16 +22,15 @@ function StatCard({
 }
 
 export default function AdminDashboard() {
-  const { token } = useAdmin();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/admin/stats?token=${encodeURIComponent(token)}`)
+    authedFetch(`/api/admin/stats`)
       .then((r) => r.json())
       .then((d) => { setStats(d as Stats); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   const now = new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 

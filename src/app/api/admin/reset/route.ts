@@ -18,6 +18,7 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,21 +41,17 @@ const ALL_EXTRA_TABLES = [
   "waitlist",
 ] as const;
 
-function unauthorized() {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
-
 export async function POST(request: Request) {
-  let body: { token?: unknown; confirm?: unknown; scope?: unknown };
+  // Guard 1: admin authorization.
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { confirm?: unknown; scope?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-
-  // Guard 1: admin token.
-  const adminToken = process.env.WAITLIST_ADMIN_TOKEN;
-  if (!adminToken || String(body.token ?? "") !== adminToken) return unauthorized();
 
   // Guard 2: explicit confirmation — prevents accidental wipes.
   if (body.confirm !== "RESET") {

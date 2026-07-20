@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAdmin } from "../layout";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DoctorRow { id: number; name: string; email: string; specialty: string | null; status: string; created_at: string; }
@@ -108,8 +108,8 @@ function Row({ children }: { children: React.ReactNode }) {
 }
 
 // ── Reset dialog ──────────────────────────────────────────────────────────────
-function ResetDialog({ token, onClose, onDone }: {
-  token: string; onClose: () => void; onDone: () => void;
+function ResetDialog({ onClose, onDone }: {
+  onClose: () => void; onDone: () => void;
 }) {
   const [loading, setLoading] = useState<ResetScope | null>(null);
   const [error, setError] = useState("");
@@ -118,10 +118,10 @@ function ResetDialog({ token, onClose, onDone }: {
     setLoading(scope);
     setError("");
     try {
-      const res = await fetch("/api/admin/reset", {
+      const res = await authedFetch("/api/admin/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, confirm: "RESET", scope }),
+        body: JSON.stringify({ confirm: "RESET", scope }),
       });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
@@ -185,7 +185,6 @@ function ResetDialog({ token, onClose, onDone }: {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminFlujoPage() {
-  const { token } = useAdmin();
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [showReset, setShowReset] = useState(false);
@@ -193,12 +192,12 @@ export default function AdminFlujoPage() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/overview?token=${encodeURIComponent(token)}`);
+      const res = await authedFetch(`/api/admin/overview`);
       const d = (await res.json()) as Overview;
       setData(d);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [token]);
+  }, []);
 
   useEffect(() => { void fetchOverview(); }, [fetchOverview]);
 
@@ -397,7 +396,6 @@ export default function AdminFlujoPage() {
 
       {showReset && (
         <ResetDialog
-          token={token}
           onClose={() => setShowReset(false)}
           onDone={() => void fetchOverview()}
         />
