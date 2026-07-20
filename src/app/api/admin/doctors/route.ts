@@ -4,26 +4,11 @@
  * PATCH  /api/admin/doctors           — update / block doctor
  * DELETE /api/admin/doctors           — delete doctor
  */
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensureTable(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS doctors (
-      id          SERIAL PRIMARY KEY,
-      name        TEXT NOT NULL,
-      email       TEXT NOT NULL UNIQUE,
-      specialty   TEXT,
-      license_num TEXT,
-      rut         TEXT,
-      status      TEXT NOT NULL DEFAULT 'active',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +26,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     const rows = await sql`
       SELECT id, name, email, specialty, license_num, rut, status, created_at
       FROM doctors
@@ -72,7 +56,6 @@ export async function POST(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     const [row] = await sql`
       INSERT INTO doctors (name, email, specialty, license_num, rut)
       VALUES (${name}, ${email}, ${specialty}, ${licenseNum}, ${rut})
@@ -101,7 +84,6 @@ export async function PATCH(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     if (body.name      !== undefined) await sql`UPDATE doctors SET name        = ${String(body.name).trim()} WHERE id = ${id}`;
     if (body.email     !== undefined) await sql`UPDATE doctors SET email       = ${String(body.email).trim().toLowerCase()} WHERE id = ${id}`;
     if (body.specialty !== undefined) await sql`UPDATE doctors SET specialty   = ${body.specialty ? String(body.specialty).trim() : null} WHERE id = ${id}`;

@@ -129,20 +129,68 @@ step("doctor_time_off", async () => {
 });
 
 // ── Pre-existing tables, centralised here ───────────────────────────────────
+// Schema mirrors what /api/licenses reads and writes (fecha_inicio/dias/cie10/
+// tipo/... plus the on-chain sign result tx_hash/doc_hash/doc_id/mode). An
+// earlier version of this step declared start_date/days/diagnosis/rest_type,
+// columns no route or component ever used; the route's own ensureTable created
+// the real shape on first request. IF NOT EXISTS makes this a no-op on the
+// already-migrated dev/prod branches and correct on a fresh one.
 step("medical_licenses", async () => {
   await sql`
     CREATE TABLE IF NOT EXISTS medical_licenses (
       id            SERIAL PRIMARY KEY,
       doctor_email  TEXT NOT NULL,
-      patient_email TEXT NOT NULL,
-      patient_name  TEXT NOT NULL DEFAULT '',
+      patient_email TEXT,
+      patient_name  TEXT NOT NULL,
       patient_rut   TEXT,
-      start_date    DATE NOT NULL,
-      days          INTEGER NOT NULL,
-      diagnosis     TEXT,
-      rest_type     TEXT,
-      status        TEXT NOT NULL DEFAULT 'active',
+      fecha_inicio  DATE NOT NULL,
+      dias          INTEGER NOT NULL,
+      cie10         TEXT NOT NULL,
+      tipo          TEXT NOT NULL,
+      diagnostico   TEXT,
+      observaciones TEXT,
+      status        TEXT NOT NULL DEFAULT 'draft',
+      tx_hash       TEXT,
+      doc_hash      TEXT,
+      doc_id        INTEGER,
+      mode          TEXT,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+});
+
+// ── Waitlist signups (landing page) ─────────────────────────────────────────
+step("waitlist", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id         SERIAL PRIMARY KEY,
+      email      TEXT    NOT NULL UNIQUE,
+      role       TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+});
+
+// ── Registered users (tracked on auth login) ────────────────────────────────
+step("registered_users", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS registered_users (
+      id         SERIAL PRIMARY KEY,
+      privy_id   TEXT NOT NULL UNIQUE,
+      email      TEXT,
+      wallet     TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+});
+
+// ── Pain diary (diario de dolor) ────────────────────────────────────────────
+step("pain_diary", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS pain_diary (
+      id         SERIAL PRIMARY KEY,
+      privy_id   TEXT NOT NULL,
+      date       TEXT NOT NULL,
+      entries    JSONB NOT NULL DEFAULT '[]',
+      saved_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (privy_id, date)
     )`;
 });
 

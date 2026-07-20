@@ -2,43 +2,11 @@
  * GET /api/admin/stats — dashboard summary
  * Query: ?token=WAITLIST_ADMIN_TOKEN
  */
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensureTables(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS waitlist (
-      id         SERIAL PRIMARY KEY,
-      email      TEXT NOT NULL UNIQUE,
-      role       TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS registered_users (
-      id         SERIAL PRIMARY KEY,
-      privy_id   TEXT NOT NULL UNIQUE,
-      email      TEXT,
-      wallet     TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS doctors (
-      id          SERIAL PRIMARY KEY,
-      name        TEXT NOT NULL,
-      email       TEXT NOT NULL UNIQUE,
-      specialty   TEXT,
-      license_num TEXT,
-      rut         TEXT,
-      status      TEXT NOT NULL DEFAULT 'active',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -52,7 +20,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTables(sql);
 
     const [waitlistTotal] = await sql`SELECT COUNT(*)::int AS count FROM waitlist`;
     const [usersTotal]    = await sql`SELECT COUNT(*)::int AS count FROM registered_users`;

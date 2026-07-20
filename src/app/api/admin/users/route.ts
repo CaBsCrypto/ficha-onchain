@@ -2,23 +2,11 @@
  * GET  /api/admin/users?token=X  — list registered users
  * POST /api/admin/users           — track user login (called from client on auth)
  */
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensureTable(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS registered_users (
-      id         SERIAL PRIMARY KEY,
-      privy_id   TEXT NOT NULL UNIQUE,
-      email      TEXT,
-      wallet     TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -30,7 +18,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     const rows = await sql`
       SELECT privy_id, email, wallet, created_at
       FROM registered_users
@@ -59,7 +46,6 @@ export async function POST(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     await sql`
       INSERT INTO registered_users (privy_id, email, wallet)
       VALUES (${privyId}, ${email}, ${wallet})
@@ -92,7 +78,6 @@ export async function PATCH(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     if (body.email !== undefined) {
       const email = body.email ? String(body.email).trim().toLowerCase() : null;
       await sql`UPDATE registered_users SET email = ${email} WHERE privy_id = ${privyId}`;
