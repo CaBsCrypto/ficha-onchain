@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 import { authedFetch } from '@/lib/auth/authed-fetch';
-import { MOCK_PRESCRIPTIONS, MOCK_LICENSES } from './types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Appointment {
@@ -77,7 +76,11 @@ export function InicioTab() {
 
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [totalAppointments, setTotalAppointments] = useState(0);
+  const [rxCount, setRxCount] = useState<number | null>(null);
+  const [licCount, setLicCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const demoDoctorWallet = process.env.NEXT_PUBLIC_DEMO_DOCTOR_WALLET ?? '';
 
   const today = new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -100,7 +103,25 @@ export function InicioTab() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [doctorEmail, todayISO]);
+
+    // Real licence count (medical_licenses, signed = activa).
+    authedFetch(`/api/licenses?doctorEmail=${encodeURIComponent(doctorEmail)}`)
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j: { data?: { status?: string }[] }) =>
+        setLicCount((j.data ?? []).filter((l) => l.status === 'signed' || l.status === 'active').length))
+      .catch(() => setLicCount(0));
+
+    // Real prescription count — recetas are minted on-chain by the demo doctor
+    // wallet, so we list by that wallet rather than the logged-in email.
+    if (demoDoctorWallet) {
+      authedFetch(`/api/prescriptions?wallet=${encodeURIComponent(demoDoctorWallet)}&role=doctor`)
+        .then((r) => (r.ok ? r.json() : { prescriptions: [] }))
+        .then((j: { prescriptions?: unknown[] }) => setRxCount((j.prescriptions ?? []).length))
+        .catch(() => setRxCount(0));
+    } else {
+      setRxCount(0);
+    }
+  }, [doctorEmail, todayISO, demoDoctorWallet]);
 
   const statsData = [
     {
@@ -116,8 +137,8 @@ export function InicioTab() {
     },
     {
       label: 'Recetas emitidas',
-      value: String(MOCK_PRESCRIPTIONS.length),
-      sub: 'Datos de muestra',
+      value: rxCount === null ? '…' : String(rxCount),
+      sub: 'on-chain',
       color: 'bg-emerald-50 text-emerald-600',
       icon: (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -128,8 +149,8 @@ export function InicioTab() {
     },
     {
       label: 'Licencias activas',
-      value: String(MOCK_LICENSES.filter((l) => l.status === 'Emitida' || l.status === 'Validada').length),
-      sub: 'Datos de muestra',
+      value: licCount === null ? '…' : String(licCount),
+      sub: 'firmadas',
       color: 'bg-amber-50 text-amber-600',
       icon: (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

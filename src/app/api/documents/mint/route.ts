@@ -152,21 +152,42 @@ async function realMint(args: {
     nativeToScVal(BigInt(args.expiresAt), { type: "u64" }),
   );
 
-  const source = await server.getAccount(issuer.publicKey());
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(op)
-    .setTimeout(60)
-    .build();
+  // One build→prepare→sign→submit cycle. The account is fetched inside so each
+  // retry gets a fresh sequence number.
+  const attempt = async () => {
+    const source = await server.getAccount(issuer.publicKey());
+    const tx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(op)
+      .setTimeout(60)
+      .build();
 
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(issuer);
+    const prepared = await server.prepareTransaction(tx);
+    prepared.sign(issuer);
+    return feeBumpAndSend(prepared.toXDR());
+  };
 
-  const submit = await feeBumpAndSend(prepared.toXDR());
-  if (submit.status !== "SUCCESS") {
-    throw new Error(`transaction ${submit.status} (${submit.hash})`);
+  // Back-to-back mints from the same demo issuer collide on the account sequence
+  // (txBadSeq) and, without a retry, degrade the caller to "simulated". Re-fetch
+  // the account and retry a few times before giving up. Mirrors the retry in
+  // stellar/server.ts signInvokeAndSubmit.
+  let submit: Awaited<ReturnType<typeof feeBumpAndSend>> | undefined;
+  let lastError: unknown;
+  for (let i = 0; i < 3; i++) {
+    try {
+      submit = await attempt();
+      if (submit.status === "SUCCESS") break;
+    } catch (err) {
+      lastError = err;
+    }
+    if (i < 2) await new Promise((r) => setTimeout(r, 1500));
+  }
+  if (!submit || submit.status !== "SUCCESS") {
+    throw new Error(
+      submit ? `transaction ${submit.status} (${submit.hash})` : String(lastError),
+    );
   }
 
   const docId =
