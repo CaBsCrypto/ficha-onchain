@@ -65,10 +65,14 @@ export async function GET(request: Request) {
       FROM doctors ORDER BY created_at DESC LIMIT 100
     `.catch(() => [])) {
       const ts = iso(r.created_at); if (!ts) continue;
+      const st = r.status as string;
       events.push({
         ts, kind: "doctor.registered", table: "doctors",
-        title: `Médico registrado: ${r.name}`,
-        detail: [r.specialty, r.status === "active" ? "activo" : "bloqueado"].filter(Boolean).join(" · "),
+        title: st === "pending"
+          ? `Médico solicitó acceso: ${r.name}`
+          : `Médico registrado: ${r.name}`,
+        detail: [r.specialty, st === "active" ? "activo" : st === "pending" ? "pendiente de aprobación" : "bloqueado"]
+          .filter(Boolean).join(" · "),
         actor: r.email as string,
       });
     }

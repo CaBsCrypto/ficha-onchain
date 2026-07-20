@@ -218,6 +218,7 @@ export default function AdminFlujoPage() {
 
   const activeDoctors = doctors.filter((d) => d.status === "active").length;
   const blockedDoctors = doctors.filter((d) => d.status === "blocked").length;
+  const pendingDoctors = doctors.filter((d) => d.status === "pending").length;
   const consentCount = appointments.filter((a) => a.consent_tx).length;
 
   const totalRecords =
@@ -283,8 +284,8 @@ export default function AdminFlujoPage() {
                 {doctors.map((d) => (
                   <Row key={d.id}>
                     <span className="font-medium text-slate-700">{d.name}</span>
-                    <Badge tone={d.status === "active" ? "emerald" : "rose"}>
-                      {d.status === "active" ? "activo" : "bloqueado"}
+                    <Badge tone={d.status === "active" ? "emerald" : d.status === "pending" ? "amber" : "rose"}>
+                      {d.status === "active" ? "activo" : d.status === "pending" ? "pendiente" : "bloqueado"}
                     </Badge>
                   </Row>
                 ))}
@@ -293,10 +294,16 @@ export default function AdminFlujoPage() {
 
             {/* 2. Aprobación del médico */}
             <StageCard n={2} title="Aprobación del médico" count={doctorsCount}>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                <Badge tone="amber">{pendingDoctors} pendientes</Badge>
                 <Badge tone="emerald">{activeDoctors} aceptados</Badge>
                 <Badge tone="rose">{blockedDoctors} bloqueados</Badge>
               </div>
+              {pendingDoctors > 0 && (
+                <p className="mt-2 text-xs text-amber-600">
+                  Hay {pendingDoctors} médico(s) esperando aprobación en el panel de Médicos.
+                </p>
+              )}
             </StageCard>
 
             {/* 3. Usuario (paciente) creado */}
