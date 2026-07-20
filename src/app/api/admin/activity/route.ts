@@ -191,13 +191,19 @@ export async function GET(request: Request) {
     }
 
     // ── Pain-diary entries ────────────────────────────────────────────────
+    // NB: the column is `saved_at`, not `created_at` — the old query selected a
+    // non-existent column, silently caught, and pain logs never reached the feed.
     for (const r of await sql`
-      SELECT created_at FROM pain_diary ORDER BY created_at DESC LIMIT 100
+      SELECT privy_id, date, entries, saved_at FROM pain_diary
+      ORDER BY saved_at DESC LIMIT 100
     `.catch(() => [])) {
-      const ts = iso(r.created_at); if (!ts) continue;
+      const ts = iso(r.saved_at); if (!ts) continue;
+      const n = Array.isArray(r.entries) ? r.entries.length : 0;
       events.push({
         ts, kind: "pain.logged", table: "pain_diary",
         title: "Registro de diario de dolor",
+        detail: [r.date, n ? `${n} zona${n === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || undefined,
+        actor: (r.privy_id as string) ?? undefined,
       });
     }
 
