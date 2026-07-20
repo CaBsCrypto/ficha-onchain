@@ -126,16 +126,16 @@ function PatientDetailModal({
     if (!patient.patient_email) return;
     setLoading(true);
     Promise.all([
-      fetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}&patientEmail=${encodeURIComponent(patient.patient_email)}`)
+      authedFetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}&patientEmail=${encodeURIComponent(patient.patient_email)}`)
         .then(r => r.json() as Promise<{ data?: DBAppointment[]; appointments?: DBAppointment[] }>)
         .then(j => j.data ?? j.appointments ?? []),
-      fetch(`/api/licenses?patientEmail=${encodeURIComponent(patient.patient_email)}`)
+      authedFetch(`/api/licenses?patientEmail=${encodeURIComponent(patient.patient_email)}`)
         .then(r => r.json() as Promise<{ data?: DBLicense[] }>)
         .then(j => j.data ?? []),
       // Prescriptions are on-chain, keyed by wallet — resolve the patient's
       // wallet from their email first, then read the chain. authedFetch carries
       // the doctor's token past the /api/prescriptions guard.
-      fetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`)
+      authedFetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`)
         .then(r => (r.ok ? r.json() as Promise<{ wallet?: string }> : { wallet: undefined }))
         .then(async ({ wallet }) => {
           if (!wallet) return [] as RxItem[];
@@ -508,7 +508,7 @@ function FichaEntries({
       // Resolve the patient's wallet so the entry anchors under their record.
       let wallet: string | undefined;
       try {
-        const wr = await fetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`);
+        const wr = await authedFetch(`/api/patient-wallet?email=${encodeURIComponent(patient.patient_email)}`);
         if (wr.ok) wallet = ((await wr.json()) as { wallet?: string }).wallet;
       } catch { /* wallet optional */ }
 

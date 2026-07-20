@@ -29,6 +29,7 @@
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
 
 type Sql = NeonQueryFunction<any, any>;
 
@@ -68,12 +69,19 @@ async function ensureTable(sql: Sql) {
 // ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const doctorEmail  = searchParams.get("doctorEmail")?.trim().toLowerCase();
-  const patientEmail = searchParams.get("patientEmail")?.trim().toLowerCase();
+  const doctorParam  = searchParams.get("doctorEmail")?.trim().toLowerCase();
+  const patientParam = searchParams.get("patientEmail")?.trim().toLowerCase();
 
-  if (!doctorEmail && !patientEmail) {
+  if (!doctorParam && !patientParam) {
     return NextResponse.json({ error: "doctorEmail or patientEmail required" }, { status: 400 });
   }
+
+  // Licenses carry diagnosis + RUT — the caller may only list their own, as the
+  // doctor or the patient named. Param trusted only in demo mode.
+  const owner = await resolveOwnerEmail(request, doctorParam || patientParam);
+  if ("error" in owner) return owner.error;
+  const doctorEmail  = doctorParam  ? owner.email : undefined;
+  const patientEmail = patientParam ? owner.email : undefined;
 
   try {
     const sql = getDb();
@@ -126,6 +134,10 @@ export async function POST(request: Request) {
   if (!doctor_email || !patient_name || !fecha_inicio || !dias || !cie10 || !tipo) {
     return NextResponse.json({ error: "missing_required_fields" }, { status: 400 });
   }
+
+  // Issuing a license is a doctor action — the caller must be that doctor.
+  const actor = await requireActor(request, [doctor_email]);
+  if ("error" in actor) return actor.error;
 
   try {
     const sql = getDb();

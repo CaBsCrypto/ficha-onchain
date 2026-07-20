@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
 import { MOCK_PRESCRIPTIONS } from './types';
 import type { MockPrescription, PrescriptionTipo, PrescriptionStatus } from './types';
@@ -139,7 +140,7 @@ function NuevaRecetaModal({
     setWalletStatus('looking');
     emailDebounce.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/patient-wallet?email=${encodeURIComponent(email)}`);
+        const res = await authedFetch(`/api/patient-wallet?email=${encodeURIComponent(email)}`);
         if (res.ok) {
           const data = await res.json() as { wallet: string };
           set('patientWallet', data.wallet);
