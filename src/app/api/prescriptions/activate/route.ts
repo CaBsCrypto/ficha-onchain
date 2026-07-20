@@ -30,7 +30,7 @@ import {
   STELLAR_EXPERT_TX,
 } from "@/lib/stellar/config";
 import { server, getPrescription } from "@/lib/stellar/client";
-import { feeBumpAndSend } from "@/lib/stellar/server";
+import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { requireUser, unauthorized } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
@@ -64,9 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const doctorSecret = getDemoDoctorSecret();
 
   if (doctorSecret) {
     try {

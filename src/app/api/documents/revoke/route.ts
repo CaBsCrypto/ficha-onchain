@@ -20,7 +20,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { server } from "@/lib/stellar/client";
-import { feeBumpAndSend } from "@/lib/stellar/server";
+import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { getDocument } from "@/lib/stellar/documents";
 import { withAuth } from "@/lib/auth/withAuth";
 
@@ -44,9 +44,7 @@ async function handleRevokeDocument(request: Request) {
     return NextResponse.json({ error: "docId must be a numeric string" }, { status: 400 });
   }
 
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const doctorSecret = getDemoDoctorSecret();
 
   if (doctorSecret && CONTRACT_IDS.documentSoulbound) {
     try {

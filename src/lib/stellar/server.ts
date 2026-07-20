@@ -27,6 +27,24 @@ export function getRelayerKeypair(): Keypair {
   return Keypair.fromSecret(secret);
 }
 
+/**
+ * Demo doctor signing secret, gated on the relayer being configured. Returns
+ * undefined when there is no relayer (so on-chain flows degrade to simulated).
+ */
+export function getDemoDoctorSecret(): string | undefined {
+  return process.env.RELAYER_SECRET ? process.env.DEMO_DOCTOR_SECRET : undefined;
+}
+
+/**
+ * Demo patient (owner) signing secret, gated on the relayer being configured.
+ * Returns undefined when there is no relayer.
+ */
+export function getDemoPatientSecret(): string | undefined {
+  return process.env.RELAYER_SECRET
+    ? process.env.DEMO_PATIENT_SECRET
+    : undefined;
+}
+
 export interface SubmitResult {
   hash: string;
   status: "SUCCESS" | "FAILED" | "PENDING";
@@ -82,6 +100,38 @@ export async function feeBumpAndSend(innerXdr: string): Promise<SubmitResult> {
 }
 
 /**
+ * Build a Soroban invoke against `contractId.method(...args)`, sign it with
+ * `signerSecret` (the signer is also the tx source, satisfying require_auth),
+ * then fee-bump it via the relayer so the signer spends no XLM.
+ *
+ * Shared by appendClinicalEntry and grantWriteAccess — the fee (BASE_FEE),
+ * timeout (60s), prepare-then-sign order and fee-bump are identical for both.
+ */
+async function signInvokeAndSubmit(args: {
+  signerSecret: string;
+  contractId: string;
+  method: string;
+  args: xdr.ScVal[];
+}): Promise<SubmitResult> {
+  const signer = Keypair.fromSecret(args.signerSecret);
+  const contract = new Contract(args.contractId);
+  const op = contract.call(args.method, ...args.args);
+
+  const source = await server.getAccount(signer.publicKey());
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(op)
+    .setTimeout(60)
+    .build();
+
+  const prepared = await server.prepareTransaction(tx);
+  prepared.sign(signer);
+  return feeBumpAndSend(prepared.toXDR());
+}
+
+/**
  * Append a clinical entry to a patient's ClinicalRecord, signed by the doctor
  * and fee-bumped by the relayer (gasless for the doctor). The doctor wallet must
  * already hold write access on the record (the patient granted it); otherwise
@@ -97,26 +147,16 @@ export async function appendClinicalEntry(args: {
   contentHash: Buffer; // 32 bytes
 }): Promise<SubmitResult> {
   const doctor = Keypair.fromSecret(args.doctorSecret);
-  const contract = new Contract(args.contractId);
-  const op = contract.call(
-    "append_entry",
-    new Address(doctor.publicKey()).toScVal(),
-    nativeToScVal(args.kind, { type: "string" }),
-    xdr.ScVal.scvBytes(args.contentHash),
-  );
-
-  const source = await server.getAccount(doctor.publicKey());
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(op)
-    .setTimeout(60)
-    .build();
-
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(doctor);
-  return feeBumpAndSend(prepared.toXDR());
+  return signInvokeAndSubmit({
+    signerSecret: args.doctorSecret,
+    contractId: args.contractId,
+    method: "append_entry",
+    args: [
+      new Address(doctor.publicKey()).toScVal(),
+      nativeToScVal(args.kind, { type: "string" }),
+      xdr.ScVal.scvBytes(args.contentHash),
+    ],
+  });
 }
 
 /**
@@ -134,23 +174,10 @@ export async function grantWriteAccess(args: {
   contractId: string;
   grantee: string;
 }): Promise<SubmitResult> {
-  const owner = Keypair.fromSecret(args.ownerSecret);
-  const contract = new Contract(args.contractId);
-  const op = contract.call(
-    "grant_write_access",
-    new Address(args.grantee).toScVal(),
-  );
-
-  const source = await server.getAccount(owner.publicKey());
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(op)
-    .setTimeout(60)
-    .build();
-
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(owner);
-  return feeBumpAndSend(prepared.toXDR());
+  return signInvokeAndSubmit({
+    signerSecret: args.ownerSecret,
+    contractId: args.contractId,
+    method: "grant_write_access",
+    args: [new Address(args.grantee).toScVal()],
+  });
 }

@@ -15,14 +15,12 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
-import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
-import { grantWriteAccess } from "@/lib/stellar/server";
+import { CONTRACT_IDS, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
+import { grantWriteAccess, getDemoPatientSecret } from "@/lib/stellar/server";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const G_ADDR = /^G[A-Z2-7]{55}$/;
 
 export async function POST(request: Request) {
   let body: { appointmentId?: unknown; patientEmail?: unknown };
@@ -69,14 +67,12 @@ export async function POST(request: Request) {
     // Unauthorized. (In prod each patient has their own record and the doctor's
     // real passkey wallet signs — a different path, not this demo endpoint.)
     const grantee = process.env.NEXT_PUBLIC_DEMO_DOCTOR_WALLET ?? "";
-    if (!G_ADDR.test(grantee)) {
+    if (!isStellarAddress(grantee)) {
       return NextResponse.json({ error: "doctor_wallet_not_found" }, { status: 404 });
     }
 
     // Attempt a real on-chain grant, signed by the record owner (the patient).
-    const ownerSecret = process.env.RELAYER_SECRET
-      ? process.env.DEMO_PATIENT_SECRET
-      : undefined;
+    const ownerSecret = getDemoPatientSecret();
 
     let mode: "onchain" | "simulated" = "simulated";
     let txHash: string | null = null;

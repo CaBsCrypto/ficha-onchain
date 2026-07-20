@@ -10,6 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { listDocuments } from "@/lib/stellar/documents";
+import { isStellarAddress } from "@/lib/stellar/config";
 import type { DocumentType } from "@/types";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   const roleParam = searchParams.get("role") ?? "recipient";
   const typeFilter = searchParams.get("type") as DocumentType | null;
 
-  if (!wallet || !/^G[A-Z2-7]{55}$/.test(wallet)) {
+  if (!wallet || !isStellarAddress(wallet)) {
     return NextResponse.json(
       { error: "wallet must be a valid Stellar G-address" },
       { status: 400 },

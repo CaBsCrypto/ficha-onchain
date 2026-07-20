@@ -50,6 +50,14 @@ export const CONTRACT_IDS = {
     "CCATYIFOHLLRS6CMONJQZ66A6QN3Z7EQFU3O4HD4RMTNS67F2U422GY5",
 } as const;
 
+/** Matches a Stellar public key (G-address): 'G' + 55 base32 chars. */
+export const STELLAR_G_ADDRESS = /^G[A-Z2-7]{55}$/;
+
+/** True when `a` is a well-formed Stellar public key (G-address). */
+export function isStellarAddress(a: string): boolean {
+  return STELLAR_G_ADDRESS.test(a);
+}
+
 export const STELLAR_EXPERT_TX = (hash: string) =>
   `https://stellar.expert/explorer/${STELLAR_NETWORK}/tx/${hash}`;
 

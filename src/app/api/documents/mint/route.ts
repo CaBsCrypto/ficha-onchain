@@ -24,9 +24,9 @@ import {
   BASE_FEE,
   xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
+import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { server } from "@/lib/stellar/client";
-import { feeBumpAndSend } from "@/lib/stellar/server";
+import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { hashDocumentContent, DOC_LABEL } from "@/lib/fhir/documents";
 import { withAuth } from "@/lib/auth/withAuth";
 import type { DocumentType, DocumentContent } from "@/types";
@@ -80,10 +80,8 @@ async function handleMintDocument(request: Request) {
     return NextResponse.json({ error: "payload is required" }, { status: 400 });
   }
 
-  const recipientIsG = /^G[A-Z2-7]{55}$/.test(recipient);
-  const doctorSecret = process.env.RELAYER_SECRET
-    ? process.env.DEMO_DOCTOR_SECRET
-    : undefined;
+  const recipientIsG = isStellarAddress(recipient);
+  const doctorSecret = getDemoDoctorSecret();
 
   // Compute content hash from the off-chain payload.
   const contentHash = hashDocumentContent(payload);
