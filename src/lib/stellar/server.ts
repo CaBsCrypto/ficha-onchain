@@ -17,6 +17,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { NETWORK_PASSPHRASE } from "./config";
 import { server } from "./client";
+import { withSignerLock } from "./serialize";
 
 /** Fee the relayer is willing to cover for a bumped transaction (stroops). */
 const RELAY_FEE = "2000000"; // 0.2 XLM ceiling — plenty for a Soroban invoke.
@@ -134,27 +135,29 @@ async function signInvokeAndSubmit(args: {
     return feeBumpAndSend(prepared.toXDR());
   };
 
-  // Back-to-back invokes from the same demo signer collide on the account
-  // sequence (txBadSeq): the prepare/submit throws or returns a non-SUCCESS
-  // status, and without a retry the caller silently degrades to "simulated".
-  // Re-fetch the account (fresh sequence) and retry a few times before giving up.
-  const MAX_ATTEMPTS = 3;
-  let lastResult: SubmitResult | undefined;
-  let lastError: unknown;
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    try {
-      const res = await attempt();
-      if (res.status === "SUCCESS") return res;
-      lastResult = res;
-    } catch (err) {
-      lastError = err;
+  // Serialize per signer so concurrent invokes from the same demo secret never
+  // race on the account sequence (see serialize.ts). The retry below is the
+  // second line of defence — for transient RPC hiccups, not for the self-
+  // inflicted txBadSeq collisions the lock already removes.
+  return withSignerLock(signer.publicKey(), async () => {
+    const MAX_ATTEMPTS = 3;
+    let lastResult: SubmitResult | undefined;
+    let lastError: unknown;
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      try {
+        const res = await attempt();
+        if (res.status === "SUCCESS") return res;
+        lastResult = res;
+      } catch (err) {
+        lastError = err;
+      }
+      if (i < MAX_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, 1500));
     }
-    if (i < MAX_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, 1500));
-  }
-  // Persistent failure: hand back the last real status so the caller can degrade
-  // with an accurate reason, or rethrow if we never got a result at all.
-  if (lastResult) return lastResult;
-  throw lastError;
+    // Persistent failure: hand back the last real status so the caller can
+    // degrade with an accurate reason, or rethrow if we never got a result.
+    if (lastResult) return lastResult;
+    throw lastError;
+  });
 }
 
 /**

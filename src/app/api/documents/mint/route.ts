@@ -27,6 +27,7 @@ import {
 import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { server } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
+import { withSignerLock } from "@/lib/stellar/serialize";
 import { hashDocumentContent, DOC_LABEL } from "@/lib/fhir/documents";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 import type { DocumentType, DocumentContent } from "@/types";
@@ -169,21 +170,24 @@ async function realMint(args: {
     return feeBumpAndSend(prepared.toXDR());
   };
 
-  // Back-to-back mints from the same demo issuer collide on the account sequence
-  // (txBadSeq) and, without a retry, degrade the caller to "simulated". Re-fetch
-  // the account and retry a few times before giving up. Mirrors the retry in
-  // stellar/server.ts signInvokeAndSubmit.
-  let submit: Awaited<ReturnType<typeof feeBumpAndSend>> | undefined;
-  let lastError: unknown;
-  for (let i = 0; i < 3; i++) {
-    try {
-      submit = await attempt();
-      if (submit.status === "SUCCESS") break;
-    } catch (err) {
-      lastError = err;
+  // Serialize per issuer so a license mint never races the consultation's other
+  // invokes (ficha, exam, prescription) on the shared demo secret's account
+  // sequence — see stellar/serialize.ts. The retry stays as a transient-error
+  // backstop; the lock is what removes the txBadSeq collisions.
+  const { submit, lastError } = await withSignerLock(issuer.publicKey(), async () => {
+    let submit: Awaited<ReturnType<typeof feeBumpAndSend>> | undefined;
+    let lastError: unknown;
+    for (let i = 0; i < 3; i++) {
+      try {
+        submit = await attempt();
+        if (submit.status === "SUCCESS") break;
+      } catch (err) {
+        lastError = err;
+      }
+      if (i < 2) await new Promise((r) => setTimeout(r, 1500));
     }
-    if (i < 2) await new Promise((r) => setTimeout(r, 1500));
-  }
+    return { submit, lastError };
+  });
   if (!submit || submit.status !== "SUCCESS") {
     throw new Error(
       submit ? `transaction ${submit.status} (${submit.hash})` : String(lastError),

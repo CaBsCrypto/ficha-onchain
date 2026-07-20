@@ -4,7 +4,6 @@ import { useState, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
-import { MOCK_PRESCRIPTIONS } from './types';
 import type { MockPrescription, PrescriptionTipo, PrescriptionStatus } from './types';
 
 // ── Status badges ─────────────────────────────────────────────────────────────
@@ -519,7 +518,9 @@ export function RecetasTab() {
   const { user } = usePrivy();
   const doctorEmail = user?.email?.address ?? '';
 
-  const [recetas, setRecetas] = useState<MockPrescription[]>(MOCK_PRESCRIPTIONS);
+  // Starts empty — only real prescriptions the doctor signs this session appear.
+  // (No seeded sample rows: those read as real patients that were never treated.)
+  const [recetas, setRecetas] = useState<MockPrescription[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [lastMint, setLastMint] = useState<MintResult | null>(null);
 
@@ -574,6 +575,19 @@ export function RecetasTab() {
             )}
           </div>
           <button onClick={() => setLastMint(null)} className="ml-auto shrink-0 text-xs opacity-50 hover:opacity-80">✕</button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {recetas.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+          <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 12h6m-6 4h6M9 4h6a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-3 2V6a2 2 0 0 1 2-2z" />
+          </svg>
+          <p className="mt-3 text-sm font-medium text-slate-600">Aún no hay recetas</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Emite una receta con «Nueva Receta» y quedará anclada on-chain.
+          </p>
         </div>
       )}
 
