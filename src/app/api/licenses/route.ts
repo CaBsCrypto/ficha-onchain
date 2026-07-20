@@ -27,36 +27,12 @@
  * DELETE /api/licenses?id=N&token=ADMIN_TOKEN → hard delete (admin)
  */
 
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensureTable(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS medical_licenses (
-      id            SERIAL PRIMARY KEY,
-      doctor_email  TEXT NOT NULL,
-      patient_email TEXT,
-      patient_name  TEXT NOT NULL,
-      patient_rut   TEXT,
-      fecha_inicio  DATE NOT NULL,
-      dias          INTEGER NOT NULL,
-      cie10         TEXT NOT NULL,
-      tipo          TEXT NOT NULL,
-      diagnostico   TEXT,
-      observaciones TEXT,
-      status        TEXT NOT NULL DEFAULT 'draft',
-      tx_hash       TEXT,
-      doc_hash      TEXT,
-      doc_id        INTEGER,
-      mode          TEXT,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -77,7 +53,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
 
     const rows = doctorEmail
       ? await sql`
@@ -133,7 +108,6 @@ export async function POST(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
 
     const [row] = (await sql`
       INSERT INTO medical_licenses
@@ -185,7 +159,6 @@ export async function PATCH(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
 
     const [updated] = (await sql`
       UPDATE medical_licenses

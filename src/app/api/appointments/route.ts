@@ -5,31 +5,13 @@
  * PATCH  /api/appointments                 — update status / notes
  * DELETE /api/appointments                 — delete appointment
  */
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensureTable(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS appointments (
-      id            SERIAL PRIMARY KEY,
-      doctor_email  TEXT NOT NULL,
-      patient_email TEXT NOT NULL,
-      patient_name  TEXT NOT NULL DEFAULT '',
-      date          DATE NOT NULL,
-      time_slot     TEXT NOT NULL,
-      type          TEXT NOT NULL DEFAULT 'Presencial',
-      motivo        TEXT,
-      notes         TEXT,
-      status        TEXT NOT NULL DEFAULT 'scheduled',
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -50,7 +32,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
 
     const rows = doctorEmail
       ? await sql`
@@ -114,7 +95,6 @@ export async function POST(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     const [row] = await sql`
       INSERT INTO appointments (doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, meet_link)
       VALUES (${doctorEmail}, ${patientEmail}, ${patientName}, ${date}, ${timeSlot}, ${type}, ${motivo}, ${notes}, ${meetLink})
@@ -148,7 +128,6 @@ export async function PATCH(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     // Only a party to the appointment may edit it.
     const [row] = await sql`SELECT doctor_email, patient_email FROM appointments WHERE id = ${id}`;
     if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });

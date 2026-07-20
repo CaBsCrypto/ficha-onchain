@@ -13,7 +13,7 @@
  *   400 { error }   — malformed / missing email
  *   500 { error }   — database error
  */
-import { getDb, type Sql } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -21,17 +21,6 @@ export const dynamic = "force-dynamic";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LEN = 254;
-
-async function ensureTable(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS waitlist (
-      id         SERIAL PRIMARY KEY,
-      email      TEXT    NOT NULL UNIQUE,
-      role       TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
 
 export async function POST(request: Request) {
   let body: { email?: unknown; role?: unknown };
@@ -51,7 +40,6 @@ export async function POST(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
 
     await sql`
       INSERT INTO waitlist (email, role)
@@ -79,7 +67,6 @@ export async function GET(request: Request) {
 
   try {
     const sql = getDb();
-    await ensureTable(sql);
     const rows = await sql`SELECT email, role, created_at FROM waitlist ORDER BY created_at DESC`;
     return NextResponse.json({ count: rows.length, signups: rows });
   } catch (err) {
