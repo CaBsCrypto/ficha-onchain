@@ -55,7 +55,10 @@ interface MintDocData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function addDays(iso: string, n: number): string {
-  const d = new Date(iso + 'T12:00:00');
+  // iso may be a plain "YYYY-MM-DD" or a full ISO timestamp (Neon serialises
+  // DATE columns with a time part); take the date portion so appending
+  // 'T12:00:00' never yields an Invalid Date (which would throw in toISOString).
+  const d = new Date((iso ?? '').slice(0, 10) + 'T12:00:00');
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
 }
