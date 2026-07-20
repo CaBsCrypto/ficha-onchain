@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
 import type { ConsultationType } from './types';
 
@@ -79,7 +80,7 @@ function NuevaConsultaModal({
     if (!canSubmit) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/appointments', {
+      const res = await authedFetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -220,7 +221,7 @@ export function ConsultasTab() {
     if (!doctorEmail) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+      const res = await authedFetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const data = (await res.json()) as { appointments?: Appointment[] };
       setAppointments(data.appointments ?? []);
     } catch { /* ignore */ }
@@ -231,7 +232,7 @@ export function ConsultasTab() {
 
   async function updateStatus(id: number, status: Appointment['status']) {
     setUpdatingId(id);
-    await fetch('/api/appointments', {
+    await authedFetch('/api/appointments', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status }),
@@ -242,7 +243,7 @@ export function ConsultasTab() {
 
   async function deleteAppointment(id: number) {
     setUpdatingId(id);
-    await fetch('/api/appointments', {
+    await authedFetch('/api/appointments', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),

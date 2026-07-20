@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 import { MOCK_PRESCRIPTIONS, MOCK_LICENSES } from './types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ export function InicioTab() {
 
   useEffect(() => {
     if (!doctorEmail) { setLoading(false); return; }
-    fetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}`)
+    authedFetch(`/api/appointments?doctorEmail=${encodeURIComponent(doctorEmail)}`)
       .then((r) => r.json())
       .then((data: { appointments?: Appointment[] }) => {
         const all = data.appointments ?? [];

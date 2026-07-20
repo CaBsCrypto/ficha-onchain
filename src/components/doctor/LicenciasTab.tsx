@@ -18,6 +18,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LicenseTipo = 'Enfermedad' | 'Accidente' | 'Maternidad';
@@ -143,7 +144,7 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
 
   // ── helpers ──────────────────────────────────────────────────────────────
   async function createInDb(): Promise<DBLicense> {
-    const res = await fetch('/api/licenses', {
+    const res = await authedFetch('/api/licenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -232,7 +233,7 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
       setMintRes(result);
 
       // Patch DB
-      await fetch('/api/licenses', {
+      await authedFetch('/api/licenses', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -595,7 +596,7 @@ export function LicenciasTab() {
     if (!doctorEmail) return;
     setLoading(true);
     try {
-      const res  = await fetch(`/api/licenses?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+      const res  = await authedFetch(`/api/licenses?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const json = await res.json() as { data?: DBLicense[] };
       if (json.data) setLicencias(json.data);
     } catch (err) {

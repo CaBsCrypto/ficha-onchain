@@ -22,6 +22,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,10 +48,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const doctorEmail = searchParams.get("doctorEmail")?.trim().toLowerCase();
   const date = searchParams.get("date")?.trim();
-  const includeTaken = searchParams.get("all") === "1";
+  let includeTaken = searchParams.get("all") === "1";
 
   if (!doctorEmail) {
     return NextResponse.json({ error: "doctorEmail required" }, { status: 400 });
+  }
+
+  // Free slots are public (patients need them to book). But ?all=1 also exposes
+  // the patient_name on taken slots — that PII is only for the owning doctor. A
+  // non-owner asking for all=1 silently degrades to the public free-slots view.
+  if (includeTaken) {
+    const owner = await resolveOwnerEmail(request, doctorEmail);
+    if ("error" in owner || owner.email !== doctorEmail) includeTaken = false;
   }
   if (!date || !DATE_RE.test(date)) {
     return NextResponse.json({ error: "date required (YYYY-MM-DD)" }, { status: 400 });

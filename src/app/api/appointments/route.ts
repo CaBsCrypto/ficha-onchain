@@ -8,6 +8,7 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = NeonQueryFunction<any, any>;
@@ -42,12 +43,19 @@ async function ensureTable(sql: Sql) {
 // ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const doctorEmail  = url.searchParams.get("doctorEmail")?.toLowerCase()  ?? "";
-  const patientEmail = url.searchParams.get("patientEmail")?.toLowerCase() ?? "";
+  const doctorParam  = url.searchParams.get("doctorEmail")?.toLowerCase()  ?? "";
+  const patientParam = url.searchParams.get("patientEmail")?.toLowerCase() ?? "";
 
-  if (!doctorEmail && !patientEmail) {
+  if (!doctorParam && !patientParam) {
     return NextResponse.json({ error: "doctorEmail or patientEmail required" }, { status: 400 });
   }
+
+  // The caller may only list their own agenda — as the doctor or as the patient
+  // named in the query. The param is trusted only in demo mode.
+  const owner = await resolveOwnerEmail(request, doctorParam || patientParam);
+  if ("error" in owner) return owner.error;
+  const doctorEmail  = doctorParam  ? owner.email : "";
+  const patientEmail = patientParam ? owner.email : "";
 
   try {
     const sql = getDb();
@@ -97,6 +105,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "doctorEmail, patientEmail, date, timeSlot required" }, { status: 400 });
   }
 
+  // Either party to the appointment may create it: the patient booking with
+  // their doctor, or the doctor scheduling for their patient. A logged-in caller
+  // must be one of the two; demo mode passes through.
+  const actor = await requireActor(request, [doctorEmail, patientEmail]);
+  if ("error" in actor) return actor.error;
+
   // A telemedicine appointment gets its own video room, stored on the row so it
   // survives restarts and both portals read the same link. Jitsi rooms need no
   // account or API — the random suffix keeps the URL unguessable.
@@ -142,6 +156,12 @@ export async function PATCH(request: Request) {
   try {
     const sql = getDb();
     await ensureTable(sql);
+    // Only a party to the appointment may edit it.
+    const [row] = await sql`SELECT doctor_email, patient_email FROM appointments WHERE id = ${id}`;
+    if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    const actor = await requireActor(request, [row.doctor_email as string, row.patient_email as string]);
+    if ("error" in actor) return actor.error;
+
     if (body.status !== undefined) await sql`UPDATE appointments SET status = ${String(body.status)} WHERE id = ${id}`;
     if (body.notes  !== undefined) await sql`UPDATE appointments SET notes  = ${body.notes ? String(body.notes) : null} WHERE id = ${id}`;
     if (body.motivo !== undefined) await sql`UPDATE appointments SET motivo = ${body.motivo ? String(body.motivo) : null} WHERE id = ${id}`;
@@ -164,6 +184,12 @@ export async function DELETE(request: Request) {
 
   try {
     const sql = getDb();
+    // Only a party to the appointment may delete it.
+    const [row] = await sql`SELECT doctor_email, patient_email FROM appointments WHERE id = ${id}`;
+    if (!row) return NextResponse.json({ success: true }); // already gone (idempotent)
+    const actor = await requireActor(request, [row.doctor_email as string, row.patient_email as string]);
+    if ("error" in actor) return actor.error;
+
     await sql`DELETE FROM appointments WHERE id = ${id}`;
     return NextResponse.json({ success: true });
   } catch (err) {

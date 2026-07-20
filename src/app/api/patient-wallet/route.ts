@@ -14,6 +14,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,11 @@ function getDb() {
 }
 
 export async function GET(request: Request) {
+  // A logged-in user (doctor resolving a patient's wallet) is required under
+  // enforcement; demo passes through. This route claimed to guard but did not.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   const { searchParams } = new URL(request.url);
   const email = searchParams.get("email")?.trim().toLowerCase();
 

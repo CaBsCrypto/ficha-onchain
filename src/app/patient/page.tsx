@@ -1715,7 +1715,7 @@ function LicenciasTab() {
   useEffect(() => {
     if (!privyEmail) { setLoading(false); return; }
     setLoading(true);
-    fetch(`/api/licenses?patientEmail=${encodeURIComponent(privyEmail)}`)
+    authedFetch(`/api/licenses?patientEmail=${encodeURIComponent(privyEmail)}`)
       .then(r => r.json() as Promise<{ data?: PatientDBLicense[] }>)
       .then(json => { if (json.data) setLicencias(json.data); })
       .catch(err => console.error('[LicenciasTab patient]', err))
@@ -2233,7 +2233,7 @@ function ConsultasTab({ wallet: _wallet, mock }: { wallet: string; mock: boolean
   // Fetch real appointments by patient email
   useEffect(() => {
     if (!privyEmail) { setLoading(false); return; }
-    fetch(`/api/appointments?patientEmail=${encodeURIComponent(privyEmail)}`)
+    authedFetch(`/api/appointments?patientEmail=${encodeURIComponent(privyEmail)}`)
       .then((r) => r.json())
       .then((data: { appointments?: DBAppointment[] }) => {
         setAppointments(data.appointments ?? []);
@@ -2458,7 +2458,7 @@ function RequestAppointmentForm({
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/appointments', {
+      const res = await authedFetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

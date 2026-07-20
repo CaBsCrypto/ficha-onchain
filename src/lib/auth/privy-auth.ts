@@ -128,6 +128,47 @@ export async function resolveOwnerEmail(
   return { email: wanted };
 }
 
+/**
+ * Guard for a resource shared by more than one actor (an appointment belongs to
+ * BOTH a doctor and a patient; either may act on it). The caller is allowed when
+ * their token email matches ANY of `candidateEmails`.
+ *
+ *   - token matching one candidate  → { email } (the caller's own)
+ *   - token matching none           → { error: 403 }
+ *   - no token + enforced           → { error: 401 }
+ *   - no token + demo               → { email: first candidate }  (param trusted)
+ */
+export async function requireActor(
+  request: Request,
+  candidateEmails: (string | null | undefined)[],
+): Promise<{ email: string } | { error: NextResponse }> {
+  const cands = candidateEmails
+    .map((e) => e?.trim().toLowerCase())
+    .filter((e): e is string => Boolean(e));
+  const user = await requireUser(request);
+
+  if (user?.email) {
+    if (cands.length && !cands.includes(user.email)) return { error: forbidden() };
+    return { email: user.email };
+  }
+  if (authEnforced()) return { error: unauthorized() };
+  return { email: cands[0] ?? "" };
+}
+
+/**
+ * Minimal guard for routes that only need "a logged-in user" (no ownership),
+ * e.g. resolving another user's public wallet from the doctor portal. Requires a
+ * valid token when enforcement is on; passes through in demo mode.
+ */
+export async function requireAuthOrDemo(
+  request: Request,
+): Promise<{ error: NextResponse } | null> {
+  const user = await requireUser(request);
+  if (user) return null;
+  if (authEnforced()) return { error: unauthorized() };
+  return null;
+}
+
 export function forbidden() {
   return NextResponse.json({ error: "forbidden" }, { status: 403 });
 }
