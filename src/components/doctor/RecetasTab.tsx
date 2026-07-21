@@ -204,6 +204,7 @@ function NuevaRecetaModal({
           patientEmail:      form.patientEmail || undefined,
           healthSystem:      'FONASA',
           // Prescriber
+          doctorEmail:       defaultDoctorEmail || undefined,
           doctorName:        form.doctorName || defaultDoctorEmail,
           doctorRut:         form.doctorRut || '00000000-0',
           doctorSpecialty:   form.doctorSpecialty || 'Medicina General',

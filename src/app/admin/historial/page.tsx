@@ -23,6 +23,7 @@ const KIND_META: Record<string, { label: string; dot: string; ring: string }> = 
   "appointment.created": { label: "Reserva",       dot: "bg-indigo-500",  ring: "bg-indigo-50 text-indigo-700" },
   "consent.granted":     { label: "Consentimiento",dot: "bg-amber-500",   ring: "bg-amber-50 text-amber-700" },
   "ficha.appended":      { label: "Ficha",         dot: "bg-teal-500",    ring: "bg-teal-50 text-teal-700" },
+  "prescription.issued": { label: "Receta",        dot: "bg-violet-500",  ring: "bg-violet-50 text-violet-700" },
   "document.uploaded":   { label: "Examen",        dot: "bg-cyan-500",    ring: "bg-cyan-50 text-cyan-700" },
   "antecedentes.updated":{ label: "Antecedentes",  dot: "bg-lime-500",    ring: "bg-lime-50 text-lime-700" },
   "license.issued":      { label: "Licencia",      dot: "bg-rose-500",    ring: "bg-rose-50 text-rose-700" },

@@ -37,6 +37,7 @@ import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { withSignerLock } from "@/lib/stellar/serialize";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
+import { getDb } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 import type {
   Decreto41Prescription,
@@ -65,6 +66,7 @@ interface MintBody {
   patientAddress?: string;
   patientPhone?: string;
   patientEmail?: string;
+  doctorEmail?: string;
   healthSystem?: HealthSystem;
   representativeName?: string;
   representativeRut?: string;
@@ -175,6 +177,26 @@ async function handleMint(request: Request) {
   const patientIsG = isStellarAddress(patient);
   const doctorSecret = getDemoDoctorSecret();
 
+  // Off-chain mirror of the issuance so /admin/historial can surface recetas
+  // (the chain is the source of truth; this is only for observability). Never
+  // blocks or fails the mint — best-effort.
+  const logPrescription = async (result: { mode: string; rxId: string | null; hash: string }) => {
+    try {
+      const sql = getDb();
+      await sql`
+        INSERT INTO prescriptions_log
+          (rx_id, tx_hash, mode, patient_email, patient_name, doctor_email,
+           medication, dosage, quantity, cie10, diagnosis)
+        VALUES
+          (${result.rxId}, ${result.hash ?? null}, ${result.mode},
+           ${body.patientEmail ?? null}, ${body.patientName ?? null}, ${body.doctorEmail ?? null},
+           ${medication}, ${dosage}, ${quantity},
+           ${body.cie10Code ?? null}, ${body.diagnosis ?? null})`;
+    } catch (err) {
+      console.error("[mint] prescriptions_log", err);
+    }
+  };
+
   // 2. Attempt a real on-chain mint when we have a signer + a valid patient addr.
   if (doctorSecret && patientIsG) {
     try {
@@ -186,10 +208,13 @@ async function handleMint(request: Request) {
         dosage,
         units,
       });
+      await logPrescription(result);
       return NextResponse.json(result);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      return NextResponse.json(simulated(rxHash, `on-chain mint failed: ${detail}`));
+      const sim = simulated(rxHash, `on-chain mint failed: ${detail}`);
+      await logPrescription(sim);
+      return NextResponse.json(sim);
     }
   }
 
@@ -197,7 +222,9 @@ async function handleMint(request: Request) {
   const reason = !doctorSecret
     ? "no doctor signer configured (DEMO_DOCTOR_SECRET/RELAYER_SECRET)"
     : "patient is not a Stellar address";
-  return NextResponse.json(simulated(rxHash, reason));
+  const sim = simulated(rxHash, reason);
+  await logPrescription(sim);
+  return NextResponse.json(sim);
 }
 
 export const POST = handleMint;
