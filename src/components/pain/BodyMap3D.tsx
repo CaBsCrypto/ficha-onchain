@@ -245,6 +245,13 @@ export default function BodyMap3D({
     const w = container.clientWidth, h = container.clientHeight;
     renderer.setSize(w, h);
     renderer.setClearColor(0x000000, 0);
+    // Colour management (THREE r128). Without this the sRGB skin textures are
+    // shown straight in linear space — blown out and orange. sRGB output +
+    // ACES tone mapping give a natural, filmic skin tone. GLTFLoader already
+    // tags the colour/emissive maps as sRGB, so only the OUTPUT needs setting.
+    renderer.outputEncoding = T.sRGBEncoding;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     container.appendChild(renderer.domElement);
 
     // ── Camera ────────────────────────────────────────────────────────────────
@@ -254,14 +261,18 @@ export default function BodyMap3D({
 
     // ── Scene & lights ────────────────────────────────────────────────────────
     const scene = new T.Scene();
-    scene.add(new T.AmbientLight(0xffe8d8, 0.90));   // warm ambient
-    const key = new T.DirectionalLight(0xfff6ee, 1.6); // warm key light
+    // Near-neutral studio lighting. The previous rig was strongly warm-tinted on
+    // top of orange skin, which — with no tone mapping — pushed the model neon
+    // orange. Neutral whites + ACES keep the skin natural. A faint warm/cool
+    // split (key barely warm, fill barely cool) still gives it dimension.
+    scene.add(new T.AmbientLight(0xffffff, 0.55));      // neutral ambient
+    const key = new T.DirectionalLight(0xfff4ec, 2.2);  // key, a touch warm
     key.position.set(1.5, 3.5, 3.0); scene.add(key);
-    const fill = new T.DirectionalLight(0x88aacc, 0.55); // cool fill (opposite)
+    const fill = new T.DirectionalLight(0xdce6f2, 0.9); // fill, a touch cool
     fill.position.set(-2.5, 1.0, -1.5); scene.add(fill);
-    const back = new T.DirectionalLight(0xffe0c0, 0.40); // warm rim from behind
-    back.position.set(0.0, 1.0, -3.0); scene.add(back);
-    const top = new T.DirectionalLight(0xffffff, 0.25); // soft top
+    const back = new T.DirectionalLight(0xffffff, 0.7); // rim from behind
+    back.position.set(0.0, 1.5, -3.0); scene.add(back);
+    const top = new T.DirectionalLight(0xffffff, 0.35); // soft top
     top.position.set(0, 4, 0); scene.add(top);
 
     // ── Pivot for rotation ────────────────────────────────────────────────────
@@ -387,6 +398,15 @@ export default function BodyMap3D({
 
     // ── Camera state ──────────────────────────────────────────────────────────
     let rotY = 0, rotX = 0;
+    // When a focus preset (incl. Reset) is chosen, ease the body back to a
+    // front-on orientation instead of leaving it at whatever angle the last drag
+    // or the idle auto-spin left it. null = no target (free / dragging).
+    let rotYTarget: number | null = null, rotXTarget = 0;
+    const faceFront = () => {
+      // Nearest multiple of 2π to the current rotY → shortest way round to front.
+      rotYTarget = Math.round(rotY / (2 * Math.PI)) * 2 * Math.PI;
+      rotXTarget = 0;
+    };
     const ROT_X_MIN = -Math.PI / 4, ROT_X_MAX = Math.PI / 3;
     const ZOOM_MIN = 1.2, ZOOM_MAX = 6.0;
 
@@ -497,7 +517,7 @@ export default function BodyMap3D({
     function onMouseDown(e: MouseEvent) {
       const { nx, ny, px, py } = screenToNDC(e);
       lastInteractionRef.current = performance.now();
-      camAnim = null;
+      camAnim = null; rotYTarget = null; // manual drag cancels face-front easing
       isDragging = true;
       prevX = dragStartX = e.clientX; prevY = dragStartY = e.clientY;
       if (toolRef.current === "area" && !readOnly) {
@@ -553,7 +573,7 @@ export default function BodyMap3D({
     function onWheel(e: WheelEvent) {
       e.preventDefault();
       lastInteractionRef.current = performance.now();
-      camAnim = null; // manual zoom cancels any focus animation
+      camAnim = null; rotYTarget = null; // manual zoom cancels any focus animation
       const { nx, ny } = screenToNDC(e);
       // Multiplicative: each notch changes distance by a percentage, so steps
       // shrink as you close in instead of overshooting past the skin.
@@ -565,7 +585,7 @@ export default function BodyMap3D({
     let touchStartX = 0, touchStartY = 0, pinchDist0 = 0, camZ0 = 0;
     function onTouchStart(e: TouchEvent) {
       lastInteractionRef.current = performance.now();
-      camAnim = null;
+      camAnim = null; rotYTarget = null;
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -672,8 +692,17 @@ export default function BodyMap3D({
         }
       }
 
+      // Ease toward a front-on orientation after a focus preset / Reset.
+      if (rotYTarget !== null) {
+        rotY += (rotYTarget - rotY) * 0.15;
+        rotX += (rotXTarget - rotX) * 0.15;
+        if (Math.abs(rotYTarget - rotY) < 0.001 && Math.abs(rotXTarget - rotX) < 0.001) {
+          rotY = rotYTarget; rotX = rotXTarget; rotYTarget = null;
+        }
+      }
+
       const idle = performance.now() - lastInteractionRef.current > IDLE_RESUME_MS;
-      if (idle && !isDragging && !draggingNeedleRef.current && !confirmingRef.current && hoveredZone === null) {
+      if (rotYTarget === null && idle && !isDragging && !draggingNeedleRef.current && !confirmingRef.current && hoveredZone === null) {
         rotY += 0.003;
       }
 
@@ -736,6 +765,7 @@ export default function BodyMap3D({
       },
       focusOn(x: number, y: number, z: number) {
         camAnim = { x: clamp(x, CAM_X_MIN, CAM_X_MAX), y: clamp(y, CAM_Y_MIN, CAM_Y_MAX), z: clamp(z, ZOOM_MIN, ZOOM_MAX) };
+        faceFront(); // re-orient to front, not wherever the last drag/spin left it
         lastInteractionRef.current = performance.now(); // don't auto-spin on arrival
       },
       removeNeedle(id: string) {
@@ -894,6 +924,9 @@ export default function BodyMap3D({
           {([
             ["Cabeza",  0, 1.52, 1.45],
             ["Torso",   0, 1.02, 2.10],
+            // Arms hang at the sides (y≈0.47–1.1); frame both a touch wider so
+            // brazo/antebrazo/muñeca/mano are all reachable without hunting.
+            ["Brazos",  0, 0.82, 2.35],
             ["Piernas", 0, 0.18, 2.30],
             ["Reset",   0, 0.58, 2.80],
           ] as const).map(([label, x, y, z]) => (
@@ -1086,7 +1119,7 @@ interface THREEGroup  extends THREEObj3D { remove(o: THREEObj3D): void; worldToL
 interface THREECamera { position: THREEVec3; aspect?: number; updateProjectionMatrix?(): void }
 interface THREEQuaternion { setFromUnitVectors(from: THREEVec3, to: THREEVec3): THREEQuaternion; copy(q: THREEQuaternion): void }
 interface THREEBox3   { setFromObject(o: THREEObj3D): THREEBox3; getSize(v: THREEVec3): THREEVec3; getCenter(v: THREEVec3): THREEVec3 }
-interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void }
+interface THREERenderer { domElement: HTMLCanvasElement; setPixelRatio(r: number): void; setSize(w: number, h: number): void; setClearColor(c: number, a: number): void; render(s: THREEScene, c: THREECamera): void; dispose(): void; outputEncoding: number; toneMapping: number; toneMappingExposure: number }
 interface THREECaster  { setFromCamera(p: THREEVec2, c: THREECamera): void; intersectObjects(o: THREEMesh[], recursive?: boolean): Array<{ object: THREEObj3D; point: THREEVec3; face?: { normal: THREEVec3 } | null }> }
 interface GLTF         { scene: THREEGroup }
 interface THREECtors {
@@ -1105,6 +1138,9 @@ interface THREECtors {
   Vector2:          new () => THREEVec2;
   Quaternion:       new () => THREEQuaternion;
   Raycaster:        new () => THREECaster;
+  // Colour-management constants (THREE r128).
+  sRGBEncoding: number;
+  ACESFilmicToneMapping: number;
 }
 interface GLTFLoaderClass { load(url: string, onLoad: (g: GLTF) => void, onProgress: undefined, onError: (e: unknown) => void): void }
 interface WindowWithTHREE { THREE?: THREECtors; GLTFLoader?: new () => GLTFLoaderClass }
