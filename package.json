@@ -9,7 +9,9 @@
     "lint": "next lint",
     "test:flow": "node scripts/test-flow.mjs",
     "test:onchain": "node scripts/test-onchain.mjs",
-    "test:phases": "node scripts/phases/run.mjs"
+    "test:phases": "node scripts/phases/run.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -47,6 +49,7 @@
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^4.3.2",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.10"
   }
 }
