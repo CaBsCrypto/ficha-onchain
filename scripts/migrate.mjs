@@ -329,10 +329,15 @@ step("prescriptions_log", async () => {
       quantity       INTEGER,
       cie10          TEXT,
       diagnosis      TEXT,
+      prescription_type TEXT,               -- SIMPLE | RETENIDA | MAGISTRAL
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+  // Added after the table shipped — idempotent for branches already migrated.
+  await sql`ALTER TABLE prescriptions_log ADD COLUMN IF NOT EXISTS prescription_type TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS idx_prescriptions_log_created
               ON prescriptions_log (created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_prescriptions_log_doctor
+              ON prescriptions_log (doctor_email, created_at DESC)`;
 });
 
 // ── Run ─────────────────────────────────────────────────────────────────────

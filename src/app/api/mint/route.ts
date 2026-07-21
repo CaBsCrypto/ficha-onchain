@@ -186,12 +186,12 @@ async function handleMint(request: Request) {
       await sql`
         INSERT INTO prescriptions_log
           (rx_id, tx_hash, mode, patient_email, patient_name, doctor_email,
-           medication, dosage, quantity, cie10, diagnosis)
+           medication, dosage, quantity, cie10, diagnosis, prescription_type)
         VALUES
           (${result.rxId}, ${result.hash ?? null}, ${result.mode},
            ${body.patientEmail ?? null}, ${body.patientName ?? null}, ${body.doctorEmail ?? null},
            ${medication}, ${dosage}, ${quantity},
-           ${body.cie10Code ?? null}, ${body.diagnosis ?? null})`;
+           ${body.cie10Code ?? null}, ${body.diagnosis ?? null}, ${body.prescriptionType ?? null})`;
     } catch (err) {
       console.error("[mint] prescriptions_log", err);
     }
