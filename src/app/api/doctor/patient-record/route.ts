@@ -18,9 +18,12 @@
  * In demo mode (no token, enforcement off) the treating check passes through so
  * the flow scripts keep working; with a token it is enforced.
  */
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
+import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
+import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,7 +121,50 @@ export async function PATCH(request: Request): Promise<NextResponse> {
         conditions = EXCLUDED.conditions,
         updated_at = NOW()
       RETURNING patient_email, blood_type, height_cm, weight_kg, bmi, allergies, conditions, updated_at`;
-    return NextResponse.json({ data: rows[0] });
+
+    // Anchor the antecedentes on-chain — the hash of the just-saved structured
+    // record is appended to the patient's ClinicalRecord (same contract, signer
+    // and doctor write-grant as the ficha). Only the 32-byte hash touches the
+    // chain; the record itself stays off-chain. Best-effort: a chain failure
+    // degrades to mode:"simulated" and never fails the save.
+    const saved = rows[0] as Record<string, unknown>;
+    const canonical = JSON.stringify({
+      kind: "Antecedentes",
+      patientEmail: g.patientEmail,
+      blood_type: saved.blood_type ?? null,
+      height_cm: saved.height_cm ?? null,
+      weight_kg: saved.weight_kg ?? null,
+      bmi: saved.bmi ?? null,
+      allergies: saved.allergies ?? [],
+      conditions: saved.conditions ?? [],
+    });
+    const contentHash = createHash("sha256").update(canonical).digest();
+    let mode: "onchain" | "simulated" = "simulated";
+    let txHash: string | null = null;
+    const doctorSecret = getDemoDoctorSecret();
+    if (doctorSecret) {
+      try {
+        const res = await appendClinicalEntry({
+          doctorSecret,
+          contractId: CONTRACT_IDS.clinicalRecordDemo,
+          kind: "Antecedentes",
+          contentHash,
+        });
+        if (res.status === "SUCCESS") { mode = "onchain"; txHash = res.hash; }
+      } catch (err) {
+        console.error("[patient-record] anchor", err);
+      }
+    }
+    await sql`
+      UPDATE patient_health_records
+      SET content_hash = ${contentHash.toString("hex")}, tx_hash = ${txHash}, mode = ${mode}
+      WHERE patient_email = ${g.patientEmail}`;
+
+    return NextResponse.json({
+      data: saved,
+      anchor: { mode, hash: txHash, contentHash: contentHash.toString("hex"),
+                explorer: txHash ? STELLAR_EXPERT_TX(txHash) : null },
+    });
   } catch (err) {
     if (err instanceof DbNotConfiguredError) {
       return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
