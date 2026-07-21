@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { privyEmail } from '@/lib/auth/privy-email';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
 import type { ConsultationType } from './types';
@@ -214,7 +215,7 @@ function NuevaConsultaModal({
 // ── ConsultasTab ──────────────────────────────────────────────────────────────
 export function ConsultasTab() {
   const { user } = usePrivy();
-  const doctorEmail = user?.email?.address ?? '';
+  const doctorEmail = privyEmail(user) ?? '';
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);

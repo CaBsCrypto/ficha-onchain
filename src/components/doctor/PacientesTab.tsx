@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { privyEmail } from '@/lib/auth/privy-email';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { cn } from '@/lib/utils';
@@ -354,7 +355,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export function PacientesTab() {
   const { user }     = usePrivy();
   const displayEmail = usePrivyEmail();
-  const doctorEmail  = user?.email?.address ?? displayEmail ?? '';
+  const doctorEmail  = privyEmail(user) ?? displayEmail ?? '';
 
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [loading,  setLoading]  = useState(true);

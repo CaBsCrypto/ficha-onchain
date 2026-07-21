@@ -34,6 +34,7 @@ import {
 import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { server, isDoctorAuthorized } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
+import { withSignerLock } from "@/lib/stellar/serialize";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
@@ -235,22 +236,45 @@ async function realMint(args: {
     nativeToScVal(expiresAt, { type: "u64" }),
   );
 
-  const source = await server.getAccount(doctor.publicKey());
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(op)
-    .setTimeout(60)
-    .build();
+  // One build→prepare→sign→submit cycle; account fetched inside so each retry
+  // gets a fresh sequence number.
+  const attempt = async () => {
+    const source = await server.getAccount(doctor.publicKey());
+    const tx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(op)
+      .setTimeout(60)
+      .build();
 
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(doctor);
+    const prepared = await server.prepareTransaction(tx);
+    prepared.sign(doctor);
+    // Relayer fee-bumps so the doctor spends no XLM.
+    return feeBumpAndSend(prepared.toXDR());
+  };
 
-  // Relayer fee-bumps so the doctor spends no XLM.
-  const submit = await feeBumpAndSend(prepared.toXDR());
-  if (submit.status !== "SUCCESS") {
-    throw new Error(`transaction ${submit.status} (${submit.hash})`);
+  // Serialize per doctor signer + retry, so a prescription mint never races the
+  // consultation's ficha / exam / license invokes on the shared account
+  // sequence (see stellar/serialize.ts).
+  const { submit, lastError } = await withSignerLock(doctor.publicKey(), async () => {
+    let submit: Awaited<ReturnType<typeof feeBumpAndSend>> | undefined;
+    let lastError: unknown;
+    for (let i = 0; i < 3; i++) {
+      try {
+        submit = await attempt();
+        if (submit.status === "SUCCESS") break;
+      } catch (err) {
+        lastError = err;
+      }
+      if (i < 2) await new Promise((r) => setTimeout(r, 1500));
+    }
+    return { submit, lastError };
+  });
+  if (!submit || submit.status !== "SUCCESS") {
+    throw new Error(
+      submit ? `transaction ${submit.status} (${submit.hash})` : String(lastError),
+    );
   }
 
   const rxId =
