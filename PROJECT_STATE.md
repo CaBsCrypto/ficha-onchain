@@ -2,7 +2,7 @@
 
 > Fuente de verdad del **estado** (no del código). Qué está hecho, qué falta,
 > qué se decidió y por qué. Se actualiza al cerrar cada pieza de trabajo.
-> Última actualización: 2026-07-17
+> Última actualización: 2026-07-21
 
 ---
 
@@ -13,9 +13,9 @@ comprobables en Stellar Expert. El SOW tiene 3 entregables.
 
 | Entregable | Estado | Detalle |
 | --- | --- | --- |
-| **D1 — Contratos testeados y desplegados** | ✅ **Cerrado** | 33 tests pasando, validación de médico on-chain, ambos contratos desplegados. Mergeado en `main` (PR #4). |
-| **D2 — Interfaz doctor + paciente** | 🟡 **~85%** | Doctor emite (real). Paciente ve recetas reales + botón activar. **Falta: verificar logueado en el navegador.** En PR #5. |
-| **D3 — Integración E2E + demo grabado** | ⬜ **~15%** | Hay hashes reales (timestamp map empezado). Falta: correr la secuencia completa por la UI, grabar, mapear cada paso a su hash. |
+| **D1 — Contratos testeados y desplegados** | ✅ **Cerrado** | Contratos desplegados; `cargo test` (3 crates) en CI + suite `vitest` (18 tests). |
+| **D2 — Interfaz doctor + paciente** | ✅ **Cerrado** | Flujo verificado **logueado en el navegador** con 3 actores Privy reales. Médico emite receta real (`rx-17` on-chain); paciente la ve desde Soroban y **activa** (QR). Se resolvieron los bugs de login Google que bloqueaban el portal médico. |
+| **D3 — Integración E2E + demo grabado** | 🟡 **~65%** | Integración **cerrada**: los 5 pasos on-chain con tx reales verificables → ver [`docs/D3_EVIDENCE.md`](docs/D3_EVIDENCE.md). **Falta: grabar el video** siguiendo [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). |
 
 ---
 
@@ -43,18 +43,23 @@ comprobables en Stellar Expert. El SOW tiene 3 entregables.
 
 ---
 
-## 📌 Trabajo en curso
+## 📌 Sprint 1 de pulido (2026-07-21) — mergeado a `main`
 
-- **PR #5** `feat/patient-rx-flow` — flujo del paciente (lectura on-chain + activar).
-  Verificado por código y cadena; **falta la prueba visual logueado**.
-- Rama actual de trabajo: `feat/patient-rx-flow`.
+Sobre el núcleo del SOW, ya cerrado, se hizo una pasada de pulido:
+
+- **Licencias on-chain** (#37): firmaban con el email en vez de la wallet → resuelto (resuelve la G-address). Validado on-chain + concurrencia.
+- **Recetas en el historial global** (#38): espejo `prescriptions_log` → aparecen en `/admin/historial`.
+- **Antecedentes on-chain** (#40): se ancla el hash en ClinicalRecord (cerró la última brecha off-chain del núcleo).
+- **Tests** (#39): vitest instalado + 18 tests en verde.
+- **Recetas reales en el portal médico** (#41): la pestaña lista lo que el médico realmente emitió (desde el espejo).
 
 ## ⬜ Pendiente (priorizado)
 
-1. **Verificar D2 en el navegador** — entrar como paciente, ver las 3 recetas, activar la Registrada.
-2. **Grabar el demo D3** + completar el timestamp map.
-3. **Deuda de seguridad** — 10 rutas todavía confían en `?email=` sin auth (la ficha ya se cerró). Ver `src/lib/auth/privy-auth.ts`.
-4. Actualizar los "facts" de `AGENTS.md` (dicen "minting blocked", ya es falso).
+1. **Grabar el demo D3** — seguir [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md); la evidencia de una corrida real está en [`docs/D3_EVIDENCE.md`](docs/D3_EVIDENCE.md).
+2. **Deploy prod on-chain** — cargar en Vercel los secrets de firma (`DEMO_DOCTOR_SECRET`, `DEMO_PATIENT_SECRET`, `RELAYER_SECRET`) y correr `node scripts/migrate.mjs` contra el branch prod (tablas nuevas: `prescriptions_log`, columnas de antecedentes). Sin eso, el deploy degrada a simulado.
+3. **CI: sumar `npm test`** al workflow (requiere token con scope `workflow`).
+4. **Fase 2** — firma **por-cuenta real** (passkey por usuario, hoy es una wallet demo compartida en servidor); periféricos (farmacia, dental, óptica, cuidador); diario de dolor drill-down (PR #36, en pausa).
+5. Actualizar los "facts" de `AGENTS.md` (el "minting blocked" ya es falso: `rx-17` minteó on-chain).
 
 ---
 
