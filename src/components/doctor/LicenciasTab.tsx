@@ -206,11 +206,26 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
         ? Math.floor(new Date(fechaFin + 'T23:59:59').getTime() / 1000)
         : 0;
 
+      // document-soulbound only mints on-chain when the recipient is a Stellar
+      // G-address; a raw email always degraded the licence to "simulated".
+      // Resolve the patient's wallet from their email first, and only fall back
+      // to the email/name if they have no registered wallet.
+      let recipient = form.patientEmail || form.patientName;
+      if (form.patientEmail) {
+        try {
+          const wr = await authedFetch(`/api/patient-wallet?email=${encodeURIComponent(form.patientEmail)}`);
+          if (wr.ok) {
+            const wj = (await wr.json()) as { wallet?: string };
+            if (wj.wallet) recipient = wj.wallet;
+          }
+        } catch { /* keep fallback — licence will simulate, but honestly */ }
+      }
+
       const mintResponse = await authedFetch('/api/documents/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipient: form.patientEmail || form.patientName,
+          recipient,
           docType: 'LaborRest',
           expiresAt,
           payload: {
