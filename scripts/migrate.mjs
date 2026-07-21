@@ -251,6 +251,11 @@ step("patient_health_records", async () => {
   await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS address           TEXT`;
   await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS prevision         TEXT`;
   await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS emergency_contact TEXT`;
+  // On-chain anchor of the antecedentes: SHA-256 of the structured record +
+  // the tx that appended it to the patient's ClinicalRecord (null if simulated).
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS content_hash TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS tx_hash      TEXT`;
+  await sql`ALTER TABLE patient_health_records ADD COLUMN IF NOT EXISTS mode         TEXT`;
 });
 
 // ── Clinical record entries (off-chain mirror of the on-chain ficha) ────────

@@ -196,7 +196,7 @@ export async function GET(request: Request) {
 
     // ── Antecedentes (structured health record) updated ───────────────────
     for (const r of await sql`
-      SELECT patient_email, full_name, updated_at
+      SELECT patient_email, full_name, tx_hash, mode, updated_at
       FROM patient_health_records ORDER BY updated_at DESC LIMIT 200
     `.catch(() => [])) {
       const ts = iso(r.updated_at); if (!ts) continue;
@@ -205,6 +205,8 @@ export async function GET(request: Request) {
         title: "Antecedentes clínicos actualizados",
         detail: (r.full_name as string) ?? undefined,
         actor: (r.patient_email as string) ?? undefined,
+        tx_hash: (r.tx_hash as string) ?? undefined,
+        mode: (r.mode as string) ?? undefined,
       });
     }
 
