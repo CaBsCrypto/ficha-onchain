@@ -303,6 +303,33 @@ step("clinical_documents", async () => {
               ON clinical_documents (patient_email, created_at DESC)`;
 });
 
+step("prescriptions_log", async () => {
+  // Prescriptions live on-chain (prescription-soulbound), not in a table — so
+  // the global activity feed had no way to surface them. This is a thin OFF-chain
+  // MIRROR written right after a mint: enough to list "who prescribed what, when,
+  // on-chain or simulated" in /admin/historial. The chain stays the source of
+  // truth; this is only for observability. No PII beyond what a receta already
+  // carries; the clinical payload itself is never stored here.
+  await sql`
+    CREATE TABLE IF NOT EXISTS prescriptions_log (
+      id             SERIAL PRIMARY KEY,
+      rx_id          TEXT,                 -- on-chain prescription id (null if simulated)
+      tx_hash        TEXT,
+      mode           TEXT NOT NULL DEFAULT 'simulated',  -- 'onchain' | 'simulated'
+      patient_email  TEXT,
+      patient_name   TEXT,
+      doctor_email   TEXT,
+      medication     TEXT,
+      dosage         TEXT,
+      quantity       INTEGER,
+      cie10          TEXT,
+      diagnosis      TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_prescriptions_log_created
+              ON prescriptions_log (created_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

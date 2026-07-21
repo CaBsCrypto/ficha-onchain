@@ -160,6 +160,24 @@ export async function GET(request: Request) {
       });
     }
 
+    // ── Prescriptions issued (off-chain mirror of the on-chain receta) ────
+    for (const r of await sql`
+      SELECT rx_id, tx_hash, mode, patient_email, patient_name, doctor_email,
+             medication, dosage, quantity, created_at
+      FROM prescriptions_log ORDER BY created_at DESC LIMIT 200
+    `.catch(() => [])) {
+      const ts = iso(r.created_at); if (!ts) continue;
+      events.push({
+        ts, kind: "prescription.issued", table: "prescriptions_log",
+        title: `Receta emitida: ${r.medication ?? "medicamento"}`,
+        detail: [r.dosage, r.quantity ? `${r.quantity} u.` : null, r.patient_name]
+          .filter(Boolean).join(" · ") || undefined,
+        actor: (r.doctor_email as string) ?? (r.patient_email as string) ?? undefined,
+        tx_hash: (r.tx_hash as string) ?? undefined,
+        mode: (r.mode as string) ?? undefined,
+      });
+    }
+
     // ── Clinical documents (exams / labs / imaging) uploaded ──────────────
     for (const r of await sql`
       SELECT id, patient_email, doctor_email, category, title, tx_hash, mode, created_at

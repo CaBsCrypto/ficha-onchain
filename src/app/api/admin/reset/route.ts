@@ -30,6 +30,7 @@ const TRANSACTIONAL_TABLES = [
   "medical_licenses",
   "clinical_entries",
   "clinical_documents",
+  "prescriptions_log",
   "doctor_availability",
   "doctor_time_off",
   "pain_diary",
