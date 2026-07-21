@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
+import { privyEmail } from '@/lib/auth/privy-email';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 // ── InicioTab ─────────────────────────────────────────────────────────────────
 export function InicioTab() {
   const { user } = usePrivy();
-  const doctorEmail = user?.email?.address ?? '';
+  const doctorEmail = privyEmail(user) ?? '';
 
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [totalAppointments, setTotalAppointments] = useState(0);

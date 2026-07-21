@@ -91,7 +91,8 @@ export default function PainDiaryPage() {
   const [entries, setEntries] = useState<PainEntry[]>([]);
   const [selectedZone, setSelectedZone] = useState<BodyZone | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [view3D, setView3D] = useState(false);
+  // 3D is the primary map — default to it. 2D stays available behind the toggle.
+  const [view3D, setView3D] = useState(true);
   const [fibromyalgiaMode, setFibromyalgiaMode] = useState(false);
   const [pageTab, setPageTab] = useState<PageTab>("hoy");
   const [history, setHistory] = useState<HistoryDay[]>([]);
@@ -103,8 +104,10 @@ export default function PainDiaryPage() {
     try {
       const raw = localStorage.getItem(getTodayKey());
       if (raw) setEntries(JSON.parse(raw) as PainEntry[]);
+      // Honour a saved preference in either direction; default (no pref) is 3D.
       const savedView = localStorage.getItem(VIEW_PREF_KEY);
-      if (savedView === "3d") setView3D(true);
+      if (savedView === "2d") setView3D(false);
+      else if (savedView === "3d") setView3D(true);
     } catch { /* ignore */ }
     setHydrated(true);
   }, []);
@@ -346,16 +349,6 @@ export default function PainDiaryPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
             <button
-              onClick={() => !view3D || toggleView()}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                !view3D
-                  ? "bg-sky-500 text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
-              }`}
-            >
-              Vista 2D
-            </button>
-            <button
               onClick={() => view3D || toggleView()}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 view3D
@@ -364,6 +357,16 @@ export default function PainDiaryPage() {
               }`}
             >
               Vista 3D
+            </button>
+            <button
+              onClick={() => !view3D || toggleView()}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                !view3D
+                  ? "bg-sky-500 text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Vista 2D
             </button>
           </div>
 

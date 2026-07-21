@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { privyEmail } from '@/lib/auth/privy-email';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 
@@ -589,7 +590,7 @@ function LicCard({ lic }: { lic: DBLicense }) {
 export function LicenciasTab() {
   const { user }     = usePrivy();
   const displayEmail = usePrivyEmail();
-  const doctorEmail  = user?.email?.address ?? displayEmail ?? '';
+  const doctorEmail  = privyEmail(user) ?? displayEmail ?? '';
 
   const [licencias, setLicencias] = useState<DBLicense[]>([]);
   const [loading,   setLoading]   = useState(true);

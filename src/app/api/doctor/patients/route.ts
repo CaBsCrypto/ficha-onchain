@@ -110,9 +110,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // Sort by last_seen desc
+    // Sort by last_seen desc. `last_seen` is MAX(created_at) — the Neon driver
+    // hands it back as a Date, not a string, so compare by epoch millis
+    // (localeCompare only exists on strings and would throw a 500).
+    const ms = (v: unknown) => new Date(v as string | Date).getTime() || 0;
     const patients = [...map.values()].sort(
-      (a, b) => b.last_seen.localeCompare(a.last_seen),
+      (a, b) => ms(b.last_seen) - ms(a.last_seen),
     );
 
     return NextResponse.json({ data: patients });

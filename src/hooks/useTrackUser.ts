@@ -9,29 +9,7 @@
  */
 import { useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-
-/** Extract the best email from the Privy user object regardless of login method. */
-function extractEmail(user: ReturnType<typeof usePrivy>["user"]): string | null {
-  if (!user) return null;
-  // Direct email login
-  if (user.email?.address) return user.email.address;
-  // Google OAuth
-  if (user.google?.email) return user.google.email;
-  // LinkedIn
-  if (user.linkedin?.email) return user.linkedin.email;
-  // Scan linkedAccounts for any email
-  if (user.linkedAccounts) {
-    for (const acct of user.linkedAccounts) {
-      if ("email" in acct && typeof acct.email === "string" && acct.email) {
-        return acct.email;
-      }
-      if ("emailAddress" in acct && typeof acct.emailAddress === "string" && acct.emailAddress) {
-        return acct.emailAddress;
-      }
-    }
-  }
-  return null;
-}
+import { privyEmail as extractEmail } from "@/lib/auth/privy-email";
 
 export function useTrackUser() {
   const { user, authenticated, getAccessToken } = usePrivy();

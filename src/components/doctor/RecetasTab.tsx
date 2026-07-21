@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { privyEmail } from '@/lib/auth/privy-email';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
 import type { MockPrescription, PrescriptionTipo, PrescriptionStatus } from './types';
@@ -516,7 +517,7 @@ function NuevaRecetaModal({
 // ── RecetasTab ────────────────────────────────────────────────────────────────
 export function RecetasTab() {
   const { user } = usePrivy();
-  const doctorEmail = user?.email?.address ?? '';
+  const doctorEmail = privyEmail(user) ?? '';
 
   // Starts empty — only real prescriptions the doctor signs this session appear.
   // (No seeded sample rows: those read as real patients that were never treated.)
