@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { privyEmail } from '@/lib/auth/privy-email';
 import { authedFetch } from '@/lib/auth/authed-fetch';
@@ -520,11 +520,26 @@ export function RecetasTab() {
   const { user } = usePrivy();
   const doctorEmail = privyEmail(user) ?? '';
 
-  // Starts empty — only real prescriptions the doctor signs this session appear.
-  // (No seeded sample rows: those read as real patients that were never treated.)
   const [recetas, setRecetas] = useState<MockPrescription[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [lastMint, setLastMint] = useState<MintResult | null>(null);
+
+  // Load the doctor's real issued recetas from the off-chain mirror
+  // (prescriptions_log). No more empty-every-session or seeded sample rows.
+  useEffect(() => {
+    if (!doctorEmail) { setLoading(false); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await authedFetch(`/api/doctor/prescriptions?doctorEmail=${encodeURIComponent(doctorEmail)}`);
+        const json = (await res.json()) as { data?: MockPrescription[] };
+        if (alive && res.ok && Array.isArray(json.data)) setRecetas(json.data);
+      } catch { /* keep empty on failure */ }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [doctorEmail]);
 
   function handleSave(rx: MockPrescription, mint: MintResult | null) {
     setRecetas((prev) => [rx, ...prev]);
@@ -580,8 +595,16 @@ export function RecetasTab() {
         </div>
       )}
 
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
+          Cargando recetas…
+        </div>
+      )}
+
       {/* Empty state */}
-      {recetas.length === 0 && (
+      {!loading && recetas.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
           <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 12h6m-6 4h6M9 4h6a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-3 2V6a2 2 0 0 1 2-2z" />
