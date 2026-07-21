@@ -2,10 +2,11 @@
 
 import { usePrivy } from '@privy-io/react-auth';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
+import { authedFetch } from '@/lib/auth/authed-fetch';
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 function IconHome({ className }: { className?: string }) {
@@ -227,6 +228,154 @@ function DoctorShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ── Minimal shell for the pre-portal screens (registro / pendiente) ────────────
+function GateShell({ children }: { children: React.ReactNode }) {
+  const { logout } = usePrivy();
+  return (
+    <div className="min-h-screen bg-[#f8fafc]">
+      <header className="border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
+          <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-white shadow-sm"><span className="text-xs font-bold">T</span></span>
+            <span className="text-slate-900">Trust<span className="text-sky-500">Leaf</span></span>
+          </Link>
+          <button onClick={() => void logout()} className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600">Cerrar sesión</button>
+        </div>
+      </header>
+      <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-12">{children}</div>
+    </div>
+  );
+}
+
+const gateInput = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100';
+
+// ── Registration form: an unregistered doctor requests access ──────────────────
+function RegistrationForm({ email, onDone }: { email: string; onDone: () => void }) {
+  const [name, setName] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [rut, setRut] = useState('');
+  const [licenseNum, setLicenseNum] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const canSubmit = name.trim().length > 1 && !saving;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setSaving(true); setError('');
+    try {
+      const res = await authedFetch('/api/doctors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email, specialty: specialty.trim() || undefined, rut: rut.trim() || undefined, licenseNum: licenseNum.trim() || undefined }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) { setError(json.error ?? 'No se pudo enviar la solicitud'); setSaving(false); return; }
+      onDone();
+    } catch { setError('Error de conexión'); setSaving(false); }
+  }
+
+  return (
+    <GateShell>
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-800">Solicitar acceso como médico</h1>
+        <p className="mt-1 text-sm text-slate-500">Completá tus datos. Un administrador revisará tu solicitud antes de habilitarte para emitir recetas.</p>
+        <div className="mt-5 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre completo <span className="text-rose-400">*</span></label>
+            <input className={gateInput} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Dr. Cristian Brown" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label>
+            <input className={cn(gateInput, 'cursor-not-allowed opacity-60')} value={email} disabled />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Especialidad</label>
+              <input className={gateInput} value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Medicina General" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">RUT</label>
+              <input className={gateInput} value={rut} onChange={(e) => setRut(e.target.value)} placeholder="12.345.678-5" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nº de registro (SIS/Superintendencia)</label>
+            <input className={gateInput} value={licenseNum} onChange={(e) => setLicenseNum(e.target.value)} placeholder="123456" />
+          </div>
+        </div>
+        {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+        <button onClick={submit} disabled={!canSubmit} className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40">
+          {saving ? 'Enviando…' : 'Enviar solicitud'}
+        </button>
+      </div>
+    </GateShell>
+  );
+}
+
+// ── Status screens (pending / blocked) ─────────────────────────────────────────
+function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'blocked'; onRefresh: () => void }) {
+  const pending = variant === 'pending';
+  return (
+    <GateShell>
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className={cn('mx-auto flex h-12 w-12 items-center justify-center rounded-full', pending ? 'bg-amber-100' : 'bg-rose-100')}>
+          <span className="text-2xl">{pending ? '⏳' : '🚫'}</span>
+        </div>
+        <h1 className="mt-4 text-xl font-semibold text-slate-800">{pending ? 'Solicitud enviada' : 'Acceso bloqueado'}</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          {pending
+            ? 'Tu solicitud está en revisión. Un administrador te habilitará en breve; podés volver a comprobar el estado.'
+            : 'Tu cuenta fue bloqueada por un administrador. Contactá al soporte si creés que es un error.'}
+        </p>
+        {pending && (
+          <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
+            Comprobar estado
+          </button>
+        )}
+      </div>
+    </GateShell>
+  );
+}
+
+// ── Access gate: registro → pendiente → portal ─────────────────────────────────
+type DocStatus = 'loading' | 'unregistered' | 'pending' | 'active' | 'blocked';
+
+function DoctorAccessGate({ children }: { children: React.ReactNode }) {
+  const email = usePrivyEmail();
+  const [status, setStatus] = useState<DocStatus>('loading');
+
+  const check = useCallback(async () => {
+    setStatus('loading');
+    try {
+      const res = await authedFetch('/api/doctor/profile');
+      const json = (await res.json()) as { data?: { status?: string } | null };
+      const row = json.data;
+      if (!row) setStatus('unregistered');
+      else if (row.status === 'active') setStatus('active');
+      else if (row.status === 'blocked') setStatus('blocked');
+      else setStatus('pending');
+    } catch {
+      // On a transient error, don't lock the doctor out — let them into the portal.
+      setStatus('active');
+    }
+  }, []);
+
+  useEffect(() => { void check(); }, [check]);
+
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f8fafc]">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (status === 'unregistered') return <RegistrationForm email={email ?? ''} onDone={check} />;
+  if (status === 'pending') return <StatusScreen variant="pending" onRefresh={check} />;
+  if (status === 'blocked') return <StatusScreen variant="blocked" onRefresh={check} />;
+  return <DoctorShell>{children}</DoctorShell>;
+}
+
 // ── Layout (default export) ───────────────────────────────────────────────────
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated } = usePrivy();
@@ -244,5 +393,5 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  return <DoctorShell>{children}</DoctorShell>;
+  return <DoctorAccessGate>{children}</DoctorAccessGate>;
 }
