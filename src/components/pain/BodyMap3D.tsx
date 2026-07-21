@@ -924,6 +924,9 @@ export default function BodyMap3D({
           {([
             ["Cabeza",  0, 1.52, 1.45],
             ["Torso",   0, 1.02, 2.10],
+            // Arms hang at the sides (y≈0.47–1.1); frame both a touch wider so
+            // brazo/antebrazo/muñeca/mano are all reachable without hunting.
+            ["Brazos",  0, 0.82, 2.35],
             ["Piernas", 0, 0.18, 2.30],
             ["Reset",   0, 0.58, 2.80],
           ] as const).map(([label, x, y, z]) => (
