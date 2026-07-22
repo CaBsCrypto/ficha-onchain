@@ -340,6 +340,113 @@ step("prescriptions_log", async () => {
               ON prescriptions_log (doctor_email, created_at DESC)`;
 });
 
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  API/MCP externa de salud — familia de tablas unificada (Fase 0 · PR-0c)  ║
+// ║  Ver docs/ARCHITECTURE_REVIEW.md. Resuelve C1 (una sola familia "centro")  ║
+// ║  y C2 (un solo center_grants). Todo aditivo e idempotente — no toca datos. ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+// ── patient_records — directorio paciente → su contrato ClinicalRecord ──────
+// La llave es rut_hash (HMAC, ver src/lib/identity/rut.ts): el RUT nunca se
+// guarda en claro acá. deploy_salt es ALEATORIO (no el rut_hash) para que el
+// despliegue del contrato sea idempotente SIN filtrar un valor derivado del RUT
+// en el ledger (resuelve C7). env separa sandbox de datos reales.
+step("patient_records", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS patient_records (
+      id             SERIAL PRIMARY KEY,
+      rut_hash       TEXT NOT NULL,
+      env            TEXT NOT NULL DEFAULT 'sandbox',   -- 'sandbox' | 'live'
+      contract_id    TEXT,                              -- C... ClinicalRecord (NULL hasta provisioning)
+      patient_wallet TEXT,                              -- G... owner del contrato
+      deploy_salt    TEXT,                              -- salt ALEATORIO del deploy (no derivado del RUT)
+      patient_email  TEXT,                              -- índice de conveniencia, NO la llave
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  // Un paciente = una ficha POR entorno (permite un record sandbox y otro live).
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_patient_records_rut_env
+              ON patient_records (rut_hash, env)`;
+});
+
+// ── api_orgs — el centro médico autorizado (dueño de una signing wallet) ────
+step("api_orgs", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_orgs (
+      id             SERIAL PRIMARY KEY,
+      name           TEXT NOT NULL,
+      signing_wallet TEXT,                              -- G... author on-chain de append_entry
+      key_custody    TEXT NOT NULL DEFAULT 'custodial', -- 'custodial' | 'self'
+      trust_level    TEXT NOT NULL DEFAULT 'self_declared', -- self_declared|org_vouched|registry_verified
+      status         TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'active' | 'suspended'
+      contact_email  TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+});
+
+// ── api_keys — N keys por org; el prefijo codifica el entorno ───────────────
+// Nunca se guarda la key en claro, solo su hash. key_prefix (ej. tl_sandbox_ab12)
+// permite identificarla sin revelarla. Absorbe la idea de mcp_api_keys.
+step("api_keys", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id           SERIAL PRIMARY KEY,
+      org_id       INTEGER NOT NULL REFERENCES api_orgs(id),
+      key_hash     TEXT NOT NULL,                       -- SHA-256 de la key
+      key_prefix   TEXT NOT NULL,                       -- 'tl_sandbox_...' | 'tl_live_...'
+      env          TEXT NOT NULL DEFAULT 'sandbox',     -- 'sandbox' | 'live'
+      scopes       JSONB NOT NULL DEFAULT '[]',         -- ['ficha:append','ficha:read']
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      revoked_at   TIMESTAMPTZ
+    )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_hash ON api_keys (key_hash)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_api_keys_org ON api_keys (org_id)`;
+});
+
+// ── center_doctors — atribución fina del médico dentro del centro ───────────
+// La atribución on-chain es a nivel de centro (signing_wallet); el médico exacto
+// vive off-chain acá + dentro del payload hasheado.
+step("center_doctors", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS center_doctors (
+      id              SERIAL PRIMARY KEY,
+      org_id          INTEGER NOT NULL REFERENCES api_orgs(id),
+      doctor_rut_hash TEXT,                             -- identidad del médico, hasheada
+      doctor_name     TEXT,
+      doctor_registro TEXT,                             -- N° de registro profesional
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_center_doctors_org ON center_doctors (org_id)`;
+});
+
+// ── center_grants — espejo off-chain de grant_write_access (consentimiento) ──
+// Un centro obtiene permiso del paciente (dueño) para escribir su ficha, una vez
+// por centro (no por cita). Fuente de verdad = on-chain; esto es el espejo para
+// consultar/expirar. Índice parcial: UN solo grant activo por (centro, paciente).
+step("center_grants", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS center_grants (
+      id               SERIAL PRIMARY KEY,
+      org_id           INTEGER NOT NULL REFERENCES api_orgs(id),
+      patient_rut_hash TEXT NOT NULL,
+      record_contract  TEXT,                            -- C... ficha a la que aplica
+      grantee_wallet   TEXT NOT NULL,                   -- G... signing wallet del centro
+      status           TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'revoked' | 'expired'
+      mode             TEXT NOT NULL DEFAULT 'simulated',-- 'onchain' | 'simulated'
+      grant_tx         TEXT,
+      revoke_tx        TEXT,
+      expires_at       TIMESTAMPTZ,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at       TIMESTAMPTZ
+    )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_center_grants_active
+              ON center_grants (org_id, patient_rut_hash)
+              WHERE status = 'active'`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_center_grants_patient
+              ON center_grants (patient_rut_hash)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);
