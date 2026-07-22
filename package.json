@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:flow": "node scripts/test-flow.mjs",
     "test:onchain": "node scripts/test-onchain.mjs",
+    "smoke:sandbox": "node scripts/smoke-sandbox-isolation.mjs",
     "test:phases": "node scripts/phases/run.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
