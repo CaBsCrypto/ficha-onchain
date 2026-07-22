@@ -24,6 +24,7 @@ import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
 import { requestConsent, checkConsent, revokeConsent } from "@/lib/identity/center-grants";
+import { anchorRecord, ConsentRequiredError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
@@ -231,6 +232,47 @@ const TOOLS: Record<string, Tool> = {
       const rut = requireRut(args);
       const res = await revokeConsent({ orgId: c.orgId, rut, env: c.env });
       return [{ type: "text", text: JSON.stringify({ ...res, env: c.env }, null, 2) }];
+    },
+  },
+
+  anchor_record: {
+    description:
+      "Ancla el hash de un artefacto clínico (receta, examen, antecedente…) en la ficha del paciente. Requiere consentimiento vigente del paciente (request_consent). Solo el hash va on-chain; el contenido queda off-chain. Requiere API key.",
+    requiresAuth: true,
+    scope: "ficha:append",
+    inputSchema: {
+      type: "object",
+      properties: {
+        patient_rut: { type: "string", description: "RUT del paciente." },
+        kind: { type: "string", description: "Tipo de artefacto (ej. Receta, Examen, Antecedentes)." },
+        content: { type: "string", description: "Contenido clínico. Se hashea (SHA-256); no se guarda on-chain." },
+      },
+      required: ["patient_rut", "kind", "content"],
+      additionalProperties: false,
+    },
+    handler: async (args, ctx) => {
+      const c = requireCtx(ctx);
+      const rut = requireRut(args);
+      const kind = String(args.kind ?? "").trim();
+      const content = String(args.content ?? "").trim();
+      if (!kind) throw new ToolInputError("'kind' es obligatorio.");
+      if (!content) throw new ToolInputError("'content' es obligatorio.");
+      try {
+        const res = await anchorRecord({
+          orgId: c.orgId,
+          granteeWallet: c.signingWallet,
+          rut,
+          env: c.env,
+          kind,
+          content,
+        });
+        const txUrl = res.txHash ? STELLAR_EXPERT_TX(res.txHash) : null;
+        return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env }, null, 2) }];
+      } catch (e) {
+        // Consent-required is a caller-safe message → surface it as isError.
+        if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        throw e;
+      }
     },
   },
 };
