@@ -108,6 +108,38 @@ export async function feeBumpAndSend(innerXdr: string): Promise<SubmitResult> {
  * Shared by appendClinicalEntry and grantWriteAccess — the fee (BASE_FEE),
  * timeout (60s), prepare-then-sign order and fee-bump are identical for both.
  */
+/**
+ * Build + prepare (simulate) a Soroban invoke against `contractId.method(...args)`
+ * for `sourcePublicKey`, returning the UNSIGNED transaction XDR. The account is
+ * fetched HERE so each call picks up a fresh sequence number.
+ *
+ * This is the half of an invoke that does NOT need a secret key. It is shared by
+ * signInvokeAndSubmit (server-side signing below) and by future client-side
+ * signing flows where a center/patient signs the XDR with their own passkey
+ * wallet and the relayer only fee-bumps — so the signing party never has to hand
+ * us their key. Keeping the build logic in one place stops those flows from
+ * diverging from the server path.
+ */
+export async function buildInvokeXdr(args: {
+  sourcePublicKey: string;
+  contractId: string;
+  method: string;
+  args: xdr.ScVal[];
+}): Promise<string> {
+  const contract = new Contract(args.contractId);
+  const source = await server.getAccount(args.sourcePublicKey);
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(contract.call(args.method, ...args.args))
+    .setTimeout(60)
+    .build();
+
+  const prepared = await server.prepareTransaction(tx);
+  return prepared.toXDR();
+}
+
 async function signInvokeAndSubmit(args: {
   signerSecret: string;
   contractId: string;
@@ -115,22 +147,20 @@ async function signInvokeAndSubmit(args: {
   args: xdr.ScVal[];
 }): Promise<SubmitResult> {
   const signer = Keypair.fromSecret(args.signerSecret);
-  const contract = new Contract(args.contractId);
 
-  // One full build→prepare→sign→submit cycle. The account is fetched HERE (not
-  // once outside) so each retry picks up a fresh sequence number.
+  // One full build→prepare→sign→submit cycle. buildInvokeXdr fetches the account
+  // HERE (not once outside) so each retry picks up a fresh sequence number.
   const attempt = async (): Promise<SubmitResult> => {
-    const op = contract.call(args.method, ...args.args);
-    const source = await server.getAccount(signer.publicKey());
-    const tx = new TransactionBuilder(source, {
-      fee: BASE_FEE,
-      networkPassphrase: NETWORK_PASSPHRASE,
-    })
-      .addOperation(op)
-      .setTimeout(60)
-      .build();
-
-    const prepared = await server.prepareTransaction(tx);
+    const unsignedXdr = await buildInvokeXdr({
+      sourcePublicKey: signer.publicKey(),
+      contractId: args.contractId,
+      method: args.method,
+      args: args.args,
+    });
+    const prepared = TransactionBuilder.fromXDR(
+      unsignedXdr,
+      NETWORK_PASSPHRASE,
+    ) as Transaction;
     prepared.sign(signer);
     return feeBumpAndSend(prepared.toXDR());
   };
@@ -207,6 +237,29 @@ export async function grantWriteAccess(args: {
     signerSecret: args.ownerSecret,
     contractId: args.contractId,
     method: "grant_write_access",
+    args: [new Address(args.grantee).toScVal()],
+  });
+}
+
+/**
+ * Revoke a doctor/center's write access on a patient's ClinicalRecord, signed by
+ * the OWNER (the patient) and fee-bumped by the relayer. Mirrors
+ * {@link grantWriteAccess} exactly — the contract's `revoke_write_access` (see
+ * contracts/clinical-record/src/lib.rs) also calls `require_owner()`, so only the
+ * owner's signature is accepted; the relayer fee-bump does NOT count as it.
+ *
+ * Needed so a patient can withdraw a center's standing consent (the external-API
+ * model grants write access per center, not per appointment).
+ */
+export async function revokeWriteAccess(args: {
+  ownerSecret: string;
+  contractId: string;
+  grantee: string;
+}): Promise<SubmitResult> {
+  return signInvokeAndSubmit({
+    signerSecret: args.ownerSecret,
+    contractId: args.contractId,
+    method: "revoke_write_access",
     args: [new Address(args.grantee).toScVal()],
   });
 }
