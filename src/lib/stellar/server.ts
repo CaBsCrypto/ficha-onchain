@@ -57,6 +57,19 @@ export function getSandboxOwnerSecret(): string | undefined {
     : undefined;
 }
 
+/**
+ * Signing secret of the SANDBOX center — signs the (real) on-chain append_entry
+ * when a center anchors a record in the sandbox. Its public key MUST be the
+ * wallet the patient granted write access to (the org's signing_wallet), or the
+ * contract reverts Unauthorized. Custodial, sandbox-only. Gated on the relayer;
+ * undefined → anchor degrades to mode:"simulated".
+ */
+export function getSandboxCenterSecret(): string | undefined {
+  return process.env.RELAYER_SECRET
+    ? process.env.SANDBOX_CENTER_SECRET
+    : undefined;
+}
+
 export interface SubmitResult {
   hash: string;
   status: "SUCCESS" | "FAILED" | "PENDING";
