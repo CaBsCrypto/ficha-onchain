@@ -13,14 +13,18 @@
 set -euo pipefail
 
 NETWORK="${NETWORK:-testnet}"
-WASM="${1:-contracts/target/wasm32-unknown-unknown/release/clinical_record.wasm}"
+# `stellar contract build` emits to the wasm32v1-none target and produces a
+# host-compatible module. Do NOT use a raw `cargo build --target
+# wasm32-unknown-unknown` — newer Rust enables reference-types and the Soroban
+# host rejects it ("reference-types not enabled").
+WASM="${1:-contracts/target/wasm32v1-none/release/clinical_record.wasm}"
 
 # The account that deploys AND is the record owner (signs future grants).
 OWNER="${SANDBOX_OWNER:?Set SANDBOX_OWNER to a funded testnet CLI identity or secret}"
 
 if [ ! -f "$WASM" ]; then
   echo "WASM no encontrado: $WASM" >&2
-  echo "Compílalo (fuera de WDAC): cd contracts && cargo build --release --target wasm32-unknown-unknown -p clinical-record" >&2
+  echo "Compílalo:  cd contracts/clinical-record && stellar contract build" >&2
   exit 1
 fi
 

@@ -5,19 +5,26 @@
 > código ya está listo (PR "sandbox-onchain-grant"): en cuanto existan las dos
 > env vars, `request_consent` firma un `grant_write_access` real.
 >
-> **No se puede compilar el contrato localmente** (WDAC bloquea la toolchain de
-> Rust — os error 4551). El WASM sale de CI o de una máquina sin WDAC (WSL/Docker
-> con la toolchain de Soroban). Esta guía es para ejecutarla **tú**.
+> **ACTUALIZADO 2026-07-22:** el build SÍ corre localmente con
+> `stellar contract build` (CLI v27). Se hizo el deploy y se verificó el grant +
+> revoke on-chain end-to-end. Instancia sandbox ya desplegada (testnet):
+> `CDQ25BXUHDMGJW3ZQLXGGZ6BRFBMIQIJT5X2V5WH7TP7XEYHOISFRNRF`.
+>
+> ⚠️ Usa `stellar contract build`, NO `cargo build --target
+> wasm32-unknown-unknown`: Rust nuevo activa `reference-types` y el host de
+> Soroban rechaza ese WASM ("reference-types not enabled").
 
 ## Qué vas a obtener
 - `SANDBOX_CLINICAL_RECORD_ID` — el contrato de juguete (una ficha compartida).
 - `SANDBOX_OWNER_SECRET` — la llave del dueño del contrato, que firma los grants.
 
 ## Prerrequisitos
-- `stellar` CLI instalado (`stellar --version`).
-- El WASM de `clinical-record` compilado: `contracts/target/wasm32-unknown-unknown/release/clinical_record.wasm`
-  - vía CI (artefacto de `.github/workflows/contracts.yml`) **o**
-  - `cd contracts && cargo build --release --target wasm32-unknown-unknown -p clinical-record` en una máquina sin WDAC.
+- `stellar` CLI instalado (`stellar --version` — probado con v27).
+- El WASM de `clinical-record` compilado con:
+  ```bash
+  cd contracts/clinical-record && stellar contract build
+  # → contracts/target/wasm32v1-none/release/clinical_record.wasm
+  ```
 - Una cuenta testnet fundeada para pagar el deploy (o reusar el relayer).
 
 ## Pasos
@@ -34,8 +41,8 @@ curl "https://friendbot.stellar.org/?addr=$(stellar keys address sandbox-owner)"
 El constructor es `__constructor(env, owner)` (ver `contracts/clinical-record/src/lib.rs:73`).
 ```bash
 stellar contract deploy \
-  --wasm contracts/target/wasm32-unknown-unknown/release/clinical_record.wasm \
-  --source sandbox-owner \
+  --wasm contracts/target/wasm32v1-none/release/clinical_record.wasm \
+  --source-account sandbox-owner \
   --network testnet \
   -- --owner "$(stellar keys address sandbox-owner)"
 # → imprime el CONTRACT ID (C...)
