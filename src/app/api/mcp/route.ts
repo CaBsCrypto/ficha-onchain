@@ -22,6 +22,8 @@
  */
 import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
+import { isValidRut } from "@/lib/identity/rut";
+import { requestConsent, checkConsent, revokeConsent } from "@/lib/identity/center-grants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +50,20 @@ interface Tool {
 
 /** A bad-input error a handler can throw — its message IS safe to show the caller. */
 class ToolInputError extends Error {}
+
+/** Read a required, valid RUT from tool args or throw a caller-safe error. */
+function requireRut(args: Record<string, unknown>): string {
+  const rut = String(args.patient_rut ?? "").trim();
+  if (!rut) throw new ToolInputError("'patient_rut' es obligatorio.");
+  if (!isValidRut(rut)) throw new ToolInputError("'patient_rut' no es un RUT válido (dígito verificador).");
+  return rut;
+}
+
+/** Guarantee the auth context is present (only reachable on requiresAuth tools). */
+function requireCtx(ctx?: ApiContext): ApiContext {
+  if (!ctx) throw new Error("contexto de autenticación ausente");
+  return ctx;
+}
 
 /** Max JSON-RPC messages per batch — caps the 1-request→N-query amplification. */
 const MAX_BATCH = 50;
@@ -144,6 +160,74 @@ const TOOLS: Record<string, Tool> = {
         note: "MVP simulado — con la firma real del médico esto devuelve la tx anclada.",
       };
       return [{ type: "text", text: JSON.stringify(payload, null, 2) }];
+    },
+  },
+
+  request_consent: {
+    description:
+      "Solicita el consentimiento de un paciente (por RUT) para que tu centro pueda escribir su ficha. En sandbox se auto-aprueba (simulado) para poder demostrar el flujo end-to-end; en live queda 'pending' hasta que el paciente firme. Requiere API key.",
+    requiresAuth: true,
+    scope: "consent:manage",
+    inputSchema: {
+      type: "object",
+      properties: {
+        patient_rut: { type: "string", description: "RUT del paciente (ej. 12.345.678-5)." },
+      },
+      required: ["patient_rut"],
+      additionalProperties: false,
+    },
+    handler: async (args, ctx) => {
+      const c = requireCtx(ctx);
+      const rut = requireRut(args);
+      const res = await requestConsent({
+        orgId: c.orgId,
+        granteeWallet: c.signingWallet,
+        rut,
+        env: c.env,
+      });
+      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env, org: c.orgName }, null, 2) }];
+    },
+  },
+
+  check_consent: {
+    description:
+      "Consulta si tu centro tiene consentimiento vigente para escribir la ficha de un paciente (por RUT). Requiere API key.",
+    requiresAuth: true,
+    scope: "consent:read",
+    inputSchema: {
+      type: "object",
+      properties: {
+        patient_rut: { type: "string", description: "RUT del paciente." },
+      },
+      required: ["patient_rut"],
+      additionalProperties: false,
+    },
+    handler: async (args, ctx) => {
+      const c = requireCtx(ctx);
+      const rut = requireRut(args);
+      const res = await checkConsent({ orgId: c.orgId, rut, env: c.env });
+      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env }, null, 2) }];
+    },
+  },
+
+  revoke_consent: {
+    description:
+      "Revoca el consentimiento vigente de tu centro sobre un paciente (por RUT). Requiere API key.",
+    requiresAuth: true,
+    scope: "consent:manage",
+    inputSchema: {
+      type: "object",
+      properties: {
+        patient_rut: { type: "string", description: "RUT del paciente." },
+      },
+      required: ["patient_rut"],
+      additionalProperties: false,
+    },
+    handler: async (args, ctx) => {
+      const c = requireCtx(ctx);
+      const rut = requireRut(args);
+      const res = await revokeConsent({ orgId: c.orgId, rut, env: c.env });
+      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env }, null, 2) }];
     },
   },
 };
