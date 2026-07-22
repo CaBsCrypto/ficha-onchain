@@ -373,30 +373,30 @@ export default function HackathonPage() {
           <div className="mt-10 grid gap-5 md:grid-cols-3">
             {[
               {
-                icon: "📝",
-                verb: "create_approval",
-                t: tr("Pedir una aprobación", "Request an approval"),
+                icon: "🤝",
+                verb: "request_consent",
+                t: tr("El paciente consiente", "The patient consents"),
                 d: tr(
-                  "Tu IA sugiere algo. Nos mandas el texto y te devolvemos un link para que tu médico lo apruebe.",
-                  "Your AI suggests something. Send us the text and we return a link for your doctor to approve.",
+                  "Pides el consentimiento del paciente (por RUT). El permiso queda firmado on-chain — el paciente puede revocarlo cuando quiera.",
+                  "Request the patient's consent (by RUT). The grant is signed on-chain — the patient can revoke it anytime.",
                 ),
               },
               {
-                icon: "✍️",
-                verb: tr("aprobar (redirect)", "approve (redirect)"),
-                t: tr("El humano firma", "The human signs"),
+                icon: "⚓",
+                verb: "anchor_record",
+                t: tr("Anclas la ficha", "Anchor the record"),
                 d: tr(
-                  "Rediriges a tu médico a nuestra página. Entra con su email y aprueba con su propia llave. La IA no puede falsificarlo.",
-                  "Redirect your doctor to our page. They log in with email and approve with their own key. AI can’t forge it.",
+                  "Anclas el hash de un artefacto clínico (receta, examen…) en la ficha del paciente. Solo el hash va on-chain; el contenido queda off-chain.",
+                  "Anchor the hash of a clinical artifact (prescription, lab…) into the patient's record. Only the hash goes on-chain; the content stays off-chain.",
                 ),
               },
               {
                 icon: "🔗",
                 verb: "verify",
-                t: tr("Mostrar la prueba", "Show the proof"),
+                t: tr("Todo verificable", "All verifiable"),
                 d: tr(
-                  "Consultas el resultado: quién aprobó, cuándo, y un link verificable en Stellar. Listo para tu pitch.",
-                  "Query the result: who approved, when, and a verifiable Stellar link. Ready for your pitch.",
+                  "Cada grant y cada ficha dejan una tx en Stellar Expert. Prueba de que un paciente autorizó y un centro escribió — auditable.",
+                  "Every grant and record leaves a tx on Stellar Expert. Proof a patient authorized and a center wrote — auditable.",
                 ),
               },
             ].map((f, i) => (
@@ -697,8 +697,8 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
               },
               {
                 n: "3",
-                t: tr("Envía a firmar y verifica", "Send to sign and verify"),
-                d: tr("create_approval → redirect → verify. Listo para tu demo.", "create_approval → redirect → verify. Ready for your demo."),
+                t: tr("Consiente y ancla", "Consent and anchor"),
+                d: tr("request_consent → anchor_record. Ficha anclada y verificable en Stellar.", "request_consent → anchor_record. Record anchored and verifiable on Stellar."),
               },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 0.08}>
