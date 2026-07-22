@@ -21,6 +21,7 @@
  * break when we flip create/verify from simulated → onchain.
  */
 import { NextResponse } from "next/server";
+import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,12 +31,26 @@ const DEFAULT_PROTOCOL = "2025-06-18";
 
 // ── Tool registry ───────────────────────────────────────────────────────────
 // Each tool: JSON-Schema for inputs + a handler returning MCP `content`.
+// `requiresAuth` tools are gated by a valid API key (see src/lib/auth/api-key);
+// the resolved ApiContext is passed to the handler so it can act per-org and
+// pick sandbox vs live. Open tools (discovery/docs) get ctx === undefined.
 type ToolContent = { type: "text"; text: string };
 interface Tool {
   description: string;
   inputSchema: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => Promise<ToolContent[]> | ToolContent[];
+  requiresAuth?: boolean;
+  scope?: string;
+  handler: (
+    args: Record<string, unknown>,
+    ctx?: ApiContext,
+  ) => Promise<ToolContent[]> | ToolContent[];
 }
+
+/** A bad-input error a handler can throw — its message IS safe to show the caller. */
+class ToolInputError extends Error {}
+
+/** Max JSON-RPC messages per batch — caps the 1-request→N-query amplification. */
+const MAX_BATCH = 50;
 
 /** Deterministic id without Date.now()/random (keeps the endpoint pure & testable). */
 function approvalId(seed: string): string {
@@ -73,7 +88,9 @@ const TOOLS: Record<string, Tool> = {
 
   create_approval: {
     description:
-      "Crea una solicitud de aprobación humana para una sugerencia de tu IA. Devuelve un id y una approval_url a la que rediriges a tu médico para que la firme. (MVP: modo simulado — no ancla on-chain todavía.)",
+      "Crea una solicitud de aprobación humana para una sugerencia de tu IA. Devuelve un id y una approval_url a la que rediriges a tu médico para que la firme. Requiere API key. (MVP: modo simulado — no ancla on-chain todavía.)",
+    requiresAuth: true,
+    scope: "approval:create",
     inputSchema: {
       type: "object",
       properties: {
@@ -83,18 +100,20 @@ const TOOLS: Record<string, Tool> = {
       required: ["suggestion"],
       additionalProperties: false,
     },
-    handler: (args) => {
+    handler: (args, ctx) => {
       const suggestion = String(args.suggestion ?? "").trim();
       if (!suggestion) {
-        return [{ type: "text", text: "Error: 'suggestion' es obligatorio." }];
+        throw new ToolInputError("'suggestion' es obligatorio.");
       }
       const id = approvalId(suggestion + "|" + String(args.context ?? ""));
       const payload = {
         id,
         approval_url: `/approve/${id}`,
         status: "pending",
+        env: ctx?.env ?? "sandbox",
+        org: ctx?.orgName,
         mode: "simulated",
-        note: "MVP simulado — la firma del médico y el anclaje en Stellar se conectan detrás de esta misma forma con API key.",
+        note: "MVP simulado — la firma del médico y el anclaje en Stellar se conectan detrás de esta misma forma.",
       };
       return [{ type: "text", text: JSON.stringify(payload, null, 2) }];
     },
@@ -102,24 +121,27 @@ const TOOLS: Record<string, Tool> = {
 
   verify_approval: {
     description:
-      "Consulta el estado de una aprobación por id: quién la aprobó, cuándo y el link verificable en Stellar. (MVP: modo simulado.)",
+      "Consulta el estado de una aprobación por id: quién la aprobó, cuándo y el link verificable en Stellar. Requiere API key. (MVP: modo simulado.)",
+    requiresAuth: true,
+    scope: "approval:read",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string", description: "El id devuelto por create_approval." } },
       required: ["id"],
       additionalProperties: false,
     },
-    handler: (args) => {
+    handler: (args, ctx) => {
       const id = String(args.id ?? "").trim();
-      if (!id) return [{ type: "text", text: "Error: 'id' es obligatorio." }];
+      if (!id) throw new ToolInputError("'id' es obligatorio.");
       const payload = {
         id,
         status: "approved",
         approvedBy: "dr.demo@trustleaf.health",
         at: "14:32",
+        env: ctx?.env ?? "sandbox",
         txUrl: "https://stellar.expert/explorer/testnet/tx/…",
         mode: "simulated",
-        note: "MVP simulado — con API key esto devuelve la firma real del médico y la tx anclada.",
+        note: "MVP simulado — con la firma real del médico esto devuelve la tx anclada.",
       };
       return [{ type: "text", text: JSON.stringify(payload, null, 2) }];
     },
@@ -142,7 +164,15 @@ function err(id: JsonRpcId, code: number, message: string) {
   return NextResponse.json({ jsonrpc: "2.0", id, error: { code, message } });
 }
 
-async function handleRpc(msg: JsonRpcRequest): Promise<Response | null> {
+/** JSON-RPC error code for authentication/authorization failures (server-defined). */
+const AUTH_ERROR = -32001;
+
+async function handleRpc(
+  msg: JsonRpcRequest,
+  request: Request,
+): Promise<Response | null> {
+  // JSON-RPC: a message with no `id` is a notification — never answer it.
+  if (!("id" in msg)) return null;
   const id = msg.id ?? null;
 
   switch (msg.method) {
@@ -178,12 +208,50 @@ async function handleRpc(msg: JsonRpcRequest): Promise<Response | null> {
       const name = msg.params?.name as string;
       const tool = TOOLS[name];
       if (!tool) return err(id, -32602, `Tool desconocida: ${name}`);
+
+      // Auth gate: open tools (discovery/docs) run without a key; the rest need
+      // a valid API key, and its scope must cover the tool. Fail closed —
+      // including when the auth backend itself errors (a DB outage must deny,
+      // not 500 the whole request/batch).
+      let ctx: ApiContext | undefined;
+      if (tool.requiresAuth) {
+        let auth: Awaited<ReturnType<typeof authenticateApiKey>>;
+        try {
+          auth = await authenticateApiKey(request);
+        } catch (e) {
+          console.error("[mcp] auth backend error:", e);
+          return err(id, AUTH_ERROR, "Servicio de autenticación no disponible.");
+        }
+        if (!auth.ok) {
+          return err(id, AUTH_ERROR, `No autorizado (${auth.code}): ${auth.message}`);
+        }
+        // A protected tool MUST declare a scope, and the key MUST hold it.
+        // Missing scope → deny (never authorize any key by omission).
+        if (!tool.scope || !hasScope(auth.ctx, tool.scope)) {
+          return err(
+            id,
+            AUTH_ERROR,
+            `La API key no tiene el scope requerido${tool.scope ? `: ${tool.scope}` : ""}.`,
+          );
+        }
+        ctx = auth.ctx;
+      }
+
       try {
-        const content = await tool.handler((msg.params?.arguments as Record<string, unknown>) ?? {});
+        const content = await tool.handler(
+          (msg.params?.arguments as Record<string, unknown>) ?? {},
+          ctx,
+        );
         return ok(id, { content, isError: false });
       } catch (e) {
+        // Input errors carry a caller-safe message; anything else is opaque so a
+        // stray exception (DB host, SQL, stack) never leaks to an integrator.
+        if (e instanceof ToolInputError) {
+          return ok(id, { content: [{ type: "text", text: e.message }], isError: true });
+        }
+        console.error(`[mcp] tool ${name} error:`, e);
         return ok(id, {
-          content: [{ type: "text", text: `Error ejecutando ${name}: ${e instanceof Error ? e.message : String(e)}` }],
+          content: [{ type: "text", text: "Error interno procesando la solicitud." }],
           isError: true,
         });
       }
@@ -194,6 +262,11 @@ async function handleRpc(msg: JsonRpcRequest): Promise<Response | null> {
   }
 }
 
+/** A well-formed JSON-RPC message: an object with a string `method`. */
+function isRpcObject(m: unknown): m is JsonRpcRequest {
+  return typeof m === "object" && m !== null && typeof (m as { method?: unknown }).method === "string";
+}
+
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -202,16 +275,28 @@ export async function POST(request: Request) {
     return err(null, -32700, "Parse error");
   }
 
-  // Batch or single.
+  // Batch.
   if (Array.isArray(body)) {
-    const responses = await Promise.all((body as JsonRpcRequest[]).map(handleRpc));
+    if (body.length === 0) return err(null, -32600, "Invalid Request: batch vacío");
+    if (body.length > MAX_BATCH) {
+      return err(null, -32600, `Batch demasiado grande (máx ${MAX_BATCH})`);
+    }
+    const responses = await Promise.all(
+      body.map((m) =>
+        isRpcObject(m) ? handleRpc(m, request) : err(null, -32600, "Invalid Request"),
+      ),
+    );
     const payloads = await Promise.all(
       responses.filter((r): r is Response => r !== null).map((r) => r.json()),
     );
+    // A batch of only notifications yields no responses → 202 with no body.
+    if (payloads.length === 0) return new NextResponse(null, { status: 202 });
     return NextResponse.json(payloads);
   }
 
-  const res = await handleRpc(body as JsonRpcRequest);
+  // Single.
+  if (!isRpcObject(body)) return err(null, -32600, "Invalid Request");
+  const res = await handleRpc(body, request);
   // Pure notification → 202 with no body.
   return res ?? new NextResponse(null, { status: 202 });
 }
