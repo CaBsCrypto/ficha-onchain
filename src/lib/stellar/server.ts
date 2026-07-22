@@ -46,6 +46,17 @@ export function getDemoPatientSecret(): string | undefined {
     : undefined;
 }
 
+/**
+ * Owner secret of the SANDBOX toy ClinicalRecord — signs the (real) on-chain
+ * grant when a center requests consent in the sandbox. Gated on the relayer.
+ * Returns undefined when unset, so sandbox consent degrades to mode:"simulated".
+ */
+export function getSandboxOwnerSecret(): string | undefined {
+  return process.env.RELAYER_SECRET
+    ? process.env.SANDBOX_OWNER_SECRET
+    : undefined;
+}
+
 export interface SubmitResult {
   hash: string;
   status: "SUCCESS" | "FAILED" | "PENDING";

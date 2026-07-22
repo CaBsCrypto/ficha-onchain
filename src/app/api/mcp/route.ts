@@ -24,6 +24,7 @@ import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
 import { requestConsent, checkConsent, revokeConsent } from "@/lib/identity/center-grants";
+import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,7 +186,8 @@ const TOOLS: Record<string, Tool> = {
         rut,
         env: c.env,
       });
-      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env, org: c.orgName }, null, 2) }];
+      const txUrl = res.grantTx ? STELLAR_EXPERT_TX(res.grantTx) : null;
+      return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env, org: c.orgName }, null, 2) }];
     },
   },
 
@@ -206,7 +208,8 @@ const TOOLS: Record<string, Tool> = {
       const c = requireCtx(ctx);
       const rut = requireRut(args);
       const res = await checkConsent({ orgId: c.orgId, rut, env: c.env });
-      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env }, null, 2) }];
+      const txUrl = res.grantTx ? STELLAR_EXPERT_TX(res.grantTx) : null;
+      return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env }, null, 2) }];
     },
   },
 
