@@ -434,14 +434,21 @@ step("center_grants", async () => {
       grantee_wallet   TEXT NOT NULL,                   -- G... signing wallet del centro
       status           TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'revoked' | 'expired'
       mode             TEXT NOT NULL DEFAULT 'simulated',-- 'onchain' | 'simulated'
+      env              TEXT NOT NULL DEFAULT 'sandbox', -- 'sandbox' | 'live'
       grant_tx         TEXT,
       revoke_tx        TEXT,
       expires_at       TIMESTAMPTZ,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       revoked_at       TIMESTAMPTZ
     )`;
+  // Added after the table shipped (PR-1d) — idempotent for already-migrated branches.
+  await sql`ALTER TABLE center_grants ADD COLUMN IF NOT EXISTS env TEXT NOT NULL DEFAULT 'sandbox'`;
+  // env MUST scope the "one active grant" guarantee: a sandbox consent (auto-
+  // approved, no real signature) must never satisfy a live check. Replace the
+  // 2-column active index with a 3-column one that includes env.
+  await sql`DROP INDEX IF EXISTS uq_center_grants_active`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_center_grants_active
-              ON center_grants (org_id, patient_rut_hash)
+              ON center_grants (org_id, patient_rut_hash, env)
               WHERE status = 'active'`;
   await sql`CREATE INDEX IF NOT EXISTS idx_center_grants_patient
               ON center_grants (patient_rut_hash)`;
