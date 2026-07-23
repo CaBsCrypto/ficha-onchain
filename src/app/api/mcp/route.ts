@@ -24,7 +24,7 @@ import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
 import { requestConsent, checkConsent, revokeConsent } from "@/lib/identity/center-grants";
-import { anchorRecord, ConsentRequiredError } from "@/lib/identity/anchor";
+import { anchorRecord, readRecords, ConsentRequiredError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
@@ -270,6 +270,32 @@ const TOOLS: Record<string, Tool> = {
         return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env }, null, 2) }];
       } catch (e) {
         // Consent-required is a caller-safe message → surface it as isError.
+        if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        throw e;
+      }
+    },
+  },
+
+  read_records: {
+    description:
+      "Lee las entradas ancladas de la ficha de un paciente (kind + hash + autor + timestamp; nunca el contenido clínico). Requiere consentimiento vigente. Requiere API key.",
+    requiresAuth: true,
+    scope: "ficha:read",
+    inputSchema: {
+      type: "object",
+      properties: {
+        patient_rut: { type: "string", description: "RUT del paciente." },
+      },
+      required: ["patient_rut"],
+      additionalProperties: false,
+    },
+    handler: async (args, ctx) => {
+      const c = requireCtx(ctx);
+      const rut = requireRut(args);
+      try {
+        const res = await readRecords({ orgId: c.orgId, rut, env: c.env });
+        return [{ type: "text", text: JSON.stringify({ ...res, count: res.entries.length, env: c.env }, null, 2) }];
+      } catch (e) {
         if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
         throw e;
       }

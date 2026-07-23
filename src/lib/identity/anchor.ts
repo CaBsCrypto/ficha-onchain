@@ -18,6 +18,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { hasActiveConsent } from "@/lib/identity/center-grants";
 import { ensureSandboxRecord, resolvePatientRecord, type RecordEnv } from "@/lib/identity/patient-records";
 import { appendClinicalEntry, getSandboxCenterSecret } from "@/lib/stellar/server";
+import { getClinicalEntries } from "@/lib/stellar/client";
 
 /** Thrown when a center tries to anchor without the patient's active consent. */
 export class ConsentRequiredError extends Error {
@@ -119,4 +120,51 @@ function safePub(secret: string): string | null {
   } catch {
     return null;
   }
+}
+
+export interface ReadEntry {
+  kind: string;
+  contentHash: string; // hex
+  author: string; // G… wallet that anchored it
+  timestamp: number; // ledger unix seconds
+}
+
+export interface ReadResult {
+  recordContract: string | null;
+  entries: ReadEntry[];
+}
+
+/**
+ * Read the anchored entries of a patient's ficha — the read side of the loop.
+ * Gated on active consent (a center only reads records of patients that
+ * consented to it). Returns the on-chain append-only history: kind + hash +
+ * author + timestamp. Never returns clinical content — that lives off-chain.
+ *
+ * SANDBOX CAVEAT: every sandbox patient shares one toy ClinicalRecord, so this
+ * returns ALL sandbox entries in that shared record, not just this patient's.
+ * In production each patient has their own contract and the read is scoped.
+ *
+ * @throws {ConsentRequiredError} when the center has no active grant.
+ * @throws {RutError} when the RUT is invalid / pepper missing.
+ */
+export async function readRecords(args: {
+  orgId: number;
+  rut: string;
+  env: RecordEnv;
+}): Promise<ReadResult> {
+  if (!(await hasActiveConsent(args.orgId, args.rut, args.env))) {
+    throw new ConsentRequiredError();
+  }
+  const record = await resolvePatientRecord(args.rut, args.env);
+  const contractId = record?.contractId ?? null;
+  if (!contractId) return { recordContract: null, entries: [] };
+
+  const raw = await getClinicalEntries(contractId).catch(() => []);
+  const entries: ReadEntry[] = raw.map((e) => ({
+    kind: e.kind,
+    contentHash: e.contentHash,
+    author: e.author,
+    timestamp: e.timestamp,
+  }));
+  return { recordContract: contractId, entries };
 }
