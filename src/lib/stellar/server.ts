@@ -10,11 +10,14 @@ import {
   FeeBumpTransaction,
   Keypair,
   nativeToScVal,
+  Operation,
+  scValToNative,
   Transaction,
   TransactionBuilder,
   rpc,
   xdr,
 } from "@stellar/stellar-sdk";
+import { randomBytes } from "node:crypto";
 import { NETWORK_PASSPHRASE } from "./config";
 import { server } from "./client";
 import { withSignerLock } from "./serialize";
@@ -285,5 +288,59 @@ export async function revokeWriteAccess(args: {
     contractId: args.contractId,
     method: "revoke_write_access",
     args: [new Address(args.grantee).toScVal()],
+  });
+}
+
+/**
+ * Wasm hash of the clinical-record contract already uploaded to the network
+ * (from `stellar contract build`). Deploying a per-patient instance only needs a
+ * createContract op against this hash — no re-upload. Override via env if a new
+ * build is published.
+ */
+const CLINICAL_RECORD_WASM_HASH =
+  process.env.CLINICAL_RECORD_WASM_HASH ??
+  "93001b7638bf1008a6fb1fc2ccf2f6bb6bfa0aee87048b660759e722ee2ee60c";
+
+/**
+ * Deploy a FRESH ClinicalRecord instance owned by `ownerAddress` and return its
+ * contract id. This is what makes "1 paciente = 1 ficha" real: each patient gets
+ * their own record whose owner is fixed at deploy (the constructor takes owner).
+ *
+ * `deployerSecret` pays nothing (relayer fee-bumps) but is the tx source; the
+ * salt is random so every call yields a distinct contract. The owner does NOT
+ * sign — the constructor sets the owner from the argument — so a provisioning
+ * key can deploy a record owned by a patient's wallet.
+ */
+export async function deployClinicalRecord(args: {
+  ownerAddress: string;
+  deployerSecret: string;
+}): Promise<string> {
+  const deployer = Keypair.fromSecret(args.deployerSecret);
+  const wasmHash = Buffer.from(CLINICAL_RECORD_WASM_HASH, "hex");
+
+  return withSignerLock(deployer.publicKey(), async () => {
+    const op = Operation.createCustomContract({
+      address: new Address(deployer.publicKey()),
+      wasmHash,
+      salt: randomBytes(32), // distinct instance per patient
+      constructorArgs: [new Address(args.ownerAddress).toScVal()],
+    });
+    const source = await server.getAccount(deployer.publicKey());
+    const tx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(op)
+      .setTimeout(60)
+      .build();
+
+    const prepared = await server.prepareTransaction(tx);
+    prepared.sign(deployer);
+    const res = await feeBumpAndSend(prepared.toXDR());
+    if (res.status !== "SUCCESS" || !res.returnValue) {
+      throw new Error(`deploy ClinicalRecord: estado ${res.status}`);
+    }
+    // The host function returns the new contract's address (C…).
+    return scValToNative(res.returnValue) as string;
   });
 }

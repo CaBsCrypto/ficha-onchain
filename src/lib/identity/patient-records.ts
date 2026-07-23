@@ -15,8 +15,10 @@
  * CI (WDAC blocks local Rust builds). For the sandbox we point every row at one
  * shared TOY contract (SANDBOX_CLINICAL_RECORD_ID); see provisionLiveRecord.
  */
+import { Keypair } from "@stellar/stellar-sdk";
 import { getDb } from "@/lib/db";
 import { hashRut } from "@/lib/identity/rut";
+import { deployClinicalRecord, getSandboxOwnerSecret } from "@/lib/stellar/server";
 
 export type RecordEnv = "sandbox" | "live";
 
@@ -77,16 +79,55 @@ export async function ensureSandboxRecord(
   rut: string,
   patientWallet?: string,
 ): Promise<PatientRecord> {
+  // Already provisioned → reuse it (never redeploy a patient's record).
+  const existing = await resolvePatientRecord(rut, "sandbox");
+  if (existing?.contractId) return existing;
+
   const rutHash = hashRut(rut);
-  const contractId = process.env.SANDBOX_CLINICAL_RECORD_ID ?? null;
   const sql = getDb();
+
+  // Reserve the directory slot FIRST with contract_id NULL. This way a deploy
+  // that later fails leaves an UNPROVISIONED row (→ the flow degrades to
+  // simulated), and we NEVER fall back to a shared record — that would mix
+  // patients, exactly what per-patient records exist to prevent. Fail closed.
   await sql`
     INSERT INTO patient_records (rut_hash, env, contract_id, patient_wallet)
-    VALUES (${rutHash}, 'sandbox', ${contractId}, ${patientWallet ?? null})
-    ON CONFLICT (rut_hash, env)
-      DO UPDATE SET updated_at = NOW()`;
+    VALUES (${rutHash}, 'sandbox', NULL, ${patientWallet ?? null})
+    ON CONFLICT (rut_hash, env) DO NOTHING`;
+
+  // A concurrent call may have already provisioned it between our check and now.
+  const afterReserve = await resolvePatientRecord(rut, "sandbox");
+  if (afterReserve?.contractId) return afterReserve;
+
+  // Deploy a per-patient ClinicalRecord (owner = sandbox owner key we control;
+  // the real patient key is Fase 2). If we can't deploy, stay unprovisioned —
+  // no shared-contract fallback.
+  const ownerSecret = getSandboxOwnerSecret();
+  if (!ownerSecret) return afterReserve as PatientRecord;
+
+  let contractId: string;
+  try {
+    const ownerAddress = Keypair.fromSecret(ownerSecret).publicKey();
+    contractId = await deployClinicalRecord({ ownerAddress, deployerSecret: ownerSecret });
+  } catch (e) {
+    console.error(
+      "[patient-records] deploy por-paciente falló; queda sin anclar (simulated). " +
+        "NO se comparte contrato para no mezclar pacientes:",
+      e,
+    );
+    return afterReserve as PatientRecord;
+  }
+
+  // Claim the fresh contract for THIS patient only if nobody else did, so a
+  // concurrent deploy can't overwrite the winner (the loser's contract is
+  // orphaned on-chain but no patient data is ever mixed).
+  await sql`
+    UPDATE patient_records
+      SET contract_id  = ${contractId},
+          patient_wallet = COALESCE(patient_wallet, ${patientWallet ?? null}),
+          updated_at   = NOW()
+    WHERE rut_hash = ${rutHash} AND env = 'sandbox' AND contract_id IS NULL`;
   const rec = await resolvePatientRecord(rut, "sandbox");
-  // The upsert guarantees the row exists, so this is non-null.
   return rec as PatientRecord;
 }
 
