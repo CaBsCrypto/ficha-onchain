@@ -85,6 +85,79 @@ const STATEMENTS: Array<[string, string]> = [
   ["rxlog.prescription_type", `ALTER TABLE prescriptions_log ADD COLUMN IF NOT EXISTS prescription_type TEXT`],
   ["rxlog.idx_created", `CREATE INDEX IF NOT EXISTS idx_prescriptions_log_created ON prescriptions_log (created_at DESC)`],
   ["rxlog.idx_doctor", `CREATE INDEX IF NOT EXISTS idx_prescriptions_log_doctor ON prescriptions_log (doctor_email, created_at DESC)`],
+
+  // ── API/MCP externa de salud (mirror de scripts/migrate.mjs) ──────────────
+  ["patient_records", `
+    CREATE TABLE IF NOT EXISTS patient_records (
+      id             SERIAL PRIMARY KEY,
+      rut_hash       TEXT NOT NULL,
+      env            TEXT NOT NULL DEFAULT 'sandbox',
+      contract_id    TEXT,
+      patient_wallet TEXT,
+      deploy_salt    TEXT,
+      patient_email  TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["patient_records.uq", `CREATE UNIQUE INDEX IF NOT EXISTS uq_patient_records_rut_env ON patient_records (rut_hash, env)`],
+
+  ["api_orgs", `
+    CREATE TABLE IF NOT EXISTS api_orgs (
+      id             SERIAL PRIMARY KEY,
+      name           TEXT NOT NULL,
+      signing_wallet TEXT,
+      key_custody    TEXT NOT NULL DEFAULT 'custodial',
+      trust_level    TEXT NOT NULL DEFAULT 'self_declared',
+      status         TEXT NOT NULL DEFAULT 'pending',
+      contact_email  TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+
+  ["api_keys", `
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id           SERIAL PRIMARY KEY,
+      org_id       INTEGER NOT NULL REFERENCES api_orgs(id),
+      key_hash     TEXT NOT NULL,
+      key_prefix   TEXT NOT NULL,
+      env          TEXT NOT NULL DEFAULT 'sandbox',
+      scopes       JSONB NOT NULL DEFAULT '[]',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      revoked_at   TIMESTAMPTZ
+    )`],
+  ["api_keys.uq", `CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_hash ON api_keys (key_hash)`],
+  ["api_keys.idx", `CREATE INDEX IF NOT EXISTS idx_api_keys_org ON api_keys (org_id)`],
+
+  ["center_doctors", `
+    CREATE TABLE IF NOT EXISTS center_doctors (
+      id              SERIAL PRIMARY KEY,
+      org_id          INTEGER NOT NULL REFERENCES api_orgs(id),
+      doctor_rut_hash TEXT,
+      doctor_name     TEXT,
+      doctor_registro TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["center_doctors.idx", `CREATE INDEX IF NOT EXISTS idx_center_doctors_org ON center_doctors (org_id)`],
+
+  ["center_grants", `
+    CREATE TABLE IF NOT EXISTS center_grants (
+      id               SERIAL PRIMARY KEY,
+      org_id           INTEGER NOT NULL REFERENCES api_orgs(id),
+      patient_rut_hash TEXT NOT NULL,
+      record_contract  TEXT,
+      grantee_wallet   TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'active',
+      mode             TEXT NOT NULL DEFAULT 'simulated',
+      env              TEXT NOT NULL DEFAULT 'sandbox',
+      grant_tx         TEXT,
+      revoke_tx        TEXT,
+      expires_at       TIMESTAMPTZ,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at       TIMESTAMPTZ
+    )`],
+  ["center_grants.env", `ALTER TABLE center_grants ADD COLUMN IF NOT EXISTS env TEXT NOT NULL DEFAULT 'sandbox'`],
+  ["center_grants.uq", `CREATE UNIQUE INDEX IF NOT EXISTS uq_center_grants_active ON center_grants (org_id, patient_rut_hash, env) WHERE status = 'active'`],
+  ["center_grants.idx", `CREATE INDEX IF NOT EXISTS idx_center_grants_patient ON center_grants (patient_rut_hash)`],
 ];
 
 export async function POST(request: Request) {
