@@ -9,7 +9,12 @@
  * works together with the ones before it:
  *
  *   médicos → disponibilidad → slots → reserva → Meet → anti doble-reserva
- *           → ficha on-chain (append) → historial de la ficha
+ *           → consentimiento → ficha on-chain (append) → historial de la ficha
+ *           → receta on-chain (Decreto 41) → verificación pública sin sesión
+ *
+ * El paso de la receta vale además como prueba de que el médico está autorizado
+ * en DoctorRegistry: uno que no lo esté no falla, degrada a mode:"simulated" con
+ * reason:"doctor_not_authorized", que es justo el resultado que aquí es rojo.
  *
  * It is idempotent: every run uses a fresh patient email and cleans up the
  * appointment it creates. Safe to re-run. Exit code 0 = all green.
@@ -135,6 +140,43 @@ async function main() {
   // 8 ── Historial de la ficha lo devuelve (integración).
   const hist = await j(await fetch(`${BASE}/api/ficha/entries?patientEmail=${encodeURIComponent(PATIENT_EMAIL)}`));
   ok("GET /api/ficha/entries devuelve la entrada", (hist.entries ?? []).some((e) => e.content_hash === entryRes.contentHash), `entradas=${hist.entries?.length}`);
+
+  // 9 ── Receta on-chain: el médico emite, y sólo puede si el DoctorRegistry lo
+  //      autoriza — un médico no registrado devuelve mode:"simulated" con
+  //      reason:"doctor_not_authorized". Por eso este paso vale como prueba de
+  //      la validación del médico, además de la emisión.
+  console.log("\n\x1b[1m9. Receta on-chain (Decreto 41)\x1b[0m");
+  const mint = await j(await fetch(`${BASE}/api/mint`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      patient: PATIENT_WALLET,
+      patientName: "Paciente de Flujo", patientDocType: "RUT",
+      patientDocNumber: "12345678-5", patientSex: "F",
+      patientBirthDate: "1990-05-14", patientAddress: "Av. Siempre Viva 742, Santiago",
+      patientEmail: PATIENT_EMAIL, healthSystem: "FONASA",
+      doctorEmail: DOCTOR_EMAIL, doctorName: "Dr. Cristian Brown",
+      doctorRut: "00000000-0", doctorSpecialty: "Medicina General",
+      clinicName: "TrustLeaf Demo", clinicRut: "76000000-0",
+      medication: "Ibuprofeno", dosage: "400mg — 1 cada 8h",
+      quantity: 30, refills: 0, prescriptionType: "SIMPLE",
+      diagnosis: "Lumbago", cie10Code: "M54.5",
+    }),
+  }));
+  ok("el médico está autorizado en DoctorRegistry", mint.reason !== "doctor_not_authorized", mint.reason ? `reason=${mint.reason}` : "sin reason");
+  ok("POST /api/mint emite la receta on-chain", mint.mode === "onchain", `mode=${mint.mode}${mint.reason ? ` (${mint.reason})` : ""}`);
+  ok("devuelve un tx hash de 64 hex", /^[0-9a-f]{64}$/.test(mint.hash ?? ""), `tx=${(mint.hash ?? "").slice(0, 12)}…`);
+  ok("devuelve el id soulbound de la receta", mint.rxId != null, `rxId=${mint.rxId}`);
+
+  // 10 ── Verificación pública: cualquiera lee la receta del contrato, sin sesión.
+  //       Es el cierre del arco — lo que se enseña en cámara y lo que un tercero
+  //       puede comprobar por su cuenta.
+  if (mint.rxId != null) {
+    console.log("\n\x1b[1m10. Verificación pública (sin sesión)\x1b[0m");
+    const pub = await j(await fetch(`${BASE}/api/public/prescription/${mint.rxId}`));
+    ok("GET /api/public/prescription/:id lee la receta del contrato", pub.data?.medication != null, `medicamento=${pub.data?.medication ?? "—"}`);
+    ok("el rx_hash público coincide con el que devolvió el minteo", pub.data?.rxHash === mint.rxHash, pub.data?.rxHash ? `${pub.data.rxHash.slice(0, 12)}…` : "sin hash");
+  }
 
   // ── Limpieza: borra la cita de prueba (la entrada on-chain es inmutable).
   if (apptId) {

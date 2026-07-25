@@ -157,13 +157,22 @@ export default function AdminHistorialPage() {
                       }`}>
                         {e.mode === "onchain" ? "on-chain" : "simulado"}
                       </span>
-                      <a
-                        href={`https://stellar.expert/explorer/testnet/tx/${e.tx_hash}`}
-                        target="_blank" rel="noreferrer"
-                        className="font-mono text-[11px] text-sky-600 hover:underline"
-                      >
-                        {trunc(e.tx_hash)}
-                      </a>
+                      {/* Only an on-chain entry gets a link: a simulated one has
+                          no transaction, so pointing at the explorer would
+                          promise evidence that is not there. */}
+                      {e.mode === "onchain" ? (
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${e.tx_hash}`}
+                          target="_blank" rel="noreferrer"
+                          className="font-mono text-[11px] text-sky-600 hover:underline"
+                        >
+                          {trunc(e.tx_hash)}
+                        </a>
+                      ) : (
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {trunc(e.tx_hash)} · sin transacción
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

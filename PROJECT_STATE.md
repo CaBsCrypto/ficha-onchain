@@ -2,7 +2,12 @@
 
 > Fuente de verdad del **estado** (no del código). Qué está hecho, qué falta,
 > qué se decidió y por qué. Se actualiza al cerrar cada pieza de trabajo.
-> Última actualización: 2026-07-21
+> Última actualización: 2026-07-25
+>
+> Regla de esta casa: **no escribas aquí un "no se puede" sin volver a probarlo.**
+> Tres afirmaciones de este archivo resultaron falsas por no re-testearlas, y una
+> costó una PR entera construida sobre una limitación inexistente. `npm test`,
+> `npm run test:flow` y `npm run test:onchain` existen para eso.
 
 ---
 
@@ -13,76 +18,122 @@ comprobables en Stellar Expert. El SOW tiene 3 entregables.
 
 | Entregable | Estado | Detalle |
 | --- | --- | --- |
-| **D1 — Contratos testeados y desplegados** | ✅ **Cerrado** | Contratos desplegados; `cargo test` (3 crates) en CI + suite `vitest` (18 tests). |
-| **D2 — Interfaz doctor + paciente** | ✅ **Cerrado** | Flujo verificado **logueado en el navegador** con 3 actores Privy reales. Médico emite receta real (`rx-17` on-chain); paciente la ve desde Soroban y **activa** (QR). Se resolvieron los bugs de login Google que bloqueaban el portal médico. |
-| **D3 — Integración E2E + demo grabado** | 🟡 **~65%** | Integración **cerrada**: los 5 pasos on-chain con tx reales verificables → ver [`docs/D3_EVIDENCE.md`](docs/D3_EVIDENCE.md). **Falta: grabar el video** siguiendo [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). |
+| **D1 — Contratos testeados y desplegados** | ✅ **Cerrado** | 4 contratos desplegados en testnet. `cargo test` (3 crates) en CI + suite `vitest` (67 tests). |
+| **D2 — Interfaz doctor + paciente** | ✅ **Cerrado** | Flujo verificado **logueado en el navegador** con 3 actores Privy reales. |
+| **D3 — Integración E2E + demo grabado** | 🟡 **Integración cerrada. Falta el video.** | Evidencia en [`docs/D3_EVIDENCE.md`](docs/D3_EVIDENCE.md), re-verificada contra Horizon el 2026-07-25: las 5 transacciones existen y devuelven `SUCCESS`. Guion en [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). |
+
+**Fuera del alcance del SOW** (existen, funcionan, pero no se entregan ni se
+graban aquí): el MCP externo para centros médicos (`/api/mcp`, ver `AGENTS.md`)
+y el diario/mapa de dolor.
+
+---
+
+## ✅ El flujo completo, corrido de punta a punta (2026-07-25)
+
+`npm run test:flow` → **19 PASS · 0 FAIL**, contra los contratos reales de
+testnet. Cada paso devolvió `mode:"onchain"`, ninguno degradó a simulado:
+
+| # | Paso | Resultado |
+| --- | --- | --- |
+| 1 | El paciente ve la lista de médicos | `GET /api/doctors` con el médico activo |
+| 2–3 | Disponibilidad del médico → slots libres | 8 horas libres derivadas |
+| 4 | El paciente reserva (telemedicina + Meet) | 201 + enlace de sala |
+| 5 | Anti doble-reserva | 409, y el slot desaparece |
+| 6 | El paciente **otorga consentimiento** | `grant_write_access` · onchain |
+| 7 | El médico **agrega a la ficha** | `append_entry` · onchain |
+| 8 | El historial de la ficha lo devuelve | ancla SHA-256 correcta |
+| 9 | El médico **emite receta** (Decreto 41) | `mint_prescription` · onchain, rxId real |
+| 10 | **Verificación pública sin sesión** | el `rx_hash` del contrato coincide con el del minteo |
+
+El paso 9 vale además como prueba de la **validación del médico**: un médico que
+no esté autorizado en `DoctorRegistry` no falla, degrada a `mode:"simulated"`
+con `reason:"doctor_not_authorized"`, que en el test es rojo.
+
+Para reproducirlo hace falta `TRUSTLEAF_REQUIRE_AUTH=false` en local (el script
+llama sin sesión de Privy). En producción la bandera está en `true` y el mismo
+recorrido se hace logueado.
 
 ---
 
 ## 🔗 Contratos en vivo (Stellar Testnet)
 
-| Contrato | ID | Admin |
-| --- | --- | --- |
-| DoctorRegistry | `CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O` | relayer (clave que tenemos) |
-| PrescriptionSoulbound | `CA3I4NLBELODRXUUBVZDBVAU47W65KPZ6UFWEXCEEDUDQYZQ4E5YLXYL` | relayer; valida contra el registry |
-
-- Médico demo `GAAG2XS7…` está **registrado y autorizado** on-chain.
-- Paciente demo `GD7WGS7M…` tiene 3 recetas: id 1 (Activa), id 2 (Revocada), id 3 (Registrada).
-- Los IDs viven en `src/lib/stellar/config.ts` y `.env.local`. Un redeploy = actualizar ambos + Vercel.
-
-### Timestamp map (evidencia D3, en construcción)
-
-| Paso | tx hash |
+| Contrato | ID |
 | --- | --- |
-| Deploy registry | `9dd160da…` |
-| init (admin) | `a7d30d0c…` |
-| register_doctor | `e1e6fa13…` |
-| Mint receta 1 | `79be93fa…` |
-| activate → is_valid true | `324f1619…` |
-| revoke → is_valid false | `0407f3fa…` |
+| DoctorRegistry | `CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O` |
+| PrescriptionSoulbound | `CA3I4NLBELODRXUUBVZDBVAU47W65KPZ6UFWEXCEEDUDQYZQ4E5YLXYL` |
+| DocumentSoulbound (licencias) | `CBNX6WYTQUWTKKJSDLKARXQHONUW6H435CSZ4VA6O4U7TGI5E2IVCMON` |
+| ClinicalRecord (ficha demo) | `CCATYIFOHLLRS6CMONJQZ66A6QN3Z7EQFU3O4HD4RMTNS67F2U422GY5` |
+
+`npm run test:onchain` los comprueba los cuatro: **11 PASS · 0 FAIL**
+(2026-07-25). Los IDs viven en `src/lib/stellar/config.ts` y `.env.local`; un
+redeploy obliga a actualizar ambos **y** Vercel.
+
+- Médico demo `GAAG2XS7…` **registrado y autorizado** on-chain.
+- **No tenemos la clave de admin del registry**
+  (`GB2PFKB24QPIEB3VIKYTIEG7M4KRH5I4KBPV26LUC6KOE2YAWSCPXKZ6`): podemos mintear
+  con el médico ya registrado, pero **no registrar médicos nuevos on-chain**.
 
 ---
 
-## 📌 Sprint 1 de pulido (2026-07-21) — mergeado a `main`
-
-Sobre el núcleo del SOW, ya cerrado, se hizo una pasada de pulido:
-
-- **Licencias on-chain** (#37): firmaban con el email en vez de la wallet → resuelto (resuelve la G-address). Validado on-chain + concurrencia.
-- **Recetas en el historial global** (#38): espejo `prescriptions_log` → aparecen en `/admin/historial`.
-- **Antecedentes on-chain** (#40): se ancla el hash en ClinicalRecord (cerró la última brecha off-chain del núcleo).
-- **Tests** (#39): vitest instalado + 18 tests en verde.
-- **Recetas reales en el portal médico** (#41): la pestaña lista lo que el médico realmente emitió (desde el espejo).
-
 ## ⬜ Pendiente (priorizado)
 
-1. **Grabar el demo D3** — seguir [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md); la evidencia de una corrida real está en [`docs/D3_EVIDENCE.md`](docs/D3_EVIDENCE.md).
-2. **Deploy prod on-chain** — cargar en Vercel los secrets de firma (`DEMO_DOCTOR_SECRET`, `DEMO_PATIENT_SECRET`, `RELAYER_SECRET`) y correr `node scripts/migrate.mjs` contra el branch prod (tablas nuevas: `prescriptions_log`, columnas de antecedentes). Sin eso, el deploy degrada a simulado.
-3. **CI: sumar `npm test`** al workflow (requiere token con scope `workflow`).
-4. **Fase 2** — firma **por-cuenta real** (passkey por usuario, hoy es una wallet demo compartida en servidor); periféricos (farmacia, dental, óptica, cuidador); diario de dolor drill-down (PR #36, en pausa).
-5. Actualizar los "facts" de `AGENTS.md` (el "minting blocked" ya es falso: `rx-17` minteó on-chain).
+1. **Grabar el demo D3** — es lo único que separa el SOW del 100%. Guion en
+   `docs/DEMO_SCRIPT.md`.
+2. **Sembrar el médico en producción.** La tabla `doctors` de prod está
+   **vacía**, así que `GET /api/doctors` devuelve `[]` y un paciente que busca
+   hora no ve a nadie. Se arregla con el alta real (`POST /api/doctors` →
+   `pending`) y la aprobación desde `/admin/doctors`; en local lo hace
+   `node scripts/seed-demo-journey.mjs`. **Requiere el `WAITLIST_ADMIN_TOKEN` de
+   prod, que solo tiene el dueño.**
+3. **Completar el paso 6 de la evidencia D3.** La activación de la receta por el
+   paciente es el único paso sin hash de transacción en `D3_EVIDENCE.md`
+   ("validada en UI"). Se cierra capturando el hash al grabar.
+4. **CI: sumar `npm test`** al workflow (requiere token con scope `workflow`).
+5. **Fase 2** — firma por-cuenta real (passkey por usuario; hoy es una wallet
+   demo compartida en servidor); periféricos (farmacia, dental, óptica,
+   cuidador).
 
 ---
 
 ## 🧠 Decisiones tomadas (para no re-litigar)
 
-- **SDK `@stellar/stellar-sdk` pineado a v14.** v13 no parsea protocol 27; v16 rompe passkey-kit.
-- **El registry se redesplegó con el relayer como admin** porque la clave del admin original se perdió.
-- **Los contratos no compilan local** (WDAC, os error 4551). Se construyen en CI y se optimizan con `stellar contract optimize` (quita reference-types que la VM rechaza).
-- **`contracts/Cargo.lock` se commitea** — son binarios que van a la cadena, el build tiene que ser reproducible.
-- **Auth = Privy, no el sistema de sesiones propio** (que nunca se conectó). Identidad server-side vía `requireUser()`.
-- **App de Privy correcta = `ficha-onchain` (`cmrix722m…`)**, no "SalesAgent" (otro proyecto del owner).
-- **CI gratis (GitHub Actions) es el gate de merge, no Vercel.** Vercel plan Hobby se quedaba sin cuota y bloqueaba merges. Actions hace tsc + build sin límite.
-- **Sin worktrees** — se trabaja una feature a la vez, en git normal. Los worktrees eran ~9 GB para resolver un problema (sesiones paralelas) que no tenemos.
+- **SDK `@stellar/stellar-sdk` pineado a v14.** v13 no parsea protocol 27; v16
+  rompe passkey-kit.
+- **El registry se redesplegó con el relayer como admin** porque la clave del
+  admin original se perdió.
+- **Los contratos SÍ compilan local**, con `stellar contract build` (target
+  `wasm32v1-none`), no con `cargo build --target wasm32-unknown-unknown`: este
+  emite `reference-types` que la VM de Soroban rechaza. *(Este archivo afirmó
+  durante semanas que WDAC lo impedía —`os error 4551`—; era falso y costó una
+  PR diseñada alrededor de esa limitación.)*
+- **`contracts/Cargo.lock` se commitea** — son binarios que van a la cadena, el
+  build tiene que ser reproducible.
+- **Auth = Privy**, no el sistema de sesiones propio. Identidad server-side vía
+  `requireUser()`.
+- **App de Privy correcta = `ficha-onchain` (`cmrix722m…`)**, no "SalesAgent".
+- **CI (GitHub Actions) es el gate de merge, no Vercel.** En Vercel los deploys
+  **Preview fallan siempre** (ambiental) y los **Production quedan Ready**: el
+  check rojo "Vercel" en una PR se ignora, el que manda es `typecheck + build`.
+- **Nada de modo demo.** `/demo/medico` y `/demo/paciente` eran maquetas que
+  mostraban un hash de transacción inventado bajo el texto "El registro fue
+  acuñado"; se borraron (PR #67). Entrar con Privy **es** el producto, sobre
+  testnet.
+- **Sin worktrees** — una feature a la vez, en git normal.
 
 ---
 
 ## 🛠️ Comandos que importan
 
 ```
+npm test                    # 67 tests (vitest)
+npm run test:onchain        # los 4 contratos contra testnet
+npm run test:flow           # el journey completo contra la app corriendo
 npx tsc --noEmit            # 0 errores en src/ antes de commitear
-npm run build               # el gate real (limpiar .next si da error de archivo generado)
-node scripts/migrate.mjs    # aplicar esquema a la rama Neon de dev
+node scripts/migrate.mjs    # esquema en la rama Neon de dev
+node scripts/seed-demo-journey.mjs   # deja un journey completo persistido
 ```
 
-- Base local: rama **dev** de Neon (`ep-lingering-water-ahzh89z5`), nunca la de producción.
-- Deploy de contrato: bajar el WASM del artefacto de CI → `stellar contract deploy`.
+- Base local: rama **dev** de Neon (`ep-lingering-water-ahzh89z5`), nunca la de
+  producción. Los deploys de **preview comparten la base de producción**: un
+  preview que escribe, escribe en prod.
+- Deploy de contrato: `stellar contract build` → `stellar contract deploy`.
