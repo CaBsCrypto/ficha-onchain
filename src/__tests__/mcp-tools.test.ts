@@ -16,7 +16,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
-const ROUTE = readFileSync(join(process.cwd(), "src/app/api/mcp/route.ts"), "utf8");
+// Line endings are normalised because these assertions match on source layout,
+// and a Windows checkout hands back CRLF: a regex anchored on `\n` then matches
+// nothing and the loops below iterate zero times — a test that passes by finding
+// no code to check. That happened; the `toBeGreaterThan(0)` guards caught it.
+const ROUTE = readFileSync(join(process.cwd(), "src/app/api/mcp/route.ts"), "utf8").replace(
+  /\r\n/g,
+  "\n",
+);
 
 /** The closed list as it must appear in route.ts. Change BOTH deliberately. */
 const EXPECTED_KINDS = [
@@ -78,6 +85,9 @@ describe("registro de tools", () => {
     // verify_approval returned "approved" signed by a fictional doctor for any
     // id. It only comes back with a real signature route behind it.
     const registry = ROUTE.match(/const TOOLS: Record<string, Tool> = \{[\s\S]*?\n\};/)?.[0] ?? "";
+    // Without this, a registry the regex fails to locate is an empty string, and
+    // "the empty string does not contain create_approval" is a green test.
+    expect(registry).toMatch(/anchor_record:/);
     expect(registry).not.toMatch(/\bcreate_approval:/);
     expect(registry).not.toMatch(/\bverify_approval:/);
   });
