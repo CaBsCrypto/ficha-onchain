@@ -93,11 +93,16 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
 - **`@stellar/stellar-sdk` is pinned to v14.** v13 cannot parse protocol 27 —
   every on-chain read throws `Bad union switch: 1`. v16 breaks `passkey-kit`,
   which needs `^14.2.0`.
-- **`DoctorRegistry`'s admin secret is not in the repo.** Its admin is
-  `GB2PFKB24QPIEB3VIKYTIEG7M4KRH5I4KBPV26LUC6KOE2YAWSCPXKZ6`. `register_doctor`
-  cannot be called, so `is_authorized` is false for everyone and `/api/mint`
-  degrades to `mode:"simulated"`. **Real minting is blocked on this** — the fix
-  is redeploying the registry with an admin whose key we hold.
+- **Real minting WORKS.** The demo doctor is registered in `DoctorRegistry`
+  (`is_authorized=true`) and `/api/mint` produces real transactions — verify with
+  `npm run test:onchain`, which checks all four contracts against testnet. An
+  earlier version of this file claimed the registry admin key was lost and that
+  "real minting is blocked on this"; that is stale and, like the WDAC claim
+  above, is the kind of thing that gets planned around instead of tested. **Run
+  the script before believing any on-chain claim in this file.** What is true:
+  we do not hold the registry's admin key
+  (`GB2PFKB24QPIEB3VIKYTIEG7M4KRH5I4KBPV26LUC6KOE2YAWSCPXKZ6`), so we cannot
+  register *new* doctors — only the already-registered demo doctor can mint.
 - **Contract IDs live in `src/lib/stellar/config.ts` and `.env.local`.** A newly
   deployed contract needs its ID wired in.
 - **Production's Neon branch is migrated** (as of the profiles/booking/ficha
