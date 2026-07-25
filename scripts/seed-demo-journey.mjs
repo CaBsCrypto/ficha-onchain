@@ -45,7 +45,29 @@ const PATIENT = { email: `maria.gonzalez.${Date.now()}@demo.cl`, name: "María G
 
 console.log(`\n${B}Seed — journey de demo (deja datos persistidos)${X}\n`);
 
-// ── 0. Approve any pending doctor (shows the approval step) ──────────────────
+// ── 0a. Register the demo doctor if the directory has no row for them ────────
+// Without this the `doctors` table stays empty, GET /api/doctors returns [] and
+// a patient looking for an appointment sees nobody to book with — the journey
+// dead-ends at its first screen. Self-registration lands as status='pending',
+// which is what step 0b then approves, so the seed exercises the real
+// validation path instead of writing an active row behind its back.
+{
+  const publicList = await get("/api/doctors");
+  const alreadyActive = (publicList.doctors ?? []).some((d) => d.email === DOCTOR_EMAIL);
+  if (!alreadyActive) {
+    const reg = await post("/api/doctors", {
+      name: "Dr. Cristian Brown",
+      email: DOCTOR_EMAIL,
+      specialty: "Medicina General",
+    });
+    // 409 = the row exists but is not active yet; step 0b approves it.
+    ok("Médico demo registrado (queda pendiente)", reg.ok || reg.status === 409, `HTTP ${reg.status}`);
+  } else {
+    ok("Médico demo ya está activo en el directorio", true);
+  }
+}
+
+// ── 0b. Approve any pending doctor (shows the approval step) ─────────────────
 if (ADMIN) {
   const docs = await get(`/api/admin/doctors?token=${ADMIN}`);
   const pending = (docs.doctors ?? []).filter((d) => d.status === "pending");

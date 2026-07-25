@@ -53,7 +53,8 @@ function ModeBadge({ mode }: { mode: 'onchain' | 'simulated' }) {
 interface MintResult {
   mode: 'onchain' | 'simulated';
   rxId: number | null;
-  hash: string;
+  /** Transaction hash — null when mode is 'simulated' (no tx was submitted). */
+  hash: string | null;
   rxHash: string;
   explorer?: string;
   reason?: string;

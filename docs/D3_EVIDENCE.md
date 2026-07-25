@@ -55,3 +55,20 @@ fee-bumped por el relayer (gasless).
 | **D1 — Contratos testeados + desplegados** | ✅ Cerrado (contratos desplegados; suite vitest + `cargo test` en CI) |
 | **D2 — Interfaz doctor + paciente** | ✅ Cerrado (flujo verificado **logueado en navegador** con 3 actores Privy reales) |
 | **D3 — Integración E2E + demo grabado** | 🟡 Integración **cerrada** (esta evidencia). Falta: **grabar el video** siguiendo `docs/DEMO_SCRIPT.md` |
+
+## Re-verificación (2026-07-25)
+
+Las cinco transacciones de la tabla se consultaron de nuevo contra Horizon
+testnet: las cinco existen y devuelven `successful: true`. La evidencia no se da
+por buena de memoria — se vuelve a comprobar:
+
+```bash
+curl -s https://horizon-testnet.stellar.org/transactions/<hash> | grep successful
+```
+
+El mismo día, `npm run test:flow` recorrió el journey entero contra los
+contratos (**19 PASS · 0 FAIL**), incluyendo emisión de receta con `rxId` real y
+lectura pública sin sesión.
+
+**Hueco conocido:** el paso 6 (el paciente activa la receta) es el único sin
+hash en la tabla. Se cierra capturando el hash durante la grabación.

@@ -180,7 +180,7 @@ async function handleMint(request: Request) {
   // Off-chain mirror of the issuance so /admin/historial can surface recetas
   // (the chain is the source of truth; this is only for observability). Never
   // blocks or fails the mint — best-effort.
-  const logPrescription = async (result: { mode: string; rxId: string | null; hash: string }) => {
+  const logPrescription = async (result: { mode: string; rxId: string | null; hash: string | null }) => {
     try {
       const sql = getDb();
       await sql`
@@ -322,7 +322,12 @@ function simulated(rxHash: Buffer, reason: string) {
   return {
     mode: "simulated" as const,
     rxId: null,
-    hash: randomBytes(32).toString("hex"),
+    // No transaction happened, so there is no transaction hash. This used to be
+    // randomBytes(32) — a value indistinguishable from a real one, stored in
+    // prescriptions_log.tx_hash and rendered by /admin/historial as a link to
+    // stellar.expert, where it resolves to nothing. rxHash below is the real
+    // SHA-256 of the prescription and is what the simulated path has to show.
+    hash: null,
     rxHash: rxHash.toString("hex"),
     reason,
   };
