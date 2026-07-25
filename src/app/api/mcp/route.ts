@@ -4,7 +4,9 @@
  * "TrustLeaf Verify" packaged as a Model Context Protocol server so any team at
  * the hackathon can connect in a SINGLE line: point an MCP client at this URL.
  *
- *   { "mcpServers": { "trustleaf-verify": { "url": "https://<host>/api/mcp" } } }
+ *   { "mcpServers": { "trustleaf": {
+ *       "url": "https://<host>/api/mcp",
+ *       "headers": { "Authorization": "Bearer tl_sandbox_…" } } } }
  *
  * We speak MCP over JSON-RPC 2.0 directly (no SDK) to keep the dependency
  * surface zero and match the plain route-handler style used elsewhere in this
@@ -30,7 +32,7 @@ import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
 import { requestConsent, checkConsent, revokeConsent, consentSourceFor } from "@/lib/identity/center-grants";
-import { anchorRecord, readRecords, ConsentRequiredError } from "@/lib/identity/anchor";
+import { anchorRecord, readRecords, ConsentRequiredError, UpstreamUnavailableError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
@@ -61,8 +63,7 @@ class ToolInputError extends Error {}
 
 /** Read a required, valid RUT from tool args or throw a caller-safe error. */
 function requireRut(args: Record<string, unknown>): string {
-  const rut = String(args.patient_rut ?? "").trim();
-  if (!rut) throw new ToolInputError("'patient_rut' es obligatorio.");
+  const rut = requireString(args, "patient_rut", 32);
   if (!isValidRut(rut)) throw new ToolInputError("'patient_rut' no es un RUT válido (dígito verificador).");
   return rut;
 }
@@ -96,27 +97,38 @@ function requireString(args: Record<string, unknown>, name: string, max = 20_000
  * 1:1 with a person, so free text here would let an integrator write
  * `kind: "TARV — VIH+"` into a permanent, public ledger next to that patient's
  * identity — exactly the disclosure the hash-on-chain model exists to prevent.
- * Closed list of FHIR-ish resource types: says what kind of artifact it is,
- * never what it says.
+ * Closed list of FHIR resourceTypes: says what kind of artifact it is, never
+ * what it says. FHIR names on purpose — they are the vocabulary integrators
+ * already have, and `MedicationRequest` matches what the rest of this repo uses
+ * (there is no `Prescription` resourceType in FHIR).
+ *
+ * `DocumentReference` is the escape hatch for anything unlisted. Widening this
+ * list is a product decision, not a convenience: each addition is a new word
+ * that becomes permanently public next to a person's identity.
  */
 const ALLOWED_KINDS = [
-  "Prescription",
-  "DiagnosticReport",
-  "Condition",
-  "Observation",
-  "Immunization",
-  "Encounter",
-  "Procedure",
-  "DocumentReference",
+  "MedicationRequest",   // receta
+  "MedicationStatement", // lo que el paciente efectivamente toma (suplementos)
+  "DiagnosticReport",    // informe de examen
+  "Observation",         // medición puntual (presión, biomarcador, wearable)
+  "Condition",           // antecedente / diagnóstico registrado
+  "AllergyIntolerance",  // alergias
+  "Immunization",        // vacunas
+  "Procedure",           // procedimiento realizado
+  "Encounter",           // atención / consulta
+  "CarePlan",            // plan de cuidado o protocolo (longevidad)
+  "DocumentReference",   // cualquier otro artefacto documental
 ] as const;
 
 function requireKind(args: Record<string, unknown>): string {
   const kind = requireString(args, "kind", 64);
   if (!(ALLOWED_KINDS as readonly string[]).includes(kind)) {
     throw new ToolInputError(
-      `'kind' debe ser uno de: ${ALLOWED_KINDS.join(", ")}. ` +
-        "Es texto público en la cadena, por eso la lista es cerrada y no clínica: " +
-        "describe el TIPO de artefacto, nunca su contenido.",
+      `'kind' debe ser uno de: ${ALLOWED_KINDS.join(", ")} (resourceTypes FHIR, sensibles a mayúsculas). ` +
+        "Es el único campo tuyo que queda legible y permanente en la cadena, por eso " +
+        "la lista es cerrada y no clínica: describe el TIPO de artefacto, nunca su contenido. " +
+        "Equivalencias: Receta → MedicationRequest, Examen → DiagnosticReport, " +
+        "Antecedentes → Condition. Si tu artefacto no calza en ninguno, usa DocumentReference.",
     );
   }
   return kind;
@@ -124,6 +136,18 @@ function requireKind(args: Record<string, unknown>): string {
 
 /** Max JSON-RPC messages per batch — caps the 1-request→N-query amplification. */
 const MAX_BATCH = 50;
+
+/** Tools that used to exist. Answering "unknown tool" would strand an integrator. */
+const REMOVED_TOOLS: Record<string, string> = {
+  create_approval:
+    "'create_approval' fue eliminada: era un stub simulado que no persistía nada y " +
+    "apuntaba a una página de firma inexistente. El flujo real es " +
+    "request_consent → check_consent → anchor_record → read_records.",
+  verify_approval:
+    "'verify_approval' fue eliminada: devolvía 'aprobado' firmado por un médico ficticio " +
+    "para cualquier id, o sea una constancia clínica falsa. Volverá cuando exista la firma " +
+    "real del médico. Mientras tanto: request_consent → anchor_record → read_records.",
+};
 
 const TOOLS: Record<string, Tool> = {
   explain_architecture: {
@@ -142,7 +166,7 @@ const TOOLS: Record<string, Tool> = {
           "FLUJO (4 verbos, en este orden):\n" +
           "  1. request_consent(patient_rut)   -> pide acceso de escritura. En " +
           "sandbox se auto-aprueba para que puedas demostrar el flujo (viene " +
-          "marcado consent_source:'auto_sandbox'); en live queda 'pending' hasta " +
+          "marcado consentSource:'auto_sandbox'); en live queda 'pending' hasta " +
           "que el paciente firme.\n" +
           "  2. check_consent(patient_rut)     -> confirma que está vigente.\n" +
           "  3. anchor_record(patient_rut, kind, content) -> ancla el artefacto. " +
@@ -256,7 +280,12 @@ const TOOLS: Record<string, Tool> = {
           description:
             "Tipo de artefacto. Lista cerrada: es el único campo que viaja legible on-chain, así que describe el tipo, nunca el contenido clínico.",
         },
-        content: { type: "string", description: "Contenido clínico. Se hashea (SHA-256); ni se guarda ni se publica." },
+        content: {
+          type: "string",
+          maxLength: 1_000_000,
+          description:
+            "Contenido clínico, como string (serializa tu JSON/FHIR antes de enviarlo). Se hashea (SHA-256); ni se guarda ni se publica.",
+        },
       },
       required: ["patient_rut", "kind", "content"],
       additionalProperties: false,
@@ -265,7 +294,9 @@ const TOOLS: Record<string, Tool> = {
       const c = requireCtx(ctx);
       const rut = requireRut(args);
       const kind = requireKind(args);
-      const content = requireString(args, "content");
+      // 1 MB matches the schema's maxLength. Generous on purpose: content is only
+      // ever hashed, so the cap is anti-abuse, not a data-model constraint.
+      const content = requireString(args, "content", 1_000_000);
       try {
         const res = await anchorRecord({
           orgId: c.orgId,
@@ -291,7 +322,10 @@ const TOOLS: Record<string, Tool> = {
         ];
       } catch (e) {
         // Consent-required is a caller-safe message → surface it as isError.
+        // Both carry caller-safe, actionable messages → surface them verbatim
+        // instead of flattening to "error interno".
         if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        if (e instanceof UpstreamUnavailableError) throw new ToolInputError(e.message);
         throw e;
       }
     },
@@ -326,7 +360,10 @@ const TOOLS: Record<string, Tool> = {
           },
         ];
       } catch (e) {
+        // Both carry caller-safe, actionable messages → surface them verbatim
+        // instead of flattening to "error interno".
         if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        if (e instanceof UpstreamUnavailableError) throw new ToolInputError(e.message);
         throw e;
       }
     },
@@ -395,8 +432,13 @@ async function handleRpc(
 
     case "tools/call": {
       const name = msg.params?.name as string;
-      const tool = TOOLS[name];
-      if (!tool) return err(id, -32602, `Tool desconocida: ${name}`);
+      const tool = Object.prototype.hasOwnProperty.call(TOOLS, name) ? TOOLS[name] : undefined;
+      if (!tool) {
+        // A tombstone beats a bare "unknown tool": an agent that read the old
+        // docs otherwise has no way to find out what replaced them.
+        if (name in REMOVED_TOOLS) return err(id, -32602, REMOVED_TOOLS[name]);
+        return err(id, -32602, `Tool desconocida: ${name}`);
+      }
 
       // Auth gate: open tools (discovery/docs) run without a key; the rest need
       // a valid API key, and its scope must cover the tool. Fail closed —
