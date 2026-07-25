@@ -13,23 +13,26 @@ interface NavLink {
   roleKey?: string;
 }
 
+// Every href here must resolve to a real route — six of these pointed at pages
+// that do not exist (`/farmacia` is `/pharmacy`, `/verify/demo` is `/verify`,
+// and `/for-doctors` and `/pricing` were never built). A menu entry that 404s
+// is worse than a missing one: it advertises something and then denies it.
+// `src/__tests__/nav-links.test.ts` fails if a new one is added.
+
 // Landing nav — cleaner, focused on conversion
 const LANDING_NAV_LINKS: NavLink[] = [
   { href: "/#how-it-works", label: "Cómo funciona" },
-  { href: "/for-doctors", label: "Para Médicos" },
   { href: "/caregiver/types", label: "Cuidadores" },
-  { href: "/farmacia", label: "Portal Farmacia" },
-  { href: "/pricing", label: "Precios" },
+  { href: "/pharmacy", label: "Portal Farmacia" },
 ];
 
 // Portal nav — full app navigation
 const PORTAL_NAV_LINKS: NavLink[] = [
   { href: "/patient", label: "Paciente", roleKey: "patient" },
   { href: "/doctor", label: "Médico", roleKey: "doctor" },
-  { href: "/farmacia", label: "Farmacia", roleKey: "farmacia" },
-  { href: "/verify/demo", label: "Verificar" },
+  { href: "/pharmacy", label: "Farmacia", roleKey: "farmacia" },
+  { href: "/verify", label: "Verificar" },
   { href: "/caregiver", label: "Cuidadores" },
-  { href: "/pricing", label: "Precios" },
 ];
 
 function MenuIcon({ open }: { open: boolean }) {
@@ -116,21 +119,12 @@ function AuthSection({ variant = "landing", onClose }: { variant?: "landing" | "
   }
 
   if (isLight) {
-    // Landing nav auth: Demo Paciente | Demo Médico | Iniciar sesión | Unirse
+    // Landing nav auth: Iniciar sesión | Unirse.
+    // "Demo Paciente" / "Demo Médico" used to sit here pointing at
+    // /login?demo=… — a route that does not exist, so both 404'd. There is no
+    // demo mode any more: signing in with Privy is the product, on testnet.
     return (
       <div className="flex items-center gap-2">
-        <Link
-          href="/login?demo=paciente"
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-sky-200 text-sky-600 bg-sky-50 hover:bg-sky-100 transition-colors"
-        >
-          Demo Paciente
-        </Link>
-        <Link
-          href="/login?demo=medico"
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:border-sky-200 hover:text-sky-600 transition-colors"
-        >
-          Demo Médico
-        </Link>
         <button
           onClick={() => { login(); onClose?.(); }}
           className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
@@ -156,13 +150,14 @@ function AuthSection({ variant = "landing", onClose }: { variant?: "landing" | "
       >
         Iniciar sesión
       </button>
-      <Link
-        href="/patient/onboarding"
-        onClick={onClose}
+      {/* Privy's modal covers sign-up too, so this is a login() call and not a
+          link. It pointed at /patient/onboarding, which 404s. */}
+      <button
+        onClick={() => { login(); onClose?.(); }}
         className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#10B981] hover:bg-[#059669] text-slate-900 transition-colors"
       >
         Registrarse
-      </Link>
+      </button>
     </div>
   );
 }
@@ -215,20 +210,6 @@ function MobileAuthSection({ onClose, variant = "landing" }: { onClose: () => vo
   if (isLight) {
     return (
       <div className="pt-2 pb-1 space-y-2">
-        <Link
-          href="/login?demo=paciente"
-          onClick={onClose}
-          className="block text-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-sky-50 border border-sky-200 text-sky-600"
-        >
-          Demo Paciente
-        </Link>
-        <Link
-          href="/login?demo=medico"
-          onClick={onClose}
-          className="block text-center px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600"
-        >
-          Demo Médico
-        </Link>
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             onClick={() => { login(); onClose(); }}
@@ -256,13 +237,12 @@ function MobileAuthSection({ onClose, variant = "landing" }: { onClose: () => vo
       >
         Iniciar sesión
       </button>
-      <Link
-        href="/patient/onboarding"
-        onClick={onClose}
+      <button
+        onClick={() => { login(); onClose(); }}
         className="text-center px-4 py-2.5 text-sm font-semibold rounded-xl bg-[#10B981] text-slate-900"
       >
         Registrarse
-      </Link>
+      </button>
     </div>
   );
 }
