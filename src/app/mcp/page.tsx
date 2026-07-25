@@ -72,7 +72,17 @@ export default function HackathonPage() {
 
   const [copied, setCopied] = useState(false);
   const MCP_URL = "https://trustleaf-demo.vercel.app/api/mcp";
-  const MCP_CONFIG = `{ "mcpServers": { "trustleaf-verify": { "url": "${MCP_URL}" } } }`;
+  // The Authorization header is NOT optional: every tool except
+  // explain_architecture is gated by an API key, so a config without it connects
+  // and then fails on 7 of 8 tools. Ship the placeholder in the copyable block.
+  const MCP_CONFIG = `{
+  "mcpServers": {
+    "trustleaf": {
+      "url": "${MCP_URL}",
+      "headers": { "Authorization": "Bearer tl_sandbox_TU_KEY" }
+    }
+  }
+}`;
   const copyConfig = async () => {
     // Primary: async Clipboard API (HTTPS). Fallback: legacy execCommand for
     // contexts where the Clipboard API is blocked (e.g. sandboxed iframes).
@@ -236,19 +246,13 @@ export default function HackathonPage() {
           </div>
 
           <pre className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-ink p-5 text-sm leading-relaxed">
-            <code className="font-mono text-slate-200">{`{
-  "mcpServers": {
-    "trustleaf-verify": {
-      "url": "${MCP_URL}"
-    }
-  }
-}`}</code>
+            <code className="font-mono text-slate-200">{MCP_CONFIG}</code>
           </pre>
 
           <p className="mt-3 text-xs text-muted">
             {tr(
-              "Compatible con clientes MCP (Claude, Cursor, tu propio agente). También expone REST si prefieres.",
-              "Works with MCP clients (Claude, Cursor, your own agent). Also exposes REST if you prefer.",
+              "Compatible con clientes MCP (Claude, Cursor, tu propio agente). Reemplaza tl_sandbox_TU_KEY por tu key: sin ella solo funciona explain_architecture.",
+              "Works with MCP clients (Claude, Cursor, your own agent). Replace tl_sandbox_TU_KEY with your key — without it only explain_architecture works.",
             )}
           </p>
         </div>
@@ -508,12 +512,12 @@ export default function HackathonPage() {
           {/* steps */}
           <ol className="mt-4 space-y-3">
             {[
-              { n: "1", who: "clinical", t: tr("Tu IA sugiere algo", "Your AI suggests something"), d: tr("create_approval(sugerencia) → { id, approval_url }", "create_approval(suggestion) → { id, approval_url }") },
-              { n: "2", who: "clinical", t: tr("Rediriges a tu médico", "You redirect your doctor"), d: tr("Mandas al humano a approval_url. Nada de wallets de tu lado.", "Send the human to approval_url. No wallets on your side.") },
-              { n: "3", who: "mint", t: tr("Entra con su email", "They log in with email"), d: tr("Privy le crea su wallet sola — ni se entera.", "Privy creates their wallet automatically — they never notice.") },
-              { n: "4", who: "mint", t: tr("Revisa y aprueba", "They review and approve"), d: tr("Firma con su propia llave. Prueba real de humano-en-el-loop.", "They sign with their own key. Real human-in-the-loop proof.") },
-              { n: "5", who: "ink", t: tr("Verifica la firma y ancla", "Verifies the signature & anchors"), d: tr("Confirma la firma del médico y ancla la aprobación en Stellar.", "Confirms the doctor’s signature and anchors the approval on Stellar.") },
-              { n: "6", who: "clinical", t: tr("Muestras la prueba", "You show the proof"), d: tr("verify(id) → resultado auditable en tu propia app.", "verify(id) → auditable result in your own app.") },
+              { n: "1", who: "clinical", t: tr("Pides el consentimiento", "You request consent"), d: tr("request_consent(patient_rut) → el paciente autoriza a tu centro a escribir su ficha.", "request_consent(patient_rut) → the patient authorizes your center to write their record.") },
+              { n: "2", who: "mint", t: tr("El paciente decide", "The patient decides"), d: tr("En sandbox se auto-aprueba para que puedas demostrar el flujo (viene marcado consent_source: auto_sandbox). En producción firma el paciente.", "In sandbox it auto-approves so you can demo the flow (flagged consent_source: auto_sandbox). In production the patient signs.") },
+              { n: "3", who: "clinical", t: tr("Confirmas que está vigente", "You confirm it is active"), d: tr("check_consent(patient_rut) → status, mode, txUrl.", "check_consent(patient_rut) → status, mode, txUrl.") },
+              { n: "4", who: "ink", t: tr("Anclas el artefacto", "You anchor the artifact"), d: tr("anchor_record(patient_rut, kind, content) → solo el hash va a Stellar. El contenido nunca sale de tu lado.", "anchor_record(patient_rut, kind, content) → only the hash goes to Stellar. The content never leaves your side.") },
+              { n: "5", who: "ink", t: tr("Muestras la prueba", "You show the proof"), d: tr("read_records(patient_rut) → historial anclado, con su tx verificable en Stellar Expert.", "read_records(patient_rut) → anchored history, each with its verifiable tx on Stellar Expert.") },
+              { n: "6", who: "mint", t: tr("El paciente puede cortar", "The patient can cut it off"), d: tr("revoke_consent(patient_rut) revoca el acceso on-chain. El dueño de la ficha es él.", "revoke_consent(patient_rut) revokes access on-chain. They own the record.") },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 0.05}>
                 <li className="flex gap-4 rounded-2xl border border-slate-200 bg-canvas p-5">
@@ -723,10 +727,18 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
               </a>
             </div>
             <p className="mt-6 text-center text-sm text-muted">
-              {tr(
-                "¿Necesitas tu API key para la hackatón? Escríbenos en el canal del evento.",
-                "Need your API key for the hackathon? Reach us in the event channel.",
-              )}
+              {tr("¿Necesitas tu API key para la hackatón? Pídela ", "Need your API key for the hackathon? Request it ")}
+              <a
+                href="https://github.com/CaBsCrypto/ficha-onchain/issues/new?title=API%20key%20sandbox%20-%20hackaton&body=Equipo%3A%20%0AQu%C3%A9%20van%20a%20construir%3A%20%0AContacto%3A%20"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-clinical underline underline-offset-4 hover:text-clinical-600"
+              >
+                {tr("abriendo un issue en GitHub", "by opening a GitHub issue")}
+              </a>
+              {tr(" o escríbenos en el canal del evento. Respondemos con una key ", " or reach us in the event channel. We reply with a ")}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">tl_sandbox_…</code>
+              {tr(" el mismo día.", " key the same day.")}
             </p>
           </Reveal>
         </div>

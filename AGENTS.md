@@ -81,9 +81,13 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
 
 ## Facts worth knowing
 
-- **Contracts do not build locally.** WDAC blocks the Rust toolchain (os error
-  4551). Soroban work goes through CI (`.github/workflows/contracts.yml`), which
-  runs `cargo test` on three crates only — `doctor-registry`,
+- **Contracts DO build locally** — with `stellar contract build` (target
+  `wasm32v1-none`), not `cargo build --target wasm32-unknown-unknown`: newer Rust
+  enables `reference-types` and the Soroban host rejects that WASM. An earlier
+  version of this file claimed WDAC blocked the toolchain (os error 4551); that
+  is no longer true and cost a whole PR built around the wrong assumption.
+  `cargo test` still runs in CI (`.github/workflows/contracts.yml`) over three
+  crates only — `doctor-registry`,
   `prescription-soulbound`, `trustleaf-e2e` — deliberately, so an unfinished
   contract elsewhere cannot redden the badge. It does not deploy.
 - **`@stellar/stellar-sdk` is pinned to v14.** v13 cannot parse protocol 27 —
@@ -115,14 +119,41 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
 - **Privy app is `ficha-onchain` (`cmrix722m…`)**, not `SalesAgent` — that one
   is a different project of the owner's. `allowed_domains` is deliberately empty:
   filling it in breaks preview deploys, whose URL changes every build.
-- **Tests do not run.** `vitest.config.ts` and four suites under `src/__tests__/`
-  exist, but vitest is not installed and there is no `test` script.
+- **Tests run: `npm test`** (vitest, suites under `src/__tests__/`). They are not
+  yet wired into the CI workflow — add them there when you get `workflow` scope.
 - **The 3D body map loads THREE r128 from a CDN**, not from npm, as UMD scripts.
   `BodyMap3D.tsx` hand-rolls its own THREE type declarations because of it.
 - **`public/models/` holds five GLBs, only `body_1k.glb` is used.** The other
   four are ~18 MB of dead weight; `body_final.glb` and `body_opt.glb` are
   smaller only because their textures were stripped, so they are not drop-in
   replacements.
+
+## The external MCP (`/api/mcp`)
+
+A JSON-RPC 2.0 endpoint that lets authorized medical centers anchor clinical
+artifacts into a patient's on-chain record. Hand-rolled, no SDK.
+
+- **Model:** 1 patient = 1 ficha, keyed by `rut_hash` = HMAC-SHA256 of the
+  normalized RUT under `TRUSTLEAF_RUT_PEPPER`. 1 center = N fichas, each gated by
+  that patient's consent. `src/lib/identity/` holds the whole thing.
+- **Tables:** `patient_records`, `api_orgs`, `api_keys`, `center_doctors`,
+  `center_grants`. They live in **two** places — `scripts/migrate.mjs` (dev,
+  source of truth) and `src/app/api/admin/migrate/route.ts` (the only way to
+  migrate prod, whose connection string Vercel will not hand out). Change one,
+  change the other.
+- **Env vars:** `TRUSTLEAF_RUT_PEPPER`, `SANDBOX_OWNER_SECRET`,
+  `SANDBOX_CENTER_SECRET`, `MCP_LIVE_ENABLED` (kill-switch: `live` keys are
+  rejected while it is off).
+- **`live` writes nothing on-chain yet** — only `sandbox` signs. A `live`
+  consent records `pending`; a `live` anchor returns `reason:"live_not_enabled"`.
+- **`kind` is the only caller-supplied field that is readable on-chain**, so it
+  is a closed list in `route.ts` (`ALLOWED_KINDS`). Never widen it to free text:
+  the record contract is 1:1 with a person, and a diagnosis in there is a
+  permanent public disclosure.
+- **Sandbox consent is machine-issued** — nobody is asked. Every response says so
+  via `consentSource:"auto_sandbox"`, independent of `mode`.
+- Before adding a tool: it must declare `requiresAuth` **and** a `scope`, or the
+  gate denies it. Verify with `npm test` and `npm run smoke:sandbox`.
 
 ## Do not
 
