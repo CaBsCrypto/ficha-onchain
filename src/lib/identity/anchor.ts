@@ -15,10 +15,24 @@
  */
 import { createHash } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
+import { hashRut } from "@/lib/identity/rut";
 import { hasActiveConsent } from "@/lib/identity/center-grants";
 import { ensureSandboxRecord, resolvePatientRecord, type RecordEnv } from "@/lib/identity/patient-records";
 import { appendClinicalEntry, getSandboxCenterSecret } from "@/lib/stellar/server";
 import { getClinicalEntries } from "@/lib/stellar/client";
+
+/**
+ * Thrown when a dependency we don't control (the Soroban RPC) is unavailable.
+ * Distinct from an internal bug: the message is caller-safe and the right move
+ * is to retry, so the MCP surfaces it instead of flattening it to "error
+ * interno" — otherwise the careful wording below never reaches anyone.
+ */
+export class UpstreamUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UpstreamUnavailableError";
+  }
+}
 
 /** Thrown when a center tries to anchor without the patient's active consent. */
 export class ConsentRequiredError extends Error {
@@ -28,9 +42,27 @@ export class ConsentRequiredError extends Error {
   }
 }
 
+/**
+ * Why an anchor did not confirm. `mode:"simulated"` used to be a catch-all for
+ * four unrelated causes, two of which only left a console.error in Vercel — so
+ * an integrator saw the same opaque shape whether the server was misconfigured
+ * or their own record had no contract. The reason travels in the response now.
+ */
+export type AnchorReason =
+  | "confirmed"          // onchain
+  | "submitted"          // pending: broadcast, not yet confirmed
+  | "no_record_contract" // the patient's ficha could not be provisioned
+  | "signer_unavailable" // SANDBOX_CENTER_SECRET unset → nothing to sign with
+  | "signer_mismatch"    // our signer ≠ the granted wallet; append would revert
+  | "tx_failed"          // the network rejected the transaction
+  | "append_error"       // the append threw (RPC/network)
+  | "live_not_enabled";  // live env does not sign yet
+
 export interface AnchorResult {
   /** onchain = confirmed; pending = submitted, not yet confirmed; simulated = not anchored. */
   mode: "onchain" | "pending" | "simulated";
+  /** Stable machine-readable cause — always present, especially when simulated. */
+  reason: AnchorReason;
   txHash: string | null;
   contentHash: string; // hex
   kind: string;
@@ -51,12 +83,29 @@ export async function anchorRecord(args: {
   kind: string;
   content: string;
 }): Promise<AnchorResult> {
+  // 0) live signs nothing yet. Answer that BEFORE the consent gate: a live grant
+  // never reaches 'active', so checking consent first would report "falta el
+  // consentimiento" for what is really "live todavía no ancla" — a misleading
+  // answer that sends the integrator to fix the wrong thing.
+  if (args.env !== "sandbox") {
+    return {
+      mode: "simulated",
+      reason: "live_not_enabled",
+      txHash: null,
+      contentHash: createHash("sha256")
+        .update(JSON.stringify({ rut_hash: hashRut(args.rut), kind: args.kind, content: args.content }))
+        .digest("hex"),
+      kind: args.kind,
+      recordContract: null,
+    };
+  }
+
   // 1) Consent gate — fail closed. No grant, no write.
   if (!(await hasActiveConsent(args.orgId, args.rut, args.env))) {
     throw new ConsentRequiredError();
   }
 
-  // 2) Resolve the patient's record contract (sandbox provisions the toy record).
+  // 2) Resolve the patient's record contract (sandbox deploys one per patient).
   const record =
     args.env === "sandbox"
       ? await ensureSandboxRecord(args.rut)
@@ -64,11 +113,22 @@ export async function anchorRecord(args: {
   const recordContract = record?.contractId ?? null;
 
   // 3) Hash the artifact — only this hash ever touches the chain.
-  const payload = JSON.stringify({ rut: args.rut, kind: args.kind, content: args.content });
+  //
+  // The preimage binds the artifact to the patient so the same content under two
+  // patients yields two hashes. It MUST use the peppered rut_hash, never the raw
+  // RUT: the RUT space is enumerable, so a plain SHA-256 over it is brute-force
+  // reversible from the public ledger (see rut.ts). hashRut also normalizes, so
+  // "12.345.678-5" and "123456785" produce the same anchor.
+  const payload = JSON.stringify({
+    rut_hash: hashRut(args.rut),
+    kind: args.kind,
+    content: args.content,
+  });
   const contentHash = createHash("sha256").update(payload).digest(); // Buffer(32)
 
   // 4) Real on-chain append in sandbox, signed by the center wallet.
   let mode: "onchain" | "pending" | "simulated" = "simulated";
+  let reason: AnchorReason = "no_record_contract";
   let txHash: string | null = null;
   if (args.env === "sandbox" && recordContract) {
     const centerSecret = getSandboxCenterSecret();
@@ -77,7 +137,9 @@ export async function anchorRecord(args: {
     const centerPub = centerSecret ? safePub(centerSecret) : null;
     if (!centerSecret) {
       // Expected when SANDBOX_CENTER_SECRET is unset → simulated, no noise.
+      reason = "signer_unavailable";
     } else if (!centerPub || centerPub !== args.granteeWallet) {
+      reason = "signer_mismatch";
       // Config mismatch: the grant went to granteeWallet but our signer is a
       // DIFFERENT wallet → the append would revert Unauthorized. Surface it
       // loudly instead of a silent "simulated" — the two must be aligned.
@@ -98,19 +160,27 @@ export async function anchorRecord(args: {
         // after the poll window — reporting "simulated, no tx" would be a lie.
         if (res.status === "SUCCESS") {
           mode = "onchain";
+          reason = "confirmed";
           txHash = res.hash;
         } else if (res.status === "PENDING") {
           mode = "pending";
+          reason = "submitted";
           txHash = res.hash;
+        } else {
+          // FAILED → nothing durable was anchored. Keep the hash (the caller can
+          // retry with it) and say so out loud; this used to log nothing at all.
+          reason = "tx_failed";
+          txHash = res.hash ?? null;
+          console.error(`[anchor] tx ${res.hash ?? "?"} FAILED en ${recordContract}`);
         }
-        // FAILED → stays simulated with no tx (nothing durable was anchored).
       } catch (e) {
+        reason = "append_error";
         console.error("[anchor] append on-chain falló, degradando a simulated:", e);
       }
     }
   }
 
-  return { mode, txHash, contentHash: contentHash.toString("hex"), kind: args.kind, recordContract };
+  return { mode, reason, txHash, contentHash: contentHash.toString("hex"), kind: args.kind, recordContract };
 }
 
 /** Public key of a secret, or null if malformed (never throw into the caller). */
@@ -140,9 +210,8 @@ export interface ReadResult {
  * consented to it). Returns the on-chain append-only history: kind + hash +
  * author + timestamp. Never returns clinical content — that lives off-chain.
  *
- * SANDBOX CAVEAT: every sandbox patient shares one toy ClinicalRecord, so this
- * returns ALL sandbox entries in that shared record, not just this patient's.
- * In production each patient has their own contract and the read is scoped.
+ * Every patient — sandbox included — has their OWN ClinicalRecord contract
+ * (see patient-records.ts), so the read is always scoped to one person.
  *
  * @throws {ConsentRequiredError} when the center has no active grant.
  * @throws {RutError} when the RUT is invalid / pepper missing.
@@ -159,7 +228,15 @@ export async function readRecords(args: {
   const contractId = record?.contractId ?? null;
   if (!contractId) return { recordContract: null, entries: [] };
 
-  const raw = await getClinicalEntries(contractId).catch(() => []);
+  // An RPC failure must not masquerade as "this patient has no history" — a
+  // silent [] here is indistinguishable from an empty ficha to the caller.
+  const raw = await getClinicalEntries(contractId).catch((e) => {
+    console.error(`[anchor] getClinicalEntries falló para ${contractId}:`, e);
+    throw new UpstreamUnavailableError(
+      "No se pudo leer la ficha on-chain en este momento (falla del RPC de Stellar). " +
+        "Reintenta: esto NO significa que el paciente no tenga entradas.",
+    );
+  });
   const entries: ReadEntry[] = raw.map((e) => ({
     kind: e.kind,
     contentHash: e.contentHash,

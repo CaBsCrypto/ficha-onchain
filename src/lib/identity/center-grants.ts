@@ -7,9 +7,11 @@
  *
  * CONSENT COMES FROM THE PATIENT, not the center — a center can request consent
  * and check it, but cannot authorize itself. How that resolves depends on env:
- *   - sandbox: toy data on a shared toy contract we own, so a request is
- *     AUTO-APPROVED in mode 'simulated' — this is what makes the hackathon demo
- *     end-to-end. It is clearly labelled simulated; no real person consented.
+ *   - sandbox: throwaway data on records we own, so a request is AUTO-APPROVED — this
+ *     is what makes the hackathon demo end-to-end. NOBODY consented; every
+ *     response carries consentSource:'auto_sandbox' to say so. That label is
+ *     separate from `mode` on purpose: `mode` flips to 'onchain' as soon as the
+ *     grant tx confirms, and the "no human consented" fact must survive that.
  *   - live: a request only ever records status 'pending'; a real patient must
  *     sign the grant out of band (deferred with per-patient provisioning). Live
  *     is disabled by the MCP kill-switch anyway.
@@ -25,12 +27,29 @@ import { isStellarAddress } from "@/lib/stellar/config";
 
 export type GrantStatus = "active" | "pending" | "revoked" | "none";
 
+/**
+ * WHO actually consented. Independent of `mode` (which only says whether the
+ * grant reached the chain) and of `status`. In sandbox no human is ever asked,
+ * and that must be legible in every response — including the ones that carry a
+ * real txUrl, which is exactly where it is easiest to mistake for the real thing.
+ */
+export type ConsentSource = "auto_sandbox" | "patient_signature";
+
+/** What actually happened to the center's on-chain write access on revoke. */
+export type OnchainRevoke = "done" | "skipped_shared_wallet" | "unconfigured" | "failed";
+
 export interface ConsentState {
   status: GrantStatus;
   mode: "onchain" | "simulated" | null;
+  consentSource: ConsentSource;
   granteeWallet: string | null;
   recordContract: string | null;
   grantTx: string | null;
+}
+
+/** Sandbox grants are machine-issued; live ones require the patient to sign. */
+export function consentSourceFor(env: RecordEnv): ConsentSource {
+  return env === "sandbox" ? "auto_sandbox" : "patient_signature";
 }
 
 /**
@@ -57,13 +76,15 @@ export async function checkConsent(args: {
     WHERE org_id = ${args.orgId} AND patient_rut_hash = ${rutHash} AND env = ${args.env}
     ORDER BY (status = 'active') DESC, created_at DESC
     LIMIT 1`;
+  const consentSource = consentSourceFor(args.env);
   if (!rows.length) {
-    return { status: "none", mode: null, granteeWallet: null, recordContract: null, grantTx: null };
+    return { status: "none", mode: null, consentSource, granteeWallet: null, recordContract: null, grantTx: null };
   }
   const r = rows[0];
   return {
     status: r.status,
     mode: r.mode,
+    consentSource,
     granteeWallet: r.grantee_wallet,
     recordContract: r.record_contract,
     grantTx: r.grant_tx,
@@ -114,9 +135,9 @@ export async function requestConsent(args: {
 
   const status: GrantStatus = args.env === "sandbox" ? "active" : "pending";
 
-  // Try a REAL on-chain grant on the sandbox toy record: the sandbox owner signs
+  // Try a REAL on-chain grant on the patient's sandbox record: its owner signs
   // grant_write_access(centerWallet), fee-bumped by the relayer. Only when fully
-  // configured (toy contract deployed + SANDBOX_OWNER_SECRET set) and the grantee
+  // configured (record provisioned + SANDBOX_OWNER_SECRET set) and the grantee
   // is a real G-address. Anything missing or any failure → mode:"simulated", so
   // the flow never breaks and nothing degrades silently into a wrong state.
   let mode: "onchain" | "simulated" = "simulated";
@@ -173,54 +194,103 @@ export async function requestConsent(args: {
 }
 
 /**
- * Revoke a center's active consent for a patient in this env. If the grant was
- * anchored on-chain, revoke it on-chain too (symmetric with requestConsent) so
- * the center's wallet actually loses write access — revocation is the direction
- * that matters most for consent. Best-effort: the DB row is always marked
- * revoked; revoke_tx records the on-chain revoke when it happened.
+ * Revoke a center's active consent for a patient in this env. Symmetric with
+ * requestConsent: the center's wallet should actually lose write access, since
+ * revocation is the direction that matters most for consent.
+ *
+ * The DB row is ALWAYS marked revoked (never leave consent "active" because the
+ * chain hiccuped). The on-chain revoke is conditional — write_access is keyed by
+ * WALLET and sandbox orgs share one, so pulling it unconditionally would cut
+ * every other org holding a grant through that same wallet. We only pull it when
+ * this was the last active grant on that (contract, wallet) pair.
+ *
+ * `onchainRevoke` reports which of those actually happened, because "revoked"
+ * alone would imply the key can no longer write:
+ *   done                  — revoked on-chain, see revokeTx
+ *   skipped_shared_wallet — another org still holds a grant through this wallet
+ *   unconfigured          — no owner secret / no contract; nothing to revoke with
+ *   failed                — we tried and the chain refused or errored
+ * Only "done" means the wallet lost write access.
  */
 export async function revokeConsent(args: {
   orgId: number;
   rut: string;
   env: RecordEnv;
-}): Promise<{ revoked: boolean; revokeTx: string | null }> {
+}): Promise<{
+  revoked: boolean;
+  revokeTx: string | null;
+  onchainRevoke: OnchainRevoke | null;
+  onchainAccessRemains: boolean;
+}> {
   const rutHash = hashRut(args.rut);
   const sql = getDb();
 
+  // Revoke in the DB FIRST, atomically. Two reasons the order matters:
+  //   · `AND status = 'active'` + RETURNING makes a double revoke a no-op — only
+  //     one concurrent caller gets the row.
+  //   · The "last one out turns off the light" count below must run AFTER this
+  //     row is already inactive. Counting first is a TOCTOU: two concurrent
+  //     revokes would each see the other still active, both skip the on-chain
+  //     revoke, and leave the wallet with write access and zero active grants.
   const [g] = await sql<{
     id: number;
-    mode: "onchain" | "simulated";
     record_contract: string | null;
     grantee_wallet: string | null;
   }>`
-    SELECT id, mode, record_contract, grantee_wallet
-    FROM center_grants
+    UPDATE center_grants SET status = 'revoked', revoked_at = NOW()
     WHERE org_id = ${args.orgId} AND patient_rut_hash = ${rutHash}
       AND env = ${args.env} AND status = 'active'
-    LIMIT 1`;
-  if (!g) return { revoked: false, revokeTx: null };
+    RETURNING id, record_contract, grantee_wallet`;
+  if (!g) return { revoked: false, revokeTx: null, onchainRevoke: null, onchainAccessRemains: false };
+
+  // write_access is keyed by WALLET, and every sandbox org defaults to the same
+  // custodial signing wallet — so pulling it while another org still holds a
+  // grant through that wallet would silently cut them off too.
+  const [sharing] = await sql<{ n: number }>`
+    SELECT COUNT(*)::int AS n FROM center_grants
+    WHERE record_contract = ${g.record_contract} AND grantee_wallet = ${g.grantee_wallet}
+      AND env = ${args.env} AND status = 'active'`;
+  const walletStillGranted = (sharing?.n ?? 0) > 0;
 
   let revokeTx: string | null = null;
-  if (g.mode === "onchain" && g.record_contract && g.grantee_wallet && isStellarAddress(g.grantee_wallet)) {
+  let onchainRevoke: OnchainRevoke;
+  if (walletStillGranted) {
+    onchainRevoke = "skipped_shared_wallet";
+  } else if (!g.record_contract || !g.grantee_wallet || !isStellarAddress(g.grantee_wallet)) {
+    onchainRevoke = "unconfigured";
+  } else {
     const ownerSecret = getSandboxOwnerSecret();
-    if (ownerSecret) {
+    if (!ownerSecret) {
+      onchainRevoke = "unconfigured";
+    } else {
       try {
         const res = await revokeWriteAccess({
           ownerSecret,
           contractId: g.record_contract,
           grantee: g.grantee_wallet,
         });
-        if (res.status === "SUCCESS") revokeTx = res.hash;
+        if (res.status === "SUCCESS") {
+          revokeTx = res.hash;
+          onchainRevoke = "done";
+        } else {
+          onchainRevoke = "failed";
+          console.error(`[center-grants] revoke tx ${res.hash ?? "?"} no confirmó (${res.status})`);
+        }
       } catch (e) {
-        // Still mark revoked in the DB — never leave consent "active" because
-        // the chain hiccuped. Surface it for operators.
+        // The DB row stays revoked — never leave consent "active" because the
+        // chain hiccuped — but say out loud that the key can still write.
+        onchainRevoke = "failed";
         console.error("[center-grants] revoke on-chain falló; se marca revocado en DB igual:", e);
       }
     }
   }
 
-  await sql`
-    UPDATE center_grants SET status = 'revoked', revoked_at = NOW(), revoke_tx = ${revokeTx}
-    WHERE id = ${g.id}`;
-  return { revoked: true, revokeTx };
+  if (revokeTx) await sql`UPDATE center_grants SET revoke_tx = ${revokeTx} WHERE id = ${g.id}`;
+  return {
+    revoked: true,
+    revokeTx,
+    onchainRevoke,
+    // Anything but a confirmed on-chain revoke means the wallet may still write.
+    onchainAccessRemains: onchainRevoke !== "done",
+  };
 }

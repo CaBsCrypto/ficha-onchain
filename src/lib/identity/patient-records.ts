@@ -3,17 +3,18 @@
  * ---------------------------------------------------------------------------
  * Resolves a patient (identified by RUT) to THEIR on-chain ClinicalRecord
  * contract. This is what makes "1 paciente = 1 ficha" real: instead of every
- * append landing in the single hard-coded demo contract (the patient-mixing bug
- * flagged in docs/ARCHITECTURE_REVIEW.md), each patient maps to their own record
- * via the `patient_records` table, keyed by rut_hash (never the raw RUT).
+ * append landing in the single hard-coded demo contract (the patient-mixing
+ * bug), each patient maps to their own record via the `patient_records` table,
+ * keyed by rut_hash (never the raw RUT).
  *
  * `env` isolates sandbox from real data end-to-end: a 'sandbox' lookup can only
  * ever see 'sandbox' rows, so hackathon writes and production data never cross.
  *
- * Per-patient contract DEPLOY (a fresh ClinicalRecord owned by the patient) is
- * deferred — it needs the contract WASM installed on testnet, which goes through
- * CI (WDAC blocks local Rust builds). For the sandbox we point every row at one
- * shared TOY contract (SANDBOX_CLINICAL_RECORD_ID); see provisionLiveRecord.
+ * SANDBOX DEPLOYS A REAL CONTRACT PER PATIENT (`ensureSandboxRecord` →
+ * `deployClinicalRecord`), owned by the sandbox owner key. There is no shared
+ * toy record any more, and no fallback to one: if the deploy fails the row stays
+ * unprovisioned and nothing is anchored. `live` provisioning is still deferred
+ * (the patient must own their own contract) — see provisionLiveRecord.
  */
 import { Keypair } from "@stellar/stellar-sdk";
 import { getDb } from "@/lib/db";
@@ -68,12 +69,12 @@ export async function resolvePatientRecord(
 }
 
 /**
- * Ensure a SANDBOX directory row exists for this patient, pointing at the shared
- * toy ClinicalRecord (SANDBOX_CLINICAL_RECORD_ID). Idempotent via the
- * UNIQUE(rut_hash, env) index. This is the sandbox stand-in for real
- * provisioning — it lets the end-to-end flow run without deploying a contract
- * per patient. NEVER used for 'live': sandbox rows share one toy contract, which
- * is fine for throwaway data but would mix real patients.
+ * Ensure a SANDBOX directory row exists for this patient AND that it points at a
+ * ClinicalRecord deployed for THEM. Idempotent via the UNIQUE(rut_hash, env)
+ * index: the row is reserved first with contract_id NULL, then claimed once the
+ * deploy returns. Fail-closed — a failed deploy leaves the row unprovisioned
+ * rather than borrowing another patient's contract. NEVER used for 'live', where
+ * the patient must own the contract themselves.
  */
 export async function ensureSandboxRecord(
   rut: string,
@@ -140,6 +141,6 @@ export async function ensureSandboxRecord(
 export async function provisionLiveRecord(): Promise<never> {
   throw new Error(
     "provisionLiveRecord no implementado: requiere el deploy de un ClinicalRecord " +
-      "por paciente (WASM en testnet vía CI). Ver docs/ARCHITECTURE_REVIEW.md, fase de deploy.",
+      "por paciente cuyo owner sea el propio paciente (wallet Privy), no una llave nuestra.",
   );
 }

@@ -16,7 +16,7 @@ import { buttonVariants } from "@/components/ui/Button";
  * the audience is Chilean) via the `tr()` helper.
  */
 
-const PRODUCT = "TrustLeaf Verify";
+const PRODUCT = "TrustLeaf MCP";
 const EXPERT = "https://stellar.expert/explorer/testnet/tx/";
 
 // Real anchored transactions from the end-to-end demo (docs/D3_EVIDENCE.md).
@@ -72,7 +72,17 @@ export default function HackathonPage() {
 
   const [copied, setCopied] = useState(false);
   const MCP_URL = "https://trustleaf-demo.vercel.app/api/mcp";
-  const MCP_CONFIG = `{ "mcpServers": { "trustleaf-verify": { "url": "${MCP_URL}" } } }`;
+  // The Authorization header is NOT optional: every tool except
+  // explain_architecture is gated by an API key, so a config without it connects
+  // and then fails on 5 of the 6 tools. Ship the placeholder in the copyable block.
+  const MCP_CONFIG = `{
+  "mcpServers": {
+    "trustleaf": {
+      "url": "${MCP_URL}",
+      "headers": { "Authorization": "Bearer tl_sandbox_TU_KEY" }
+    }
+  }
+}`;
   const copyConfig = async () => {
     // Primary: async Clipboard API (HTTPS). Fallback: legacy execCommand for
     // contexts where the Clipboard API is blocked (e.g. sandboxed iframes).
@@ -162,8 +172,8 @@ export default function HackathonPage() {
             transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
             className="mt-6 max-w-3xl text-4xl font-bold tracking-tight text-balance sm:text-6xl"
           >
-            {tr("La prueba de que tu IA ", "Proof that your AI ")}
-            <span className="text-clinical">{tr("no decidió sola", "didn’t decide alone")}</span>.
+            {tr("Lo que tu app produce, ", "What your app produces, ")}
+            <span className="text-clinical">{tr("en la ficha del paciente", "in the patient’s record")}</span>.
           </motion.h1>
 
           <motion.p
@@ -173,8 +183,8 @@ export default function HackathonPage() {
             className="mt-6 max-w-2xl text-lg leading-relaxed text-muted"
           >
             {tr(
-              "Eres dev en la hackatón y tu app de salud necesita un humano que apruebe lo que sugiere la IA. En vez de construir wallets, firmas y anclaje on-chain, haces una llamada a nuestra API. Integración en una tarde.",
-              "You’re a dev at the hackathon and your health app needs a human to approve what the AI suggests. Instead of building wallets, signatures and on-chain anchoring, you call our API. Integrate in an afternoon.",
+              "Eres dev en la hackatón y tu app de salud genera artefactos clínicos que hoy se quedan en tu base de datos. Con dos llamadas quedan anclados en la ficha on-chain del paciente — con su consentimiento, y verificables por cualquiera. En vez de construir wallets, contratos y firmas, enchufas un MCP.",
+              "You’re a dev at the hackathon and your health app produces clinical artifacts that today just sit in your database. Two calls anchor them into the patient’s on-chain record — with their consent, verifiable by anyone. Instead of building wallets, contracts and signatures, you plug in an MCP.",
             )}
           </motion.p>
 
@@ -236,19 +246,13 @@ export default function HackathonPage() {
           </div>
 
           <pre className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-ink p-5 text-sm leading-relaxed">
-            <code className="font-mono text-slate-200">{`{
-  "mcpServers": {
-    "trustleaf-verify": {
-      "url": "${MCP_URL}"
-    }
-  }
-}`}</code>
+            <code className="font-mono text-slate-200">{MCP_CONFIG}</code>
           </pre>
 
           <p className="mt-3 text-xs text-muted">
             {tr(
-              "Compatible con clientes MCP (Claude, Cursor, tu propio agente). También expone REST si prefieres.",
-              "Works with MCP clients (Claude, Cursor, your own agent). Also exposes REST if you prefer.",
+              "Compatible con clientes MCP (Claude, Cursor, tu propio agente). Reemplaza tl_sandbox_TU_KEY por tu key: sin ella solo funciona explain_architecture.",
+              "Works with MCP clients (Claude, Cursor, your own agent). Replace tl_sandbox_TU_KEY with your key — without it only explain_architecture works.",
             )}
           </p>
         </div>
@@ -334,8 +338,8 @@ export default function HackathonPage() {
               icon: "🚫🧠",
               t: tr("La IA no puede diagnosticar ni prescribir sola", "AI can’t diagnose or prescribe alone"),
               d: tr(
-                "Cada sugerencia de tu IA necesita un humano en el loop — y una prueba de que ese humano existió. El jurado lo va a preguntar.",
-                "Every AI suggestion needs a human in the loop — and proof that human existed. The judges will ask.",
+                "Nosotros no validamos que un médico haya revisado — eso lo tiene que resolver tu app. Lo que sí te damos es la otra mitad: el paciente autoriza explícitamente quién escribe en su ficha, y esa autorización queda on-chain.",
+                "We don’t validate that a doctor reviewed anything — that’s your app’s job. What we give you is the other half: the patient explicitly authorizes who writes to their record, and that authorization lives on-chain.",
               ),
             },
             {
@@ -392,11 +396,11 @@ export default function HackathonPage() {
               },
               {
                 icon: "🔗",
-                verb: "verify",
+                verb: "read_records",
                 t: tr("Todo verificable", "All verifiable"),
                 d: tr(
-                  "Cada grant y cada ficha dejan una tx en Stellar Expert. Prueba de que un paciente autorizó y un centro escribió — auditable.",
-                  "Every grant and record leaves a tx on Stellar Expert. Proof a patient authorized and a center wrote — auditable.",
+                  "Lees el historial anclado: tipo, hash, autor y fecha — nunca el contenido. Cada grant y cada ancla dejan su tx en Stellar Expert.",
+                  "Read the anchored history: kind, hash, author and date — never the content. Every grant and anchor leaves its tx on Stellar Expert.",
                 ),
               },
             ].map((f, i) => (
@@ -432,24 +436,24 @@ export default function HackathonPage() {
               tag: tr("Prevención", "Prevention"),
               t: tr("Screening de riesgo cardiovascular", "Cardiovascular risk screening"),
               d: tr(
-                "La IA marca a un paciente como “alto riesgo”. El médico del CESFAM lo confirma con un clic → queda la prueba de que un profesional validó la alerta.",
-                "The AI flags a patient as “high risk”. The clinic doctor confirms with one click → proof a professional validated the alert.",
+                "Tu app calcula el riesgo y el CESFAM lo registra. Anclas un Observation en la ficha del paciente → el resultado queda verificable, y el paciente se lo lleva aunque cambie de sistema.",
+                "Your app computes the risk and the clinic records it. Anchor an Observation into the patient's record → the result stays verifiable, and the patient keeps it even if they switch systems.",
               ),
             },
             {
               tag: tr("Descompresión", "Decompression"),
               t: tr("Triaje de lista de espera", "Wait-list triage"),
               d: tr(
-                "La IA prioriza la cola por riesgo. Cada cambio de prioridad lleva la firma del médico que lo aprobó — auditable ante el jurado y ante el sistema de salud.",
-                "The AI prioritizes the queue by risk. Each priority change carries the approving doctor’s signature — auditable for judges and the health system.",
+                "Tu app prioriza la cola por riesgo. Cada decisión queda anclada como CarePlan con su fecha y su autor — nadie puede reordenar la lista hacia atrás sin que se note.",
+                "Your app prioritizes the queue by risk. Each decision is anchored as a CarePlan with its date and author — nobody can reorder the list retroactively without it showing.",
               ),
             },
             {
               tag: tr("Continuidad", "Continuity"),
               t: tr("Monitoreo post-operatorio", "Post-op monitoring"),
               d: tr(
-                "La IA sugiere ajustar el seguimiento de un adulto mayor. El médico tratante lo aprueba, y el dato viaja verificable entre el hospital y la app.",
-                "The AI suggests adjusting an elder’s follow-up. The treating doctor approves it, and the data travels verifiably between hospital and app.",
+                "El hospital ancla el alta y tu app de seguimiento ancla la evolución en LA MISMA ficha, porque ambos consultan por RUT. El adulto mayor deja de ser dos historiales incompatibles.",
+                "The hospital anchors the discharge and your follow-up app anchors the recovery into THE SAME record, because both key by RUT. The elder stops being two incompatible histories.",
               ),
             },
           ].map((l, i) => (
@@ -476,12 +480,12 @@ export default function HackathonPage() {
               {tr("El flujo, de punta a punta", "The flow, end to end")}
             </p>
             <h2 className="mt-3 text-3xl font-bold text-balance sm:text-4xl">
-              {tr("Tú alojas la firma. Ellos solo redirigen.", "You host the signing. They just redirect.")}
+              {tr("Nosotros alojamos la ficha. Tú solo la alimentas.", "We host the record. You just feed it.")}
             </h2>
             <p className="mt-4 max-w-2xl text-muted">
               {tr(
-                "Es el mismo patrón que “Pagar con Stripe” o “Entrar con Google”: la parte sensible pasa en nuestro dominio, no en el tuyo.",
-                "Same pattern as “Pay with Stripe” or “Sign in with Google”: the sensitive part happens on our domain, not yours.",
+                "El contrato, las wallets y las firmas viven en nuestro lado. Tú mandas un hash y recibes un txUrl.",
+                "The contract, the wallets and the signatures live on our side. You send a hash and get back a txUrl.",
               )}
             </p>
           </Reveal>
@@ -490,7 +494,7 @@ export default function HackathonPage() {
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[
               { h: tr("🧩 Tú (tu app)", "🧩 You (your app)"), s: tr("tu app + tu IA", "your app + AI"), c: "clinical" },
-              { h: tr("👩‍⚕️ Tu médico", "👩‍⚕️ Your doctor"), s: tr("el humano que aprueba", "the human who approves"), c: "mint" },
+              { h: tr("🧑 El paciente", "🧑 The patient"), s: tr("el dueño de la ficha", "the record's owner"), c: "mint" },
               { h: "🌿 TrustLeaf", s: tr("la API que integras", "the API you integrate"), c: "ink" },
             ].map((x) => (
               <div
@@ -508,12 +512,12 @@ export default function HackathonPage() {
           {/* steps */}
           <ol className="mt-4 space-y-3">
             {[
-              { n: "1", who: "clinical", t: tr("Tu IA sugiere algo", "Your AI suggests something"), d: tr("create_approval(sugerencia) → { id, approval_url }", "create_approval(suggestion) → { id, approval_url }") },
-              { n: "2", who: "clinical", t: tr("Rediriges a tu médico", "You redirect your doctor"), d: tr("Mandas al humano a approval_url. Nada de wallets de tu lado.", "Send the human to approval_url. No wallets on your side.") },
-              { n: "3", who: "mint", t: tr("Entra con su email", "They log in with email"), d: tr("Privy le crea su wallet sola — ni se entera.", "Privy creates their wallet automatically — they never notice.") },
-              { n: "4", who: "mint", t: tr("Revisa y aprueba", "They review and approve"), d: tr("Firma con su propia llave. Prueba real de humano-en-el-loop.", "They sign with their own key. Real human-in-the-loop proof.") },
-              { n: "5", who: "ink", t: tr("Verifica la firma y ancla", "Verifies the signature & anchors"), d: tr("Confirma la firma del médico y ancla la aprobación en Stellar.", "Confirms the doctor’s signature and anchors the approval on Stellar.") },
-              { n: "6", who: "clinical", t: tr("Muestras la prueba", "You show the proof"), d: tr("verify(id) → resultado auditable en tu propia app.", "verify(id) → auditable result in your own app.") },
+              { n: "1", who: "clinical", t: tr("Pides el consentimiento", "You request consent"), d: tr("request_consent(patient_rut) → el paciente autoriza a tu centro a escribir su ficha.", "request_consent(patient_rut) → the patient authorizes your center to write their record.") },
+              { n: "2", who: "mint", t: tr("El paciente decide", "The patient decides"), d: tr("En sandbox se auto-aprueba para que puedas demostrar el flujo (viene marcado consentSource: auto_sandbox). En producción firma el paciente.", "In sandbox it auto-approves so you can demo the flow (flagged consentSource: auto_sandbox). In production the patient signs.") },
+              { n: "3", who: "clinical", t: tr("Confirmas que está vigente", "You confirm it is active"), d: tr("check_consent(patient_rut) → status, mode, txUrl.", "check_consent(patient_rut) → status, mode, txUrl.") },
+              { n: "4", who: "ink", t: tr("Anclas el artefacto", "You anchor the artifact"), d: tr("anchor_record(patient_rut, kind, content) → solo el hash va a Stellar. El contenido nunca sale de tu lado.", "anchor_record(patient_rut, kind, content) → only the hash goes to Stellar. The content never leaves your side.") },
+              { n: "5", who: "ink", t: tr("Muestras la prueba", "You show the proof"), d: tr("read_records(patient_rut) → historial anclado, con su tx verificable en Stellar Expert.", "read_records(patient_rut) → anchored history, each with its verifiable tx on Stellar Expert.") },
+              { n: "6", who: "mint", t: tr("El paciente puede cortar", "The patient can cut it off"), d: tr("revoke_consent(patient_rut) revoca el acceso on-chain. El dueño de la ficha es él.", "revoke_consent(patient_rut) revokes access on-chain. They own the record.") },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 0.05}>
                 <li className="flex gap-4 rounded-2xl border border-slate-200 bg-canvas p-5">
@@ -569,8 +573,8 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
           <Reveal delay={0.15}>
             <p className="mt-6 text-sm text-slate-400">
               {tr(
-                "Se conecta como MCP (tecnología requerida del hackatón) o como REST. Te autenticas con una API key por equipo; las escrituras van a Stellar Testnet.",
-                "Connect via MCP (required hackathon tech) or REST. Authenticate with a per-team API key; writes go to Stellar Testnet.",
+                "Se conecta como MCP (tecnología requerida del hackatón), JSON-RPC 2.0 sobre HTTP. Te autenticas con una API key por equipo; las escrituras van a Stellar Testnet.",
+                "Connect via MCP (required hackathon tech), JSON-RPC 2.0 over HTTP. Authenticate with a per-team API key; writes go to Stellar Testnet.",
               )}
             </p>
           </Reveal>
@@ -631,29 +635,36 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
               {
                 q: tr("¿Mis usuarios tienen que ser de TrustLeaf?", "Do my users have to be TrustLeaf users?"),
                 a: tr(
-                  "No. El médico entra con su email en nuestra página de firma; la wallet se crea sola. Nunca fue parte de TrustLeaf.",
-                  "No. The doctor logs in with their email on our signing page; the wallet is created automatically. They were never a TrustLeaf user.",
+                  "No. Identificamos al paciente por su RUT, que se convierte en un HMAC antes de tocar cualquier tabla. Si nunca estuvo en TrustLeaf, le creamos su ficha al vuelo.",
+                  "No. We identify the patient by their RUT, hashed into an HMAC before it touches any table. If they were never in TrustLeaf, we create their record on the fly.",
                 ),
               },
               {
                 q: tr("¿Tengo que saber de blockchain?", "Do I need to know blockchain?"),
                 a: tr(
-                  "Cero. Haces una llamada, un redirect y una consulta. Toda la firma y el anclaje pasan en nuestro servidor.",
-                  "Zero. You make one call, one redirect and one query. All signing and anchoring happen on our server.",
+                  "Cero. Son dos llamadas MCP: request_consent y anchor_record. Las wallets, el contrato y las firmas pasan en nuestro servidor; tú recibes un txUrl.",
+                  "Zero. Two MCP calls: request_consent and anchor_record. Wallets, contract and signatures happen on our server; you get back a txUrl.",
                 ),
               },
               {
-                q: tr("¿Por qué anclar prueba que un humano decidió?", "How does anchoring prove a human decided?"),
+                q: tr("¿Qué prueba exactamente el ancla?", "What exactly does the anchor prove?"),
                 a: tr(
-                  "Porque la aprobación la firma la llave propia del médico, no la nuestra ni la de la IA. En la cadena quedan dos firmas distintas: el agente que sugirió y el humano que aprobó.",
-                  "Because the approval is signed by the doctor’s own key — not ours, not the AI’s. On-chain there are two distinct signatures: the agent that suggested and the human that approved.",
+                  "Que ESTE centro, con consentimiento vigente del paciente, ancló un artefacto de ESTE tipo en ESTE momento, y que el contenido no cambió desde entonces. No prueba que un médico lo revisó: validar al profesional es responsabilidad de tu app. Preferimos decirlo a que lo descubras frente al jurado.",
+                  "That THIS center, holding the patient's active consent, anchored an artifact of THIS kind at THIS moment, and that the content hasn't changed since. It does NOT prove a doctor reviewed it: validating the professional is your app's job. We'd rather say so than have you find out in front of the judges.",
+                ),
+              },
+              {
+                q: tr("¿Y en sandbox, quién da el consentimiento?", "In sandbox, who gives consent?"),
+                a: tr(
+                  "Nadie. Se auto-aprueba para que puedas demostrar el flujo completo, y cada respuesta lo dice con consentSource: \"auto_sandbox\" — incluso las que traen un txUrl real. Nunca uses RUTs de personas reales en sandbox.",
+                  "Nobody. It auto-approves so you can demo the full flow, and every response says so via consentSource: \"auto_sandbox\" — including the ones carrying a real txUrl. Never use real people's RUTs in sandbox.",
                 ),
               },
               {
                 q: tr("¿Se expone algún dato del paciente?", "Is any patient data exposed?"),
                 a: tr(
-                  "No. Solo se ancla un hash. El texto clínico y la PII nunca tocan la cadena.",
-                  "No. Only a hash is anchored. Clinical text and PII never touch the chain.",
+                  "Del contenido, nada: se hashea y ni se guarda ni se publica. El RUT tampoco viaja: se convierte en HMAC con un pepper del servidor. Lo único legible on-chain es el tipo de artefacto (kind), y por eso es una lista cerrada de tipos FHIR — nunca diagnósticos.",
+                  "Of the content, nothing: it's hashed and neither stored nor published. The RUT doesn't travel either — it becomes an HMAC under a server-side pepper. The only thing readable on-chain is the artifact kind, which is why it's a closed list of FHIR types — never diagnoses.",
                 ),
               },
             ].map((f) => (
@@ -692,8 +703,8 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
               },
               {
                 n: "2",
-                t: tr("Conecta la MCP o el REST", "Connect the MCP or REST"),
-                d: tr("Apunta tu cliente MCP a nuestro endpoint, o llama al REST. Sin SDK de blockchain.", "Point your MCP client at our endpoint, or call REST. No blockchain SDK."),
+                t: tr("Conecta tu cliente MCP", "Connect your MCP client"),
+                d: tr("Apunta tu cliente MCP a nuestro endpoint con tu API key en el header. Sin SDK de blockchain.", "Point your MCP client at our endpoint with your API key in the header. No blockchain SDK."),
               },
               {
                 n: "3",
@@ -723,10 +734,18 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
               </a>
             </div>
             <p className="mt-6 text-center text-sm text-muted">
-              {tr(
-                "¿Necesitas tu API key para la hackatón? Escríbenos en el canal del evento.",
-                "Need your API key for the hackathon? Reach us in the event channel.",
-              )}
+              {tr("¿Necesitas tu API key para la hackatón? Pídela ", "Need your API key for the hackathon? Request it ")}
+              <a
+                href="https://github.com/CaBsCrypto/ficha-onchain/issues/new?title=API%20key%20sandbox%20-%20hackaton&body=Equipo%3A%20%0AQu%C3%A9%20van%20a%20construir%3A%20%0AContacto%3A%20"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-clinical underline underline-offset-4 hover:text-clinical-600"
+              >
+                {tr("abriendo un issue en GitHub", "by opening a GitHub issue")}
+              </a>
+              {tr(" o escríbenos en el canal del evento. Respondemos con una key ", " or reach us in the event channel. We reply with a ")}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">tl_sandbox_…</code>
+              {tr(" el mismo día.", " key the same day.")}
             </p>
           </Reveal>
         </div>
@@ -737,7 +756,7 @@ const c = await call("check_consent", { patient_rut: "12.345.678-5" });
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-6 py-8 text-xs text-muted sm:flex-row">
           <span>
             <strong className="text-ink">{PRODUCT}</strong> ·{" "}
-            {tr("infraestructura de aprobación humana verificable", "verifiable human-approval infrastructure")}
+            {tr("ficha clínica anclada, con el consentimiento del paciente", "clinical records anchored, with the patient’s consent")}
           </span>
           <span>Claude Impact Lab · Longevidad 2026</span>
         </div>

@@ -4,7 +4,9 @@
  * "TrustLeaf Verify" packaged as a Model Context Protocol server so any team at
  * the hackathon can connect in a SINGLE line: point an MCP client at this URL.
  *
- *   { "mcpServers": { "trustleaf-verify": { "url": "https://<host>/api/mcp" } } }
+ *   { "mcpServers": { "trustleaf": {
+ *       "url": "https://<host>/api/mcp",
+ *       "headers": { "Authorization": "Bearer tl_sandbox_…" } } } }
  *
  * We speak MCP over JSON-RPC 2.0 directly (no SDK) to keep the dependency
  * surface zero and match the plain route-handler style used elsewhere in this
@@ -12,19 +14,25 @@
  * single application/json response (allowed by the Streamable HTTP spec — no
  * SSE/session bookkeeping needed for simple tool calls).
  *
- * Tools in this MVP are SAFE — no signing secrets, no real on-chain writes:
- *   · explain_architecture  — pure docs, so a dev's agent understands the model
- *   · create_approval       — SIMULATED: returns an id + approval_url + mode
- *   · verify_approval       — SIMULATED: returns a fake-but-shaped verdict
- * The real signature + Stellar anchoring flow lands behind these same shapes
- * later, gated by a per-team API key. Shapes stay stable so integrations don't
- * break when we flip create/verify from simulated → onchain.
+ * Tools:
+ *   · explain_architecture             — open, pure docs (no key needed)
+ *   · request/check/revoke_consent     — the patient's grant to a center
+ *   · anchor_record                    — REAL append_entry, gated on consent
+ *   · read_records                     — the anchored history (never content)
+ * Everything except explain_architecture needs a per-org API key and the
+ * matching scope. `anchor_record` SIGNS a real Soroban transaction in sandbox.
+ *
+ * NOTE — there is deliberately no `create_approval` / `verify_approval` here.
+ * They existed as simulated stubs and were removed: `verify_approval` returned
+ * `status:"approved"` signed by a fictional doctor for ANY id, which in a health
+ * product is not a stub but a forged clinical attestation. They come back only
+ * when a real signature route exists.
  */
 import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
-import { requestConsent, checkConsent, revokeConsent } from "@/lib/identity/center-grants";
-import { anchorRecord, readRecords, ConsentRequiredError } from "@/lib/identity/anchor";
+import { requestConsent, checkConsent, revokeConsent, consentSourceFor } from "@/lib/identity/center-grants";
+import { anchorRecord, readRecords, ConsentRequiredError, UpstreamUnavailableError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
 export const runtime = "nodejs";
@@ -55,8 +63,7 @@ class ToolInputError extends Error {}
 
 /** Read a required, valid RUT from tool args or throw a caller-safe error. */
 function requireRut(args: Record<string, unknown>): string {
-  const rut = String(args.patient_rut ?? "").trim();
-  if (!rut) throw new ToolInputError("'patient_rut' es obligatorio.");
+  const rut = requireString(args, "patient_rut", 32);
   if (!isValidRut(rut)) throw new ToolInputError("'patient_rut' no es un RUT válido (dígito verificador).");
   return rut;
 }
@@ -67,102 +74,116 @@ function requireCtx(ctx?: ApiContext): ApiContext {
   return ctx;
 }
 
+/**
+ * Read a required STRING arg. JSON-RPC `arguments` is attacker-controlled and we
+ * never validated it against the published inputSchema — `String(x)` happily
+ * turns `{a:1}` into the literal "[object Object]" and anchors ITS hash forever
+ * while reporting success. Reject the wrong type instead of coercing it.
+ */
+function requireString(args: Record<string, unknown>, name: string, max = 20_000): string {
+  const v = args[name];
+  if (typeof v !== "string") {
+    throw new ToolInputError(`'${name}' es obligatorio y debe ser un string.`);
+  }
+  const s = v.trim();
+  if (!s) throw new ToolInputError(`'${name}' es obligatorio.`);
+  if (s.length > max) throw new ToolInputError(`'${name}' excede el máximo de ${max} caracteres.`);
+  return s;
+}
+
+/**
+ * Allowed values for `kind` — the ONLY caller-supplied field that goes on-chain
+ * in clear text (see stellar/server.ts, append_entry). The record contract is
+ * 1:1 with a person, so free text here would let an integrator write
+ * `kind: "TARV — VIH+"` into a permanent, public ledger next to that patient's
+ * identity — exactly the disclosure the hash-on-chain model exists to prevent.
+ * Closed list of FHIR resourceTypes: says what kind of artifact it is, never
+ * what it says. FHIR names on purpose — they are the vocabulary integrators
+ * already have, and `MedicationRequest` matches what the rest of this repo uses
+ * (there is no `Prescription` resourceType in FHIR).
+ *
+ * `DocumentReference` is the escape hatch for anything unlisted. Widening this
+ * list is a product decision, not a convenience: each addition is a new word
+ * that becomes permanently public next to a person's identity.
+ */
+const ALLOWED_KINDS = [
+  "MedicationRequest",   // receta
+  "MedicationStatement", // lo que el paciente efectivamente toma (suplementos)
+  "DiagnosticReport",    // informe de examen
+  "Observation",         // medición puntual (presión, biomarcador, wearable)
+  "Condition",           // antecedente / diagnóstico registrado
+  "AllergyIntolerance",  // alergias
+  "Immunization",        // vacunas
+  "Procedure",           // procedimiento realizado
+  "Encounter",           // atención / consulta
+  "CarePlan",            // plan de cuidado o protocolo (longevidad)
+  "DocumentReference",   // cualquier otro artefacto documental
+] as const;
+
+function requireKind(args: Record<string, unknown>): string {
+  const kind = requireString(args, "kind", 64);
+  if (!(ALLOWED_KINDS as readonly string[]).includes(kind)) {
+    throw new ToolInputError(
+      `'kind' debe ser uno de: ${ALLOWED_KINDS.join(", ")} (resourceTypes FHIR, sensibles a mayúsculas). ` +
+        "Es el único campo tuyo que queda legible y permanente en la cadena, por eso " +
+        "la lista es cerrada y no clínica: describe el TIPO de artefacto, nunca su contenido. " +
+        "Equivalencias: Receta → MedicationRequest, Examen → DiagnosticReport, " +
+        "Antecedentes → Condition. Si tu artefacto no calza en ninguno, usa DocumentReference.",
+    );
+  }
+  return kind;
+}
+
 /** Max JSON-RPC messages per batch — caps the 1-request→N-query amplification. */
 const MAX_BATCH = 50;
 
-/** Deterministic id without Date.now()/random (keeps the endpoint pure & testable). */
-function approvalId(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return "apr_" + h.toString(16).padStart(8, "0");
-}
+/** Tools that used to exist. Answering "unknown tool" would strand an integrator. */
+const REMOVED_TOOLS: Record<string, string> = {
+  create_approval:
+    "'create_approval' fue eliminada: era un stub simulado que no persistía nada y " +
+    "apuntaba a una página de firma inexistente. El flujo real es " +
+    "request_consent → check_consent → anchor_record → read_records.",
+  verify_approval:
+    "'verify_approval' fue eliminada: devolvía 'aprobado' firmado por un médico ficticio " +
+    "para cualquier id, o sea una constancia clínica falsa. Volverá cuando exista la firma " +
+    "real del médico. Mientras tanto: request_consent → anchor_record → read_records.",
+};
 
 const TOOLS: Record<string, Tool> = {
   explain_architecture: {
     description:
-      "Explica el modelo de TrustLeaf Verify: cómo se prueba, de forma verificable, que un humano aprobó lo que sugirió una IA (humano-en-el-loop anclado en Stellar). Útil para que el agente entienda el sistema antes de integrar.",
+      "Explica el modelo de TrustLeaf: cómo un centro autorizado ancla artefactos clínicos en la ficha on-chain del paciente, con el consentimiento del paciente como puerta. Llámala primero para entender el flujo antes de integrar.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     handler: () => [
       {
         type: "text",
         text:
-          "TrustLeaf Verify — aprobación humana verificable.\n\n" +
-          "PROBLEMA: en salud, una IA no puede diagnosticar/prescribir sola. Cada " +
-          "sugerencia necesita un humano que la apruebe, y una PRUEBA de que ese " +
-          "humano existió.\n\n" +
-          "CÓMO: no basta con anclar 'humano=true' (la IA podría mentir). La " +
-          "aprobación la FIRMA la llave propia del médico (wallet creada desde su " +
-          "email vía Privy). En la cadena quedan dos firmas distintas: el agente " +
-          "que sugirió y el humano que aprobó. La IA no puede forjar la segunda.\n\n" +
-          "INTEGRACIÓN (3 verbos): create_approval(sugerencia) -> { id, approval_url }; " +
-          "rediriges a tu médico a approval_url para que firme; verify_approval(id) -> " +
-          "{ approvedBy, at, txUrl }.\n\n" +
-          "PRIVACIDAD: solo se ancla un hash. El texto clínico y la PII nunca tocan " +
-          "la cadena (modelo hash-on-chain / PII-off-chain).\n\n" +
+          "TrustLeaf — ficha clínica del paciente, anclada en Stellar.\n\n" +
+          "MODELO: 1 paciente = 1 ficha propia (un contrato ClinicalRecord por " +
+          "persona, identificada por el hash de su RUT). 1 centro médico = N " +
+          "fichas, y solo aquellas cuyo paciente le dio consentimiento. El " +
+          "paciente es el dueño: da y quita el acceso.\n\n" +
+          "FLUJO (4 verbos, en este orden):\n" +
+          "  1. request_consent(patient_rut)   -> pide acceso de escritura. En " +
+          "sandbox se auto-aprueba para que puedas demostrar el flujo (viene " +
+          "marcado consentSource:'auto_sandbox'); en live queda 'pending' hasta " +
+          "que el paciente firme.\n" +
+          "  2. check_consent(patient_rut)     -> confirma que está vigente.\n" +
+          "  3. anchor_record(patient_rut, kind, content) -> ancla el artefacto. " +
+          "Devuelve { mode, txHash, txUrl, contentHash }.\n" +
+          "  4. read_records(patient_rut)      -> el historial anclado.\n" +
+          "revoke_consent(patient_rut) corta el acceso.\n\n" +
+          "PRIVACIDAD: 'content' se hashea (SHA-256) y NUNCA se guarda ni se " +
+          "publica — ni en la cadena ni en nuestra base. El RUT tampoco: se " +
+          "convierte en un HMAC con pepper del servidor. Lo único legible " +
+          "on-chain es 'kind', y por eso es una lista cerrada de tipos de " +
+          "artefacto (nunca diagnósticos).\n\n" +
+          "MODES: onchain = tx confirmada; pending = enviada, sin confirmar aún " +
+          "(el txHash ya sirve); simulated = NO se ancló nada — mira el campo " +
+          "'reason' para saber por qué.\n\n" +
           "RED: Stellar Soroban (Testnet en la hackatón).",
       },
     ],
-  },
-
-  create_approval: {
-    description:
-      "Crea una solicitud de aprobación humana para una sugerencia de tu IA. Devuelve un id y una approval_url a la que rediriges a tu médico para que la firme. Requiere API key. (MVP: modo simulado — no ancla on-chain todavía.)",
-    requiresAuth: true,
-    scope: "approval:create",
-    inputSchema: {
-      type: "object",
-      properties: {
-        suggestion: { type: "string", description: "Lo que tu IA sugiere y un humano debe aprobar." },
-        context: { type: "string", description: "Contexto opcional (p. ej. score de riesgo)." },
-      },
-      required: ["suggestion"],
-      additionalProperties: false,
-    },
-    handler: (args, ctx) => {
-      const suggestion = String(args.suggestion ?? "").trim();
-      if (!suggestion) {
-        throw new ToolInputError("'suggestion' es obligatorio.");
-      }
-      const id = approvalId(suggestion + "|" + String(args.context ?? ""));
-      const payload = {
-        id,
-        approval_url: `/approve/${id}`,
-        status: "pending",
-        env: ctx?.env ?? "sandbox",
-        org: ctx?.orgName,
-        mode: "simulated",
-        note: "MVP simulado — la firma del médico y el anclaje en Stellar se conectan detrás de esta misma forma.",
-      };
-      return [{ type: "text", text: JSON.stringify(payload, null, 2) }];
-    },
-  },
-
-  verify_approval: {
-    description:
-      "Consulta el estado de una aprobación por id: quién la aprobó, cuándo y el link verificable en Stellar. Requiere API key. (MVP: modo simulado.)",
-    requiresAuth: true,
-    scope: "approval:read",
-    inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", description: "El id devuelto por create_approval." } },
-      required: ["id"],
-      additionalProperties: false,
-    },
-    handler: (args, ctx) => {
-      const id = String(args.id ?? "").trim();
-      if (!id) throw new ToolInputError("'id' es obligatorio.");
-      const payload = {
-        id,
-        status: "approved",
-        approvedBy: "dr.demo@trustleaf.health",
-        at: "14:32",
-        env: ctx?.env ?? "sandbox",
-        txUrl: "https://stellar.expert/explorer/testnet/tx/…",
-        mode: "simulated",
-        note: "MVP simulado — con la firma real del médico esto devuelve la tx anclada.",
-      };
-      return [{ type: "text", text: JSON.stringify(payload, null, 2) }];
-    },
   },
 
   request_consent: {
@@ -231,7 +252,16 @@ const TOOLS: Record<string, Tool> = {
       const c = requireCtx(ctx);
       const rut = requireRut(args);
       const res = await revokeConsent({ orgId: c.orgId, rut, env: c.env });
-      return [{ type: "text", text: JSON.stringify({ ...res, env: c.env }, null, 2) }];
+      return [
+        {
+          type: "text",
+          text: JSON.stringify(
+            { ...res, env: c.env, consentSource: consentSourceFor(c.env) },
+            null,
+            2,
+          ),
+        },
+      ];
     },
   },
 
@@ -244,8 +274,18 @@ const TOOLS: Record<string, Tool> = {
       type: "object",
       properties: {
         patient_rut: { type: "string", description: "RUT del paciente." },
-        kind: { type: "string", description: "Tipo de artefacto (ej. Receta, Examen, Antecedentes)." },
-        content: { type: "string", description: "Contenido clínico. Se hashea (SHA-256); no se guarda on-chain." },
+        kind: {
+          type: "string",
+          enum: [...ALLOWED_KINDS],
+          description:
+            "Tipo de artefacto. Lista cerrada: es el único campo que viaja legible on-chain, así que describe el tipo, nunca el contenido clínico.",
+        },
+        content: {
+          type: "string",
+          maxLength: 1_000_000,
+          description:
+            "Contenido clínico, como string (serializa tu JSON/FHIR antes de enviarlo). Se hashea (SHA-256); ni se guarda ni se publica.",
+        },
       },
       required: ["patient_rut", "kind", "content"],
       additionalProperties: false,
@@ -253,10 +293,10 @@ const TOOLS: Record<string, Tool> = {
     handler: async (args, ctx) => {
       const c = requireCtx(ctx);
       const rut = requireRut(args);
-      const kind = String(args.kind ?? "").trim();
-      const content = String(args.content ?? "").trim();
-      if (!kind) throw new ToolInputError("'kind' es obligatorio.");
-      if (!content) throw new ToolInputError("'content' es obligatorio.");
+      const kind = requireKind(args);
+      // 1 MB matches the schema's maxLength. Generous on purpose: content is only
+      // ever hashed, so the cap is anti-abuse, not a data-model constraint.
+      const content = requireString(args, "content", 1_000_000);
       try {
         const res = await anchorRecord({
           orgId: c.orgId,
@@ -267,10 +307,25 @@ const TOOLS: Record<string, Tool> = {
           content,
         });
         const txUrl = res.txHash ? STELLAR_EXPERT_TX(res.txHash) : null;
-        return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env }, null, 2) }];
+        // consentSource travels here too — this is the response that carries a
+        // REAL txUrl, so it is the easiest one to mistake for a consent a human
+        // actually gave.
+        return [
+          {
+            type: "text",
+            text: JSON.stringify(
+              { ...res, txUrl, env: c.env, consentSource: consentSourceFor(c.env) },
+              null,
+              2,
+            ),
+          },
+        ];
       } catch (e) {
         // Consent-required is a caller-safe message → surface it as isError.
+        // Both carry caller-safe, actionable messages → surface them verbatim
+        // instead of flattening to "error interno".
         if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        if (e instanceof UpstreamUnavailableError) throw new ToolInputError(e.message);
         throw e;
       }
     },
@@ -294,9 +349,21 @@ const TOOLS: Record<string, Tool> = {
       const rut = requireRut(args);
       try {
         const res = await readRecords({ orgId: c.orgId, rut, env: c.env });
-        return [{ type: "text", text: JSON.stringify({ ...res, count: res.entries.length, env: c.env }, null, 2) }];
+        return [
+          {
+            type: "text",
+            text: JSON.stringify(
+              { ...res, count: res.entries.length, env: c.env, consentSource: consentSourceFor(c.env) },
+              null,
+              2,
+            ),
+          },
+        ];
       } catch (e) {
+        // Both carry caller-safe, actionable messages → surface them verbatim
+        // instead of flattening to "error interno".
         if (e instanceof ConsentRequiredError) throw new ToolInputError(e.message);
+        if (e instanceof UpstreamUnavailableError) throw new ToolInputError(e.message);
         throw e;
       }
     },
@@ -338,7 +405,11 @@ async function handleRpc(
         capabilities: { tools: {} },
         serverInfo: SERVER_INFO,
         instructions:
-          "TrustLeaf Verify: prueba verificable de aprobación humana para sugerencias de IA en salud. Llama explain_architecture primero para entender el modelo.",
+          "TrustLeaf: ancla artefactos clínicos en la ficha on-chain del paciente, " +
+          "con su consentimiento como puerta. Llama explain_architecture primero " +
+          "(no necesita API key). El resto de las tools requieren la cabecera " +
+          "Authorization: Bearer tl_sandbox_… y siguen el orden " +
+          "request_consent → check_consent → anchor_record → read_records.",
       });
     }
 
@@ -361,8 +432,13 @@ async function handleRpc(
 
     case "tools/call": {
       const name = msg.params?.name as string;
-      const tool = TOOLS[name];
-      if (!tool) return err(id, -32602, `Tool desconocida: ${name}`);
+      const tool = Object.prototype.hasOwnProperty.call(TOOLS, name) ? TOOLS[name] : undefined;
+      if (!tool) {
+        // A tombstone beats a bare "unknown tool": an agent that read the old
+        // docs otherwise has no way to find out what replaced them.
+        if (name in REMOVED_TOOLS) return err(id, -32602, REMOVED_TOOLS[name]);
+        return err(id, -32602, `Tool desconocida: ${name}`);
+      }
 
       // Auth gate: open tools (discovery/docs) run without a key; the rest need
       // a valid API key, and its scope must cover the tool. Fail closed —
