@@ -21,7 +21,169 @@ export const dynamic = "force-dynamic";
 
 // Each entry is a single idempotent statement. Ordered so tables exist before
 // their ALTERs. Names are static (no user input) — no injection surface.
+//
+// PARITY IS NOT OPTIONAL. This file and scripts/migrate.mjs describe the same
+// schema for different databases, and they drifted: the consent columns on
+// appointments were added to the script but never here, so in production the
+// patient's "Iniciar consulta · Autorizar a mi médico" died with db_error —
+// discovered live, during the rehearsal of the demo. The core tables
+// (doctors, appointments, availability, licenses…) were only ever created in
+// prod by a hand-run of the script, which is why their absence here went
+// unnoticed. src/__tests__/schema-parity.test.ts now fails on any table or
+// column present in one file and missing in the other.
 const STATEMENTS: Array<[string, string]> = [
+  ["doctors", `
+    CREATE TABLE IF NOT EXISTS doctors (
+      id          SERIAL PRIMARY KEY,
+      name        TEXT NOT NULL,
+      email       TEXT NOT NULL UNIQUE,
+      specialty   TEXT,
+      license_num TEXT,
+      rut         TEXT,
+      status      TEXT NOT NULL DEFAULT 'active',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["doctors.bio", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS bio TEXT`],
+  ["doctors.telemedicine", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS telemedicine BOOLEAN NOT NULL DEFAULT TRUE`],
+  ["doctors.updated_at", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`],
+  ["doctors.phone", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS phone TEXT`],
+  ["doctors.center_name", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS center_name TEXT`],
+  ["doctors.center_address", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS center_address TEXT`],
+  ["doctors.signature_url", `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS signature_url TEXT`],
+
+  ["appointments", `
+    CREATE TABLE IF NOT EXISTS appointments (
+      id            SERIAL PRIMARY KEY,
+      doctor_email  TEXT NOT NULL,
+      patient_email TEXT NOT NULL,
+      patient_name  TEXT NOT NULL DEFAULT '',
+      date          DATE NOT NULL,
+      time_slot     TEXT NOT NULL,
+      type          TEXT NOT NULL DEFAULT 'Presencial',
+      motivo        TEXT,
+      notes         TEXT,
+      status        TEXT NOT NULL DEFAULT 'scheduled',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["appointments.meet_link", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS meet_link TEXT`],
+  ["appointments.meeting_code", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS meeting_code TEXT`],
+  ["appointments.space_name", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_name TEXT`],
+  // The consent event — the four columns whose absence broke the consultation
+  // start in production.
+  ["appointments.started_at", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ`],
+  ["appointments.consent_tx", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_tx TEXT`],
+  ["appointments.consent_mode", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_mode TEXT`],
+  ["appointments.consent_wallet", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_wallet TEXT`],
+  ["appointments.uq_slot", `
+    CREATE UNIQUE INDEX IF NOT EXISTS uniq_appt_slot
+      ON appointments (doctor_email, date, time_slot)
+      WHERE status <> 'cancelled'`],
+  ["appointments.idx_doctor_date", `CREATE INDEX IF NOT EXISTS idx_appt_doctor_date ON appointments (doctor_email, date)`],
+  ["appointments.idx_patient", `CREATE INDEX IF NOT EXISTS idx_appt_patient ON appointments (patient_email)`],
+
+  ["doctor_availability", `
+    CREATE TABLE IF NOT EXISTS doctor_availability (
+      id           SERIAL PRIMARY KEY,
+      doctor_email TEXT     NOT NULL,
+      weekday      SMALLINT NOT NULL,
+      start_time   TIME     NOT NULL,
+      end_time     TIME     NOT NULL,
+      slot_minutes SMALLINT NOT NULL DEFAULT 30,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT weekday_range CHECK (weekday BETWEEN 0 AND 6),
+      CONSTRAINT block_ordered CHECK (end_time > start_time),
+      CONSTRAINT slot_positive CHECK (slot_minutes > 0)
+    )`],
+  ["doctor_availability.idx", `CREATE INDEX IF NOT EXISTS idx_availability_doctor ON doctor_availability (doctor_email)`],
+
+  ["doctor_time_off", `
+    CREATE TABLE IF NOT EXISTS doctor_time_off (
+      id           SERIAL PRIMARY KEY,
+      doctor_email TEXT NOT NULL,
+      date         DATE NOT NULL,
+      reason       TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (doctor_email, date)
+    )`],
+  ["doctor_time_off.idx", `CREATE INDEX IF NOT EXISTS idx_timeoff_doctor ON doctor_time_off (doctor_email, date)`],
+
+  ["medical_licenses", `
+    CREATE TABLE IF NOT EXISTS medical_licenses (
+      id            SERIAL PRIMARY KEY,
+      doctor_email  TEXT NOT NULL,
+      patient_email TEXT,
+      patient_name  TEXT NOT NULL,
+      patient_rut   TEXT,
+      fecha_inicio  DATE NOT NULL,
+      dias          INTEGER NOT NULL,
+      cie10         TEXT NOT NULL,
+      tipo          TEXT NOT NULL,
+      diagnostico   TEXT,
+      observaciones TEXT,
+      status        TEXT NOT NULL DEFAULT 'draft',
+      tx_hash       TEXT,
+      doc_hash      TEXT,
+      doc_id        INTEGER,
+      mode          TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["medical_licenses.fecha_inicio", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS fecha_inicio DATE`],
+  ["medical_licenses.dias", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS dias INTEGER`],
+  ["medical_licenses.cie10", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS cie10 TEXT`],
+  ["medical_licenses.tipo", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS tipo TEXT`],
+  ["medical_licenses.diagnostico", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS diagnostico TEXT`],
+  ["medical_licenses.observaciones", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS observaciones TEXT`],
+  ["medical_licenses.tx_hash", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS tx_hash TEXT`],
+  ["medical_licenses.doc_hash", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS doc_hash TEXT`],
+  ["medical_licenses.doc_id", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS doc_id INTEGER`],
+  ["medical_licenses.mode", `ALTER TABLE medical_licenses ADD COLUMN IF NOT EXISTS mode TEXT`],
+
+  ["waitlist", `
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id         SERIAL PRIMARY KEY,
+      email      TEXT    NOT NULL UNIQUE,
+      role       TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+
+  ["registered_users", `
+    CREATE TABLE IF NOT EXISTS registered_users (
+      id         SERIAL PRIMARY KEY,
+      privy_id   TEXT NOT NULL UNIQUE,
+      email      TEXT,
+      wallet     TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+
+  ["pain_diary", `
+    CREATE TABLE IF NOT EXISTS pain_diary (
+      id         SERIAL PRIMARY KEY,
+      privy_id   TEXT NOT NULL,
+      date       TEXT NOT NULL,
+      entries    JSONB NOT NULL DEFAULT '[]',
+      saved_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (privy_id, date)
+    )`],
+
+  ["clinical_entries", `
+    CREATE TABLE IF NOT EXISTS clinical_entries (
+      id            SERIAL PRIMARY KEY,
+      patient_email TEXT NOT NULL,
+      patient_wallet TEXT,
+      kind          TEXT NOT NULL,
+      summary       TEXT NOT NULL,
+      detail        TEXT,
+      content_hash  TEXT NOT NULL,
+      tx_hash       TEXT,
+      mode          TEXT NOT NULL DEFAULT 'simulated',
+      author_wallet TEXT,
+      doctor_email  TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["clinical_entries.idx", `
+    CREATE INDEX IF NOT EXISTS idx_clinical_entries_patient
+      ON clinical_entries (patient_email, created_at DESC)`],
+
   ["clinical_documents", `
     CREATE TABLE IF NOT EXISTS clinical_documents (
       id             SERIAL PRIMARY KEY,
