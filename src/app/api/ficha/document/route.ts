@@ -23,6 +23,9 @@ import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
+// content_hash is computed over the PLAINTEXT bytes before this; encryption
+// only guards what rests in Neon.
+import { encryptAtRest } from "@/lib/crypto/at-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
          content_base64, content_hash, tx_hash, mode)
       VALUES
         (${auth.patientEmail}, ${doctorEmail}, ${category}, ${title}, ${fileName}, ${mimeType},
-         ${base64}, ${contentHash.toString("hex")}, ${txHash}, ${mode})
+         ${encryptAtRest(base64)}, ${contentHash.toString("hex")}, ${txHash}, ${mode})
       RETURNING id, patient_email, doctor_email, category, title, file_name, mime_type,
                 content_hash, tx_hash, mode, created_at`;
     return NextResponse.json({

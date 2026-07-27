@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
+import { decryptAtRest } from "@/lib/crypto/at-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function GET(
     const auth = await resolveOwnerOrTreating(request, doc.patient_email);
     if ("error" in auth) return auth.error;
 
-    const bytes = Buffer.from(doc.content_base64, "base64");
+    const bytes = Buffer.from(decryptAtRest(doc.content_base64) ?? "", "base64");
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {

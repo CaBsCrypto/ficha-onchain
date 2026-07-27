@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { decryptAtRest } from "@/lib/crypto/at-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,13 @@ export async function GET(request: Request) {
       FROM clinical_entries
       WHERE LOWER(patient_email) = ${patientEmail}
       ORDER BY created_at DESC`;
-    return NextResponse.json({ entries: rows });
+    // summary/detail rest encrypted in Neon; legacy cleartext passes through.
+    const entries = rows.map((r) => ({
+      ...r,
+      summary: decryptAtRest(r.summary as string),
+      detail: decryptAtRest(r.detail as string | null),
+    }));
+    return NextResponse.json({ entries });
   } catch (err) {
     if (err instanceof DbNotConfiguredError) {
       return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
