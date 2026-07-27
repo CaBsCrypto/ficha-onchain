@@ -60,6 +60,7 @@ import { EmptyRxState } from "@/components/patient/EmptyRxState";
 import { PatientLicCard } from "@/components/patient/PatientLicCard";
 import { AppointmentCard } from "@/components/patient/AppointmentCard";
 import { RequestAppointmentForm } from "@/components/patient/RequestAppointmentForm";
+import { EditFichaModal } from "@/components/patient/EditFichaModal";
 
 type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
 
@@ -953,8 +954,20 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       </div>
 
       {/* ── Identity card ── */}
-      <Card className="p-0">
+      <Card className="relative p-0">
         <div className="flex items-center gap-4 border-b border-slate-200/70 px-6 py-5">
+          {/* Self-report: allergies, base conditions and identity are the
+              patient's to declare — no doctor is going to type them in. What
+              the patient writes stays clearly separate from the doctor-anchored
+              history below: this edits antecedentes only, never the on-chain
+              entries. The modal existed for months with nothing opening it. */}
+          <button
+            type="button"
+            onClick={() => setShowEdit(true)}
+            className="absolute right-4 top-4 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-300 hover:text-sky-600"
+          >
+            Editar mis datos
+          </button>
           {/* Avatar con inicial */}
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-clinical/10 text-clinical">
             <span className="text-2xl font-bold leading-none">
@@ -1247,6 +1260,15 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       <p className="text-center text-xs text-muted/70">
         © 2026 Browns Studio · TrustLeaf · Datos anclados en Stellar Testnet
       </p>
+
+      {showEdit && (
+        <EditFichaModal
+          record={record}
+          email={privyEmail ?? ""}
+          onClose={() => setShowEdit(false)}
+          onSaved={(r) => { setRecord(r); setShowEdit(false); }}
+        />
+      )}
     </div>
   );
 }
