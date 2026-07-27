@@ -25,6 +25,7 @@
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin";
+import { decryptAtRest } from "@/lib/crypto/at-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,7 +138,7 @@ export async function GET(request: Request) {
       events.push({
         ts, kind: "ficha.appended", table: "clinical_entries",
         title: "Ficha clínica actualizada",
-        detail: [r.kind, r.summary].filter(Boolean).join(": ").slice(0, 120) || undefined,
+        detail: [r.kind, decryptAtRest(r.summary as string)].filter(Boolean).join(": ").slice(0, 120) || undefined,
         actor: (r.doctor_email as string) ?? (r.patient_email as string) ?? undefined,
         tx_hash: (r.tx_hash as string) ?? undefined,
         mode: (r.mode as string) ?? undefined,

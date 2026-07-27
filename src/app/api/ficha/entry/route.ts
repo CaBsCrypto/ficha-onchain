@@ -22,6 +22,9 @@ import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
+// The SHA-256 anchor is computed over the PLAINTEXT payload above the INSERT;
+// encryption only guards what rests in Neon, never what the chain verifies.
+import { encryptAtRest } from "@/lib/crypto/at-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,7 +105,8 @@ async function handleAppend(request: Request) {
         (patient_email, patient_wallet, kind, summary, detail,
          content_hash, tx_hash, mode, author_wallet, doctor_email)
       VALUES
-        (${patientEmail}, ${patientWallet}, ${kind}, ${summary}, ${detail},
+        (${patientEmail}, ${patientWallet}, ${kind},
+         ${encryptAtRest(summary)}, ${encryptAtRest(detail)},
          ${contentHash.toString("hex")}, ${txHash}, ${mode}, ${authorWallet}, ${doctorEmail})
       RETURNING *`;
     return NextResponse.json({
@@ -111,7 +115,8 @@ async function handleAppend(request: Request) {
       hash: txHash,
       contentHash: contentHash.toString("hex"),
       explorer: txHash ? STELLAR_EXPERT_TX(txHash) : null,
-      entry: row,
+      // The row holds ciphertext; the caller gets back what they sent.
+      entry: { ...row, summary, detail },
     });
   } catch (err) {
     if (err instanceof DbNotConfiguredError) {
