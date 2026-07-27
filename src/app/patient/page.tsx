@@ -941,11 +941,14 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/60 px-4 py-3.5">
         <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
         <p className="text-xs leading-relaxed text-amber-800">
-          Tu ficha médica vive on-chain en Soroban — solo los médicos con acceso
-          que tú autoricen pueden verla completa.{" "}
+          {/* Cada afirmación de este aviso debe ser verificable: las anclas de tu
+              historial viven on-chain; el contenido y el resumen viven fuera de
+              la cadena. Decir "se leen desde tu wallet" era falso. */}
+          Las anclas de tu ficha viven on-chain en Soroban — solo los médicos
+          que tú autorices pueden escribir en ella.{" "}
           {mock
             ? "Datos de ejemplo · tu historial real estará aquí cuando conectes tu wallet."
-            : "Los datos de resumen se leen desde tu wallet."}
+            : "El contenido vive fuera de la cadena, bajo tu control."}
         </p>
       </div>
 
@@ -1230,9 +1233,13 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
             Privacidad by design
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Tus datos personales no están en la blockchain. Solo tu wallet
-            actúa como identificador — el resto vive cifrado, bajo tu control,
-            y solo los médicos que tú autoricen pueden leerlo.
+            {/* "vive cifrado" vuelve aquí el día que el cifrado at-rest exista
+                de verdad — hasta entonces, prometerlo en la pantalla más
+                visible del producto es la clase de afirmación que este repo
+                lleva una semana erradicando. */}
+            Tus datos personales no están en la blockchain: allí solo viaja su
+            huella digital. El contenido vive fuera de la cadena, bajo tu
+            control, y solo los médicos que tú autorices pueden leerlo.
           </p>
         </div>
       </div>
