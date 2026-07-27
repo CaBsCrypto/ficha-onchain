@@ -50,7 +50,22 @@ export async function POST(request: Request) {
   if (!signingWallet && env === "sandbox") {
     const secret = getSandboxCenterSecret();
     if (secret) {
-      try { signingWallet = Keypair.fromSecret(secret).publicKey(); } catch { /* leave null */ }
+      try {
+        signingWallet = Keypair.fromSecret(secret).publicKey();
+      } catch {
+        // A configured-but-malformed secret used to be swallowed here ("leave
+        // null"), which stored a sandbox org that could never receive a grant:
+        // every request_consent then died on the NOT NULL grantee_wallet
+        // constraint as an opaque 500. This is an admin endpoint — say it.
+        return NextResponse.json(
+          {
+            error:
+              "SANDBOX_CENTER_SECRET está configurado pero no es una secret key válida " +
+              "(¿comillas, espacios o salto de línea al pegarlo?). Corrígelo y reintenta.",
+          },
+          { status: 500 },
+        );
+      }
     }
   }
   if (signingWallet && !isStellarAddress(signingWallet)) {
