@@ -92,6 +92,16 @@ describe("registro de tools", () => {
     expect(registry).not.toMatch(/\bverify_approval:/);
   });
 
+  it("GET responde 405 (spec Streamable HTTP, sin stream SSE)", () => {
+    // El SDK oficial abre un GET al conectar para sondear el stream. Un GET
+    // 200 application/json — el "health check amable" que hubo aquí — rompe el
+    // handshake: curl funciona y Claude Desktop no. Si no hay SSE, es 405.
+    const get = ROUTE.match(/export async function GET\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(get, "no se encontró el handler GET").not.toBe("");
+    expect(get).toMatch(/status: 405/);
+    expect(get).toMatch(/Allow: "POST"/);
+  });
+
   it("toda tool protegida declara un scope", () => {
     // The gate denies when `scope` is missing, so this is defence in depth: a
     // tool with requiresAuth and no scope is dead on arrival, not wide open.

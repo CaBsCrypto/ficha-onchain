@@ -539,12 +539,24 @@ export async function POST(request: Request) {
   return res ?? new NextResponse(null, { status: 202 });
 }
 
-// A GET is handy for humans/health checks (MCP itself only needs POST here).
+// Streamable HTTP spec: a server that does not offer an SSE stream MUST answer
+// GET with 405 Method Not Allowed. This used to return 200 application/json
+// (a friendly health page), and the official MCP SDK — which opens a GET on
+// every connection to probe for the stream — choked on the handshake: curl
+// worked, Claude Desktop did not. The human-friendly info lives on in the 405
+// body, which the spec allows and the SDK ignores.
+const NOT_ALLOWED = {
+  error: "method_not_allowed",
+  server: SERVER_INFO,
+  transport: "streamable-http (stateless json, sin stream SSE)",
+  howto: "POST JSON-RPC 2.0 a esta URL: initialize, tools/list, tools/call.",
+};
+
 export async function GET() {
-  return NextResponse.json({
-    server: SERVER_INFO,
-    transport: "streamable-http (stateless json)",
-    tools: Object.keys(TOOLS),
-    howto: "Apunta tu cliente MCP a esta URL. POST JSON-RPC 2.0: initialize, tools/list, tools/call.",
-  });
+  return NextResponse.json(NOT_ALLOWED, { status: 405, headers: { Allow: "POST" } });
+}
+
+// Session termination — stateless server, no session to delete. Same rule.
+export async function DELETE() {
+  return NextResponse.json(NOT_ALLOWED, { status: 405, headers: { Allow: "POST" } });
 }
