@@ -31,7 +31,7 @@
 import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
 import { isValidRut } from "@/lib/identity/rut";
-import { requestConsent, checkConsent, revokeConsent, consentSourceFor } from "@/lib/identity/center-grants";
+import { requestConsent, checkConsent, revokeConsent, consentSourceFor, SignerUnavailableError } from "@/lib/identity/center-grants";
 import { anchorRecord, readRecords, ConsentRequiredError, UpstreamUnavailableError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 
@@ -202,12 +202,19 @@ const TOOLS: Record<string, Tool> = {
     handler: async (args, ctx) => {
       const c = requireCtx(ctx);
       const rut = requireRut(args);
-      const res = await requestConsent({
-        orgId: c.orgId,
-        granteeWallet: c.signingWallet,
-        rut,
-        env: c.env,
-      });
+      let res;
+      try {
+        res = await requestConsent({
+          orgId: c.orgId,
+          granteeWallet: c.signingWallet,
+          rut,
+          env: c.env,
+        });
+      } catch (e) {
+        // Caller-safe by construction — forward instead of the opaque 500.
+        if (e instanceof SignerUnavailableError) throw new ToolInputError(e.message);
+        throw e;
+      }
       const txUrl = res.grantTx ? STELLAR_EXPERT_TX(res.grantTx) : null;
       return [{ type: "text", text: JSON.stringify({ ...res, txUrl, env: c.env, org: c.orgName }, null, 2) }];
     },

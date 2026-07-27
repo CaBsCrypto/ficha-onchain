@@ -25,6 +25,18 @@ import { ensureSandboxRecord, resolvePatientRecord, type RecordEnv } from "@/lib
 import { grantWriteAccess, revokeWriteAccess, getSandboxOwnerSecret } from "@/lib/stellar/server";
 import { isStellarAddress } from "@/lib/stellar/config";
 
+/**
+ * The center's signing wallet is missing or invalid, so a consent cannot be
+ * granted to anyone. The message is caller-safe (no secrets, no SQL) — the MCP
+ * route forwards it to the integrator instead of an opaque internal error.
+ */
+export class SignerUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SignerUnavailableError";
+  }
+}
+
 export type GrantStatus = "active" | "pending" | "revoked" | "none";
 
 /**
@@ -122,6 +134,20 @@ export async function requestConsent(args: {
   rut: string;
   env: RecordEnv;
 }): Promise<ConsentState> {
+  // A grant IS "this wallet may write" — center_grants.grantee_wallet is NOT
+  // NULL by design. Without a wallet there is nothing to consent to, so fail
+  // closed with a clear reason instead of letting the INSERT hit the constraint
+  // and surface as an opaque 500. Seen in prod: a malformed
+  // SANDBOX_CENTER_SECRET made key-creation store the org with signing_wallet
+  // null, and every request_consent after that crashed here.
+  if (!args.granteeWallet || !isStellarAddress(args.granteeWallet)) {
+    throw new SignerUnavailableError(
+      "El centro no tiene una wallet firmante configurada, así que no hay a quién otorgar el acceso. " +
+        "En sandbox esto significa que SANDBOX_CENTER_SECRET falta o es inválido en el servidor; " +
+        "el consentimiento NO quedó registrado.",
+    );
+  }
+
   const rutHash = hashRut(args.rut);
   const sql = getDb();
 

@@ -18,6 +18,7 @@
 import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "node:fs";
 import { createHash, createHmac } from "node:crypto";
+import { Keypair } from "@stellar/stellar-sdk";
 
 // ── env (.env.local fallback, same as migrate.mjs) ──────────────────────────
 if (existsSync(".env.local")) {
@@ -70,7 +71,10 @@ try {
   await sql`DELETE FROM api_orgs WHERE name = '__smoke_org__'`;
   const [o] = await sql`
     INSERT INTO api_orgs (name, status, trust_level, signing_wallet)
-    VALUES ('__smoke_org__', 'active', 'org_vouched', 'GSMOKEWALLET') RETURNING id`;
+    VALUES ('__smoke_org__', 'active', 'org_vouched', ${Keypair.random().publicKey()}) RETURNING id`;
+  // A real (random) G-address, because requestConsent now fails closed on a
+  // grantee that is not a valid wallet — the old 'GSMOKEWALLET' placeholder is
+  // exactly the misconfiguration that guard exists to catch.
   orgId = o.id;
   await sql`
     INSERT INTO api_keys (org_id, key_hash, key_prefix, env, scopes)
