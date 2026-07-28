@@ -1246,13 +1246,12 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
             Privacidad by design
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            {/* "vive cifrado" vuelve aquí el día que el cifrado at-rest exista
-                de verdad — hasta entonces, prometerlo en la pantalla más
-                visible del producto es la clase de afirmación que este repo
-                lleva una semana erradicando. */}
+            {/* "cifrado" volvió el día que se volvió verdad: AES-256-GCM
+                at-rest sobre el contenido clínico (#75). El comentario que
+                estuvo aquí prohibía escribirlo antes de eso. */}
             Tus datos personales no están en la blockchain: allí solo viaja su
-            huella digital. El contenido vive fuera de la cadena, bajo tu
-            control, y solo los médicos que tú autorices pueden leerlo.
+            huella digital. El contenido vive cifrado fuera de la cadena, bajo
+            tu control, y solo los médicos que tú autorices pueden leerlo.
           </p>
         </div>
       </div>
