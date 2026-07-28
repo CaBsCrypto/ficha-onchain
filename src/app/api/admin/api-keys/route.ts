@@ -123,3 +123,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
 }
+
+/**
+ * PATCH /api/admin/api-keys — revoke a key by its prefix.
+ * ---------------------------------------------------------------------------
+ * Body: { keyPrefix, action: 'revoke' }. Sets revoked_at, which the auth gate
+ * already honours (api-key.ts denies any key with revoked_at set) — the column
+ * existed from day one, but nothing could ever write it: a leaked key was
+ * irrevocable by construction. Prefix-based because the plaintext is shown
+ * exactly once and only its sha256 is stored; the prefix is what an admin can
+ * actually still see. Idempotent — revoking a revoked key reports it as such.
+ */
+export async function PATCH(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  let body: { keyPrefix?: unknown; action?: unknown };
+  try { body = (await request.json()) as typeof body; } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  if (body.action !== "revoke") {
+    return NextResponse.json({ error: "action debe ser 'revoke'" }, { status: 400 });
+  }
+  const keyPrefix = String(body.keyPrefix ?? "").trim();
+  if (!/^tl_(sandbox|live)_[0-9a-f]{4,}$/.test(keyPrefix)) {
+    return NextResponse.json({ error: "keyPrefix inválido (ej: tl_sandbox_ab12cd)" }, { status: 400 });
+  }
+
+  try {
+    const sql = getDb();
+    const rows = await sql<{ id: number; org_id: number; revoked_at: string | null }>`
+      UPDATE api_keys SET revoked_at = COALESCE(revoked_at, NOW())
+      WHERE key_prefix = ${keyPrefix}
+      RETURNING id, org_id, revoked_at`;
+    if (!rows.length) {
+      return NextResponse.json({ error: "no existe una key con ese prefijo" }, { status: 404 });
+    }
+    return NextResponse.json({
+      ok: true,
+      revoked: rows.map((r) => ({ keyId: r.id, orgId: r.org_id, revokedAt: r.revoked_at })),
+    });
+  } catch (err) {
+    console.error("[admin/api-keys PATCH]", err);
+    return NextResponse.json({ error: "db_error" }, { status: 500 });
+  }
+}
