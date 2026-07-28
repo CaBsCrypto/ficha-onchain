@@ -454,6 +454,23 @@ step("center_grants", async () => {
               ON center_grants (patient_rut_hash)`;
 });
 
+// ── Access log — quién miró la ficha (Ley 20.584) ──────────────────────────
+step("api_access_log", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_access_log (
+      id               SERIAL PRIMARY KEY,
+      patient_email    TEXT,
+      patient_rut_hash TEXT,
+      accessor         TEXT NOT NULL,
+      accessor_role    TEXT NOT NULL,
+      action           TEXT NOT NULL,
+      detail           TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_access_log_patient ON api_access_log (patient_email, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_access_log_ruthash ON api_access_log (patient_rut_hash, created_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

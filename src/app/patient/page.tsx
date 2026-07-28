@@ -1347,10 +1347,36 @@ function LicenciasTab() {
 // ---------------------------------------------------------------------------
 // Tab: Mis Accesos (grant / revoke doctor access)
 // ---------------------------------------------------------------------------
+type AccessRow = {
+  accessor: string;
+  accessor_role: string;
+  action: string;
+  detail: string | null;
+  created_at: string;
+};
+
+const ACCESS_ACTION_LABELS: Record<string, string> = {
+  "ficha.entries.read": "Leyó tu historial clínico",
+  "ficha.antecedentes.read": "Leyó tus antecedentes",
+  "ficha.document.view": "Abrió un examen",
+  "mcp.read_records": "Centro externo leyó tu ficha (MCP)",
+  "mcp.anchor_record": "Centro externo ancló un registro (MCP)",
+};
+
 function AccesosTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const [doctors, setDoctors] = useState<AuthorizedDoctor[]>(
     mock ? MOCK_AUTHORIZED_DOCTORS : [],
   );
+  // Registro de accesos (Ley 20.584) — real, desde api_access_log.
+  const [accesses, setAccesses] = useState<AccessRow[]>([]);
+  const [accessesLoading, setAccessesLoading] = useState(true);
+  useEffect(() => {
+    authedFetch("/api/patient/access-log")
+      .then((r) => (r.ok ? r.json() : { accesses: [] }))
+      .then((j: { accesses?: AccessRow[] }) => setAccesses(j.accesses ?? []))
+      .catch(() => setAccesses([]))
+      .finally(() => setAccessesLoading(false));
+  }, []);
   const [grantWallet, setGrantWallet] = useState("");
   const [granting, setGranting] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -1409,6 +1435,47 @@ function AccesosTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           de TrustLeaf.
         </p>
       </div>
+
+      {/* Registro de accesos — Ley 20.584: quién miró tu ficha, con datos
+          reales de api_access_log (a diferencia del grant demo de más abajo). */}
+      <Card>
+        <SectionHeader
+          icon={<ClipboardCheckIcon className="h-4 w-4 text-clinical" />}
+          title="Registro de accesos"
+          bg="bg-clinical/10"
+        />
+        <p className="mt-2 text-xs text-muted">
+          Quién ha visto tu información clínica — tu derecho según la Ley 20.584.
+        </p>
+        {accessesLoading ? (
+          <p className="mt-3 text-sm text-muted">Cargando registro…</p>
+        ) : accesses.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            Nadie más que tú ha accedido a tu ficha.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {accesses.map((a, i) => (
+              <li key={i} className="flex items-start justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink">
+                    {ACCESS_ACTION_LABELS[a.action] ?? a.action}
+                  </p>
+                  <p className="truncate text-xs text-muted">
+                    {a.accessor}
+                    {a.detail ? ` · ${a.detail}` : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs text-muted">
+                  {new Date(a.created_at).toLocaleString("es-CL", {
+                    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {/* Notice */}
       {notice && (

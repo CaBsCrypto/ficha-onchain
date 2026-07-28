@@ -30,7 +30,8 @@
  */
 import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
-import { isValidRut } from "@/lib/identity/rut";
+import { isValidRut, hashRut } from "@/lib/identity/rut";
+import { logAccess } from "@/lib/access-log";
 import { requestConsent, checkConsent, revokeConsent, consentSourceFor, SignerUnavailableError } from "@/lib/identity/center-grants";
 import { anchorRecord, readRecords, ConsentRequiredError, UpstreamUnavailableError } from "@/lib/identity/anchor";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
@@ -314,6 +315,13 @@ const TOOLS: Record<string, Tool> = {
           content,
         });
         const txUrl = res.txHash ? STELLAR_EXPERT_TX(res.txHash) : null;
+        logAccess({
+          patientRutHash: hashRut(rut),
+          accessor: c.orgName,
+          accessorRole: "center",
+          action: "mcp.anchor_record",
+          detail: `${kind} · ${res.mode} · ${c.env}`,
+        });
         // consentSource travels here too — this is the response that carries a
         // REAL txUrl, so it is the easiest one to mistake for a consent a human
         // actually gave.
@@ -356,6 +364,15 @@ const TOOLS: Record<string, Tool> = {
       const rut = requireRut(args);
       try {
         const res = await readRecords({ orgId: c.orgId, rut, env: c.env });
+        // Ley 20.584 — an external center reading the ficha leaves a trace,
+        // keyed by rut_hash (the MCP never handles the patient's email).
+        logAccess({
+          patientRutHash: hashRut(rut),
+          accessor: c.orgName,
+          accessorRole: "center",
+          action: "mcp.read_records",
+          detail: `${res.entries.length} entradas · ${c.env}`,
+        });
         return [
           {
             type: "text",

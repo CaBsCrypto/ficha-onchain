@@ -22,6 +22,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
+import { logAccess } from "@/lib/access-log";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 
@@ -37,15 +38,28 @@ export const dynamic = "force-dynamic";
 async function gate(
   request: Request,
   patientEmailRaw: string | null,
-): Promise<{ patientEmail: string; doctorEmail: string | null } | { error: NextResponse }> {
+): Promise<
+  | { patientEmail: string; doctorEmail: string | null; actor: "patient" | "doctor" | "demo" }
+  | { error: NextResponse }
+> {
   const r = await resolveOwnerOrTreating(request, patientEmailRaw);
   if ("error" in r) return r;
-  return { patientEmail: r.patientEmail, doctorEmail: r.doctorEmail };
+  return { patientEmail: r.patientEmail, doctorEmail: r.doctorEmail, actor: r.actor };
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
   const g = await gate(request, new URL(request.url).searchParams.get("patientEmail"));
   if ("error" in g) return g.error;
+
+  // Ley 20.584 — antecedentes read by someone other than their patient.
+  if (g.actor !== "patient") {
+    logAccess({
+      patientEmail: g.patientEmail,
+      accessor: g.doctorEmail ?? "anónimo (demo)",
+      accessorRole: g.actor === "doctor" ? "doctor" : "system",
+      action: "ficha.antecedentes.read",
+    });
+  }
 
   try {
     const sql = getDb();
