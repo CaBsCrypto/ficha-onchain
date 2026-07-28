@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { usePrivy } from "@privy-io/react-auth";
+// The diary is owner-only server-side: the API resolves the owner from the
+// Privy token, so every call must carry it (plain fetch = 401 in production).
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import BodyMap, { type BodyZone, type PainEntry, ZONE_NAMES } from "@/components/pain/BodyMap";
 import BodyMap3D from "@/components/pain/BodyMap3D";
 import PainLogger from "@/components/pain/PainLogger";
@@ -119,7 +122,7 @@ export default function PainDiaryPage() {
       return;
     }
     setHistoryLoading(true);
-    fetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`)
+    authedFetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`)
       .then((r) => r.json())
       .then((data: { days?: Array<{ date: string; entries: PainEntry[] }> }) => {
         if (data.days && data.days.length > 0) {
@@ -177,7 +180,7 @@ export default function PainDiaryPage() {
     }
 
     try {
-      const res = await fetch("/api/pain-diary", {
+      const res = await authedFetch("/api/pain-diary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privyId, date: today, entries }),
@@ -185,7 +188,7 @@ export default function PainDiaryPage() {
       if (res.ok) {
         toast.success("Registro guardado en tu historial ✓");
         // Refresh history
-        const r = await fetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`);
+        const r = await authedFetch(`/api/pain-diary?privyId=${encodeURIComponent(privyId)}&days=90`);
         const data = (await r.json()) as { days?: Array<{ date: string; entries: PainEntry[] }> };
         if (data.days) {
           setHistory(data.days.filter((d) => d.entries.length > 0).map((d) => buildHistoryDay(d.date, d.entries)));
