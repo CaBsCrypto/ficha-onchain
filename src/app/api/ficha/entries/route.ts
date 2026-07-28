@@ -10,6 +10,8 @@
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { decryptAtRest } from "@/lib/crypto/at-rest";
+import { requireUser } from "@/lib/auth/privy-auth";
+import { logAccess } from "@/lib/access-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +23,19 @@ export async function GET(request: Request) {
     .toLowerCase();
   if (!patientEmail) {
     return NextResponse.json({ error: "patientEmail required" }, { status: 400 });
+  }
+
+  // Ley 20.584: the patient can know who read their historial. Self-reads are
+  // not logged (the right protects them from OTHERS); anonymous demo reads are,
+  // as 'system', so nothing accesses clinical data invisibly.
+  const viewer = await requireUser(request);
+  if (viewer?.email?.toLowerCase() !== patientEmail) {
+    logAccess({
+      patientEmail,
+      accessor: viewer?.email ?? "anónimo (demo)",
+      accessorRole: viewer ? "doctor" : "system",
+      action: "ficha.entries.read",
+    });
   }
 
   try {

@@ -320,6 +320,20 @@ const STATEMENTS: Array<[string, string]> = [
   ["center_grants.env", `ALTER TABLE center_grants ADD COLUMN IF NOT EXISTS env TEXT NOT NULL DEFAULT 'sandbox'`],
   ["center_grants.uq", `CREATE UNIQUE INDEX IF NOT EXISTS uq_center_grants_active ON center_grants (org_id, patient_rut_hash, env) WHERE status = 'active'`],
   ["center_grants.idx", `CREATE INDEX IF NOT EXISTS idx_center_grants_patient ON center_grants (patient_rut_hash)`],
+
+  ["api_access_log", `
+    CREATE TABLE IF NOT EXISTS api_access_log (
+      id               SERIAL PRIMARY KEY,
+      patient_email    TEXT,
+      patient_rut_hash TEXT,
+      accessor         TEXT NOT NULL,
+      accessor_role    TEXT NOT NULL,
+      action           TEXT NOT NULL,
+      detail           TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["api_access_log.idx_email", `CREATE INDEX IF NOT EXISTS idx_access_log_patient ON api_access_log (patient_email, created_at DESC)`],
+  ["api_access_log.idx_rut", `CREATE INDEX IF NOT EXISTS idx_access_log_ruthash ON api_access_log (patient_rut_hash, created_at DESC)`],
 ];
 
 export async function POST(request: Request) {

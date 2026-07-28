@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 import { decryptAtRest } from "@/lib/crypto/at-rest";
+import { logAccess } from "@/lib/access-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,17 @@ export async function GET(
     // Authorize against the document's own patient.
     const auth = await resolveOwnerOrTreating(request, doc.patient_email);
     if ("error" in auth) return auth.error;
+
+    // Ley 20.584 — an exam opened by anyone but its patient leaves a trace.
+    if (auth.actor !== "patient") {
+      logAccess({
+        patientEmail: auth.patientEmail,
+        accessor: auth.doctorEmail ?? "anónimo (demo)",
+        accessorRole: auth.actor === "doctor" ? "doctor" : "system",
+        action: "ficha.document.view",
+        detail: doc.file_name ?? `documento #${docId}`,
+      });
+    }
 
     const bytes = Buffer.from(decryptAtRest(doc.content_base64) ?? "", "base64");
     return new NextResponse(new Uint8Array(bytes), {
