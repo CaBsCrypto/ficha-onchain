@@ -15,6 +15,11 @@
  *
  *   node scripts/seed-pain-journey.mjs --privy-id=did:privy:xxx [--base=URL] [--weeks=8]
  *
+ * NOTE: the diary API is now owner-only (the owner comes from the Privy token,
+ * not from --privy-id). Against a server with auth enforced — production — this
+ * script gets 401 by design; it works against local dev, where demo mode still
+ * accepts the claimed id.
+ *
  * BASE defaults to localhost:3000. Point it at production to seed the real
  * deploy. Idempotent: /api/pain-diary upserts on (privy_id, date), so re-running
  * overwrites the same days instead of duplicating them.
