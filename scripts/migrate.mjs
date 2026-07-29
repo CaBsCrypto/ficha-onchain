@@ -489,6 +489,19 @@ step("patient_grants", async () => {
   await sql`CREATE INDEX IF NOT EXISTS idx_patient_grants_email ON patient_grants (patient_email, granted_at DESC)`;
 });
 
+// ── MCP rate limiting — ventanas fijas de 1 minuto por org ──────────────────
+step("api_rate_limits", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_rate_limits (
+      org_id       INT NOT NULL,
+      env          TEXT NOT NULL,
+      bucket       TEXT NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      count        INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (org_id, env, bucket, window_start)
+    )`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

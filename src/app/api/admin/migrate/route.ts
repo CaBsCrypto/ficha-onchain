@@ -349,6 +349,16 @@ const STATEMENTS: Array<[string, string]> = [
       revoked_at     TIMESTAMPTZ
     )`],
   ["patient_grants.idx", `CREATE INDEX IF NOT EXISTS idx_patient_grants_email ON patient_grants (patient_email, granted_at DESC)`],
+
+  ["api_rate_limits", `
+    CREATE TABLE IF NOT EXISTS api_rate_limits (
+      org_id       INT NOT NULL,
+      env          TEXT NOT NULL,
+      bucket       TEXT NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      count        INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (org_id, env, bucket, window_start)
+    )`],
 ];
 
 export async function POST(request: Request) {
