@@ -47,9 +47,12 @@ interface DBLicense {
 
 interface MintDocData {
   mode: 'onchain' | 'simulated';
+  /** Stellar tx hash from the API's `hash` field. In simulated mode the API
+   *  fills it with random bytes, so it is only meaningful when mode==='onchain'. */
+  hash?: string;
   txHash?: string;
   contentHash: string;
-  docId?: number;
+  docId?: number | string;
   explorer?: string;
   simulatedReason?: string;
 }
@@ -249,6 +252,11 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
       if (!mintResponse.ok || mintJson.error) throw new Error(mintJson.error ?? 'mint_failed');
 
       const result = mintJson.data!;
+      // The API returns the tx hash as `hash`; this component always read the
+      // nonexistent `txHash`, so signed licences persisted tx_hash NULL. Only
+      // the real mode carries a real hash — simulated fills `hash` with random
+      // bytes that must never be stored as a transaction.
+      result.txHash = result.mode === 'onchain' ? result.hash : undefined;
       setMintRes(result);
 
       // Patch DB
@@ -292,7 +300,8 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
         status:   'signed',
         tx_hash:  result.txHash      ?? null,
         doc_hash: result.contentHash,
-        doc_id:   result.docId       ?? null,
+        // The API serialises the on-chain doc id as a string.
+        doc_id:   result.docId != null ? Number(result.docId) : null,
         mode:     result.mode,
       };
       setSavedLic(signed);
