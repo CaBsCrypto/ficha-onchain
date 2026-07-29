@@ -21,6 +21,7 @@
  */
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { mintUnlockToken } from "@/lib/pharmacy/unlock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   const res = NextResponse.json({ ok: true, demo });
-  res.cookies.set("pharmacy_unlocked", "1", {
+  res.cookies.set("pharmacy_unlocked", mintUnlockToken(), {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",

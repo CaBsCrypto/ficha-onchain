@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { decryptAtRest } from "@/lib/crypto/at-rest";
-import { requireUser } from "@/lib/auth/privy-auth";
+import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 import { logAccess } from "@/lib/access-log";
 
 export const runtime = "nodejs";
@@ -25,15 +25,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "patientEmail required" }, { status: 400 });
   }
 
+  // Same boundary as ficha/document: the patient themselves or a treating
+  // doctor. Any other authenticated user gets 403 — the historial is not
+  // readable by whoever holds a valid token.
+  const auth = await resolveOwnerOrTreating(request, patientEmail);
+  if ("error" in auth) return auth.error;
+
   // Ley 20.584: the patient can know who read their historial. Self-reads are
   // not logged (the right protects them from OTHERS); anonymous demo reads are,
   // as 'system', so nothing accesses clinical data invisibly.
-  const viewer = await requireUser(request);
-  if (viewer?.email?.toLowerCase() !== patientEmail) {
+  if (auth.actor !== "patient") {
     logAccess({
       patientEmail,
-      accessor: viewer?.email ?? "anónimo (demo)",
-      accessorRole: viewer ? "doctor" : "system",
+      accessor: auth.doctorEmail ?? "anónimo (demo)",
+      accessorRole: auth.actor === "doctor" ? "doctor" : "system",
       action: "ficha.entries.read",
     });
   }

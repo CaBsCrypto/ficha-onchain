@@ -245,7 +245,7 @@ function PatientDashboardInner({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
+        const res = await authedFetch(
           `/api/consultations?patientWallet=${encodeURIComponent(session.address)}`,
         );
         const data = await res.json();
@@ -918,7 +918,7 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       .catch(err => console.error('[FichaTab]', err))
       .finally(() => setLoading(false));
     // On-chain clinical history (anchored by the patient's doctors).
-    fetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(privyEmail)}`)
+    authedFetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(privyEmail)}`)
       .then(r => r.json() as Promise<{ entries?: ClinicalEntry[] }>)
       .then(j => setEntries(j.entries ?? []))
       .catch(() => setEntries([]));

@@ -23,6 +23,7 @@
 import { NextResponse } from "next/server";
 import { listPrescriptions } from "@/lib/stellar/client";
 import { computeExpiry } from "@/lib/stellar/expiry";
+import { isUnlocked } from "@/lib/pharmacy/unlock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,12 +46,6 @@ function parseRutIndex(): Map<string, string> {
     if (rut && wallet) map.set(rut, wallet);
   }
   return map;
-}
-
-/** True when the request carries the pharmacy_unlocked cookie. */
-function isUnlocked(request: Request): boolean {
-  const cookie = request.headers.get("cookie") ?? "";
-  return /(?:^|;\s*)pharmacy_unlocked=1(?:;|$)/.test(cookie);
 }
 
 export async function GET(request: Request) {

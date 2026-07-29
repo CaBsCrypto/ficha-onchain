@@ -8,14 +8,19 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getConsultation } from "@/lib/consultations/store";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Meet link + clinical notes — same gate as the list endpoint.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   const { id } = await params;
   const consultation = getConsultation(id);
 

@@ -22,6 +22,7 @@
  * Requires RESEND_API_KEY — if absent returns { mode:"skipped" }.
  */
 import { NextResponse } from "next/server";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -199,6 +200,11 @@ function buildHtml(b: LicenseNotifyBody): string {
 }
 
 export async function POST(request: Request) {
+  // Same reasoning as notify/prescription: the body controls recipient and
+  // content over the official template — gate it like the doctor action itself.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: LicenseNotifyBody;
   try {
     body = await request.json() as LicenseNotifyBody;

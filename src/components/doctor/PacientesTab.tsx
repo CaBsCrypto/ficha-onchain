@@ -116,7 +116,7 @@ function PatientDetailModal({
 
   const loadFicha = useCallback(() => {
     if (!patient.patient_email) return;
-    fetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(patient.patient_email)}`)
+    authedFetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(patient.patient_email)}`)
       .then(r => r.json() as Promise<{ entries?: FichaEntry[] }>)
       .then(j => setFicha(j.entries ?? []))
       .catch(() => setFicha([]));
