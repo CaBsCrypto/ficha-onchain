@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { Consultation } from "@/lib/consultations/store";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,7 +101,7 @@ export function ConsultationPanel({ doctorWallet, onIssueRx }: Props) {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/consultations", {
+      const res = await authedFetch("/api/consultations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

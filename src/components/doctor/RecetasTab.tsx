@@ -234,7 +234,7 @@ function NuevaRecetaModal({
 
       // Fire-and-forget email notification to patient (best-effort)
       if (form.patientEmail) {
-        void fetch('/api/notify/prescription', {
+        void authedFetch('/api/notify/prescription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

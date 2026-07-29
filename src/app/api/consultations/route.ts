@@ -47,6 +47,11 @@ interface ConsultationBody {
  * 400 → { error }
  */
 export async function GET(request: NextRequest) {
+  // Consultations carry Meet links and internal clinical notes — wallets are
+  // public on-chain, so an unauthenticated GET was an open directory of both.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   const params = new URL(request.url).searchParams;
   const patientWallet = (
     params.get("patientWallet") ??

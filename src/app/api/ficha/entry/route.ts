@@ -21,7 +21,7 @@ import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
-import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
+import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 // The SHA-256 anchor is computed over the PLAINTEXT payload above the INSERT;
 // encryption only guards what rests in Neon, never what the chain verifies.
 import { encryptAtRest } from "@/lib/crypto/at-rest";
@@ -39,10 +39,6 @@ interface EntryBody {
 }
 
 async function handleAppend(request: Request) {
-  // Appending to a ficha is a doctor action — guard it (demo mode passes through).
-  const gate = await requireAuthOrDemo(request);
-  if (gate) return gate.error;
-
   let body: EntryBody;
   try {
     body = (await request.json()) as EntryBody;
@@ -50,12 +46,20 @@ async function handleAppend(request: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const patientEmail = (body.patientEmail ?? "").trim().toLowerCase();
+  // Writing into a ficha needs the same boundary as reading it: the patient
+  // themselves or a treating doctor (consented appointment). requireAuthOrDemo
+  // let ANY logged-in user append entries to any patient's ficha.
+  const auth = await resolveOwnerOrTreating(request, body.patientEmail ?? null);
+  if ("error" in auth) return auth.error;
+
+  const patientEmail = auth.patientEmail;
   const patientWallet = (body.patientWallet ?? "").trim() || null;
   const kind = (body.kind ?? "").trim();
   const summary = (body.summary ?? "").trim();
   const detail = body.detail?.trim() || null;
-  const doctorEmail = (body.doctorEmail ?? "").trim().toLowerCase() || null;
+  // The verified token email wins over whatever the body claims.
+  const doctorEmail =
+    auth.doctorEmail ?? ((body.doctorEmail ?? "").trim().toLowerCase() || null);
 
   if (!patientEmail || !kind || !summary) {
     return NextResponse.json(

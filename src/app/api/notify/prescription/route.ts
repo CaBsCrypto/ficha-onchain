@@ -22,6 +22,7 @@
  * Never throws — notification is best-effort (fire-and-forget from the client).
  */
 import { NextResponse } from "next/server";
+import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -177,6 +178,12 @@ function escHtml(s: string): string {
 }
 
 export async function POST(request: Request) {
+  // The body controls recipient, names and medication over the official
+  // template — unauthenticated, this is an open phishing relay. Same gate as
+  // the doctor actions that trigger it.
+  const gate = await requireAuthOrDemo(request);
+  if (gate) return gate.error;
+
   let body: NotifyBody;
   try {
     body = await request.json() as NotifyBody;

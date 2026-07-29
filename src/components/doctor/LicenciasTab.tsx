@@ -267,7 +267,7 @@ function NewLicModal({ defaultDoctorEmail, onClose, onSaved }: NewLicModalProps)
 
       // Fire-and-forget email
       if (form.patientEmail) {
-        fetch('/api/notify/license', {
+        authedFetch('/api/notify/license', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
