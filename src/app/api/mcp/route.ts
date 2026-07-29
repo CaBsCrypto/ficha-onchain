@@ -30,6 +30,7 @@
  */
 import { NextResponse } from "next/server";
 import { authenticateApiKey, hasScope, type ApiContext } from "@/lib/auth/api-key";
+import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { isValidRut, hashRut } from "@/lib/identity/rut";
 import { logAccess } from "@/lib/access-log";
 import { requestConsent, checkConsent, revokeConsent, consentSourceFor, SignerUnavailableError } from "@/lib/identity/center-grants";
@@ -416,6 +417,9 @@ const AUTH_ERROR = -32001;
 async function handleRpc(
   msg: JsonRpcRequest,
   request: Request,
+  // Request-scoped memo of authenticateApiKey — the key header is identical
+  // for every message of a batch, so one DB lookup covers the whole POST.
+  authOnce?: (request: Request) => Promise<Awaited<ReturnType<typeof authenticateApiKey>>>,
 ): Promise<Response | null> {
   // JSON-RPC: a message with no `id` is a notification — never answer it.
   if (!("id" in msg)) return null;
@@ -472,7 +476,7 @@ async function handleRpc(
       if (tool.requiresAuth) {
         let auth: Awaited<ReturnType<typeof authenticateApiKey>>;
         try {
-          auth = await authenticateApiKey(request);
+          auth = await (authOnce ?? authenticateApiKey)(request);
         } catch (e) {
           console.error("[mcp] auth backend error:", e);
           return err(id, AUTH_ERROR, "Servicio de autenticación no disponible.");
@@ -490,6 +494,17 @@ async function handleRpc(
           );
         }
         ctx = auth.ctx;
+
+        // Throttle AFTER auth (only known orgs consume quota), per MESSAGE —
+        // a batch spends one unit per tools/call, so batching is not a bypass.
+        const rate = await checkRateLimit(ctx, name);
+        if (!rate.allowed) {
+          return err(
+            id,
+            AUTH_ERROR,
+            `Rate limit excedido (${rate.limit}/min para ${rate.bucket === "heavy" ? "operaciones on-chain" : "esta API"}). Reintenta en un minuto.`,
+          );
+        }
       }
 
       try {
@@ -536,9 +551,12 @@ export async function POST(request: Request) {
     if (body.length > MAX_BATCH) {
       return err(null, -32600, `Batch demasiado grande (máx ${MAX_BATCH})`);
     }
+    // One auth lookup for the whole batch (same Authorization header).
+    let cached: Promise<Awaited<ReturnType<typeof authenticateApiKey>>> | null = null;
+    const authOnce = () => (cached ??= authenticateApiKey(request));
     const responses = await Promise.all(
       body.map((m) =>
-        isRpcObject(m) ? handleRpc(m, request) : err(null, -32600, "Invalid Request"),
+        isRpcObject(m) ? handleRpc(m, request, authOnce) : err(null, -32600, "Invalid Request"),
       ),
     );
     const payloads = await Promise.all(
