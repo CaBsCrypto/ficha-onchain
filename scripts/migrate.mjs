@@ -471,6 +471,24 @@ step("api_access_log", async () => {
   await sql`CREATE INDEX IF NOT EXISTS idx_access_log_ruthash ON api_access_log (patient_rut_hash, created_at DESC)`;
 });
 
+// ── Patient grants — a quién autorizó el paciente a escribir su ficha ───────
+step("patient_grants", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS patient_grants (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      grantee_wallet TEXT NOT NULL,
+      grantee_name   TEXT,
+      tx_hash        TEXT,
+      mode           TEXT NOT NULL,
+      revoke_tx_hash TEXT,
+      revoke_mode    TEXT,
+      granted_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at     TIMESTAMPTZ
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_patient_grants_email ON patient_grants (patient_email, granted_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);

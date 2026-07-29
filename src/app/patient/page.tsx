@@ -96,22 +96,26 @@ const MOCK_RX_STATUS_CONFIG: Record<string, { label: string; bg: string; text: s
   Registered: { label: "Registrada", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
 };
 
-const MOCK_AUTHORIZED_DOCTORS: AuthorizedDoctor[] = [
-  {
-    wallet: "GBQD7XK2Q9YAV4RPLM8W6H5T1BUFS0DQKX9ZE7NR",
-    name: "Dra. Valentina Reyes",
-    specialty: "Medicina Interna",
-    grantedAt: "2026-05-10",
-    verified: true,
-  },
-  {
-    wallet: "GCMK8P2NJZR5HVQA3DLM7W4F6C9BUFS0DQKX9ZE7",
-    name: "Dr. Carlos Muñoz",
-    specialty: "Cardiología",
-    grantedAt: "2026-06-02",
-    verified: true,
-  },
-];
+/** Row shape of /api/patient/grants. */
+interface PatientGrant {
+  grantee_wallet: string;
+  grantee_name: string | null;
+  tx_hash: string | null;
+  mode: string;
+  granted_at: string;
+  revoked_at: string | null;
+  verified?: boolean;
+}
+
+function grantToDoctor(g: PatientGrant): AuthorizedDoctor {
+  return {
+    wallet: g.grantee_wallet,
+    name: g.grantee_name ?? "Médico " + truncateHash(g.grantee_wallet, 4, 3),
+    specialty: g.verified ? "Registrado en DoctorRegistry" : "No verificado on-chain",
+    grantedAt: String(g.granted_at).split("T")[0],
+    verified: Boolean(g.verified),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Root — session gate
@@ -216,10 +220,18 @@ function PatientDashboardInner({
   const [pharmacyRx, setPharmacyRx] = useState<PatientRx | null>(null);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
 
-  // Authorized doctors — mock in demo, empty in real (grants live in chain)
-  const authorizedDoctors: AuthorizedDoctor[] = session.mock
-    ? MOCK_AUTHORIZED_DOCTORS
-    : [];
+  // Authorized doctors — real grants from patient_grants (Inicio summary).
+  const [authorizedDoctors, setAuthorizedDoctors] = useState<AuthorizedDoctor[]>([]);
+  useEffect(() => {
+    authedFetch("/api/patient/grants")
+      .then((r) => (r.ok ? r.json() : { grants: [] }))
+      .then((j: { grants?: PatientGrant[] }) =>
+        setAuthorizedDoctors(
+          (j.grants ?? []).filter((g) => !g.revoked_at).map(grantToDoctor),
+        ),
+      )
+      .catch(() => setAuthorizedDoctors([]));
+  }, []);
 
   const loadRx = useCallback(async () => {
     setItems(null);
@@ -1363,9 +1375,18 @@ const ACCESS_ACTION_LABELS: Record<string, string> = {
 };
 
 function AccesosTab({ wallet, mock }: { wallet: string; mock: boolean }) {
-  const [doctors, setDoctors] = useState<AuthorizedDoctor[]>(
-    mock ? MOCK_AUTHORIZED_DOCTORS : [],
-  );
+  // Grants reales desde patient_grants (+ verificación DoctorRegistry on-chain).
+  const [doctors, setDoctors] = useState<AuthorizedDoctor[]>([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(true);
+  useEffect(() => {
+    authedFetch("/api/patient/grants")
+      .then((r) => (r.ok ? r.json() : { grants: [] }))
+      .then((j: { grants?: PatientGrant[] }) =>
+        setDoctors((j.grants ?? []).filter((g) => !g.revoked_at).map(grantToDoctor)),
+      )
+      .catch(() => setDoctors([]))
+      .finally(() => setDoctorsLoading(false));
+  }, []);
   // Registro de accesos (Ley 20.584) — real, desde api_access_log.
   const [accesses, setAccesses] = useState<AccessRow[]>([]);
   const [accessesLoading, setAccessesLoading] = useState(true);
@@ -1386,40 +1407,66 @@ function AccesosTab({ wallet, mock }: { wallet: string; mock: boolean }) {
 
   async function handleGrant(e: React.FormEvent) {
     e.preventDefault();
-    if (!grantWallet.trim() || !grantWallet.startsWith("G")) return;
+    const target = grantWallet.trim();
+    if (!target || !target.startsWith("G")) return;
     setGranting(true);
     setNotice(null);
-
-    // Demo: simulated grant (real: call smart contract)
-    await new Promise((r) => setTimeout(r, 1200));
-    setDoctors((prev) => [
-      ...prev,
-      {
-        wallet: grantWallet.trim(),
-        name: "Médico " + truncateHash(grantWallet.trim(), 4, 3),
-        specialty: "Pendiente de verificación",
-        grantedAt: new Date().toISOString().split("T")[0],
-        verified: false,
-      },
-    ]);
-    setNotice({
-      type: "ok",
-      msg: `Acceso otorgado a ${truncateHash(grantWallet.trim(), 6, 4)}. La transacción se ancló en Soroban (simulado).`,
-    });
-    setGrantWallet("");
-    setGranting(false);
+    try {
+      const res = await authedFetch("/api/patient/grants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: target }),
+      });
+      const j = (await res.json()) as {
+        mode?: string; reason?: string; error?: string; grant?: PatientGrant;
+      };
+      if (!res.ok || j.error) throw new Error(j.error ?? "grant_failed");
+      if (j.grant) setDoctors((prev) => [grantToDoctor(j.grant!), ...prev]);
+      setNotice({
+        type: "ok",
+        msg:
+          j.mode === "onchain"
+            ? `Acceso otorgado a ${truncateHash(target, 6, 4)} — grant firmado on-chain en Soroban.`
+            : `Acceso registrado para ${truncateHash(target, 6, 4)} (modo simulado: ${j.reason ?? "sin firmante"}).`,
+      });
+      setGrantWallet("");
+    } catch (err) {
+      setNotice({
+        type: "err",
+        msg: err instanceof Error ? err.message : "No se pudo otorgar el acceso.",
+      });
+    } finally {
+      setGranting(false);
+    }
   }
 
   async function handleRevoke(doc: AuthorizedDoctor) {
     setRevoking(doc.wallet);
     setNotice(null);
-    await new Promise((r) => setTimeout(r, 1000));
-    setDoctors((prev) => prev.filter((d) => d.wallet !== doc.wallet));
-    setNotice({
-      type: "ok",
-      msg: `Acceso revocado para ${doc.name}. El grant se eliminó del contrato (simulado).`,
-    });
-    setRevoking(null);
+    try {
+      const res = await authedFetch("/api/patient/grants", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: doc.wallet }),
+      });
+      const j = (await res.json()) as { mode?: string; reason?: string; error?: string };
+      if (!res.ok || j.error) throw new Error(j.error ?? "revoke_failed");
+      setDoctors((prev) => prev.filter((d) => d.wallet !== doc.wallet));
+      setNotice({
+        type: "ok",
+        msg:
+          j.mode === "onchain"
+            ? `Acceso revocado para ${doc.name} — revoke firmado on-chain.`
+            : `Acceso revocado para ${doc.name} (modo simulado: ${j.reason ?? "sin firmante"}).`,
+      });
+    } catch (err) {
+      setNotice({
+        type: "err",
+        msg: err instanceof Error ? err.message : "No se pudo revocar el acceso.",
+      });
+    } finally {
+      setRevoking(null);
+    }
   }
 
   return (
@@ -1504,7 +1551,9 @@ function AccesosTab({ wallet, mock }: { wallet: string; mock: boolean }) {
           {mock && <Badge tone="muted">demo</Badge>}
         </div>
 
-        {doctors.length === 0 ? (
+        {doctorsLoading ? (
+          <p className="px-6 py-8 text-center text-sm text-muted">Cargando accesos…</p>
+        ) : doctors.length === 0 ? (
           <div className="px-6 py-10 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-muted">
               <LockOpenIcon className="h-6 w-6" />
