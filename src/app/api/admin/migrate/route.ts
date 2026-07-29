@@ -334,6 +334,21 @@ const STATEMENTS: Array<[string, string]> = [
     )`],
   ["api_access_log.idx_email", `CREATE INDEX IF NOT EXISTS idx_access_log_patient ON api_access_log (patient_email, created_at DESC)`],
   ["api_access_log.idx_rut", `CREATE INDEX IF NOT EXISTS idx_access_log_ruthash ON api_access_log (patient_rut_hash, created_at DESC)`],
+
+  ["patient_grants", `
+    CREATE TABLE IF NOT EXISTS patient_grants (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      grantee_wallet TEXT NOT NULL,
+      grantee_name   TEXT,
+      tx_hash        TEXT,
+      mode           TEXT NOT NULL,
+      revoke_tx_hash TEXT,
+      revoke_mode    TEXT,
+      granted_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at     TIMESTAMPTZ
+    )`],
+  ["patient_grants.idx", `CREATE INDEX IF NOT EXISTS idx_patient_grants_email ON patient_grants (patient_email, granted_at DESC)`],
 ];
 
 export async function POST(request: Request) {
