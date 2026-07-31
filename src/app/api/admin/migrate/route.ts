@@ -359,6 +359,20 @@ const STATEMENTS: Array<[string, string]> = [
       count        INT NOT NULL DEFAULT 0,
       PRIMARY KEY (org_id, env, bucket, window_start)
     )`],
+
+  ["record_requests", `
+    CREATE TABLE IF NOT EXISTS record_requests (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      provider_name  TEXT NOT NULL,
+      provider_email TEXT,
+      request_text   TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'draft',
+      sent_at        TIMESTAMPTZ,
+      due_at         TIMESTAMPTZ,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["record_requests.idx", `CREATE INDEX IF NOT EXISTS idx_record_requests_email ON record_requests (patient_email, created_at DESC)`],
 ];
 
 export async function POST(request: Request) {
