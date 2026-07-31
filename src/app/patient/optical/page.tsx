@@ -6,6 +6,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
+import { DemoNoticeBanner } from "@/components/ui/DemoNoticeBanner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,10 @@ export default function OpticalPage() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 pt-8 pb-20">
+        <DemoNoticeBanner
+          title="Módulo Óptico — Vista de Demostración"
+          subtitle="Prototipo de recetas oftálmicas digitales (sandbox). Demuestra la presentación de recetas ante ópticas."
+        />
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
