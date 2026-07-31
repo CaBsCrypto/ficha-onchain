@@ -6,6 +6,8 @@ import { useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useTrackUser } from '@/hooks/useTrackUser';
+import { privyEmail } from '@/lib/auth/privy-email';
+import { NotificationBell } from '@/components/patient/NotificationBell';
 
 // Nav icons (inline SVG to avoid import issues in layout)
 function IconHome({ className }: { className?: string }) {
@@ -58,6 +60,14 @@ function IconCalendar({ className }: { className?: string }) {
   );
 }
 
+function IconTimeline({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+    </svg>
+  );
+}
+
 type NavItem = {
   href: string;
   label: string;
@@ -76,6 +86,7 @@ function PatientNav() {
     { href: '/patient?tab=recetas',    label: 'Recetas',         icon: <IconPill className="h-5 w-5" />,      matchTab: 'recetas'   },
     { href: '/patient?tab=licencias',  label: 'Licencias',       icon: <IconClipboard className="h-5 w-5" />, matchTab: 'licencias' },
     { href: '/patient?tab=ficha',      label: 'Mi Ficha',        icon: <IconFicha className="h-5 w-5" />,     matchTab: 'ficha'     },
+    { href: '/patient?tab=timeline',   label: 'Línea de tiempo', icon: <IconTimeline className="h-5 w-5" />,  matchTab: 'timeline'  },
     { href: '/patient?tab=accesos',    label: 'Accesos',         icon: <IconLock className="h-5 w-5" />,      matchTab: 'accesos'   },
     { href: '/patient?tab=consultas',  label: 'Consultas',       icon: <IconCalendar className="h-5 w-5" />,  matchTab: 'consultas' },
     { href: '/patient/pain-diary',     label: 'Diario de Dolor', icon: <IconHeart className="h-5 w-5" />,     matchPath: '/patient/pain-diary' },
@@ -158,6 +169,22 @@ function MobileBottomNav() {
   );
 }
 
+function PatientHeaderActions() {
+  const { user } = usePrivy();
+  const email = privyEmail(user);
+  return (
+    <div className="flex items-center gap-3">
+      {email && <NotificationBell patientEmail={email} />}
+      <Link
+        href="/"
+        className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+      >
+        ← Volver
+      </Link>
+    </div>
+  );
+}
+
 function PatientShell({ children }: { children: React.ReactNode }) {
   useTrackUser();
   return (
@@ -173,12 +200,7 @@ function PatientShell({ children }: { children: React.ReactNode }) {
               Trust<span className="text-[#0ea5e9]">Leaf</span>
             </span>
           </Link>
-          <Link
-            href="/"
-            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
-          >
-            ← Volver
-          </Link>
+          <PatientHeaderActions />
         </div>
       </header>
 

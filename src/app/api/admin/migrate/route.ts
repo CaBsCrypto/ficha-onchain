@@ -373,6 +373,20 @@ const STATEMENTS: Array<[string, string]> = [
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`],
   ["record_requests.idx", `CREATE INDEX IF NOT EXISTS idx_record_requests_email ON record_requests (patient_email, created_at DESC)`],
+
+  ["patient_notifications", `
+    CREATE TABLE IF NOT EXISTS patient_notifications (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      type           TEXT NOT NULL,
+      title          TEXT NOT NULL,
+      message        TEXT NOT NULL,
+      read           BOOLEAN NOT NULL DEFAULT FALSE,
+      link           TEXT,
+      metadata       TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`],
+  ["patient_notifications.idx", `CREATE INDEX IF NOT EXISTS idx_patient_notifications_patient ON patient_notifications (patient_email, read, created_at DESC)`],
 ];
 
 export async function POST(request: Request) {

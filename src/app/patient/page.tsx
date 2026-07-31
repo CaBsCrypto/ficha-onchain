@@ -62,8 +62,10 @@ import { AppointmentCard } from "@/components/patient/AppointmentCard";
 import { RequestAppointmentForm } from "@/components/patient/RequestAppointmentForm";
 import { EditFichaModal } from "@/components/patient/EditFichaModal";
 import { SelfUploadCard } from "@/components/patient/SelfUploadCard";
+import { AiExtractionModal } from "@/components/patient/AiExtractionModal";
+import { HealthTimelineView } from "@/components/patient/HealthTimelineView";
 
-type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
+type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "timeline" | "accesos" | "consultas";
 
 // ---------------------------------------------------------------------------
 // Mock Rx data (demo mode — no contract connected)
@@ -350,6 +352,9 @@ function PatientDashboardInner({
       {tab === "licencias" && <LicenciasTab />}
       {tab === "ficha" && (
         <FichaTab wallet={session.address} mock={session.mock} />
+      )}
+      {tab === "timeline" && (
+        <HealthTimelineView patientEmail={privyEmail ?? ""} />
       )}
       {tab === "accesos" && (
         <AccesosTab wallet={session.address} mock={session.mock} />
@@ -914,14 +919,22 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const [docs,      setDocs]      = useState<ClinicalDoc[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [showEdit,  setShowEdit]  = useState(false);
+  const [aiDocTarget, setAiDocTarget] = useState<{ id: number; title: string } | null>(null);
 
-  // Recargable: la subida de un autoaporte (SelfUploadCard) vuelve a pedir la
-  // lista sin recargar la página.
+  // Recargable: la subida de un autoaporte (SelfUploadCard) o confirmación de IA
+  // vuelve a pedir la lista sin recargar la página.
   function loadDocs(email: string) {
     authedFetch(`/api/ficha/document?patientEmail=${encodeURIComponent(email)}`)
       .then(r => r.ok ? r.json() : { documents: [] })
       .then((j: { documents?: ClinicalDoc[] }) => setDocs(j.documents ?? []))
       .catch(() => setDocs([]));
+  }
+
+  function refreshEntries(email: string) {
+    authedFetch(`/api/ficha/entries?patientEmail=${encodeURIComponent(email)}`)
+      .then(r => r.json() as Promise<{ entries?: ClinicalEntry[] }>)
+      .then(j => setEntries(j.entries ?? []))
+      .catch(() => setEntries([]));
   }
 
   async function viewDoc(id: number) {
@@ -1132,17 +1145,40 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => void viewDoc(doc.id)}
-                    className="shrink-0 rounded-lg bg-clinical/10 px-3 py-1.5 text-xs font-semibold text-clinical transition-colors hover:bg-clinical/20"
-                  >
-                    Ver
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setAiDocTarget({ id: doc.id, title: doc.title })}
+                      className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-100 ring-1 ring-inset ring-indigo-200/60"
+                      title="Analizar con IA (Opt-in registrado bajo Ley 20.584)"
+                    >
+                      <span>🧠</span> Analizar con IA
+                    </button>
+                    <button
+                      onClick={() => void viewDoc(doc.id)}
+                      className="rounded-lg bg-clinical/10 px-3 py-1.5 text-xs font-semibold text-clinical transition-colors hover:bg-clinical/20"
+                    >
+                      Ver
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </Card>
+      )}
+
+      {/* Modal de extracción e inteligencia con IA (Opt-in Ley 20.584) */}
+      {aiDocTarget && privyEmail && (
+        <AiExtractionModal
+          patientEmail={privyEmail}
+          documentId={aiDocTarget.id}
+          documentTitle={aiDocTarget.title}
+          onClose={() => setAiDocTarget(null)}
+          onEntriesAdded={() => {
+            refreshEntries(privyEmail);
+            loadDocs(privyEmail);
+          }}
+        />
       )}
 
       {/* ── Datos personales ── */}
