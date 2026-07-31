@@ -6,6 +6,8 @@ import { useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useTrackUser } from '@/hooks/useTrackUser';
+import { privyEmail } from '@/lib/auth/privy-email';
+import { NotificationBell } from '@/components/patient/NotificationBell';
 
 // Nav icons (inline SVG to avoid import issues in layout)
 function IconHome({ className }: { className?: string }) {
@@ -167,6 +169,22 @@ function MobileBottomNav() {
   );
 }
 
+function PatientHeaderActions() {
+  const { user } = usePrivy();
+  const email = privyEmail(user);
+  return (
+    <div className="flex items-center gap-3">
+      {email && <NotificationBell patientEmail={email} />}
+      <Link
+        href="/"
+        className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+      >
+        ← Volver
+      </Link>
+    </div>
+  );
+}
+
 function PatientShell({ children }: { children: React.ReactNode }) {
   useTrackUser();
   return (
@@ -182,12 +200,7 @@ function PatientShell({ children }: { children: React.ReactNode }) {
               Trust<span className="text-[#0ea5e9]">Leaf</span>
             </span>
           </Link>
-          <Link
-            href="/"
-            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
-          >
-            ← Volver
-          </Link>
+          <PatientHeaderActions />
         </div>
       </header>
 
