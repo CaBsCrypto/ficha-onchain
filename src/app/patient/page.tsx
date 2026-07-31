@@ -61,6 +61,7 @@ import { PatientLicCard } from "@/components/patient/PatientLicCard";
 import { AppointmentCard } from "@/components/patient/AppointmentCard";
 import { RequestAppointmentForm } from "@/components/patient/RequestAppointmentForm";
 import { EditFichaModal } from "@/components/patient/EditFichaModal";
+import { SelfUploadCard } from "@/components/patient/SelfUploadCard";
 
 type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
 
@@ -892,6 +893,7 @@ function MockRxCard({ rx }: { rx: MockRx }) {
 // ---------------------------------------------------------------------------
 interface ClinicalDoc {
   id: number;
+  doctor_email: string | null;
   category: string;
   title: string;
   file_name: string | null;
@@ -912,6 +914,15 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
   const [docs,      setDocs]      = useState<ClinicalDoc[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [showEdit,  setShowEdit]  = useState(false);
+
+  // Recargable: la subida de un autoaporte (SelfUploadCard) vuelve a pedir la
+  // lista sin recargar la página.
+  function loadDocs(email: string) {
+    authedFetch(`/api/ficha/document?patientEmail=${encodeURIComponent(email)}`)
+      .then(r => r.ok ? r.json() : { documents: [] })
+      .then((j: { documents?: ClinicalDoc[] }) => setDocs(j.documents ?? []))
+      .catch(() => setDocs([]));
+  }
 
   async function viewDoc(id: number) {
     const res = await authedFetch(`/api/ficha/document/${id}`);
@@ -934,11 +945,8 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
       .then(r => r.json() as Promise<{ entries?: ClinicalEntry[] }>)
       .then(j => setEntries(j.entries ?? []))
       .catch(() => setEntries([]));
-    // Exam / lab documents attached by the patient's doctors.
-    authedFetch(`/api/ficha/document?patientEmail=${encodeURIComponent(privyEmail)}`)
-      .then(r => r.ok ? r.json() : { documents: [] })
-      .then((j: { documents?: ClinicalDoc[] }) => setDocs(j.documents ?? []))
-      .catch(() => setDocs([]));
+    // Exam / lab documents (attached by doctors or by the patient).
+    loadDocs(privyEmail);
   }, [privyEmail]);
 
   // Fallback to an empty record when there's no real data yet.
@@ -1068,6 +1076,14 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
         </Card>
       )}
 
+      {/* ── Subida de documentos propios (foto o PDF desde el teléfono) ── */}
+      {privyEmail && (
+        <SelfUploadCard
+          patientEmail={privyEmail}
+          onUploaded={() => loadDocs(privyEmail)}
+        />
+      )}
+
       {/* ── Exámenes y laboratorios ── */}
       {docs.length > 0 && (
         <Card className="p-0">
@@ -1083,8 +1099,14 @@ function FichaTab({ wallet, mock }: { wallet: string; mock: boolean }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-                        {doc.category}
+                        {doc.category === 'self' ? 'Personal' : doc.category}
                       </span>
+                      {/* doctor_email NULL = documento aportado por el propio paciente */}
+                      {!doc.doctor_email && (
+                        <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-inset ring-sky-200">
+                          Aportado por ti
+                        </span>
+                      )}
                       <p className="text-sm font-semibold text-ink">{doc.title}</p>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">

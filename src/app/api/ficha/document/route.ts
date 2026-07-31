@@ -58,10 +58,18 @@ export async function POST(request: Request) {
 
   const title = (body.title ?? "").trim();
   const base64 = (body.base64 ?? "").trim();
-  const category = (body.category ?? "Examen").trim() || "Examen";
   const fileName = body.fileName?.trim() || null;
   const mimeType = body.mimeType?.trim() || "application/octet-stream";
-  const doctorEmail = (body.doctorEmail ?? auth.doctorEmail ?? "").trim().toLowerCase() || null;
+  // Cuando el actor es el propio paciente, el documento es "aportado por el
+  // paciente": doctor_email queda NULL (aunque el body traiga uno — no se puede
+  // atribuir a un médico algo que él no subió) y la categoría por defecto es
+  // 'self'. La categoría no es lista cerrada en el esquema; 'self' es el valor
+  // reservado para autoaportes.
+  const isSelf = auth.actor === "patient";
+  const category = (body.category ?? "").trim() || (isSelf ? "self" : "Examen");
+  const doctorEmail = isSelf
+    ? null
+    : (body.doctorEmail ?? auth.doctorEmail ?? "").trim().toLowerCase() || null;
 
   if (!title || !base64) {
     return NextResponse.json({ error: "title y base64 son obligatorios" }, { status: 400 });
