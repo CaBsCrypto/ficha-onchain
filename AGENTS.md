@@ -128,10 +128,9 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
   yet wired into the CI workflow — add them there when you get `workflow` scope.
 - **The 3D body map loads THREE r128 from a CDN**, not from npm, as UMD scripts.
   `BodyMap3D.tsx` hand-rolls its own THREE type declarations because of it.
-- **`public/models/` holds five GLBs, only `body_1k.glb` is used.** The other
-  four are ~18 MB of dead weight; `body_final.glb` and `body_opt.glb` are
-  smaller only because their textures were stripped, so they are not drop-in
-  replacements.
+- **`public/models/` holds only `body_1k.glb`**, the model `BodyMap3D.tsx`
+  loads. Four unused GLBs (~19 MB) were deleted in the dead-code cleanup; do not
+  re-add variants without wiring them in.
 
 ## The external MCP (`/api/mcp`)
 
