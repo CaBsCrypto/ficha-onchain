@@ -63,8 +63,9 @@ import { RequestAppointmentForm } from "@/components/patient/RequestAppointmentF
 import { EditFichaModal } from "@/components/patient/EditFichaModal";
 import { SelfUploadCard } from "@/components/patient/SelfUploadCard";
 import { AiExtractionModal } from "@/components/patient/AiExtractionModal";
+import { HealthTimelineView } from "@/components/patient/HealthTimelineView";
 
-type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "accesos" | "consultas";
+type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "timeline" | "accesos" | "consultas";
 
 // ---------------------------------------------------------------------------
 // Mock Rx data (demo mode — no contract connected)
@@ -351,6 +352,9 @@ function PatientDashboardInner({
       {tab === "licencias" && <LicenciasTab />}
       {tab === "ficha" && (
         <FichaTab wallet={session.address} mock={session.mock} />
+      )}
+      {tab === "timeline" && (
+        <HealthTimelineView patientEmail={privyEmail ?? ""} />
       )}
       {tab === "accesos" && (
         <AccesosTab wallet={session.address} mock={session.mock} />
