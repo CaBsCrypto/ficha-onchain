@@ -64,8 +64,9 @@ import { EditFichaModal } from "@/components/patient/EditFichaModal";
 import { SelfUploadCard } from "@/components/patient/SelfUploadCard";
 import { AiExtractionModal } from "@/components/patient/AiExtractionModal";
 import { HealthTimelineView } from "@/components/patient/HealthTimelineView";
+import { FichaChatWidget } from "@/components/patient/FichaChatWidget";
 
-type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "timeline" | "accesos" | "consultas";
+type Tab = "inicio" | "recetas" | "licencias" | "ficha" | "timeline" | "chat" | "accesos" | "consultas";
 
 // ---------------------------------------------------------------------------
 // Mock Rx data (demo mode — no contract connected)
@@ -355,6 +356,9 @@ function PatientDashboardInner({
       )}
       {tab === "timeline" && (
         <HealthTimelineView patientEmail={privyEmail ?? ""} />
+      )}
+      {tab === "chat" && (
+        <FichaChatWidget patientEmail={privyEmail ?? ""} />
       )}
       {tab === "accesos" && (
         <AccesosTab wallet={session.address} mock={session.mock} />

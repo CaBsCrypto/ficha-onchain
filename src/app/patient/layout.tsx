@@ -68,6 +68,14 @@ function IconTimeline({ className }: { className?: string }) {
   );
 }
 
+function IconChat({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 type NavItem = {
   href: string;
   label: string;
@@ -87,6 +95,7 @@ function PatientNav() {
     { href: '/patient?tab=licencias',  label: 'Licencias',       icon: <IconClipboard className="h-5 w-5" />, matchTab: 'licencias' },
     { href: '/patient?tab=ficha',      label: 'Mi Ficha',        icon: <IconFicha className="h-5 w-5" />,     matchTab: 'ficha'     },
     { href: '/patient?tab=timeline',   label: 'Línea de tiempo', icon: <IconTimeline className="h-5 w-5" />,  matchTab: 'timeline'  },
+    { href: '/patient?tab=chat',       label: 'Chat IA',         icon: <IconChat className="h-5 w-5" />,      matchTab: 'chat'      },
     { href: '/patient?tab=accesos',    label: 'Accesos',         icon: <IconLock className="h-5 w-5" />,      matchTab: 'accesos'   },
     { href: '/patient?tab=consultas',  label: 'Consultas',       icon: <IconCalendar className="h-5 w-5" />,  matchTab: 'consultas' },
     { href: '/patient/pain-diary',     label: 'Diario de Dolor', icon: <IconHeart className="h-5 w-5" />,     matchPath: '/patient/pain-diary' },
