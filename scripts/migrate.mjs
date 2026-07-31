@@ -294,7 +294,7 @@ step("clinical_documents", async () => {
       id             SERIAL PRIMARY KEY,
       patient_email  TEXT NOT NULL,
       doctor_email   TEXT,
-      category       TEXT NOT NULL DEFAULT 'Examen',  -- Laboratorio | Imagenología | Informe | Examen
+      category       TEXT NOT NULL DEFAULT 'Examen',  -- Laboratorio | Imagenología | Informe | Examen | Receta | Otro | 'self' (autoaporte del paciente, doctor_email NULL)
       title          TEXT NOT NULL,
       file_name      TEXT,
       mime_type      TEXT,
