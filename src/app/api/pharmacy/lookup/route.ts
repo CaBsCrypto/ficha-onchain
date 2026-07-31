@@ -21,17 +21,13 @@
  *   500 { error }
  */
 import { NextResponse } from "next/server";
+import { normalizeRut } from "@/lib/identity/rut";
+import { isUnlocked } from "@/lib/pharmacy/unlock";
 import { listPrescriptions } from "@/lib/stellar/client";
 import { computeExpiry } from "@/lib/stellar/expiry";
-import { isUnlocked } from "@/lib/pharmacy/unlock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Normalize a Chilean RUT: strip dots/spaces/dashes, upper-case the DV. */
-function normalizeRut(raw: string): string {
-  return raw.replace(/[.\s]/g, "").replace(/-/g, "").toUpperCase();
-}
 
 /** Parse PHARMACY_RUT_INDEX into a Map<normalizedRut, G-address>. */
 function parseRutIndex(): Map<string, string> {
