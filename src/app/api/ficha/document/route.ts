@@ -19,7 +19,8 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
@@ -132,9 +133,8 @@ export async function POST(request: Request) {
       document: row,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[POST /api/ficha/document]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -158,9 +158,8 @@ export async function GET(request: Request) {
       LIMIT 100`;
     return NextResponse.json({ documents: rows });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[GET /api/ficha/document]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

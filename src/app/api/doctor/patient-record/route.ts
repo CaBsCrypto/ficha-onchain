@@ -20,7 +20,8 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 import { logAccess } from "@/lib/access-log";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
@@ -72,9 +73,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       LIMIT 1`;
     return NextResponse.json({ data: rows[0] ?? null });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[GET /api/doctor/patient-record]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -183,9 +183,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
                 explorer: txHash ? STELLAR_EXPERT_TX(txHash) : null },
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[PATCH /api/doctor/patient-record]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

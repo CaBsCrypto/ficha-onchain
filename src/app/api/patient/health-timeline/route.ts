@@ -8,7 +8,8 @@
  * Query params: ?patientEmail=...
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
@@ -161,9 +162,8 @@ export async function GET(request: Request) {
       events: timeline,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[api/patient/health-timeline]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

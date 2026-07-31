@@ -21,7 +21,8 @@
  * agenda view. Patients get free ones only.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
@@ -30,9 +31,8 @@ export const dynamic = "force-dynamic";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function fail(err: unknown) {
-  if (err instanceof DbNotConfiguredError) {
-    return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-  }
+  const dbDown = dbNotConfiguredResponse(err);
+  if (dbDown) return dbDown;
   console.error("[doctor/slots]", err);
   return NextResponse.json({ error: "db_error" }, { status: 500 });
 }

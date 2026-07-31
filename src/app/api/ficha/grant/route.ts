@@ -14,7 +14,8 @@
  * Body: { appointmentId: number, patientEmail: string }
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { grantWriteAccess } from "@/lib/stellar/server";
 import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
@@ -130,9 +131,8 @@ export async function POST(request: Request) {
       appointment: updated,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[ficha/grant]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

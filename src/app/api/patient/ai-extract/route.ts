@@ -11,7 +11,8 @@
  * Body: { documentId: number, patientEmail?: string }
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 import { logAccess } from "@/lib/access-log";
 import { extractClinicalDocumentData } from "@/lib/ai/document-extractor";
@@ -81,9 +82,8 @@ export async function POST(request: Request) {
       extraction,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[api/patient/ai-extract]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

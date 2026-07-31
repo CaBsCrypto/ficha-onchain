@@ -15,7 +15,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getSandboxCenterSecret } from "@/lib/stellar/server";
 import { isStellarAddress } from "@/lib/stellar/config";
@@ -80,9 +81,8 @@ export async function POST(request: Request) {
 
   let sql;
   try { sql = getDb(); } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     throw err;
   }
 

@@ -22,16 +22,16 @@
  *           phone?, center_name?, center_address?, signature_url? }
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { requireUser, unauthorized } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function fail(err: unknown) {
-  if (err instanceof DbNotConfiguredError) {
-    return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-  }
+  const dbDown = dbNotConfiguredResponse(err);
+  if (dbDown) return dbDown;
   console.error("[doctor/profile]", err);
   return NextResponse.json({ error: "db_error" }, { status: 500 });
 }

@@ -16,7 +16,8 @@
  * sigue el mismo flag de enforcement que el resto de patient/*.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 import { dueDateFromSent, PLAZO_LEGAL_DIAS_HABILES } from "@/lib/dias-habiles";
 
@@ -85,9 +86,8 @@ export async function GET(request: Request) {
       LIMIT 100`;
     return NextResponse.json({ requests: rows });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/record-requests GET]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -122,9 +122,8 @@ export async function POST(request: Request) {
       RETURNING id, provider_name, provider_email, request_text, status, sent_at, due_at, created_at`;
     return NextResponse.json({ request: row });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/record-requests POST]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -175,9 +174,8 @@ export async function PATCH(request: Request) {
     }
     return NextResponse.json({ request: row });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/record-requests PATCH]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
