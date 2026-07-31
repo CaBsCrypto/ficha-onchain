@@ -12,8 +12,9 @@
  * 3. Zero open-ended medical prescribing or independent diagnosis.
  * 4. Non-negotiable medical disclaimer.
  */
-import { getDb } from "@/lib/db";
+import { callClaudeMessages } from "@/lib/ai/claude-client";
 import { MANDATORY_MEDICAL_DISCLAIMER } from "@/lib/ai/patient-explainer";
+import { getDb } from "@/lib/db";
 
 export interface Citation {
   docId: string;
@@ -143,27 +144,13 @@ REGLAS ESTRICTAS:
 
   messages.push({ role: "user", content: query });
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 800,
-      system: systemPrompt,
-      messages,
-    }),
+  const rawAnswer = await callClaudeMessages({
+    apiKey,
+    model: "claude-3-5-sonnet-20241022",
+    maxTokens: 800,
+    system: systemPrompt,
+    messages,
   });
-
-  if (!response.ok) {
-    throw new Error(`Claude API HTTP error ${response.status}`);
-  }
-
-  const json = (await response.json()) as { content?: Array<{ text?: string }> };
-  const rawAnswer = json.content?.[0]?.text?.trim() || "";
 
   // Extract citations used in answer
   const matchedCitations: Citation[] = [];
