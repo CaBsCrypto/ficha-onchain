@@ -15,8 +15,9 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
-import { CONTRACT_IDS, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
-import { grantWriteAccess, getDemoPatientSecret } from "@/lib/stellar/server";
+import { STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
+import { grantWriteAccess } from "@/lib/stellar/server";
+import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
@@ -71,8 +72,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "doctor_wallet_not_found" }, { status: 404 });
     }
 
-    // Attempt a real on-chain grant, signed by the record owner (the patient).
-    const ownerSecret = getDemoPatientSecret();
+    // Attempt a real on-chain grant, signed by the record owner. The contract is
+    // per-patient when the RUT is on file (owner = SANDBOX_OWNER_SECRET) and the
+    // shared demo record otherwise (owner = DEMO_PATIENT_SECRET) — the helper
+    // returns the matching owner secret, since signing with the wrong one
+    // reverts Unauthorized.
+    const anchor = await resolveAnchorContract(owner.email);
+    const ownerSecret = anchor.ownerSecret;
 
     let mode: "onchain" | "simulated" = "simulated";
     let txHash: string | null = null;
@@ -82,7 +88,7 @@ export async function POST(request: Request) {
       try {
         const res = await grantWriteAccess({
           ownerSecret,
-          contractId: CONTRACT_IDS.clinicalRecordDemo,
+          contractId: anchor.contractId,
           grantee,
         });
         if (res.status === "SUCCESS") {
@@ -95,7 +101,9 @@ export async function POST(request: Request) {
         reason = err instanceof Error ? err.message : "fallo on-chain";
       }
     } else {
-      reason = "sin firmante del paciente (DEMO_PATIENT_SECRET/RELAYER_SECRET)";
+      reason = anchor.isDemo
+        ? "sin firmante del paciente (DEMO_PATIENT_SECRET/RELAYER_SECRET)"
+        : "sin firmante del owner del registro (SANDBOX_OWNER_SECRET/RELAYER_SECRET)";
     }
 
     if (mode === "simulated") {
