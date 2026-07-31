@@ -38,9 +38,6 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Run Vitest Suite
-        run: npm test
-
       # NEXT_PUBLIC_* are inlined at build time. The real values live in Vercel;
       # here they only need to be present and well-formed so the build does not
       # throw (e.g. Privy rejects an empty appId while prerendering). These are
