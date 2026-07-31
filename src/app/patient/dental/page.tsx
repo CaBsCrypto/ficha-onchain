@@ -6,6 +6,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
+import { DemoNoticeBanner } from "@/components/ui/DemoNoticeBanner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,10 @@ export default function DentalPage() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 pt-8 pb-20">
+        <DemoNoticeBanner
+          title="Módulo Dental — Vista de Demostración"
+          subtitle="Prototipo interactivo de historial odontológico (sandbox). Muestra el concepto de ficha dental portable entre clínicas."
+        />
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">

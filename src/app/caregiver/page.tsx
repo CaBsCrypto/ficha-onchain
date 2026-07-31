@@ -6,6 +6,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
+import { DemoNoticeBanner } from "@/components/ui/DemoNoticeBanner";
 
 // ─── Mock patient data ────────────────────────────────────────────────────────
 
@@ -86,6 +87,10 @@ export default function CaregiverPage() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <DemoNoticeBanner
+          title="Portal Cuidadores — Vista de Demostración"
+          subtitle="Prototipo de seguimiento para familiares y cuidadores de adultos dependientes (sandbox)."
+        />
 
         {/* Demo badge */}
         <div className="flex items-center justify-between gap-2 px-3 py-2 bg-purple-900/20 border border-purple-800 rounded-xl">
