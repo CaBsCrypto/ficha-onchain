@@ -502,6 +502,23 @@ step("api_rate_limits", async () => {
     )`;
 });
 
+// ── Solicitudes de ficha clínica — Ley 20.584 art. 13 ───────────────────────
+step("record_requests", async () => {
+  await sql`
+    CREATE TABLE IF NOT EXISTS record_requests (
+      id             SERIAL PRIMARY KEY,
+      patient_email  TEXT NOT NULL,
+      provider_name  TEXT NOT NULL,
+      provider_email TEXT,
+      request_text   TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'draft',
+      sent_at        TIMESTAMPTZ,
+      due_at         TIMESTAMPTZ,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_record_requests_email ON record_requests (patient_email, created_at DESC)`;
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
 console.log(`\n  target: ${host}\n`);
