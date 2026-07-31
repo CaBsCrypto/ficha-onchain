@@ -5,7 +5,8 @@
  * PATCH: Marks a specific notification or all notifications as read.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 import { scanAndGenerateHealthAlerts } from "@/lib/ai/health-alerts";
 
@@ -45,9 +46,8 @@ export async function GET(request: Request) {
       notifications: rows,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[api/patient/notifications GET]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -99,9 +99,8 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, notificationId });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[api/patient/notifications PATCH]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

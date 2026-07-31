@@ -10,6 +10,7 @@
  * Uses Claude via the Anthropic API when ANTHROPIC_API_KEY is present;
  * otherwise uses an intelligent offline patient-friendly explanation dictionary.
  */
+import { callClaudeMessages, stripJsonFences } from "@/lib/ai/claude-client";
 
 export interface PlainLanguageExplanation {
   termOrResult: string;
@@ -60,28 +61,13 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown ni \`\`\`json) con esta e
   "suggestedQuestionForDoctor": "Una pregunta relevante que el paciente puede hacer a su médico en el próximo control."
 }`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-haiku-20241022",
-      max_tokens: 600,
-      messages: [{ role: "user", content: prompt }],
-    }),
+  const rawText = await callClaudeMessages({
+    apiKey,
+    model: "claude-3-5-haiku-20241022",
+    maxTokens: 600,
+    messages: [{ role: "user", content: prompt }],
   });
-
-  if (!response.ok) {
-    throw new Error(`Claude API HTTP error ${response.status}`);
-  }
-
-  const json = (await response.json()) as { content?: Array<{ text?: string }> };
-  const rawText = json.content?.[0]?.text?.trim() || "";
-  const cleanedJson = rawText.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-  const parsed = JSON.parse(cleanedJson) as Partial<PlainLanguageExplanation>;
+  const parsed = JSON.parse(stripJsonFences(rawText)) as Partial<PlainLanguageExplanation>;
 
   return {
     termOrResult: input.termOrResult,

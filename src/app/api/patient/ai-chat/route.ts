@@ -8,7 +8,7 @@
  * Body: { message: string, history?: ChatMessage[], patientEmail?: string }
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 import { logAccess } from "@/lib/access-log";
 import { answerPatientQueryWithRAG, type ChatMessage } from "@/lib/ai/record-rag";
@@ -61,9 +61,8 @@ export async function POST(request: Request) {
       ...ragResponse,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[api/patient/ai-chat]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

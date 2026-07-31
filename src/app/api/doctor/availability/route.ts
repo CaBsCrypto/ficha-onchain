@@ -17,7 +17,8 @@
  * into a half-applied state if one row fails.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
 export const runtime = "nodejs";
@@ -33,9 +34,8 @@ interface Block {
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 function fail(err: unknown) {
-  if (err instanceof DbNotConfiguredError) {
-    return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-  }
+  const dbDown = dbNotConfiguredResponse(err);
+  if (dbDown) return dbDown;
   console.error("[doctor/availability]", err);
   return NextResponse.json({ error: "db_error" }, { status: 500 });
 }

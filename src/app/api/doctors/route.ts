@@ -11,7 +11,8 @@
  * → { doctors: PublicDoctor[] }
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,9 +27,8 @@ export async function GET() {
       ORDER BY name ASC`;
     return NextResponse.json({ doctors: rows });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[doctors]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -70,9 +70,8 @@ export async function POST(request: Request) {
       RETURNING id, name, email, status`;
     return NextResponse.json({ success: true, doctor: row }, { status: 201 });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     if (err instanceof Error && err.message.includes("unique")) {
       return NextResponse.json({ error: "Este email ya está registrado" }, { status: 409 });
     }

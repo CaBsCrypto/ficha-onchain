@@ -18,7 +18,8 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
@@ -126,9 +127,8 @@ async function handleAppend(request: Request) {
       entry: { ...row, summary, detail },
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[ficha/entry]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

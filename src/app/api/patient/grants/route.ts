@@ -13,7 +13,8 @@
  * way to grant or revoke on someone else's ficha.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { grantWriteAccess, revokeWriteAccess } from "@/lib/stellar/server";
 import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
@@ -71,9 +72,8 @@ export async function GET(request: Request) {
     );
     return NextResponse.json({ grants });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/grants GET]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -169,9 +169,8 @@ export async function POST(request: Request) {
       grant: { ...row, verified },
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/grants POST]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
@@ -218,9 +217,8 @@ export async function PATCH(request: Request) {
       grant: row,
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/grants PATCH]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

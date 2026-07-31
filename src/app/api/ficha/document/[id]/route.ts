@@ -7,7 +7,8 @@
  * doctor, exactly like the list endpoint.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 import { decryptAtRest } from "@/lib/crypto/at-rest";
 import { logAccess } from "@/lib/access-log";
@@ -59,9 +60,8 @@ export async function GET(
       },
     });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[GET /api/ficha/document/[id]]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }

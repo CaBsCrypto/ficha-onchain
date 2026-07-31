@@ -11,6 +11,7 @@
  * otherwise uses an intelligent offline heuristic parser so the feature is
  * 100% operational in demo, development, and offline modes without failing.
  */
+import { callClaudeMessages, stripJsonFences } from "@/lib/ai/claude-client";
 
 export interface ExtractedDiagnosis {
   cie10?: string;
@@ -76,7 +77,6 @@ async function extractWithClaude(
   doc: DocumentInput
 ): Promise<DocumentExtractionResult> {
   const isImage = doc.mimeType?.startsWith("image/") ?? false;
-  const isPdf = doc.mimeType === "application/pdf";
 
   const prompt = `Analiza este documento médico titulado "${doc.title}" (Categoría: ${doc.category || "Examen"}).
 Extrae la información médica importante y responde ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código \`\`\`json) con esta estructura exacta:
@@ -119,27 +119,15 @@ Reglas:
     text: prompt,
   });
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: isImage ? "claude-3-5-sonnet-20241022" : "claude-3-5-haiku-20241022",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: contentParts }],
-    }),
+  const rawText = await callClaudeMessages({
+    apiKey,
+    model: isImage ? "claude-3-5-sonnet-20241022" : "claude-3-5-haiku-20241022",
+    maxTokens: 1500,
+    messages: [{ role: "user", content: contentParts }],
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error ${response.status}: ${errorText}`);
-  }
-
-  const json = await response.json() as { content?: Array<{ text?: string }> };
-  const rawText = json.content?.[0]?.text?.trim() || "";
-
   // Strip possible markdown fences if returned despite instructions
-  const cleanedJson = rawText.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-  const parsed = JSON.parse(cleanedJson) as Partial<DocumentExtractionResult>;
+  const parsed = JSON.parse(stripJsonFences(rawText)) as Partial<DocumentExtractionResult>;
 
   return {
     summary: parsed.summary || `Documento "${doc.title}" analizado correctamente.`,

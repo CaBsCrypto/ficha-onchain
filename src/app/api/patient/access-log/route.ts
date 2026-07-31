@@ -9,7 +9,8 @@
  * enforcement flag as every other guarded route.
  */
 import { NextResponse } from "next/server";
-import { getDb, DbNotConfiguredError } from "@/lib/db";
+import { dbNotConfiguredResponse } from "@/lib/api/errors";
+import { getDb } from "@/lib/db";
 import { requireUser, authEnforced, unauthorized } from "@/lib/auth/privy-auth";
 import { hashRut, RutError } from "@/lib/identity/rut";
 
@@ -47,9 +48,8 @@ export async function GET(request: Request) {
       LIMIT 100`;
     return NextResponse.json({ accesses: rows });
   } catch (err) {
-    if (err instanceof DbNotConfiguredError) {
-      return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
-    }
+    const dbDown = dbNotConfiguredResponse(err);
+    if (dbDown) return dbDown;
     console.error("[patient/access-log]", err);
     return NextResponse.json({ error: "db_error" }, { status: 500 });
   }
