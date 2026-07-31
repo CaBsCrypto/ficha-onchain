@@ -23,8 +23,9 @@ import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 import { logAccess } from "@/lib/access-log";
-import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
+import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
+import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -158,9 +159,11 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const doctorSecret = getDemoDoctorSecret();
     if (doctorSecret) {
       try {
+        // Contrato POR paciente cuando su RUT está registrado; demo como fallback.
+        const anchor = await resolveAnchorContract(g.patientEmail);
         const res = await appendClinicalEntry({
           doctorSecret,
-          contractId: CONTRACT_IDS.clinicalRecordDemo,
+          contractId: anchor.contractId,
           kind: "Antecedentes",
           contentHash,
         });

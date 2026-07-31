@@ -14,8 +14,9 @@
  */
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
-import { CONTRACT_IDS, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
-import { grantWriteAccess, revokeWriteAccess, getDemoPatientSecret } from "@/lib/stellar/server";
+import { STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
+import { grantWriteAccess, revokeWriteAccess } from "@/lib/stellar/server";
+import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
 import { getDoctor } from "@/lib/stellar/client";
 import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
 
@@ -78,23 +79,32 @@ export async function GET(request: Request) {
   }
 }
 
-/** Shared signer step for grant and revoke. */
+/**
+ * Shared signer step for grant and revoke. Resolves the patient's OWN
+ * ClinicalRecord (demo fallback when no RUT is on file) and signs with that
+ * contract's owner secret — demo → DEMO_PATIENT_SECRET, per-patient →
+ * SANDBOX_OWNER_SECRET. Signing the wrong pair reverts Unauthorized.
+ */
 async function signOnChain(
   fn: typeof grantWriteAccess,
+  patientEmail: string,
   grantee: string,
 ): Promise<{ mode: "onchain" | "simulated"; txHash: string | null; reason?: string }> {
-  const ownerSecret = getDemoPatientSecret();
+  const anchor = await resolveAnchorContract(patientEmail);
+  const ownerSecret = anchor.ownerSecret;
   if (!ownerSecret) {
     return {
       mode: "simulated",
       txHash: null,
-      reason: "sin firmante del paciente (DEMO_PATIENT_SECRET/RELAYER_SECRET)",
+      reason: anchor.isDemo
+        ? "sin firmante del paciente (DEMO_PATIENT_SECRET/RELAYER_SECRET)"
+        : "sin firmante del owner del registro (SANDBOX_OWNER_SECRET/RELAYER_SECRET)",
     };
   }
   try {
     const res = await fn({
       ownerSecret,
-      contractId: CONTRACT_IDS.clinicalRecordDemo,
+      contractId: anchor.contractId,
       grantee,
     });
     if (res.status === "SUCCESS") return { mode: "onchain", txHash: res.hash };
@@ -141,7 +151,7 @@ export async function POST(request: Request) {
       if (doc) { name = doc.fullName; verified = doc.authorized; }
     } catch { /* chain unreachable — grant proceeds unnamed */ }
 
-    const { mode, txHash, reason } = await signOnChain(grantWriteAccess, wallet);
+    const { mode, txHash, reason } = await signOnChain(grantWriteAccess, owner.email, wallet);
     if (mode === "simulated") {
       console.warn(`[patient/grants] grant degraded to simulated — ${reason ?? "unknown"}`);
     }
@@ -189,7 +199,7 @@ export async function PATCH(request: Request) {
         AND grantee_wallet = ${wallet} AND revoked_at IS NULL`;
     if (!existing) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-    const { mode, txHash, reason } = await signOnChain(revokeWriteAccess, wallet);
+    const { mode, txHash, reason } = await signOnChain(revokeWriteAccess, owner.email, wallet);
     if (mode === "simulated") {
       console.warn(`[patient/grants] revoke degraded to simulated — ${reason ?? "unknown"}`);
     }

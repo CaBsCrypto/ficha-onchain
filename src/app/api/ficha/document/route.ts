@@ -20,8 +20,9 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb, DbNotConfiguredError } from "@/lib/db";
-import { CONTRACT_IDS, STELLAR_EXPERT_TX } from "@/lib/stellar/config";
+import { STELLAR_EXPERT_TX } from "@/lib/stellar/config";
 import { appendClinicalEntry, getDemoDoctorSecret } from "@/lib/stellar/server";
+import { resolveAnchorContract } from "@/lib/identity/anchor-contract";
 import { resolveOwnerOrTreating } from "@/lib/auth/treating";
 // content_hash is computed over the PLAINTEXT bytes before this; encryption
 // only guards what rests in Neon.
@@ -86,9 +87,11 @@ export async function POST(request: Request) {
 
   if (doctorSecret) {
     try {
+      // Contrato POR paciente cuando su RUT está registrado; demo como fallback.
+      const anchor = await resolveAnchorContract(auth.patientEmail);
       const res = await appendClinicalEntry({
         doctorSecret,
-        contractId: CONTRACT_IDS.clinicalRecordDemo,
+        contractId: anchor.contractId,
         kind: "DiagnosticReport",
         contentHash,
       });
