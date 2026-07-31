@@ -19,7 +19,7 @@
  * browser and POST the signed XDR to /api/relay; this server-signed path exists
  * so the flow is demonstrable end-to-end without passkey infra.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   Address,
