@@ -25,6 +25,13 @@ La instalación previa de node_modules estaba incompleta. npm ci --offline la re
 
 Resultado técnico final: typecheck PASS, Vitest 112/112, Rust 44/44, build Turbopack PASS (31/31 páginas) y cuatro WASM construidos. Evidencia en results.json y wasm-hashes.json. Esto no cierra la aceptación D1/D2/D3.
 
-## Corrección desplegada — 2026-09-06
+## Corrección desplegada & Emisiones Clínicas Reales — 2026-09-06
 
-Commit 8619734e74ca654b0b6cc106693b16b55634344f: índice persistente de duplicados en PrescriptionSoulbound, identidad estable en reintentos, errores reales sin fallback de éxito y configuración local del nuevo contrato. 118 tests de app y 36 Rust de semana uno pasan; build y typecheck PASS. Cinco transacciones sintéticas fee-bump confirmadas en Testnet. Véase WEEK_1.md para IDs, hashes y límites.
+- **Commit core 8619734:** Índice persistente de duplicados en `PrescriptionSoulbound`, identidad estable en reintentos, errores reales sin fallback de éxito y configuración local del nuevo contrato.
+- **Suite de Pruebas:** 118 tests de app (`Vitest`) y 36 tests Rust de semana uno pasando; build y typecheck PASS (0 errores).
+- **PRs Mergeados:** [#95](https://github.com/CaBsCrypto/ficha-onchain/pull/95) y [#96](https://github.com/CaBsCrypto/ficha-onchain/pull/96) en `main`.
+- **Emisiones Clínicas Reales Confirmadas en Testnet:**
+  - `Amoxicilina + Ác. Clavulánico 875/125mg` (ID #4): Mint `0d1c94b5...`, Activa `84e2ab76...`.
+  - `Ketoprofeno 200mg LP` (ID #5): Mint `fe818655...`, Activa `accebae1...`.
+  - `Losartán Potásico 50mg` (ID #6): Mint `b2600977...` (Registered).
+- Véase [`WEEK_1.md`](./WEEK_1.md) y [`NOTION.md`](./NOTION.md) para detalles completos de auditoría y enlaces a Stellar Expert.
