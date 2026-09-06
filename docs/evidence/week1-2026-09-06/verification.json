@@ -45,11 +45,11 @@
   "checks": {
     "deployed_wasm_matches_local": {
       "passed": true,
-      "at": "2026-09-06T05:13:00.626Z"
+      "at": "2026-09-06T08:42:29.806Z"
     },
     "existing_registry_is_deployed": {
       "passed": true,
-      "at": "2026-09-06T05:13:00.854Z"
+      "at": "2026-09-06T08:42:29.941Z"
     },
     "registered": {
       "passed": true,
