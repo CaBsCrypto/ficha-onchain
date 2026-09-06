@@ -6,7 +6,7 @@
 
 ### Patient-Owned Clinical Records & Smart Prescriptions on Stellar Soroban
 
-Doctors issue **clinical records, prescriptions, and medical licenses** whose **integrity is anchored on-chain** — tamper-evident, patient-owned, and publicly verifiable. Sensitive health data remains **off-chain, encrypted, and private**; only cryptographic proofs and non-transferable token states touch the blockchain.
+Doctors issue **clinical records, prescriptions, and medical licenses** whose **integrity is anchored on-chain** — tamper-evident, patient-owned, and publicly verifiable. Clinical content is stored off-chain; hashes, wallet addresses, metadata and token states are recorded on-chain. Off-chain storage alone does not establish encryption or privacy compliance.
 
 [![Stellar Soroban](https://img.shields.io/badge/Stellar-Soroban%20Testnet-08BDBA?style=for-the-badge&logo=stellar&logoColor=white)](https://stellar.org)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16%20Turbopack-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
@@ -35,13 +35,15 @@ In Chile — and across Latin America — medical history is **fragmented across
 **TrustLeaf puts the patient at the center of their healthcare data:**
 1. **Sovereign Patient Records:** Clinical consultations, lab results, and medical notes form a timeline owned by the patient.
 2. **On-Chain Cryptographic Anchoring:** Every clinical event produces a deterministic SHA-256 hash anchored into Stellar Soroban smart contracts.
-3. **Soulbound Prescriptions (Decreto 41):** Non-transferable digital prescriptions minted to the patient's wallet with built-in anti-duplicate enforcement and QR validation.
-4. **On-Chain Consent Handshake:** Doctors can only append records or read medical history after explicit, on-chain patient authorization.
-5. **Zero Friction (Gasless UX):** Patients and doctors never need XLM to sign; a relayer handles fee-bumps seamlessly.
+3. **Soulbound Prescriptions:** Non-transferable digital prescriptions minted to the patient's wallet with built-in anti-duplicate enforcement and QR validation.
+4. **On-Chain Consent Handshake:** ClinicalRecord supports patient-controlled write permissions. MCP sandbox consent is automatically issued for demonstrations, not signed by a patient; live consent remains pending.
+5. **Zero Friction (Gasless UX):** A configured relayer pays fees through Stellar fee-bumps. Week 1 verifies synthetic SDK transactions; portal behavior depends on deployment credentials and mode.
 
 ---
 
 ## 🩺 Clinical & Verification Flow
+
+This diagram describes the intended integrated flow. Week 1 validates the two prescription contracts and relay; not every portal or consent interaction shown here has been verified.
 
 ```
    👩‍⚕️ ACCREDITED DOCTOR              ⛓️ STELLAR SOROBAN                 🧑 PATIENT / 🏥 PHARMACY
@@ -55,7 +57,7 @@ In Chile — and across Latin America — medical history is **fragmented across
                └───────────────────────────────────────────────────────────────────┘
 ```
 
-> 🔒 **Soulbound Tokens:** Non-transferable tokens bound strictly to the patient's address. They can be created, activated, dispensed, or revoked, but can never be traded, transferred, or duplicated.
+> 🔒 **Soulbound Tokens:** Non-transferable tokens bound strictly to the patient's address. They can be created, activated, dispensed, or revoked, and cannot be traded or transferred after issuance. Duplicate checks reject the same issuer, patient and document hash, including after revocation; they do not identify clinically equivalent treatments in different documents.
 
 ---
 
@@ -77,7 +79,7 @@ flowchart TD
     end
 
     subgraph Storage["🔒 Hybrid Storage Model"]
-        Neon[("🐘 Neon Serverless Postgres<br/>Encrypted Off-Chain Clinical Data")]
+        Neon[("🐘 Neon Serverless Postgres<br/>Off-Chain Clinical Data")]
         Soroban["⛓️ Stellar Soroban Smart Contracts (Rust / WASM)"]
     end
 
@@ -86,6 +88,14 @@ flowchart TD
     Backend --> Relay
     Relay --> Soroban
 ```
+
+---
+
+## ✅ Verified Week 1 Scope
+
+DoctorRegistry and PrescriptionSoulbound are deployed on Stellar Testnet. Evidence records 36 Week 1 Rust tests, 118 app tests and 11 Testnet checks, including synthetic fee-bump transactions and RPC simulation of rejected issuance. The existing registry was retained; only the new prescription WASM was matched byte-for-byte to its local artifact.
+
+The delivery was merged through [PR #95](https://github.com/CaBsCrypto/ficha-onchain/pull/95), with verification timestamps updated in [PR #98](https://github.com/CaBsCrypto/ficha-onchain/pull/98). GitHub CI and Vercel passed after that merge. Formal owner acceptance and a full authenticated browser walkthrough are separate from these checks. See the [Week 1 report](./docs/sow-delivery/WEEK_1.md) and [delivery index](./docs/sow-delivery/INDEX.md).
 
 ---
 
@@ -106,13 +116,15 @@ Compiled with `stellar contract build` (`wasm32v1-none`) and tested locally via 
 
 ## ✨ Features Matrix
 
+These are project modules and implementation surfaces, not a claim that every flow is production-ready or covered by Week 1 acceptance.
+
 | Module | Feature Description | Storage / Execution | Verification |
 | :--- | :--- | :---: | :---: |
 | 🗂️ **Ficha Clínica** | Consultation history, symptoms, diagnoses and medical notes | Neon DB + SHA-256 on Soroban | Tamper-evident hash comparison |
-| 💊 **Recetas Digitales** | Soulbound prescriptions compliant with Chile's Decreto 41 | Soroban State Token | Public QR verify & Dispense API |
+| 💊 **Recetas Digitales** | Soulbound prescriptions with lifecycle and duplicate checks | Soroban State Token | Public QR verify & Dispense API |
 | 📜 **Licencias Médicas** | Digital medical leaves & specialty certificates | Soroban State Token | On-chain status check |
 | 🤝 **Consent Engine** | Patient grants / revokes write permission to specific doctors | Soroban Access Control | On-chain authorization check |
-| 🩹 **Pain & Health Diary** | Patient self-reported pain tracking with 3D anatomical body map | Neon DB (Encrypted) | Doctor consultation view |
+| 🩹 **Pain & Health Diary** | Patient self-reported pain tracking with 3D anatomical body map | Neon DB (off-chain) | Doctor consultation view |
 | 🤖 **MCP JSON-RPC API** | Standardized medical center protocol to anchor clinical events | JSON-RPC 2.0 Endpoint | API Key + Patient RUT HMAC-SHA256 |
 | 📹 **Teleconsultation** | Integrated video rooms with Jitsi without OAuth overhead | WebRTC | Dynamic ephemeral rooms |
 
@@ -123,7 +135,7 @@ Compiled with `stellar contract build` (`wasm32v1-none`) and tested locally via 
 ### 1. Prerequisites
 - **Node.js**: `v22.x`
 - **Rust & Cargo**: Latest stable (with target `wasm32v1-none` via `stellar contract build`)
-- **Stellar CLI**: `v22+`
+- **Stellar CLI**: `v27.0.0` (used by contract CI)
 
 ### 2. Installation & Setup
 
@@ -133,10 +145,11 @@ git clone https://github.com/CaBsCrypto/ficha-onchain.git
 cd ficha-onchain
 
 # Install dependencies (respects pinned stellar-sdk v14)
-npm install
+npm ci
 
 # Setup environment variables
 cp .env.example .env.local
+# Fill in development credentials; DATABASE_URL must target a dev database.
 
 # Run idempotent database migration
 node scripts/migrate.mjs
@@ -172,10 +185,11 @@ node scripts/verify-week1-testnet.mjs
 
 ---
 
-## ⚖️ Regulatory Compliance & Privacy
+## ⚖️ Privacy & Regulatory Scope
 
-- **🇨🇱 Decreto 41 (MINSAL - Chile):** Complies with the regulatory standards for digital and electronic medical prescriptions in Chile, including doctor credentials, patient identifiers, and expiration intervals.
-- **🔒 Ley 20.584 (Derechos y Deberes de los Pacientes):** Ensures the patient remains the sovereign owner of their clinical record. Sensitive Personally Identifiable Information (PII) is encrypted off-chain and never exposed publicly on the blockchain ledger.
+TrustLeaf is a Testnet prototype for clinical records and prescriptions. Week 1 testing is technical evidence, not certification of legal compliance, clinical readiness, or end-to-end encryption. Regulatory and security review remain necessary before handling real clinical data in a production workflow.
+
+Clinical content is kept off-chain by design, while public wallet addresses, hashes and metadata can still reveal relationships. Authentication enforcement depends on deployment flags. MCP sandbox consent is labeled `auto_sandbox`; live anchoring is not enabled by that demonstration.
 
 ---
 

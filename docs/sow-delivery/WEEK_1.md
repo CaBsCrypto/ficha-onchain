@@ -60,6 +60,6 @@ La configuración local y el fallback Testnet apuntan al nuevo contrato. El ID a
 
 ## Fuera de este cierre
 
-ClinicalRecord, DocumentSoulbound, video final, onboarding real y producción. Corrección guardada en commit 8619734e74ca654b0b6cc106693b16b55634344f. PR y aceptación del responsable pendientes. Las fechas y resultados de docs/evidence/sow-2026-09-05 son históricos y anteriores al fix de duplicados.
+ClinicalRecord, DocumentSoulbound, video final, onboarding real y producción. Corrección guardada en commit 8619734e74ca654b0b6cc106693b16b55634344f. Integración completada en [PR #95](https://github.com/CaBsCrypto/ficha-onchain/pull/95); fechas actualizadas en [PR #98](https://github.com/CaBsCrypto/ficha-onchain/pull/98). GitHub CI y Vercel aprobaron el merge 3d0e923. La aceptación formal del responsable sigue pendiente. Las fechas y resultados de docs/evidence/sow-2026-09-05 son históricos y anteriores al fix de duplicados.
 
 [Resultados locales y hashes de inputs](../evidence/week1-2026-09-06/local-validation.json). Repetir con node scripts/validate-week1-local.mjs.
