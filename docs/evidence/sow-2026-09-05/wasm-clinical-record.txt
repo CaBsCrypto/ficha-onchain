@@ -1,0 +1,17 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=clinical-record\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+warn: could not canonicalize path C:\Users\MGC
+    Finished `release` profile [optimized] target(s) in 0.23s
+ℹ️  Build Summary:
+    Wasm File: target/sow-wasm\clinical_record.wasm (4876 bytes optimized (original size was 5413 bytes))
+    Wasm Hash: 93001b7638bf1008a6fb1fc2ccf2f6bb6bfa0aee87048b660759e722ee2ee60c
+    Wasm Size: 4876 bytes optimized (original size was 5413 bytes)
+    Exported Functions: 8 found
+      • _
+      • __constructor
+      • append_entry
+      • get_entries
+      • get_owner
+      • grant_write_access
+      • has_write_access
+      • revoke_write_access
+✅ Build Complete

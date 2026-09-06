@@ -1,0 +1,12 @@
+
+> ficha-onchain@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 C:/Users/MGC/Desktop/Dev/ficha-onchain
+
+
+ Test Files  21 passed (21)
+      Tests  118 passed (118)
+   Start at  02:16:51
+   Duration  829ms (transform 1.79s, setup 0ms, import 2.95s, tests 282ms, environment 3ms)

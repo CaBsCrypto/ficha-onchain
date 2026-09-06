@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: typecheck + build
+    name: typecheck + tests + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +37,9 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
 
       # NEXT_PUBLIC_* are inlined at build time. The real values live in Vercel;
       # here they only need to be present and well-formed so the build does not

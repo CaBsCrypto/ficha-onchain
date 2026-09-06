@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-05",
+  "node": "24.14.0",
+  "npm": "11.9.0",
+  "cargo": "1.96.0",
+  "rustc": "1.96.0",
+  "stellar": "27.0.0",
+  "gh": "2.94.0",
+  "ghAuth": "authenticated; workflow scope present",
+  "vercel": "not found on PATH",
+  "install": "npm ci --offline --no-audit --no-fund; 1073 packages; lockfile unchanged",
+  "gitBranchCreation": "blocked by filesystem ACL after permission grant"
+}

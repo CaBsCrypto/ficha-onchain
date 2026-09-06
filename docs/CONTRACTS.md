@@ -201,27 +201,13 @@ redeploy. Two are pre-declared: `PERM_CANNABIS` (`CANNABIS`) and `PERM_MNT_HLTH`
 The contracts are a Cargo workspace under [`contracts/`](../contracts), built
 Rust → WASM.
 
-**The Rust toolchain does not run locally.** WDAC blocks `rustc` from loading
-proc-macro DLLs (`os error 4551`); under the release profile it disguises itself
-as "can't find crate for `serde_with_macros`". So **CI is the only place a
-deployable WASM comes from** — the
-[`contracts.yml`](../.github/workflows/contracts.yml) GitHub Action:
+Local Rust builds are supported. CI tests all four SOW contracts plus
+`trustleaf-e2e`, then uses Stellar CLI v27:
 
-1. **Test** — `cargo test` runs on **three crates only**: `doctor-registry`,
-   `prescription-soulbound`, `clinical-record`, plus the `trustleaf-e2e`
-   integration crate. Scoped deliberately so an unfinished contract elsewhere in
-   the workspace can't redden the badge. (`document-soulbound` compiles and
-   deploys but is kept out of the test scope — its `test.rs` is unfinished.)
-2. **Build WASM** — `cargo build --target wasm32-unknown-unknown --release` for
-   `doctor-registry`, `prescription-soulbound`, `clinical-record`, and
-   `document-soulbound`.
-3. **Optimize** — `stellar contract optimize` (CLI v27) strips reference-types /
-   multivalue instructions that Soroban's VM rejects. **Required, not
-   cosmetic**: a raw artifact fails to deploy with
-   `Error(WasmVm, InvalidAction)` — "reference-types not enabled". This can't be
-   fixed with `-C target-feature` (since Rust 1.82 those live in the target spec).
-4. **Upload** — the `*.optimized.wasm` files are uploaded as the
-   `contracts-wasm` artifact (30-day retention).
+`stellar contract build --locked --package <contract> --out-dir dist`
+
+The target is `wasm32v1-none`. CI uploads WASM files and SHA256SUMS;
+it does not deploy. See the [local validation report](SOW_AUDIT_2026-08-22.md).
 
 **To deploy:** download the `contracts-wasm` artifact from a CI run, then
 `stellar contract deploy --wasm <file>` to Testnet. A newly deployed contract's

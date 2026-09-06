@@ -1,0 +1,22 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=doctor-registry\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+warn: could not canonicalize path C:\Users\MGC
+   Compiling doctor-registry v0.1.0 (C:\Users\MGC\Desktop\Dev\ficha-onchain\contracts\doctor-registry)
+    Finished `release` profile [optimized] target(s) in 3.20s
+ℹ️  Build Summary:
+    Wasm File: target/sow-wasm\doctor_registry.wasm (6131 bytes optimized (original size was 6926 bytes))
+    Wasm Hash: c22e97de6d7aa6b4d42086d9a18477b59bedc15c517db1137872edd502d1bb74
+    Wasm Size: 6131 bytes optimized (original size was 6926 bytes)
+    Exported Functions: 12 found
+      • _
+      • get_admin
+      • get_doctor
+      • get_permissions
+      • grant_permission
+      • has_permission
+      • init
+      • is_authorized
+      • register_doctor
+      • revoke_doctor
+      • revoke_permission
+      • transfer_admin
+✅ Build Complete

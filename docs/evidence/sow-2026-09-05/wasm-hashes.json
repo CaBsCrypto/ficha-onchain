@@ -1,0 +1,18 @@
+[
+  {
+    "Hash": "93001B7638BF1008A6FB1FC2CCF2F6BB6BFA0AEE87048B660759E722EE2EE60C",
+    "Path": "C:\\Users\\MGC\\Desktop\\Dev\\ficha-onchain\\contracts\\target\\sow-wasm\\clinical_record.wasm"
+  },
+  {
+    "Hash": "C22E97DE6D7AA6B4D42086D9A18477B59BEDC15C517DB1137872EDD502D1BB74",
+    "Path": "C:\\Users\\MGC\\Desktop\\Dev\\ficha-onchain\\contracts\\target\\sow-wasm\\doctor_registry.wasm"
+  },
+  {
+    "Hash": "73E747C76AB75D2CD66DE8D595EA178C83202A8E11B24C1BAE6E7B4034232F90",
+    "Path": "C:\\Users\\MGC\\Desktop\\Dev\\ficha-onchain\\contracts\\target\\sow-wasm\\document_soulbound.wasm"
+  },
+  {
+    "Hash": "2A177676E7BF89C5C01A8767D03AD2888E1F3E0BF20C3B7F831C98A03AF9E9BC",
+    "Path": "C:\\Users\\MGC\\Desktop\\Dev\\ficha-onchain\\contracts\\target\\sow-wasm\\prescription_soulbound.wasm"
+  }
+]

@@ -53,8 +53,8 @@ in [../docs/contracts-spec.md](../docs/contracts-spec.md). The pharmacy contract
 ## Build (once the Rust toolchain is set up)
 
 ```bash
-rustup target add wasm32-unknown-unknown
-cargo build --target wasm32-unknown-unknown --release
+rustup target add wasm32v1-none
+cargo build --target wasm32v1-none --release
 stellar contract build
 ```
 
@@ -62,6 +62,6 @@ stellar contract build
 
 ```bash
 stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/doctor_registry.wasm \
+  --wasm target/wasm32v1-none/release/doctor_registry.wasm \
   --network testnet
 ```

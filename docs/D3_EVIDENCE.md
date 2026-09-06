@@ -1,5 +1,7 @@
 # D3 — Mapa de evidencia (Integración E2E on-chain)
 
+> Actualización de aceptación 2026-09-05: ver [auditoría local](SOW_AUDIT_2026-08-22.md). Los cierres y pruebas de red de abajo son históricos; D1/D2 requieren aceptación y D3 sigue abierto. No se revalidó Testnet.
+
 > Entregable **D3** del SOW de Instawards: la secuencia completa médico↔paciente
 > corrida **logueada, de punta a punta**, con cada paso anclado en **Stellar
 > Testnet** y verificable en Stellar Expert.
@@ -48,7 +50,7 @@ fee-bumped por el relayer (gasless).
    mismos eventos con su badge `on-chain` y link al explorer.
 3. Los IDs de contrato viven en `src/lib/stellar/config.ts`.
 
-## Estado del SOW
+## Estado histórico del SOW (aceptación actual en auditoría)
 
 | Entregable | Estado |
 | --- | --- |

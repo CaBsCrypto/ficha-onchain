@@ -1,0 +1,17 @@
+## main...origin/main
+ M .github/workflows/ci.yml
+ M .github/workflows/contracts.yml
+ M AGENTS.md
+ M PROJECT_STATE.md
+ M README.md
+ M contracts/README.md
+ M contracts/document-soulbound/src/test.rs
+ M docs/CONTRACTS.md
+ M docs/D3_EVIDENCE.md
+?? docs/SOW_AUDIT_2026-08-22.md
+?? docs/evidence/
+?? docs/sow-delivery/
+?? scripts/audit-sow.mjs
+?? scripts/build-sow-local.mjs
+warning: unable to access 'C:\Users\MGC/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\MGC/.config/git/ignore': Permission denied

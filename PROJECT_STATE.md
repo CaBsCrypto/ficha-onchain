@@ -1,5 +1,7 @@
 # TrustLeaf — Estado del proyecto
 
+> Actualización de aceptación 2026-09-05: ver [auditoría local](docs/SOW_AUDIT_2026-08-22.md). Los cierres y pruebas de red de abajo son históricos; D1/D2 requieren aceptación y D3 sigue abierto. No se revalidó Testnet.
+
 > Fuente de verdad del **estado** (no del código). Qué está hecho, qué falta,
 > qué se decidió y por qué. Se actualiza al cerrar cada pieza de trabajo.
 > Última actualización: 2026-07-25
@@ -77,7 +79,7 @@ redeploy obliga a actualizar ambos **y** Vercel.
 
 ## ⬜ Pendiente (priorizado)
 
-1. **Grabar el demo D3** — es lo único que separa el SOW del 100%. Guion en
+1. **Grabar el demo D3** — es un requisito pendiente; también faltan el hash #6 y la aceptación contra el SOW original. Guion en
    `docs/DEMO_SCRIPT.md`.
 2. **Sembrar el médico en producción.** La tabla `doctors` de prod está
    **vacía**, así que `GET /api/doctors` devuelve `[]` y un paciente que busca
