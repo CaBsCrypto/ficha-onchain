@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { privyEmail } from '@/lib/auth/privy-email';
+import { pendingIssuance } from '@/lib/prescription-issuance';
+import { canonicalize } from '@/lib/decreto41';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { Modal, FormField, inputCls, selectCls, textareaCls } from './Modal';
 import type { MockPrescription, PrescriptionTipo, PrescriptionStatus } from './types';
@@ -123,6 +125,9 @@ function NuevaRecetaModal({
   defaultDoctorEmail: string;
 }) {
   const [form, setForm] = useState<RecetaForm>({ ...EMPTY_FORM });
+  const signingLock = useRef(false);
+  const [duplicateFound, setDuplicateFound] = useState(false);
+  const pendingKey = `trustleaf.pending-prescription:${defaultDoctorEmail}`;
   const [signing, setSigning]         = useState(false);
   const [mintResult, setMintResult]   = useState<MintResult | null>(null);
   const [error, setError]             = useState('');
@@ -185,15 +190,13 @@ function NuevaRecetaModal({
 
   // Sign on-chain via /api/mint
   async function handleSign() {
-    if (!canSubmit) return;
+    if (!canSubmit || signingLock.current) return;
+    signingLock.current = true;
     setSigning(true);
     setError('');
     try {
       const patient = form.patientWallet.startsWith('G') ? form.patientWallet : (form.patientEmail || form.patientName);
-      const res = await authedFetch('/api/mint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const payload = {
           patient,
           // Patient identity (Decreto 41)
           patientName:       form.patientName,
@@ -220,14 +223,24 @@ function NuevaRecetaModal({
           diagnosis:         form.diagnostico,
           cie10Code:         form.cie10 || undefined,
           notes:             form.indicaciones || undefined,
-        }),
+        };
+      const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalize(payload)));
+      const digest = Array.from(new Uint8Array(digestBytes), b => b.toString(16).padStart(2, '0')).join('');
+      const issuance = pendingIssuance(sessionStorage, pendingKey, digest);
+      const res = await authedFetch('/api/mint', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, issuance }),
       });
-      const data = await res.json() as MintResult & { error?: string; details?: string[] };
+      const data = await res.json() as MintResult & { error?: string; details?: string[]; code?: string };
       if (!res.ok) {
+        if (res.status === 400) sessionStorage.removeItem(pendingKey);
         setError(data.error ?? 'Error al firmar');
+        setDuplicateFound(data.code === 'DUPLICATE_PRESCRIPTION');
+        signingLock.current = false;
         setSigning(false);
         return;
       }
+      sessionStorage.removeItem(pendingKey);
       setMintResult(data);
       setStep('result');
       onSave(makeMock(), data);
@@ -251,11 +264,20 @@ function NuevaRecetaModal({
           }),
         }).catch(() => { /* non-critical */ });
       }
-    } catch {
-      setError('Error de conexión — revisa tu red');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de conexión — reintenta con los mismos datos');
+    } finally {
+      signingLock.current = false;
+      setSigning(false);
     }
-    setSigning(false);
   }
+
+  if (duplicateFound) return (
+    <Modal title="Receta ya emitida" onClose={onClose}>
+      <p className="py-4">{error}</p>
+      <button onClick={() => { sessionStorage.removeItem(pendingKey); onClose(); }} className="rounded-lg bg-emerald-700 px-4 py-2 text-white">Entendido, cerrar</button>
+    </Modal>
+  );
 
   // ── Result screen ────────────────────────────────────────────────────────────
   if (step === 'result' && mintResult) {

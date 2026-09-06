@@ -11,9 +11,9 @@
  *    the doctor keypair signs the invoke (satisfying require_auth, since the
  *    doctor is the tx source), then the relayer fee-bumps and submits it so the
  *    doctor spends no XLM. Returns the on-chain rx id + tx hash.
- * 3. If the signer is missing, or the doctor isn't authorized in DoctorRegistry,
- *    or the network rejects the tx, returns a SIMULATED success (mode:"simulated")
- *    with the reason — the UI flow still completes for the demo.
+ * 3. Demo-only fallback when no signer or patient address is configured.
+ *    Once a real mint is attempted, rejection/uncertainty returns an error,
+ *    never simulated success. Callers must preserve issuance identity on retry.
  *
  * In production the doctor would sign step 2 with their passkey wallet in the
  * browser and POST the signed XDR to /api/relay; this server-signed path exists
@@ -39,6 +39,7 @@ import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
 import { getDb } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
+import { isPrescriptionIssuance, type PrescriptionIssuance } from "@/lib/prescription-issuance";
 import type {
   Decreto41Prescription,
   PatientDocType,
@@ -51,6 +52,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface MintBody {
+  issuance?: PrescriptionIssuance;
   /** On-chain patient wallet (G…) or demo name. */
   patient?: string;
   medication?: string;
@@ -100,6 +102,9 @@ async function handleMint(request: Request) {
   }
 
   const patient = (body.patient ?? "").trim();
+  if (!isPrescriptionIssuance(body.issuance) || Date.parse(body.issuance.issuedAt) > Date.now() + 300_000) {
+    return NextResponse.json({ error: "Falta una identidad de emisión válida. Reutilízala en cada reintento." }, { status: 400 });
+  }
   const medication = (body.medication ?? "").trim();
   const dosage = (body.dosage ?? "").trim();
   // "Cantidad a dispensar" (Decreto 41) drives the on-chain units_total.
@@ -150,7 +155,7 @@ async function handleMint(request: Request) {
       granted: Boolean(body.consentGranted),
       date: body.consentGranted ? body.consentDate ?? null : null,
     },
-    issuedAt: new Date().toISOString(),
+    issuedAt: body.issuance.issuedAt,
   };
 
   // 2. Enforce Decreto 41 mandatory fields before anchoring anything on-chain.
@@ -171,7 +176,7 @@ async function handleMint(request: Request) {
 
   // 3. Canonical FHIR Bundle → rx_hash (32 bytes).
   const bundle = buildDecreto41Bundle(record);
-  const payload = canonicalize(bundle);
+  const payload = canonicalize({ ...bundle, identifier: { system: "urn:trustleaf:prescription-issuance", value: body.issuance.id } });
   const rxHash = createHash("sha256").update(payload).digest(); // Buffer(32)
 
   const patientIsG = isStellarAddress(patient);
@@ -207,14 +212,18 @@ async function handleMint(request: Request) {
         medication,
         dosage,
         units,
+        issuedAt: record.issuedAt,
       });
       await logPrescription(result);
       return NextResponse.json(result);
     } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      const sim = simulated(rxHash, `on-chain mint failed: ${detail}`);
-      await logPrescription(sim);
-      return NextResponse.json(sim);
+      // A rejected or uncertain real submission must never look like success.
+      const duplicate = err instanceof DuplicatePrescriptionError;
+      return NextResponse.json({
+        error: duplicate ? "Esta receta ya fue emitida. Revisa tus recetas antes de crear otra." : "No se confirmó la emisión. Reintenta conservando los mismos datos.",
+        code: duplicate ? "DUPLICATE_PRESCRIPTION" : "MINT_NOT_CONFIRMED",
+        rxHash: rxHash.toString("hex"),
+      }, { status: duplicate ? 409 : 502 });
     }
   }
 
@@ -230,6 +239,7 @@ async function handleMint(request: Request) {
 export const POST = handleMint;
 
 async function realMint(args: {
+  issuedAt: string;
   doctorSecret: string;
   patient: string;
   rxHash: Buffer;
@@ -249,7 +259,7 @@ async function realMint(args: {
   // Chile's Decreto 41 gives a prescription a validity window rather than the
   // contract deriving one, so expiry is computed here and stored on-chain.
   const validityDays = Number(process.env.NEXT_PUBLIC_RX_VALIDITY_DAYS ?? 30);
-  const expiresAt = Math.floor(Date.now() / 1000) + validityDays * 24 * 60 * 60;
+  const expiresAt = Math.floor(Date.parse(args.issuedAt) / 1000) + validityDays * 24 * 60 * 60;
 
   const contract = new Contract(CONTRACT_IDS.prescriptionSoulbound);
   const op = contract.call(
@@ -275,7 +285,14 @@ async function realMint(args: {
       .setTimeout(60)
       .build();
 
-    const prepared = await server.prepareTransaction(tx);
+    let prepared;
+    try {
+      prepared = await server.prepareTransaction(tx);
+    } catch (err) {
+      // Soroban's simulation diagnostic for the contract's explicit error 8.
+      if (err instanceof Error && /Error\(Contract, #8\)/.test(err.message)) throw new DuplicatePrescriptionError();
+      throw err;
+    }
     prepared.sign(doctor);
     // Relayer fee-bumps so the doctor spends no XLM.
     return feeBumpAndSend(prepared.toXDR());
@@ -292,6 +309,7 @@ async function realMint(args: {
         submit = await attempt();
         if (submit.status === "SUCCESS") break;
       } catch (err) {
+        if (err instanceof DuplicatePrescriptionError) throw err;
         lastError = err;
       }
       if (i < 2) await new Promise((r) => setTimeout(r, 1500));
@@ -332,3 +350,5 @@ function simulated(rxHash: Buffer, reason: string) {
     reason,
   };
 }
+
+class DuplicatePrescriptionError extends Error {}
