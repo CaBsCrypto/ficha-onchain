@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-09-05T21:21:26.693Z",
+  "baseCommit": "db31fbad5355359a72ad09edea7d7134a8685fa2",
+  "workingTree": true,
+  "checks": [
+    {
+      "label": "Git state",
+      "command": "git",
+      "args": [
+        "status",
+        "--short",
+        "--branch"
+      ],
+      "exitCode": 0,
+      "log": "git-state.txt"
+    },
+    {
+      "label": "Dependency tree",
+      "command": "npm",
+      "args": [
+        "ls",
+        "--depth=0"
+      ],
+      "exitCode": 0,
+      "log": "dependency-tree.txt"
+    },
+    {
+      "label": "Typecheck",
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "node_modules/typescript/bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "typecheck.txt"
+    },
+    {
+      "label": "Unit tests",
+      "command": "npm",
+      "args": [
+        "test"
+      ],
+      "exitCode": 0,
+      "log": "unit-tests.txt"
+    },
+    {
+      "label": "Next.js build",
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "scripts/build-sow-local.mjs"
+      ],
+      "exitCode": 0,
+      "log": "next-js-build.txt"
+    },
+    {
+      "label": "Rust contracts",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "contracts/Cargo.toml",
+        "-p",
+        "doctor-registry",
+        "-p",
+        "prescription-soulbound",
+        "-p",
+        "clinical-record",
+        "-p",
+        "document-soulbound",
+        "-p",
+        "trustleaf-e2e"
+      ],
+      "exitCode": 0,
+      "log": "rust-contracts.txt"
+    }
+  ],
+  "passed": true
+}

@@ -101,6 +101,23 @@ fn mint_rx(
 
 // --- tests -------------------------------------------------------------------
 
+#[test]
+fn test_duplicate_issuance_is_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _, registry) = setup(&env);
+    let doctor = authorized_doctor(&env, &registry);
+    let patient = Address::generate(&env);
+    let id = mint_rx(&env, &client, &doctor, &patient);
+    let duplicate = client.try_mint_prescription(
+        &doctor, &patient, &rx_hash(&env), &medication(&env), &dosage(&env),
+        &10u32, &999_999_999u64,
+    );
+    assert_eq!(duplicate, Err(Ok(Error::DuplicatePrescription)));
+    assert_eq!(client.get_prescriptions_by_patient(&patient).len(), 1);
+    assert_eq!(client.get_prescription(&id).status, Status::Registered);
+}
+
 /// Test 1: Médico emite receta → status Registered, campos correctos.
 #[test]
 fn test_mint_sets_registered_status() {
@@ -123,7 +140,10 @@ fn test_mint_sets_registered_status() {
     assert_eq!(rx.id, 1);
 
     // Segundo mint: contador monotónico
-    let id2 = mint_rx(&env, &client, &doctor, &patient);
+    let id2 = client.mint_prescription(
+        &doctor, &patient, &BytesN::from_array(&env, &[0xCD; 32]),
+        &medication(&env), &dosage(&env), &10u32, &999_999_999u64,
+    );
     assert_eq!(id2, 2);
 }
 
@@ -421,7 +441,10 @@ fn test_get_prescriptions_by_patient() {
     let other_patient = Address::generate(&env);
 
     mint_rx(&env, &client, &doctor, &patient);
-    mint_rx(&env, &client, &doctor, &patient);
+    client.mint_prescription(
+        &doctor, &patient, &BytesN::from_array(&env, &[0xCD; 32]),
+        &medication(&env), &dosage(&env), &10u32, &999_999_999u64,
+    );
     mint_rx(&env, &client, &doctor, &other_patient); // no debe aparecer
 
     let rxs = client.get_prescriptions_by_patient(&patient);
@@ -486,4 +509,42 @@ fn test_mint_rejects_revoked_doctor() {
         &999_999_999u64,
     );
     assert_eq!(res, Err(Ok(Error::Unauthorized)));
+}
+
+#[test]
+fn test_revocation_does_not_allow_duplicate_issuance() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _, registry) = setup(&env);
+    let doctor = authorized_doctor(&env, &registry);
+    let patient = Address::generate(&env);
+    let id = mint_rx(&env, &client, &doctor, &patient);
+    client.activate(&patient, &id);
+    client.revoke(&doctor, &id);
+    assert_eq!(client.try_mint_prescription(
+        &doctor, &patient, &rx_hash(&env), &medication(&env), &dosage(&env),
+        &10u32, &999_999_999u64,
+    ), Err(Ok(Error::DuplicatePrescription)));
+    assert_eq!(client.get_prescription(&id).status, Status::Revoked);
+    assert_eq!(client.get_prescriptions_by_patient(&patient).len(), 1);
+}
+
+#[test]
+fn test_duplicate_with_changed_metadata_cannot_bypass_document_identity() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _, registry) = setup(&env);
+    let doctor = authorized_doctor(&env, &registry);
+    let patient = Address::generate(&env);
+    mint_rx(&env, &client, &doctor, &patient);
+    assert_eq!(client.try_mint_prescription(
+        &doctor, &patient, &rx_hash(&env), &medication(&env), &dosage(&env),
+        &20u32, &999_999_998u64,
+    ), Err(Ok(Error::DuplicatePrescription)));
+    let next = client.mint_prescription(
+        &doctor, &patient, &BytesN::from_array(&env, &[0xCD; 32]),
+        &medication(&env), &dosage(&env), &10u32, &999_999_999u64,
+    );
+    assert_eq!(next, 2, "rejected duplicate must not consume an ID");
+    assert_eq!(client.get_prescriptions_by_doctor(&doctor).len(), 2);
 }

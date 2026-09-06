@@ -18,6 +18,9 @@ export const NETWORK_PASSPHRASE =
     ? "Public Global Stellar Network ; September 2015"
     : "Test SDF Network ; September 2015";
 
+/** Previous Testnet Rx contract: records stay there; no automatic migration. */
+export const LEGACY_PRESCRIPTION_CONTRACT_IDS = ["CA3I4NLBELODRXUUBVZDBVAU47W65KPZ6UFWEXCEEDUDQYZQ4E5YLXYL"] as const;
+
 /** Deployed contract ids (Soroban Testnet). */
 export const CONTRACT_IDS = {
   doctorRegistry:
@@ -25,7 +28,7 @@ export const CONTRACT_IDS = {
     "CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O",
   prescriptionSoulbound:
     process.env.NEXT_PUBLIC_PRESCRIPTION_ID ??
-    "CA3I4NLBELODRXUUBVZDBVAU47W65KPZ6UFWEXCEEDUDQYZQ4E5YLXYL",
+    "CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU",
   /**
    * Phase 1 contracts — set these env vars when the contracts are deployed.
    * Leaving them undefined puts dispense/pharmacy endpoints in simulated mode.

@@ -1,0 +1,35 @@
+ficha-onchain@0.1.0 C:\Users\MGC\Desktop\Dev\ficha-onchain
+├── @emnapi/core@1.10.0 extraneous
+├── @emnapi/runtime@1.11.2 extraneous
+├── @emnapi/wasi-threads@1.2.1 extraneous
+├── @napi-rs/wasm-runtime@1.1.6 extraneous
+├── @neondatabase/serverless@1.1.0
+├── @privy-io/react-auth@1.99.1
+├── @privy-io/server-auth@1.32.5
+├── @react-three/drei@10.7.7
+├── @react-three/fiber@9.6.1
+├── @solana/web3.js@1.98.4
+├── @stellar/stellar-sdk@14.6.1
+├── @tailwindcss/postcss@4.3.2
+├── @tybys/wasm-util@0.10.3 extraneous
+├── @types/node@20.19.43
+├── @types/react-dom@18.3.7
+├── @types/react@18.3.31
+├── autoprefixer@10.5.2
+├── eslint-config-next@14.2.35
+├── eslint@8.57.1
+├── framer-motion@11.18.2
+├── googleapis@140.0.1
+├── next@16.2.10
+├── passkey-kit@0.12.0
+├── postcss@8.5.20
+├── qrcode@1.5.4
+├── react-dom@19.2.4
+├── react@19.2.4
+├── recharts@3.9.2
+├── resend@3.5.0
+├── sonner@2.0.7
+├── tailwindcss@4.3.2
+├── three@0.185.1
+├── typescript@5.9.3
+└── vitest@4.1.10

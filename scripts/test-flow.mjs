@@ -150,6 +150,7 @@ async function main() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      issuance: { id: crypto.randomUUID(), issuedAt: new Date().toISOString() },
       patient: PATIENT_WALLET,
       patientName: "Paciente de Flujo", patientDocType: "RUT",
       patientDocNumber: "12345678-5", patientSex: "F",

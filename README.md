@@ -108,8 +108,8 @@ flowchart TD
 
 ## 📜 Smart contracts (Soroban Testnet)
 
-Rust → WASM, in [`contracts/`](./contracts). Built in CI (the Rust toolchain is
-blocked locally) and deployed with the `stellar` CLI.
+Rust → WASM, in [`contracts/`](./contracts). Built locally and in CI with `stellar contract build` (`wasm32v1-none`).
+Deployment is a separate manual operation.
 
 | Contract | Role | Key methods | Testnet ID |
 |---|---|---|---|
@@ -180,7 +180,7 @@ Run the checks:
 
 ```bash
 npm run test:phases    # 23/23 — the 8 journey phases, end to end
-npm run test:flow      # 13/13 — integrated E2E over the HTTP API
+npm run test:flow      # integrated E2E over HTTP; requires separate environment authorization
 npm run test:onchain   # 11/11 — real Soroban anchoring
 ```
 

@@ -68,6 +68,9 @@ pub enum DataKey {
     PrescriptionsByPatient(Address),
     /// doctor_wallet → Vec<u64> de IDs de recetas emitidas por el médico.
     PrescriptionsByDoctor(Address),
+    /// (issuer, recipient, canonical document hash) → first issued ID.
+    /// Persistent even after revocation: retrying an old document is not a new Rx.
+    IssuedPrescription(Address, Address, BytesN<32>),
 }
 
 // --- status ------------------------------------------------------------------
@@ -144,6 +147,8 @@ pub enum Error {
     InsufficientBalance = 6,
     /// La receta ya estaba revocada.
     AlreadyRevoked = 7,
+    /// This issuer already issued this document to this patient.
+    DuplicatePrescription = 8,
 }
 
 // --- contract ----------------------------------------------------------------
@@ -253,6 +258,13 @@ impl PrescriptionSoulbound {
             return Err(Error::Unauthorized);
         }
 
+        let issuance_key = DataKey::IssuedPrescription(
+            doctor_wallet.clone(), patient_wallet.clone(), rx_hash.clone(),
+        );
+        if env.storage().persistent().has(&issuance_key) {
+            return Err(Error::DuplicatePrescription);
+        }
+
         let mut counter: u64 = env
             .storage()
             .instance()
@@ -275,6 +287,12 @@ impl PrescriptionSoulbound {
         };
 
         Self::store_prescription(&env, &rx);
+
+        // Stored atomically with the prescription. Never removed on revocation.
+        env.storage().persistent().set(&issuance_key, &counter);
+        env.storage().persistent().extend_ttl(
+            &issuance_key, LEDGER_THRESHOLD, LEDGER_BUMP,
+        );
 
         Self::append_to_index(
             &env,

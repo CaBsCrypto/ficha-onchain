@@ -117,6 +117,7 @@ for (const e of entries) {
 
 // ── 5. Prescription (on-chain, Decreto 41) ───────────────────────────────────
 const mint = await post("/api/mint", {
+  issuance: { id: crypto.randomUUID(), issuedAt: new Date().toISOString() },
   patient: PATIENT_WALLET, medication: "Losartán 50mg", dosage: "1 comprimido c/24h", quantity: 30,
   doctorEmail: DOCTOR_EMAIL,
   patientName: PATIENT.name, patientDocType: "RUT", patientDocNumber: "11.111.111-1",

@@ -1,0 +1,114 @@
+Isolated build snapshot: C:\Users\MGC\Desktop\Dev\ficha-onchain\.next\sow-build-cR7p6v
+No environment files, database credentials or signing keys copied. Default Turbopack build; snapshot resolution root includes linked node_modules.
+▲ Next.js 16.2.10 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 46s
+  Running TypeScript ...
+  Finished TypeScript in 16.1s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/31) ...
+  Generating static pages using 15 workers (7/31)
+  Generating static pages using 15 workers (15/31)
+  Generating static pages using 15 workers (23/31)
+✓ Generating static pages using 15 workers (31/31) in 769ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/doctors
+├ ○ /admin/flujo
+├ ○ /admin/historial
+├ ○ /admin/users
+├ ○ /admin/waitlist
+├ ƒ /api/admin/activity
+├ ƒ /api/admin/api-keys
+├ ƒ /api/admin/doctors
+├ ƒ /api/admin/encrypt
+├ ƒ /api/admin/migrate
+├ ƒ /api/admin/overview
+├ ƒ /api/admin/reset
+├ ƒ /api/admin/stats
+├ ƒ /api/admin/users
+├ ƒ /api/admin/whoami
+├ ƒ /api/appointments
+├ ƒ /api/auth/google
+├ ƒ /api/auth/google/callback
+├ ƒ /api/consultations
+├ ƒ /api/consultations/[id]
+├ ƒ /api/doctor-status
+├ ƒ /api/doctor/availability
+├ ƒ /api/doctor/patient-record
+├ ƒ /api/doctor/patients
+├ ƒ /api/doctor/prescriptions
+├ ƒ /api/doctor/profile
+├ ƒ /api/doctor/slots
+├ ƒ /api/doctors
+├ ƒ /api/documents
+├ ƒ /api/documents/mint
+├ ƒ /api/documents/revoke
+├ ƒ /api/documents/share
+├ ƒ /api/ficha/document
+├ ƒ /api/ficha/document/[id]
+├ ƒ /api/ficha/entries
+├ ƒ /api/ficha/entry
+├ ƒ /api/ficha/grant
+├ ƒ /api/licenses
+├ ƒ /api/mcp
+├ ƒ /api/mint
+├ ƒ /api/notify/license
+├ ƒ /api/notify/prescription
+├ ƒ /api/pain-diary
+├ ƒ /api/patient-wallet
+├ ƒ /api/patient/access-log
+├ ƒ /api/patient/ai-chat
+├ ƒ /api/patient/ai-explain
+├ ƒ /api/patient/ai-extract
+├ ƒ /api/patient/ficha
+├ ƒ /api/patient/grants
+├ ƒ /api/patient/health-timeline
+├ ƒ /api/patient/notifications
+├ ƒ /api/patient/record-requests
+├ ƒ /api/pharmacy/lookup
+├ ƒ /api/pharmacy/verify-pin
+├ ƒ /api/prescriptions
+├ ƒ /api/prescriptions/activate
+├ ƒ /api/privy/stellar-wallet
+├ ƒ /api/public/document/[id]
+├ ƒ /api/public/pharmacy/verify
+├ ƒ /api/public/prescription/[id]
+├ ƒ /api/public/prescription/[id]/dispense
+├ ƒ /api/relay
+├ ƒ /api/revoke
+├ ƒ /api/share
+├ ƒ /api/waitlist
+├ ○ /caregiver
+├ ○ /caregiver/diary
+├ ƒ /caregiver/emergency/[rut]
+├ ○ /caregiver/medications
+├ ○ /caregiver/onboarding
+├ ○ /caregiver/types
+├ ○ /doctor
+├ ƒ /doctor/patient-pain/[patientRut]
+├ ○ /legal
+├ ○ /licenses
+├ ○ /licenses/new
+├ ○ /mcp
+├ ○ /patient
+├ ○ /patient/dental
+├ ○ /patient/ficha
+├ ○ /patient/onboarding
+├ ○ /patient/optical
+├ ○ /patient/pain-diary
+├ ○ /patient/pain-diary/history
+├ ○ /patient/requests
+├ ○ /pharmacy
+├ ○ /traction
+├ ƒ /verify
+└ ƒ /verify/license/[id]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

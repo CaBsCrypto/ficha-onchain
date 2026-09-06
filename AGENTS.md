@@ -86,10 +86,7 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
   enables `reference-types` and the Soroban host rejects that WASM. An earlier
   version of this file claimed WDAC blocked the toolchain (os error 4551); that
   is no longer true and cost a whole PR built around the wrong assumption.
-  `cargo test` still runs in CI (`.github/workflows/contracts.yml`) over three
-  crates only — `doctor-registry`,
-  `prescription-soulbound`, `trustleaf-e2e` — deliberately, so an unfinished
-  contract elsewhere cannot redden the badge. It does not deploy.
+  `cargo test` runs in CI (`.github/workflows/contracts.yml`) over the four SOW contracts — `doctor-registry`, `prescription-soulbound`, `clinical-record`, `document-soulbound` — plus `trustleaf-e2e`. It does not deploy.
 - **`@stellar/stellar-sdk` is pinned to v14.** v13 cannot parse protocol 27 —
   every on-chain read throws `Bad union switch: 1`. v16 breaks `passkey-kit`,
   which needs `^14.2.0`.
@@ -124,8 +121,7 @@ The Vercel build runs `tsc` too, so a type error blocks the merge either way.
 - **Privy app is `ficha-onchain` (`cmrix722m…`)**, not `SalesAgent` — that one
   is a different project of the owner's. `allowed_domains` is deliberately empty:
   filling it in breaks preview deploys, whose URL changes every build.
-- **Tests run: `npm test`** (vitest, suites under `src/__tests__/`). They are not
-  yet wired into the CI workflow — add them there when you get `workflow` scope.
+- **Tests run: `npm test`** (vitest, suites under `src/__tests__/`). They are wired into `.github/workflows/ci.yml` alongside typecheck and build.
 - **The 3D body map loads THREE r128 from a CDN**, not from npm, as UMD scripts.
   `BodyMap3D.tsx` hand-rolls its own THREE type declarations because of it.
 - **`public/models/` holds only `body_1k.glb`**, the model `BodyMap3D.tsx`
@@ -165,3 +161,5 @@ artifacts into a patient's on-chain record. Hand-rolled, no SDK.
 - Commit a `.env*` file, a connection string, or a secret key.
 - Point local dev at the production Neon branch.
 - Add a second copy of something that already exists in `src/lib/`.
+
+## Imported Claude Cowork project instructions

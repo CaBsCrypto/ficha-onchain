@@ -1,0 +1,21 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=prescription-soulbound\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+warn: could not canonicalize path C:\Users\MGC
+   Compiling prescription-soulbound v0.1.0 (C:\Users\MGC\Desktop\Dev\ficha-onchain\contracts\prescription-soulbound)
+    Finished `release` profile [optimized] target(s) in 0.81s
+ℹ️  Build Summary:
+    Wasm File: target/sow-wasm\prescription_soulbound.wasm (12283 bytes optimized (original size was 13716 bytes))
+    Wasm Hash: 2a177676e7bf89c5c01a8767d03ad2888e1f3e0bf20c3b7f831c98a03af9e9bc
+    Wasm Size: 12283 bytes optimized (original size was 13716 bytes)
+    Exported Functions: 11 found
+      • _
+      • __constructor
+      • activate
+      • block
+      • dispense
+      • get_prescription
+      • get_prescriptions_by_doctor
+      • get_prescriptions_by_patient
+      • is_valid
+      • mint_prescription
+      • revoke
+✅ Build Complete

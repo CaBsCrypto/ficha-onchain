@@ -1,0 +1,14 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=document-soulbound\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+warn: could not canonicalize path C:\Users\MGC
+   Compiling document-soulbound v0.1.0 (C:\Users\MGC\Desktop\Dev\ficha-onchain\contracts\document-soulbound)
+    Finished `release` profile [optimized] target(s) in 0.66s
+ℹ️  Build Summary:
+    Wasm File: target/sow-wasm\document_soulbound.wasm (7373 bytes optimized (original size was 7944 bytes))
+    Wasm Hash: 73e747c76ab75d2cd66de8d595ea178c83202a8e11b24c1bae6e7b4034232f90
+    Wasm Size: 7373 bytes optimized (original size was 7944 bytes)
+    Exported Functions: 4 found
+      • _
+      • get_document
+      • mint_document
+      • revoke_document
+✅ Build Complete

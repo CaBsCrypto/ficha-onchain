@@ -1,0 +1,96 @@
+{
+  "network": "testnet",
+  "contractId": "CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU",
+  "patient": "GBJLXENAJ3YWZSEKHJ6LYSEBEXN2F7UD6YYMWRYS4AKL36TK3CY5GCTD",
+  "syntheticDocumentHash": "102db5c02ada4b926d72a8ef4d1bd1c20b6a915ba2186bd515ea566d360f3aa0",
+  "secondDocumentHash": "ba325b306670ca8fb804cbf9b8f6194b6beb04412622e71e4f79b0957bd0bfa2",
+  "expiry": 1788757967,
+  "transactions": {
+    "mint": {
+      "hash": "8f7de9890298676e218f8a0d0139713bb030970d92e1f8c99062bd3c88f64cd2",
+      "method": "mint_prescription",
+      "feeSource": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "confirmedAt": "2026-09-06T05:13:05.130Z"
+    },
+    "activate": {
+      "hash": "b6afbeb6559f104beed0f26de5bd4f1eb5606faba882d7710b7a8100502ad39c",
+      "method": "activate",
+      "feeSource": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "confirmedAt": "2026-09-06T05:13:10.111Z"
+    },
+    "revoke": {
+      "hash": "407e069d0b502eae0fa24c1f8424b4660d2c1d2d40f6b116f61d13aa8a635f6c",
+      "method": "revoke",
+      "feeSource": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "confirmedAt": "2026-09-06T05:13:14.365Z"
+    },
+    "distinct_mint": {
+      "hash": "670ef8e4fac5449dfd24e3524ba684e240cfc0bebcf079b6d2f1a072aac0ffff",
+      "method": "mint_prescription",
+      "feeSource": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "confirmedAt": "2026-09-06T05:13:19.951Z"
+    },
+    "distinct_revoke": {
+      "hash": "b31b4c23b8470497f4e752798b420ab2d7f3885e925b11e8710a2c95b136ab21",
+      "method": "revoke",
+      "feeSource": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "confirmedAt": "2026-09-06T05:13:25.078Z"
+    }
+  },
+  "checks": {
+    "deployed_wasm_matches_local": {
+      "passed": true,
+      "at": "2026-09-06T05:13:00.626Z"
+    },
+    "existing_registry_is_deployed": {
+      "passed": true,
+      "at": "2026-09-06T05:13:00.854Z"
+    },
+    "registered": {
+      "passed": true,
+      "at": "2026-09-06T05:13:05.398Z"
+    },
+    "patient_receives_record": {
+      "passed": true,
+      "at": "2026-09-06T05:13:05.608Z"
+    },
+    "duplicate_rejected_in_simulation": {
+      "passed": true,
+      "at": "2026-09-06T05:13:05.964Z"
+    },
+    "unauthorized_issuer_rejected_in_simulation": {
+      "passed": true,
+      "at": "2026-09-06T05:13:06.126Z"
+    },
+    "active": {
+      "passed": true,
+      "at": "2026-09-06T05:13:10.270Z"
+    },
+    "revoked": {
+      "passed": true,
+      "at": "2026-09-06T05:13:14.512Z"
+    },
+    "revoked_document_cannot_be_reissued": {
+      "passed": true,
+      "at": "2026-09-06T05:13:14.662Z"
+    },
+    "distinct_document_can_be_issued": {
+      "passed": true,
+      "at": "2026-09-06T05:13:19.952Z"
+    },
+    "relayer_paid_confirmed_transactions": {
+      "passed": true,
+      "at": "2026-09-06T05:13:25.079Z"
+    }
+  },
+  "registryCodeHash": "cc832c816bcb11286dcd0151328231700d5489a276692f0c0ece623a2c4437c8",
+  "rxId": "1",
+  "secondRxId": "2",
+  "completedAt": "2026-09-06T05:13:25.079Z",
+  "note": "Synthetic records only. Activation was signed by the issuer (supported by the contract). Rejection checks are RPC simulations, not submitted failed transactions. No browser walkthrough performed."
+}

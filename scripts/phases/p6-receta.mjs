@@ -5,6 +5,7 @@ export const name = "Fase 6 — Receta médica on-chain";
 
 // RUT 11.111.111-1 tiene dígito verificador válido; el mint valida el RUT.
 const RX_BODY = {
+  issuance: { id: crypto.randomUUID(), issuedAt: new Date().toISOString() },
   patient: DEMO_PATIENT_WALLET,
   medication: "Losartán 50mg", dosage: "1 comprimido c/24h", quantity: 30,
   patientName: "Paciente Demo", patientDocType: "RUT", patientDocNumber: "11.111.111-1",
