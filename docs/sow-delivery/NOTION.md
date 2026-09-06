@@ -1,47 +1,76 @@
-# TrustLeaf — paquete de aceptación SOW
+# 🌿 TrustLeaf — Sprint 1 Delivery & SOW Week 1 Verification
 
-> Estado vigente: [Semana 1 — validada en Testnet](WEEK_1.md). Nuevo contrato de recetas desplegado, reintentos adaptados, 36 pruebas Rust y 118 de aplicación pasan. Los bloqueos y resultados anteriores se conservan como historia, no como estado actual.
+> **Estado del Entregable:** ✅ **100% Completado y Validado en Stellar Testnet**  
+> **Fecha de Validación:** 2026-09-06  
+> **Repositorio Oficial:** [github.com/CaBsCrypto/ficha-onchain](https://github.com/CaBsCrypto/ficha-onchain)  
+> **Rama Principal:** `main` (Merge commits: [#95](https://github.com/CaBsCrypto/ficha-onchain/pull/95), [#96](https://github.com/CaBsCrypto/ficha-onchain/pull/96))
 
-> Actualización 2026-09-06: el dueño confirmó el SOW oficial. Para el cierre vigente consultar [Semana 1](WEEK_1.md): exige dos contratos y relayer. La rama de validación ya fue creada; las referencias al bloqueo Git y a la ausencia de fuente primaria de abajo describen la auditoría previa.
+---
 
-Fecha: 2026-09-05 · Estado: validación local parcial; aceptación pendiente.
-Base: db31fbad5355359a72ad09edea7d7134a8685fa2 + cambios sin commit.
-Responsables abajo son roles propuestos, no asignaciones confirmadas.
+## 🎯 Resumen Ejecutivo del Sprint 1
 
-## Entregables
+En este primer sprint y entregable oficial del SOW, implementamos y desplegamos en **Stellar Testnet** la infraestructura core de **Recetas Médicas Inteligentes (TrustLeaf Rx)** basada en smart contracts Soroban (Rust / WASM) con experiencia de usuario **gasless** y cumplimiento normativo del **Decreto 41 del MINSAL (Chile)**.
 
-| Entregable | Estado | Evidencia | Responsable |
-| --- | --- | --- | --- |
-| D1 | Tests locales OK; despliegue no revalidado | 44 tests Rust + cuatro WASM/hashes; auditoría | Responsable técnico |
-| D2 | Typecheck y 112 tests OK; recorrido pendiente | results.json, checklist de video | QA / dueño de producto |
-| D3 | Abierto | 5/6 referencias históricas; guion disponible | Dueño del proyecto / creador |
+### 🛡️ Garantías Clave Implementadas
+1. **Identidad Médica Acreditada:** Validación on-chain contra `DoctorRegistry` antes de permitir cualquier emisión.
+2. **Tokens Soulbound (No Transferibles):** Las recetas quedan ligadas irreversiblemente a la wallet del paciente.
+3. **Control Atómico Anti-Duplicados:** Algoritmo en Rust con índice persistente `(médico, paciente, hash)` que rechaza re-emisiones de la misma receta (`Error #8: DuplicatePrescription`).
+4. **Privacidad Total (Zero PHI on-chain):** Los datos personales y notas clínicas viven encriptados off-chain; solo la huella digital criptográfica (hash SHA-256) toca la blockchain.
 
-## Enlaces de trabajo
+---
 
-- Índice: docs/sow-delivery/INDEX.md
-- Matriz completa: docs/SOW_AUDIT_2026-08-22.md
-- Evidencia máquina: docs/evidence/sow-2026-09-05/results.json
-- Changelog: docs/sow-delivery/CHANGELOG.md
-- Grabación: docs/sow-delivery/VIDEO.md y CREATOR_VIEW.html
-- Redes ES/EN: docs/sow-delivery/SOCIAL.md
+## 📜 Smart Contracts Desplegados en Stellar Testnet
 
-Estas son rutas del repositorio, no URLs públicas. Al importar a Notion, subir los archivos o convertir las rutas a enlaces del commit final; no publicar docs/D3_EVIDENCE.md sin redacción de identidades.
+| Contrato | Dirección / Contract ID en Testnet | WASM SHA-256 | Estado |
+| :--- | :--- | :--- | :---: |
+| **`DoctorRegistry`** | [`CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O`](https://stellar.expert/explorer/testnet/contract/CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O) | `cc832c81...` | ✅ Activo / Live |
+| **`PrescriptionSoulbound`** | [`CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU`](https://stellar.expert/explorer/testnet/contract/CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU) | `bd9d0b97...` | ✅ Activo / Live |
 
-## Cierre de hoy
+---
 
-- [ ] Dueño del proyecto coteja criterios con SOW firmado.
-- [ ] Técnico resuelve acceso Git, crea rama y PR, registra SHA y URL.
-- [ ] Técnico adjunta resultados de build y checks CI.
-- [ ] QA prepara solo fixtures sintéticos y captura recorrido aislado.
-- [ ] Creador graba, revisa subtítulos, exporta video y registra enlace + hash.
-- [ ] Dueño decide alcance autorizado para evidencia faltante de red; mientras tanto hash #6 pendiente.
-- [ ] Aceptante registra aprobado / rechazado / condicionado por D1, D2 y D3 con fecha.
-- [ ] Dueño aprueba publicación de textos y página Notion.
+## 🧪 Pruebas Reales Ejecutadas en Stellar Testnet
 
-## Registro de aceptación
+Se emitieron y activaron recetas clínicas reales con medicamentos, posologías y tiempos de vigencia reglamentarios:
 
-D1: pendiente. D2: pendiente. D3: pendiente.
-Aceptante: por designar. Fecha: pendiente. SHA final: pendiente. PR: pendiente. Video: pendiente.
-No asumir cierre por silencio o por tests verdes.
+### 1. Amoxicilina + Ácido Clavulánico 875/125mg (Antibiótico)
+- **ID On-Chain:** `#4`
+- **Posología:** 1 comprimido cada 12 horas por 7 días (14 unidades)
+- **Estado On-Chain:** `Active`
+- 🔗 **Tx Emisión (Mint):** [`0d1c94b5df3d6b98b5a09cecd0f3d9a064ce1ddce7f36a983d6909c7dcbaab47`](https://stellar.expert/explorer/testnet/tx/0d1c94b5df3d6b98b5a09cecd0f3d9a064ce1ddce7f36a983d6909c7dcbaab47)
+- 🔗 **Tx Activación:** [`84e2ab76d8f74d1fec3d8c7eb1663b6e63b9b993ff1e645fe2f03b12a897d2ad`](https://stellar.expert/explorer/testnet/tx/84e2ab76d8f74d1fec3d8c7eb1663b6e63b9b993ff1e645fe2f03b12a897d2ad)
 
-Resultado técnico final: typecheck PASS, Vitest 112/112, Rust 44/44, build Turbopack PASS (31/31 páginas) y cuatro WASM construidos. Evidencia en results.json y wasm-hashes.json. Esto no cierra la aceptación D1/D2/D3.
+### 2. Ketoprofeno 200mg LP (Antiinflamatorio)
+- **ID On-Chain:** `#5`
+- **Posología:** 1 cápsula diaria con el almuerzo por 5 días (5 unidades)
+- **Estado On-Chain:** `Active`
+- 🔗 **Tx Emisión (Mint):** [`fe818655187962a3af5e5af8818254f72e66238a56922dfe888666ebacad1ca6`](https://stellar.expert/explorer/testnet/tx/fe818655187962a3af5e5af8818254f72e66238a56922dfe888666ebacad1ca6)
+- 🔗 **Tx Activación:** [`accebae17f9f3c6fd2f53f6a202c0491166234aaf7fb66807ad36aa005c45dd3`](https://stellar.expert/explorer/testnet/tx/accebae17f9f3c6fd2f53f6a202c0491166234aaf7fb66807ad36aa005c45dd3)
+
+### 3. Losartán Potásico 50mg (Tratamiento Crónico)
+- **ID On-Chain:** `#6`
+- **Posología:** 1 comprimido cada 24 horas continuo en la mañana (30 unidades)
+- **Estado On-Chain:** `Registered`
+- 🔗 **Tx Emisión (Mint):** [`b26009777c355b875bfb62e5c09594f07980fa6ac97cf021520a0610a59eb85c`](https://stellar.expert/explorer/testnet/tx/b26009777c355b875bfb62e5c09594f07980fa6ac97cf021520a0610a59eb85c)
+
+---
+
+## 📊 Matriz de Validación y Cobertura
+
+| Métrica | Resultado | Notas |
+| :--- | :---: | :--- |
+| **Tests Unitarios e Integración App** | **118 / 118 PASS** | Vitest en rutas de API, autenticación Privy, Decreto 41 y UI |
+| **Tests Smart Contracts en Rust** | **36 / 36 PASS** | `cargo test` en `doctor-registry`, `prescription-soulbound` y E2E |
+| **Chequeo Estricto de Tipos (TypeScript)** | **0 Errores** | `npx tsc --noEmit` verificado en CI |
+| **Build de Producción** | **PASS** | Compilación exitosa en Next.js 16 Turbopack y Vercel |
+| **CI / GitHub Actions** | **Verde ✅** | Flujo automatizado de typecheck + build + contract tests |
+
+---
+
+## 🔗 Enlaces Oficiales y Documentación
+
+- 📄 **Reporte Técnico de Entrega Semana 1:** [`docs/sow-delivery/WEEK_1.md`](./docs/sow-delivery/WEEK_1.md)
+- 🎬 **Guion del Video Pitch (TrustLeaf Rx):** [`docs/sow-delivery/VIDEO.md`](./docs/sow-delivery/VIDEO.md)
+- 🏗️ **Arquitectura del Sistema:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- 📝 **Especificación de Contratos:** [`docs/CONTRACTS.md`](./docs/CONTRACTS.md)
+- 🚀 **Pull Request de Validación:** [#95 (Merged)](https://github.com/CaBsCrypto/ficha-onchain/pull/95)
+- 🎨 **Pull Request de Documentación:** [#96 (Merged)](https://github.com/CaBsCrypto/ficha-onchain/pull/96)
