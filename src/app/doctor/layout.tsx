@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { authedFetch } from '@/lib/auth/authed-fetch';
+import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 function IconHome({ className }: { className?: string }) {
@@ -82,7 +83,7 @@ function useDoctorNav() {
     { href: '/doctor?tab=inicio',    label: 'Inicio',    icon: <IconHome className="h-5 w-5" />,     tab: 'inicio'    },
     { href: '/doctor?tab=consultas', label: 'Consultas', icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
     { href: '/doctor?tab=disponibilidad', label: 'Disponibilidad', icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
-    { href: '/doctor?tab=pacientes', label: 'Pacientes', icon: <IconUsers className="h-5 w-5" />,    tab: 'pacientes' },
+    { href: '/doctor?tab=recetas', label: 'Recetas', icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
   ];
 
   function isActive(item: NavItem): boolean {
@@ -162,7 +163,7 @@ function MobileBottomNav() {
 }
 
 // ── Doctor shell ──────────────────────────────────────────────────────────────
-function DoctorShell({ children }: { children: React.ReactNode }) {
+function DoctorShell({ children, authorization }: { children: React.ReactNode; authorization: PrivateDoctorStatus }) {
   const { logout } = usePrivy();
   const email = usePrivyEmail();
 
@@ -216,6 +217,11 @@ function DoctorShell({ children }: { children: React.ReactNode }) {
           <SidebarNav />
         </Suspense>
         <main className="min-w-0 flex-1 pb-28 md:pb-6">
+          <div role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <p className="font-semibold">Autorización confirmada · Stellar Testnet</p>
+            <p className="mt-1">Vigente hasta {new Date((authorization.authorization.validUntil ?? 0) * 1000).toLocaleString('es-CL')}.</p>
+            {authorization.pendingRequest && ['pending', 'submitted'].includes(authorization.pendingRequest.state) && <p className="mt-1">Hay una solicitud administrativa pendiente de confirmación.</p>}
+          </div>
           {children}
         </main>
       </div>
@@ -247,66 +253,16 @@ function GateShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const gateInput = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100';
-
-// ── Registration form: an unregistered doctor requests access ──────────────────
-function RegistrationForm({ email, onDone }: { email: string; onDone: () => void }) {
-  const [name, setName] = useState('');
-  const [specialty, setSpecialty] = useState('');
-  const [rut, setRut] = useState('');
-  const [licenseNum, setLicenseNum] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const canSubmit = name.trim().length > 1 && !saving;
-
-  async function submit() {
-    if (!canSubmit) return;
-    setSaving(true); setError('');
-    try {
-      const res = await authedFetch('/api/doctors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email, specialty: specialty.trim() || undefined, rut: rut.trim() || undefined, licenseNum: licenseNum.trim() || undefined }),
-      });
-      const json = await res.json() as { error?: string };
-      if (!res.ok) { setError(json.error ?? 'No se pudo enviar la solicitud'); setSaving(false); return; }
-      onDone();
-    } catch { setError('Error de conexión'); setSaving(false); }
-  }
-
+// The administrator creates the synthetic profile from the existing admin panel.
+function RegistrationPending({ email, onDone }: { email: string; onDone: () => void }) {
   return (
     <GateShell>
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-800">Solicitar acceso como médico</h1>
-        <p className="mt-1 text-sm text-slate-500">Completá tus datos. Un administrador revisará tu solicitud antes de habilitarte para emitir recetas.</p>
-        <div className="mt-5 space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre completo <span className="text-rose-400">*</span></label>
-            <input className={gateInput} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Dr. Cristian Brown" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label>
-            <input className={cn(gateInput, 'cursor-not-allowed opacity-60')} value={email} disabled />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Especialidad</label>
-              <input className={gateInput} value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Medicina General" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">RUT</label>
-              <input className={gateInput} value={rut} onChange={(e) => setRut(e.target.value)} placeholder="12.345.678-5" />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nº de registro (SIS/Superintendencia)</label>
-            <input className={gateInput} value={licenseNum} onChange={(e) => setLicenseNum(e.target.value)} placeholder="123456" />
-          </div>
-        </div>
-        {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
-        <button onClick={submit} disabled={!canSubmit} className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40">
-          {saving ? 'Enviando…' : 'Enviar solicitud'}
+        <h1 className="text-xl font-semibold text-slate-800">Perfil médico pendiente</h1>
+        <p className="mt-2 break-all text-sm font-medium text-slate-700">{email}</p>
+        <p role="status" className="mt-3 text-sm text-slate-600">El administrador debe crear tu perfil sintético y revisar la autorización de esta cuenta. El acceso se habilitará después de confirmar su recibo en Stellar Testnet.</p>
+        <button onClick={onDone} className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600">
+          Comprobar estado
         </button>
       </div>
     </GateShell>
@@ -314,54 +270,75 @@ function RegistrationForm({ email, onDone }: { email: string; onDone: () => void
 }
 
 // ── Status screens (pending / blocked) ─────────────────────────────────────────
-function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'blocked'; onRefresh: () => void }) {
-  const pending = variant === 'pending';
+function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' | 'revoked' | 'paused' | 'error'; onRefresh: () => void }) {
+  const descriptions = {
+    pending: ['Autorización pendiente', 'La autorización del administrador debe confirmarse en Stellar antes de habilitar tu acceso. Si el procesador está apagado, la solicitud permanece pendiente.'],
+    expired: ['Autorización vencida', 'Solicita al administrador la renovación. Tu acceso se habilitará cuando se confirme en Stellar.'],
+    revoked: ['Autorización revocada', 'El registro confirma que tu permiso fue revocado. Contacta al administrador para revisar tu autorización.'],
+    paused: ['Registro pausado', 'El registro de médicos está pausado. Las operaciones permanecen deshabilitadas.'],
+    error: ['No pudimos verificar tu autorización', 'Las operaciones permanecen bloqueadas hasta recuperar la conexión y comprobar tu autorización. Puedes volver a consultar el estado.'],
+  } as const;
+  const [title, description] = descriptions[variant];
   return (
     <GateShell>
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <div className={cn('mx-auto flex h-12 w-12 items-center justify-center rounded-full', pending ? 'bg-amber-100' : 'bg-rose-100')}>
-          <span className="text-2xl">{pending ? '⏳' : '🚫'}</span>
+        <div className={cn('mx-auto flex h-12 w-12 items-center justify-center rounded-full', variant === 'pending' ? 'bg-amber-100' : 'bg-rose-100')}>
+          <span aria-hidden="true" className="text-2xl">{variant === 'pending' ? '⏳' : '🚫'}</span>
         </div>
-        <h1 className="mt-4 text-xl font-semibold text-slate-800">{pending ? 'Solicitud enviada' : 'Acceso bloqueado'}</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          {pending
-            ? 'Tu solicitud está en revisión. Un administrador te habilitará en breve; podés volver a comprobar el estado.'
-            : 'Tu cuenta fue bloqueada por un administrador. Contactá al soporte si creés que es un error.'}
-        </p>
-        {pending && (
+        <h1 className="mt-4 text-xl font-semibold text-slate-800">{title}</h1>
+        <p role="status" className="mt-2 text-sm text-slate-500">{description}</p>
           <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
             Comprobar estado
           </button>
-        )}
+        <p className="mt-4 text-xs text-slate-400">DoctorRegistryPrivate · Stellar Testnet</p>
       </div>
     </GateShell>
   );
 }
 
 // ── Access gate: registro → pendiente → portal ─────────────────────────────────
-type DocStatus = 'loading' | 'unregistered' | 'pending' | 'active' | 'blocked';
+type DocStatus = 'loading' | 'unregistered' | 'pending' | 'active' | 'expired' | 'revoked' | 'paused' | 'error';
+interface PrivateDoctorStatus {
+  authorized: boolean;
+  source: 'private_registry';
+  wallet: string;
+  doctor: { id: number; name: string; email: string } | null;
+  authorization: { status: 'unregistered' | 'authorized' | 'expired' | 'revoked' | 'paused'; version: number; validUntil: number | null };
+  pendingRequest?: { state: string } | null;
+}
 
 function DoctorAccessGate({ children }: { children: React.ReactNode }) {
   const email = usePrivyEmail();
   const [status, setStatus] = useState<DocStatus>('loading');
+  const [record, setRecord] = useState<PrivateDoctorStatus | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  const check = useCallback(() => { setStatus('loading'); setRefresh((value) => value + 1); }, []);
 
-  const check = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const res = await authedFetch('/api/doctor/profile');
-      const json = (await res.json()) as { data?: { status?: string } | null };
-      const row = json.data;
-      if (!row) setStatus('unregistered');
-      else if (row.status === 'active') setStatus('active');
-      else if (row.status === 'blocked') setStatus('blocked');
-      else setStatus('pending');
-    } catch {
-      // On a transient error, don't lock the doctor out — let them into the portal.
-      setStatus('active');
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
+    async function poll() {
+      try {
+        const response = await authedFetch('/api/doctor-status', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw new Error('authorization_unavailable');
+        const body = await response.json() as PrivateDoctorStatus;
+        if (body.source !== 'private_registry' || !body.authorization) throw new Error('authorization_unverified');
+        if (!alive) return;
+        setRecord(body);
+        if (!body.doctor) setStatus('unregistered');
+        else if (body.authorized && body.wallet && body.authorization.status === 'authorized' && (body.authorization.validUntil ?? 0) * 1000 > Date.now()) setStatus('active');
+        else if (['expired', 'revoked', 'paused'].includes(body.authorization.status)) setStatus(body.authorization.status as 'expired' | 'revoked' | 'paused');
+        else setStatus('pending');
+      } catch {
+        if (alive) { setRecord(null); setStatus('error'); }
+      } finally {
+        if (alive) timer = setTimeout(() => void poll(), 3000);
+      }
     }
-  }, []);
-
-  useEffect(() => { void check(); }, [check]);
+    void poll();
+    return () => { alive = false; controller.abort(); clearTimeout(timer); };
+  }, [email, refresh]);
 
   if (status === 'loading') {
     return (
@@ -370,19 +347,18 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (status === 'unregistered') return <RegistrationForm email={email ?? ''} onDone={check} />;
-  if (status === 'pending') return <StatusScreen variant="pending" onRefresh={check} />;
-  if (status === 'blocked') return <StatusScreen variant="blocked" onRefresh={check} />;
-  return <DoctorShell>{children}</DoctorShell>;
+  if (status === 'unregistered') return <RegistrationPending email={email ?? ''} onDone={check} />;
+  if (status !== 'active' || !record) return <StatusScreen variant={status === 'active' ? 'error' : status} onRefresh={check} />;
+  return <DoctorShell authorization={record}>{children}</DoctorShell>;
 }
 
 // ── Layout (default export) ───────────────────────────────────────────────────
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
   const router = useRouter();
 
   useEffect(() => {
-    if (ready && !authenticated) router.push('/');
+    if (ready && !authenticated) router.replace('/login?role=doctor');
   }, [ready, authenticated, router]);
 
   if (!ready || !authenticated) {
@@ -393,5 +369,5 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  return <DoctorAccessGate>{children}</DoctorAccessGate>;
+  return <WalletBoundary key={user?.id}><DoctorAccessGate>{children}</DoctorAccessGate></WalletBoundary>;
 }

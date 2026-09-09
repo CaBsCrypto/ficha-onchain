@@ -162,7 +162,8 @@ export function DisponibilidadTab() {
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-slate-800">Disponibilidad</h2>
-        <p className="text-xs text-slate-400">{doctorEmail}</p>
+        <p className="break-all text-xs text-slate-500">{doctorEmail}</p>
+        <p className="mt-2 text-sm text-slate-600">Todas las horas corresponden a Chile continental (America/Santiago), incluidos sus cambios de horario.</p>
       </div>
 
       {loading ? (
@@ -252,7 +253,7 @@ export function DisponibilidadTab() {
                       {g.items.map((b, i) => (
                         <span
                           key={`${b.start_time}-${b.end_time}-${i}`}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
+                          className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
                         >
                           <span className="font-medium">{b.start_time}–{b.end_time}</span>
                           <span className="text-xs text-slate-400">{b.slot_minutes} min</span>
@@ -275,7 +276,7 @@ export function DisponibilidadTab() {
             </div>
 
             {gridError && (
-              <div className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{gridError}</div>
+              <div role="alert" className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{gridError}</div>
             )}
             {gridSaved && (
               <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
@@ -288,7 +289,7 @@ export function DisponibilidadTab() {
                 type="button"
                 onClick={() => void handleSaveGrid()}
                 disabled={savingGrid}
-                className="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 {savingGrid ? (
                   <span className="flex items-center justify-center gap-2"><Spinner /> Guardando…</span>

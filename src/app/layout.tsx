@@ -19,29 +19,29 @@ const SITE_URL = "https://trustleaf-demo.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "TrustLeaf — Patient-owned health records on Stellar",
+  title: "TrustLeaf — Recetas privadas en Stellar Testnet",
   description:
-    "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
+    "Portales de médico y paciente con Privy y recetas privadas verificadas en Stellar Testnet. Entorno de validación con datos sintéticos.",
   keywords: [
-    "medical records",
-    "blockchain health",
+    "recetas privadas",
+    "Stellar Testnet",
     "Stellar",
     "Chile",
-    "patient owned",
+    "Privy",
   ],
   openGraph: {
-    title: "TrustLeaf — Patient-owned health records on Stellar",
+    title: "TrustLeaf — Recetas privadas en Stellar Testnet",
     description:
-      "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
+      "Médico y paciente completan sus recorridos con Privy. Solo datos sintéticos y Stellar Testnet.",
     url: SITE_URL,
     type: "website",
     images: ["/og-image.png"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "TrustLeaf — Patient-owned health records on Stellar",
+    title: "TrustLeaf — Recetas privadas en Stellar Testnet",
     description:
-      "Your complete medical record, owned by you and verified on-chain. Doctors issue verifiable prescriptions. Pharmacies verify instantly via QR. Built on Stellar Soroban.",
+      "Médico y paciente completan sus recorridos con Privy. Solo datos sintéticos y Stellar Testnet.",
     images: ["/og-image.png"],
   },
 };
@@ -53,7 +53,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-canvas text-ink">
@@ -65,5 +65,4 @@ export default function RootLayout({
     </html>
   );
 }
-
 

@@ -1,0 +1,37 @@
+{
+  "capturedAt": "2026-09-09T07:22:35.380Z",
+  "network": "testnet",
+  "environment": "local portal and Neon dev",
+  "requestId": "835deb56-195d-4d06-9750-6b8f51ae7009",
+  "doctorId": 10,
+  "method": "authorize_doctor",
+  "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "wallet": "GAK5N7RPGZMHGFOJ7ZJCC5YCD6WUHGMMJMFBMGM5JGMKTV3KPVROS4DX",
+  "transactionHash": "73d76a60169f36962e986c8d52ba9b433166193b447d62d2d1ca24b1cf7510de",
+  "receiptStatus": "SUCCESS",
+  "ledger": 4582958,
+  "confirmedAt": "2026-09-09T07:20:05.526Z",
+  "authorization": {
+    "authorization": {
+      "commitment": "d2a1da1b138bcb283a6dbf07b96fbd724c6e5cf9b4015ec6c8102ec731fc3543",
+      "schema_version": 1,
+      "version": 1,
+      "valid_until": 1791530220,
+      "revoked": false
+    },
+    "authorized": true,
+    "admin": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO"
+  },
+  "checks": {
+    "receiptSuccess": true,
+    "hashMatches": true,
+    "feeBump": true,
+    "relayerPays": true,
+    "authoritySource": true,
+    "encryptedEnvelope": true,
+    "commitmentMatches": true,
+    "recipientMatches": true,
+    "stateConfirmed": true,
+    "chainAuthorized": true
+  }
+}
