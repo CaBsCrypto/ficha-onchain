@@ -1,0 +1,256 @@
+{
+  "recordedAt": "2026-09-09T09:17:56.656Z",
+  "scope": "Week 2 local validation and independently verified GitHub Actions; deployment walkthrough and formal acceptance are separate.",
+  "sourceRecords": [
+    {
+      "name": "week2-pr2-validation.json",
+      "sha256": "406509f9970c83fd08012a717bb87248154b32329f59d007bf6ff722f575b72f"
+    },
+    {
+      "name": "week2-contract-private-checks.json",
+      "sha256": "91af89f311ec078ec432ae8365752e50a11de519d11712d99058c70151be32c8"
+    }
+  ],
+  "local": {
+    "application": {
+      "validatedOn": "2026-09-09",
+      "sourceCommit": "df812d84be6dbb05c0e7d68feebe20cceef2cc2c",
+      "status": "passed",
+      "testsPassed": 414,
+      "suitesPassed": 34,
+      "typeScript": {
+        "exitCode": 0,
+        "status": "passed"
+      },
+      "build": {
+        "exitCode": 0,
+        "status": "passed"
+      },
+      "sourceSnapshotManifestSha256": "3a267ca0bc9a9547844e76d384dd62dbccf9d3c6bbb2d6a984200a36d0f44e11",
+      "sourceSnapshotFileCount": 455,
+      "limitations": [
+        "Local checks used Node 24.14.0; CI uses Node 22.",
+        "Local checks reused installed dependencies; remote CI performed its own installation.",
+        "Isolated checks did not perform a browser walkthrough, migration, deployment or chain transaction."
+      ]
+    },
+    "contracts": {
+      "sourceCommit": "5b3c9cb3a3166d19c81fb10c78aea132ca60fa9b",
+      "observedDocumentationHead": "58d0df03fa31a3908eedb8c443352e4c810ed613",
+      "startedAt": "2026-09-09T09:10:32.275Z",
+      "completedAt": "2026-09-09T09:10:44.449Z",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "exitCode": 0,
+      "suites": [
+        {
+          "crate": "doctor-registry-private",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "testNames": [
+            "test::administrative_writes_require_signature",
+            "test::admin_transfer_requires_acceptance",
+            "test::pause_does_not_prevent_revocation",
+            "test::lifecycle_and_expiry"
+          ]
+        },
+        {
+          "crate": "prescription-private",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "testNames": [
+            "test::only_patient_can_authorize_or_revoke_consent",
+            "test::booking_requires_authority_signature_and_exact_arguments",
+            "test::patient_consent_is_scoped_revocable_expiring_and_single_use",
+            "test::signatures_expiry_and_blocking",
+            "test::only_the_authorized_doctors_signature_can_issue_to_the_signed_recipient",
+            "test::authorized_private_issuance_lifecycle_and_duplicates",
+            "test::direct_mint_requires_matching_live_booking_and_consumes_it_atomically"
+          ]
+        }
+      ]
+    },
+    "privateServices": {
+      "sourceCommit": "5b3c9cb3a3166d19c81fb10c78aea132ca60fa9b",
+      "startedAt": "2026-09-09T09:10:32.287Z",
+      "completedAt": "2026-09-09T09:10:33.240Z",
+      "status": "passed",
+      "passed": 43,
+      "failed": 0,
+      "exitCode": 0,
+      "testFiles": [
+        "scripts/worker-doctor-authorizations.test.mjs",
+        "scripts/worker-prescription-bookings.test.mjs",
+        "scripts/worker-private-portal.test.mjs",
+        "scripts/lib/private-doctor-dossier.test.mjs",
+        "scripts/lib/private-prescription.test.mjs",
+        "scripts/lib/read-private-prescription.test.mjs"
+      ],
+      "sourceFilesMatchReferencedCommit": true
+    },
+    "privateCheckScope": {
+      "liveChainReads": false,
+      "transactions": false,
+      "databaseWrites": false,
+      "deployments": false,
+      "wasmRebuild": false
+    }
+  },
+  "remoteCi": {
+    "verifiedAt": "2026-09-09T09:17:56.657Z",
+    "repository": "CaBsCrypto/ficha-onchain",
+    "runs": [
+      {
+        "pullRequest": 101,
+        "runId": 34332973332,
+        "url": "https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332973332",
+        "workflow": "contracts",
+        "event": "pull_request",
+        "headCommit": "5b3c9cb3a3166d19c81fb10c78aea132ca60fa9b",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-09-09T09:07:57Z",
+        "completedAt": "2026-09-09T09:08:56Z",
+        "jobs": [
+          {
+            "name": "cargo test (Soroban contracts)",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAt": "2026-09-09T09:08:55Z",
+            "checks": [
+              {
+                "name": "Run test suite",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "build WASM",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAt": "2026-09-09T09:08:27Z",
+            "checks": [
+              {
+                "name": "Build contracts with Stellar CLI",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "verifiedLogCounts": {
+          "registryTests": 4,
+          "prescriptionTests": 7,
+          "failed": 0
+        }
+      },
+      {
+        "pullRequest": 101,
+        "runId": 34332973321,
+        "url": "https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332973321",
+        "workflow": "ci",
+        "event": "pull_request",
+        "headCommit": "5b3c9cb3a3166d19c81fb10c78aea132ca60fa9b",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-09-09T09:07:57Z",
+        "completedAt": "2026-09-09T09:10:48Z",
+        "jobs": [
+          {
+            "name": "typecheck + build",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAt": "2026-09-09T09:10:47Z",
+            "checks": [
+              {
+                "name": "Install",
+                "conclusion": "success"
+              },
+              {
+                "name": "Typecheck",
+                "conclusion": "success"
+              },
+              {
+                "name": "Unit tests",
+                "conclusion": "success"
+              },
+              {
+                "name": "Private services, identity and worker tests",
+                "conclusion": "success"
+              },
+              {
+                "name": "Build",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "verifiedLogCounts": {
+          "privateServiceTests": 43,
+          "privateServiceFailures": 0
+        }
+      },
+      {
+        "pullRequest": 102,
+        "runId": 34332997629,
+        "url": "https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332997629",
+        "workflow": "ci",
+        "event": "pull_request",
+        "headCommit": "58d0df03fa31a3908eedb8c443352e4c810ed613",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-09-09T09:08:12Z",
+        "completedAt": "2026-09-09T09:10:57Z",
+        "jobs": [
+          {
+            "name": "typecheck + build",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAt": "2026-09-09T09:10:56Z",
+            "checks": [
+              {
+                "name": "Install",
+                "conclusion": "success"
+              },
+              {
+                "name": "Typecheck",
+                "conclusion": "success"
+              },
+              {
+                "name": "Unit tests",
+                "conclusion": "success"
+              },
+              {
+                "name": "Private services, identity and worker tests",
+                "conclusion": "success"
+              },
+              {
+                "name": "Build",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "verifiedLogCounts": {
+          "privateServiceTests": 43,
+          "privateServiceFailures": 0
+        }
+      }
+    ],
+    "documentationHead": "58d0df03fa31a3908eedb8c443352e4c810ed613",
+    "testedApplicationSource": "df812d84be6dbb05c0e7d68feebe20cceef2cc2c",
+    "documentationOnlyDifferenceVerified": true,
+    "limitations": [
+      "Successful GitHub Actions verify tests and builds for the recorded pull-request heads; they do not certify a deployed preview or formal acceptance.",
+      "Remote application-suite totals are not repeated here; the workflow step success was independently verified."
+    ]
+  },
+  "pending": [
+    "Isolated deployed preview walkthrough and application link",
+    "Final walkthrough video",
+    "Remaining real-service browser failure and negative-access scenarios",
+    "Formal reviewer acceptance"
+  ]
+}
