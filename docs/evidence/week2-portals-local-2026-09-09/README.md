@@ -14,7 +14,7 @@ Las firmas de paciente y médico se realizaron mediante Privy desde sus propias 
 
 ## Evidencia independiente de recibos
 
-Los archivos siguientes contienen resultados saneados de consultas de sólo lectura a Neon dev y al RPC de Stellar Testnet. No contienen documentos clínicos, ciphertext, sobres XDR, firmas sin procesar, encabezados de autenticación, correos personales ni claves.
+Los archivos siguientes separan las lecturas de Neon dev/RPC, las observaciones de navegador y la validación automatizada. No contienen documentos clínicos, ciphertext, sobres XDR, firmas sin procesar, encabezados de autenticación, correos personales ni claves.
 
 | Archivo | Evidencia |
 |---|---|
@@ -23,8 +23,9 @@ Los archivos siguientes contienen resultados saneados de consultas de sólo lect
 | [week2-prescription-receipts.json](week2-prescription-receipts.json) | Cinco recibos `SUCCESS`: dos emisiones, dos activaciones y una revocación. Firma del médico, patrocinio, compromiso, emisor, destinatario, identificador, schema y vencimiento verificados. |
 | [week2-unauthenticated-access.json](week2-unauthenticated-access.json) | Tres peticiones HTTP locales sin sesión: listado y ambos documentos rechazados con `401`, únicamente error de autenticación y sin contenido clínico. |
 | [browser-observations.json](browser-observations.json) | Observación del agente principal: sesión del paciente, estados activo/revocado y apertura autorizada de ambos documentos con HTTP `200`, sin adjuntar contenido clínico. |
+| [validation-results.json](validation-results.json) | Resultados locales por versión, pruebas contractuales y de servicios, TypeScript, build y tres ejecuciones de GitHub Actions verificadas. |
 
-Los **11 recibos de las consultas** son transacciones, no un total de pruebas automatizadas. No se incorporan totales de pruebas hasta recibir la validación correspondiente.
+Los **11 recibos de las consultas** son transacciones. Los totales de pruebas automatizadas se detallan por separado a continuación.
 
 En el corte final de datos de las **08:57:32.389 UTC**, seguido de lectura de cadena hasta las **08:57:36.423 UTC**, la receta 3 figuraba `Active` y la receta 4 `Revoked`; ambas reservas estaban consumidas y ambas consultas finalizadas. No había operaciones pendientes de esas consultas o sus cuentas firmantes, ni fuentes con pendientes duplicadas. Las lecturas históricas y de estado actual están identificadas por fechas y ledgers dentro de cada archivo.
 
@@ -42,15 +43,38 @@ El agente principal encargado de operar y observar la interfaz registró:
 
 Estas observaciones se distinguen de la auditoría independiente de DB/RPC: los recibos verifican las wallets firmantes y los efectos contractuales; por sí solos no prueban el uso de una pantalla o de un SDK concreto. La auditoría no descifró documentos ni recalculó compromisos desde su contenido.
 
+## Pruebas locales y CI verificados
+
+Resultados locales del **9 de septiembre de 2026**:
+
+| Comprobación | Resultado | Versión y fecha |
+|---|---|---|
+| Aplicación | **414 pruebas aprobadas en 34 suites** | Código exacto `df812d8`, 9 de septiembre |
+| TypeScript | **Aprobado**, salida 0 | `df812d8` |
+| Build de la aplicación | **Aprobado**, salida 0 | `df812d8` |
+| Contratos privados | **11 pruebas aprobadas**: 4 de registro y 7 de recetas; 0 fallos | Fuentes `5b3c9cb`, nueva ejecución de **09:10:32 a 09:10:44 UTC** |
+| Servicios privados, identidad y workers | **43 pruebas aprobadas**, 0 fallos | Fuentes `5b3c9cb`, nueva ejecución de **09:10:32 a 09:10:33 UTC** |
+
+Las pruebas aisladas no ejecutaron transacciones ni desplegaron aplicaciones. La comprobación local de la aplicación utilizó Node 24 y dependencias previamente instaladas; el CI utilizó Node 22 y ejecutó su propia instalación. [validation-results.json](validation-results.json) conserva las versiones completas, la procedencia saneada y los nombres de las 11 pruebas contractuales.
+
+También se consultaron directamente los metadatos y resúmenes de GitHub Actions. Las tres ejecuciones terminaron en **`success`**:
+
+| Ejecución | Versión del PR | Comprobaciones aprobadas |
+|---|---|---|
+| [PR 101 · Contratos · run 34332973332](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332973332) | `5b3c9cb` | 11 pruebas contractuales y compilación WASM |
+| [PR 101 · Aplicación · run 34332973321](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332973321) | `5b3c9cb` | Instalación, TypeScript, pruebas de aplicación, 43 pruebas privadas y build |
+| [PR 102 · Aplicación · run 34332997629](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34332997629) | `58d0df0` | Instalación, TypeScript, pruebas de aplicación, 43 pruebas privadas y build |
+
+`58d0df0` añadió documentación sobre `df812d8`; se verificó que esa diferencia no cambia el código de la aplicación. Los conteos locales de 414/34 se atribuyen al código exacto probado localmente; para el CI se documentan las etapas y conteos confirmados en sus registros. **El CI aprobado y el build WASM no acreditan un recorrido sobre el preview desplegado**, que permanece pendiente.
+
 ## Pendientes para el entregable
 
 - Evidencia del rechazo de una identidad autenticada ajena y demás validaciones finales de integridad y recuperación.
 - Validaciones de navegador aún no acreditadas para cancelación concurrente y otros fallos de Privy/RPC o reinicio; este recorrido exitoso no sustituye esas comprobaciones.
-- Resultados finales de pruebas automatizadas, TypeScript y build de la versión que se entregará.
 - Validación del preview aislado, enlace de aplicación desplegada, video de ambos recorridos y aceptación formal del responsable.
 
 La validación local no habilita uso clínico real. La revocación conserva el historial y no se presenta como eliminación de la receta o de su documento.
 
 ## Integridad del paquete
 
-[manifest.json](manifest.json) registra tamaño y SHA-256 del README y de los cinco archivos JSON. No incluye su propio hash. Los identificadores y wallets incluidos son datos públicos de prueba; no se copiaron archivos de entorno ni material de firma.
+[manifest.json](manifest.json) registra tamaño y SHA-256 del README y de los seis archivos JSON. No incluye su propio hash. Los identificadores y wallets incluidos son datos públicos de prueba; no se copiaron archivos de entorno ni material de firma.

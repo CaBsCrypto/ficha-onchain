@@ -8,7 +8,7 @@
 
 TrustLeaf connects doctor and patient portals to **two smart contracts on Stellar Testnet**. Patients book a consultation and separately authorize one prescription. Doctors issue, activate and revoke prescriptions using their own Stellar wallets through Privy. TrustLeaf's relayer pays network fees; users do not need an external wallet or XLM purchases.
 
-**Week 2 integration candidate — September 9, 2026.** Testnet and synthetic data only. The complete patient/doctor browser walkthrough, validated deployment and Week 2 video remain pending.
+**Week 2 integration candidate — September 9, 2026.** Testnet and synthetic data only. The local doctor/patient walkthrough is complete, with one active prescription and one revoked prescription. Validation on the isolated deployment and the Week 2 video remain pending.
 
 [Week 2 operation and acceptance guide](./docs/sow-delivery/WEEK_2_PORTALS.md) · [Current configuration template](./config/testnet-config.example.txt) · [Week 1 evidence](#week-1-evidence--september-7-2026)
 
@@ -19,7 +19,8 @@ TrustLeaf connects doctor and patient portals to **two smart contracts on Stella
 - Three distinct test accounts have confirmed owner-signing probes with relayer-paid Testnet receipts: administrator, doctor and patient.
 - Administrative doctor authorization has been confirmed in `DoctorRegistryPrivate`. The doctor has entered the local portal with their own Privy session, seen the confirmed authorization and saved availability.
 - The doctor and patient interfaces are connected to the private booking, consent, prescription and recovery services. An isolated, empty Neon preview branch has been created and migrated.
-- **Still to validate:** the patient interface and two complete consultations, with one active prescription and one revoked prescription; private document access and rejection of unrelated identities; preview and main test-site deployment; the recorded walkthrough and reviewer handoff.
+- The [local walkthrough and validation package](./docs/evidence/week2-portals-local-2026-09-09/README.md) records two completed consultations, one active prescription and one revoked prescription, separate consent and withdrawal, and private document access by the patient and issuing doctor. Unauthenticated requests were rejected. Local checks passed: **414 application tests, 43 private-service tests, 11 contract tests, TypeScript and build**; source versions and remote CI results are identified in the package.
+- **Still to validate:** access rejection for an unrelated authenticated identity and remaining failure scenarios; the complete walkthrough on the isolated preview and main test site; the recorded walkthrough and reviewer handoff.
 
 These completed prerequisites do not close Week 2. Test results and browser receipts must be recorded against the version being reviewed; the Week 1 totals below are historical evidence.
 
