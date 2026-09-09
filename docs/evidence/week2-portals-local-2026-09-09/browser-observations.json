@@ -1,0 +1,48 @@
+{
+  "reportedAt": "2026-09-09T09:01:53.000Z",
+  "environment": "local",
+  "network": "testnet",
+  "source": "Observed in the browser by the principal agent operating the authenticated patient portal; recorded from its explicit report. This file does not claim an independent HTTP request by the evidence auditor.",
+  "sourceVersion": "df812d8",
+  "versionContext": "The doctor transaction walkthrough ran on 7c2ff26. df812d8 only changed pending-operation messages before this patient read validation.",
+  "role": "patient",
+  "page": "/patient?tab=recetas",
+  "checks": {
+    "privyAuthenticated": true,
+    "samePersistentWalletBinding": true,
+    "activePrescription3Visible": true,
+    "revokedPrescription4Visible": true,
+    "activationControlAbsent": true,
+    "revocationControlAbsent": true,
+    "syntheticDocumentContentsMatchExpectedIssuance": true
+  },
+  "documents": [
+    {
+      "prescriptionId": "3",
+      "applicationRecordId": "cdf6bd78-9d0b-41be-aec6-0197f2cd189a",
+      "displayedStatus": "Active",
+      "method": "GET",
+      "path": "/api/private-prescriptions/cdf6bd78-9d0b-41be-aec6-0197f2cd189a/document",
+      "httpStatus": 200,
+      "openedInPatientInterface": true,
+      "expectedSyntheticContentMatched": true
+    },
+    {
+      "prescriptionId": "4",
+      "applicationRecordId": "73741249-1a6a-4878-ad8b-abba9ca3ecba",
+      "displayedStatus": "Revoked",
+      "method": "GET",
+      "path": "/api/private-prescriptions/73741249-1a6a-4878-ad8b-abba9ca3ecba/document",
+      "httpStatus": 200,
+      "openedInPatientInterface": true,
+      "expectedSyntheticContentMatched": true
+    }
+  ],
+  "privacy": {
+    "documentPlaintextIncluded": false,
+    "ciphertextIncluded": false,
+    "personalEmailsIncluded": false,
+    "tokensHeadersKeysIncluded": false
+  },
+  "limitation": "Local browser happy-path evidence. Preview deployment, remote CI, video, formal acceptance and remaining browser fault scenarios are not accredited by this observation."
+}

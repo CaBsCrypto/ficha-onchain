@@ -1,0 +1,42 @@
+{
+  "createdAt": "2026-09-09T09:02:31.101Z",
+  "scope": "Week 2 local portal validation, partial delivery",
+  "network": "testnet",
+  "walkthroughVersion": "7c2ff26",
+  "subsequentMessageOnlyChange": "df812d8",
+  "hashAlgorithm": "SHA-256",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6523,
+      "sha256": "661072e6308506e9950ddf9bb8e6ea711d165cb7598f7225b2dcd8407d5f23be"
+    },
+    {
+      "path": "week2-booking-receipts.json",
+      "bytes": 2858,
+      "sha256": "4421e7cbc2ffa4e51baa002743ca26c15f948770e379b66a9b44d6e1fa1a7fcd"
+    },
+    {
+      "path": "week2-consent-receipts.json",
+      "bytes": 7162,
+      "sha256": "dfb2267ae4d868b74acf6d277ed368363060f592433833728961aeb3fd5fb122"
+    },
+    {
+      "path": "week2-prescription-receipts.json",
+      "bytes": 13852,
+      "sha256": "65eb8d84ce738b33dd0377f93f809e63009670b371a32479826a6c3e78ebb4c7"
+    },
+    {
+      "path": "week2-unauthenticated-access.json",
+      "bytes": 1162,
+      "sha256": "03d51fadfc88d382dc2714fcd6c80b9588787238806499e3945db61f3caa5a00"
+    },
+    {
+      "path": "browser-observations.json",
+      "bytes": 1985,
+      "sha256": "10d2cca5bd463e9174aff2d4ccfd3796ca8c89c02ae77ad62284e6f9febfc781"
+    }
+  ],
+  "updatedAt": "2026-09-09T09:04:31.455Z",
+  "patientReadVersion": "df812d8"
+}

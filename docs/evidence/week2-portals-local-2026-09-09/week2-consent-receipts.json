@@ -1,0 +1,193 @@
+{
+  "capturedAt": "2026-09-09T08:44:53.785Z",
+  "databaseCapturedAt": "2026-09-09T08:44:51.484Z",
+  "environment": "local",
+  "network": "testnet",
+  "databaseReadOnly": true,
+  "rpcReadOnly": true,
+  "appointments": [
+    {
+      "id": 76,
+      "doctorId": 10,
+      "bookingState": "confirmed",
+      "issuanceId": "58ed3f044f45fc003052c5f8e96b75cfc804335a52be4f2af24e9dda853d42a2",
+      "validUntil": 1788944471,
+      "validUntilUtc": "2026-09-09T09:01:11.000Z",
+      "patientBindingMatches": true
+    },
+    {
+      "id": 77,
+      "doctorId": 10,
+      "bookingState": "confirmed",
+      "issuanceId": "b002a5ec958384bad4522553c4672913eff775c9905d59fa52d2b3bdad37045d",
+      "validUntil": 1788944512,
+      "validUntilUtc": "2026-09-09T09:01:52.000Z",
+      "patientBindingMatches": true
+    }
+  ],
+  "operations": [
+    {
+      "id": "5243c74f-6396-4e26-b2b8-d3805280f588",
+      "appointment_id": 76,
+      "action": "consent",
+      "method": "authorize_prescriber",
+      "state": "confirmed",
+      "transaction_hash": "466747a13cc65ea7bcc1d71fef8549b4bce472322c38689365eb500b0ea428eb",
+      "error_code": null,
+      "created_at": "2026-09-09T08:40:00.137Z",
+      "confirmed_at": "2026-09-09T08:40:28.530Z"
+    },
+    {
+      "id": "f08c1c0b-ba44-46e3-ac90-d4dc95c5c435",
+      "appointment_id": 76,
+      "action": "withdraw_consent",
+      "method": "revoke_consent",
+      "state": "confirmed",
+      "transaction_hash": "85e8f17aaca0e09965c8eda9df3e1895ed067a2bd3bc217cdb62ba3eae56173d",
+      "error_code": null,
+      "created_at": "2026-09-09T08:41:05.310Z",
+      "confirmed_at": "2026-09-09T08:41:25.506Z"
+    },
+    {
+      "id": "a3da2712-349e-4822-a120-c3ff4b903ab9",
+      "appointment_id": 76,
+      "action": "consent",
+      "method": "authorize_prescriber",
+      "state": "confirmed",
+      "transaction_hash": "8d5f0cf22d001dae5ccf4b244d0b88f64be8a6a52a1b069c66263611f5fd340e",
+      "error_code": null,
+      "created_at": "2026-09-09T08:41:39.452Z",
+      "confirmed_at": "2026-09-09T08:42:06.252Z"
+    },
+    {
+      "id": "c85d3a0b-bb07-492e-a4eb-a5b34b6db910",
+      "appointment_id": 77,
+      "action": "consent",
+      "method": "authorize_prescriber",
+      "state": "confirmed",
+      "transaction_hash": "3eed3906378de64b4a0b9999dc84b45ff6fe58f52be5894d76b7615e3ac9c683",
+      "error_code": null,
+      "created_at": "2026-09-09T08:43:13.541Z",
+      "confirmed_at": "2026-09-09T08:43:38.095Z"
+    }
+  ],
+  "receipts": [
+    {
+      "appointmentId": 76,
+      "operationId": "5243c74f-6396-4e26-b2b8-d3805280f588",
+      "hash": "466747a13cc65ea7bcc1d71fef8549b4bce472322c38689365eb500b0ea428eb",
+      "status": "SUCCESS",
+      "ledger": 4583927,
+      "ledgerClosedAt": "2026-09-09T08:40:22.000Z",
+      "method": "authorize_prescriber",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "patientWallet": "GDUIUM2OR4LCV4Y6R3ZQRWMC3FZR4QRYWHQ4MKZISQ56K3ZNSGVWBMO5",
+      "relayWallet": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "issuanceId": "58ed3f044f45fc003052c5f8e96b75cfc804335a52be4f2af24e9dda853d42a2",
+      "validUntil": 1788944471,
+      "databaseState": "confirmed",
+      "databaseConfirmedAt": "2026-09-09T08:40:28.530Z",
+      "checks": {
+        "receiptSuccess": true,
+        "hashMatches": true,
+        "feeBump": true,
+        "contractMatches": true,
+        "methodMatches": true,
+        "sourceIsPatient": true,
+        "operationSourceMatches": true,
+        "patientSignatureValid": true,
+        "relayerPays": true,
+        "relayerSignatureValid": true,
+        "argumentsMatch": true
+      }
+    },
+    {
+      "appointmentId": 76,
+      "operationId": "f08c1c0b-ba44-46e3-ac90-d4dc95c5c435",
+      "hash": "85e8f17aaca0e09965c8eda9df3e1895ed067a2bd3bc217cdb62ba3eae56173d",
+      "status": "SUCCESS",
+      "ledger": 4583939,
+      "ledgerClosedAt": "2026-09-09T08:41:22.000Z",
+      "method": "revoke_consent",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "patientWallet": "GDUIUM2OR4LCV4Y6R3ZQRWMC3FZR4QRYWHQ4MKZISQ56K3ZNSGVWBMO5",
+      "relayWallet": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "issuanceId": "58ed3f044f45fc003052c5f8e96b75cfc804335a52be4f2af24e9dda853d42a2",
+      "validUntil": null,
+      "databaseState": "confirmed",
+      "databaseConfirmedAt": "2026-09-09T08:41:25.506Z",
+      "checks": {
+        "receiptSuccess": true,
+        "hashMatches": true,
+        "feeBump": true,
+        "contractMatches": true,
+        "methodMatches": true,
+        "sourceIsPatient": true,
+        "operationSourceMatches": true,
+        "patientSignatureValid": true,
+        "relayerPays": true,
+        "relayerSignatureValid": true,
+        "argumentsMatch": true
+      }
+    },
+    {
+      "appointmentId": 76,
+      "operationId": "a3da2712-349e-4822-a120-c3ff4b903ab9",
+      "hash": "8d5f0cf22d001dae5ccf4b244d0b88f64be8a6a52a1b069c66263611f5fd340e",
+      "status": "SUCCESS",
+      "ledger": 4583947,
+      "ledgerClosedAt": "2026-09-09T08:42:02.000Z",
+      "method": "authorize_prescriber",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "patientWallet": "GDUIUM2OR4LCV4Y6R3ZQRWMC3FZR4QRYWHQ4MKZISQ56K3ZNSGVWBMO5",
+      "relayWallet": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "issuanceId": "58ed3f044f45fc003052c5f8e96b75cfc804335a52be4f2af24e9dda853d42a2",
+      "validUntil": 1788944471,
+      "databaseState": "confirmed",
+      "databaseConfirmedAt": "2026-09-09T08:42:06.252Z",
+      "checks": {
+        "receiptSuccess": true,
+        "hashMatches": true,
+        "feeBump": true,
+        "contractMatches": true,
+        "methodMatches": true,
+        "sourceIsPatient": true,
+        "operationSourceMatches": true,
+        "patientSignatureValid": true,
+        "relayerPays": true,
+        "relayerSignatureValid": true,
+        "argumentsMatch": true
+      }
+    },
+    {
+      "appointmentId": 77,
+      "operationId": "c85d3a0b-bb07-492e-a4eb-a5b34b6db910",
+      "hash": "3eed3906378de64b4a0b9999dc84b45ff6fe58f52be5894d76b7615e3ac9c683",
+      "status": "SUCCESS",
+      "ledger": 4583965,
+      "ledgerClosedAt": "2026-09-09T08:43:32.000Z",
+      "method": "authorize_prescriber",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "patientWallet": "GDUIUM2OR4LCV4Y6R3ZQRWMC3FZR4QRYWHQ4MKZISQ56K3ZNSGVWBMO5",
+      "relayWallet": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "issuanceId": "b002a5ec958384bad4522553c4672913eff775c9905d59fa52d2b3bdad37045d",
+      "validUntil": 1788944512,
+      "databaseState": "confirmed",
+      "databaseConfirmedAt": "2026-09-09T08:43:38.095Z",
+      "checks": {
+        "receiptSuccess": true,
+        "hashMatches": true,
+        "feeBump": true,
+        "contractMatches": true,
+        "methodMatches": true,
+        "sourceIsPatient": true,
+        "operationSourceMatches": true,
+        "patientSignatureValid": true,
+        "relayerPays": true,
+        "relayerSignatureValid": true,
+        "argumentsMatch": true
+      }
+    }
+  ],
+  "prescriptions": []
+}
