@@ -1,0 +1,46 @@
+{
+  "capturedAt": "2026-09-09T08:58:47.417Z",
+  "environment": "local",
+  "origin": "http://127.0.0.1:3002",
+  "authenticated": false,
+  "phase": "after_doctor_lifecycle_completed",
+  "results": [
+    {
+      "method": "GET",
+      "path": "/api/private-prescriptions",
+      "status": 401,
+      "authorizationHeaderSent": false,
+      "cookiesSent": false,
+      "checks": {
+        "http401": true,
+        "errorOnly": true,
+        "noClinicalContent": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/private-prescriptions/cdf6bd78-9d0b-41be-aec6-0197f2cd189a/document",
+      "status": 401,
+      "authorizationHeaderSent": false,
+      "cookiesSent": false,
+      "checks": {
+        "http401": true,
+        "errorOnly": true,
+        "noClinicalContent": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/private-prescriptions/73741249-1a6a-4878-ad8b-abba9ca3ecba/document",
+      "status": 401,
+      "authorizationHeaderSent": false,
+      "cookiesSent": false,
+      "checks": {
+        "http401": true,
+        "errorOnly": true,
+        "noClinicalContent": true
+      }
+    }
+  ],
+  "allChecksPass": true
+}

@@ -1,10 +1,11 @@
 # Semana 2 · Operación y validación de los portales
 
 Guía técnica al **9 de septiembre de 2026** para preparar el SOW «Interface:
-Doctor and Patient». Describe la implementación y las verificaciones pendientes.
-**No acredita todavía una demostración completa en navegador, un despliegue
-validado ni el video final de semana 2.** Todos los entornos usan Stellar Testnet
-y datos sintéticos.
+Doctor and Patient». El [recorrido local de ambos portales](../evidence/week2-portals-local-2026-09-09/README.md)
+se completó con dos consultas: receta 3 activa y receta 4 revocada, ambas
+recuperadas por el médico y el paciente desde sus propias sesiones.
+**La validación del despliegue aislado, el video y la aceptación del SOW siguen
+pendientes.** Todos los entornos usan Stellar Testnet y datos sintéticos.
 
 ## Alcance y configuración
 
@@ -206,6 +207,12 @@ fuera del flujo activo, incluidos accesos directos. Sus datos históricos se
 preservan.
 
 ## Comprobaciones y evidencia nueva
+
+El paquete de [validación local del 9 de septiembre](../evidence/week2-portals-local-2026-09-09/README.md)
+conserva once recibos de transacciones verificados, las observaciones del
+navegador y las respuestas de rechazo sin sesión. Distingue las versiones de
+las acciones y de la lectura final. Esos once recibos no son un total de pruebas
+automatizadas ni certifican un despliegue remoto.
 
 Antes de publicar la versión candidata, ejecutar y guardar los resultados de
 esa versión, con fecha y commit. Estos comandos de pruebas no constituyen por
