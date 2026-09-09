@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mergeOperation, recoverPrivateOperation, verifiedOperation } from '@/components/private-portal/operation-recovery';
-import { portalErrorMessage } from '@/components/private-portal/errors';
+import { operationNoticeDetail, portalErrorMessage } from '@/components/private-portal/errors';
 import type { PrivateOperation } from '@/components/private-portal/types';
 
 const submitted: PrivateOperation = { id: 'durable-attempt', action: 'mint', state: 'submitted', transactionHash: 'ab'.repeat(32) };
@@ -86,4 +86,93 @@ describe('Monotonic UI state and reviewer-visible errors', () => {
     expect(portalErrorMessage('private_writes_paused')).toContain('temporalmente deshabilitadas');
   });
   it('does not expose unrecognized provider payloads in an error message', () => expect(portalErrorMessage('secret provider payload')).not.toContain('secret provider payload'));
+});
+
+const changedEligibility = [
+  { action: 'consent', errorCode: 'consent_already_active' },
+  { action: 'activate', errorCode: 'prescription_not_activatable' },
+] satisfies Pick<PrivateOperation, 'action' | 'errorCode'>[];
+
+describe('Changed eligibility while a saved receipt is pending', () => {
+  it.each(changedEligibility)('keeps $action pending until the same attempt receives confirmation', async (change) => {
+    vi.useFakeTimers();
+    const pending = verifiedOperation({ ...submitted, ...change });
+    const receipt: PrivateOperation = { ...pending, state: 'confirmed', errorCode: null };
+    const read = vi.fn().mockResolvedValueOnce(pending).mockResolvedValueOnce(receipt);
+    const seen: { state: PrivateOperation['state']; detail: string | null }[] = [];
+    const output = observer();
+    const work = recoverPrivateOperation(pending, { ...output, read, onUpdate: next => {
+      seen.push({ state: next.state, detail: operationNoticeDetail(next) });
+    } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toEqual([{ state: 'submitted', detail: expect.stringContaining('todavía no está confirmado') }]);
+    expect(pending.errorCode).toBe(change.errorCode);
+    expect(pending.transactionHash).toBe(submitted.transactionHash);
+    await vi.advanceTimersByTimeAsync(3000);
+    await work;
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toEqual({ state: 'confirmed', detail: null });
+    expect(read.mock.calls.map(call => call[0])).toEqual([pending.id, pending.id]);
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(output.onError).not.toHaveBeenCalled();
+  });
+
+  it.each(changedEligibility)('replaces the pending $action explanation with a real failed receipt', async (change) => {
+    vi.useFakeTimers();
+    const pending = verifiedOperation({ ...submitted, ...change });
+    const failed: PrivateOperation = { ...pending, state: 'failed', errorCode: 'transaction_failed' };
+    const read = vi.fn().mockResolvedValueOnce(pending).mockResolvedValueOnce(failed);
+    const output = observer();
+    const work = recoverPrivateOperation(pending, { ...output, read });
+    await vi.advanceTimersByTimeAsync(3000);
+    await work;
+    const updates = output.onUpdate.mock.calls.map(call => call[0] as PrivateOperation);
+    expect(updates.map(next => next.state)).toEqual(['submitted', 'failed']);
+    expect(operationNoticeDetail(updates[0])).toContain('todavía no está confirmado');
+    expect(operationNoticeDetail(updates[1])).toBe(portalErrorMessage('transaction_failed'));
+    expect(operationNoticeDetail(updates[1])).toContain('Stellar rechazó');
+    expect(updates[1].transactionHash).toBe(pending.transactionHash);
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['awaiting_signature', 'failed', 'cancelled'] as const)('preserves eligibility errors in state %s', state => {
+    for (const change of changedEligibility) {
+      expect(operationNoticeDetail({ ...submitted, ...change, state })).toBe(portalErrorMessage(change.errorCode));
+    }
+  });
+
+  it('does not reinterpret the same codes for a different action', () => {
+    for (const change of changedEligibility) {
+      expect(operationNoticeDetail({ ...submitted, ...change, action: 'revoke' })).toBe(portalErrorMessage(change.errorCode));
+    }
+    expect(operationNoticeDetail({ ...submitted, action: 'consent', errorCode: 'prescription_not_activatable' }))
+      .toBe(portalErrorMessage('prescription_not_activatable'));
+    expect(operationNoticeDetail({ ...submitted, action: 'activate', errorCode: 'consent_already_active' }))
+      .toBe(portalErrorMessage('consent_already_active'));
+  });
+
+  it.each([null, 'z'.repeat(64), 'ab'.repeat(31)])('never treats an invalid receipt hash as normal waiting: %s', transactionHash => {
+    for (const change of changedEligibility) {
+      const invalid = { ...submitted, ...change, transactionHash };
+      expect(() => verifiedOperation(invalid)).toThrow();
+      expect(operationNoticeDetail(invalid)).toBe(portalErrorMessage(change.errorCode));
+    }
+  });
+
+  it('keeps unrelated identity, integrity and relay errors visible on submitted attempts', () => {
+    for (const errorCode of ['wallet_binding_changed', 'operation_context_changed', 'receipt_mismatch', 'relay_response_unavailable']) {
+      const detail = operationNoticeDetail({ ...submitted, action: 'activate', errorCode });
+      expect(detail).toBe(portalErrorMessage(errorCode));
+      expect(detail).not.toBeNull();
+    }
+  });
+
+  it('does not add a warning without a code or retain it after confirmation', () => {
+    expect(operationNoticeDetail(submitted)).toBeNull();
+    for (const change of changedEligibility) {
+      expect(operationNoticeDetail({ ...confirmed, ...change })).toBeNull();
+    }
+  });
 });
