@@ -1,0 +1,97 @@
+{
+  "date": "2026-09-09",
+  "scope": "Week 2 doctor authorization block; local Testnet validation",
+  "checks": {
+    "application": {
+      "command": "npm test -- --run",
+      "files": 28,
+      "passed": 247
+    },
+    "workers": {
+      "command": "node --test scripts/worker-doctor-authorizations.test.mjs scripts/worker-prescription-bookings.test.mjs",
+      "passed": 26,
+      "authorizationTests": 17,
+      "bookingRegressionTests": 9
+    },
+    "contract": {
+      "command": "cargo test --locked -p doctor-registry-private --lib",
+      "passed": 4
+    },
+    "typescript": "passed, included in Next.js build",
+    "build": "npm run build passed with network access for Google Fonts",
+    "migrationParity": true
+  },
+  "limitations": [
+    "Doctor browser login confirmation pending",
+    "Preview and production deployment not performed",
+    "Prescription journey not enabled by this block",
+    "Renewal/revocation/expiry and fault cases verified by automated tests; live receipt recorded for initial authorization only"
+  ],
+  "sourceFiles": [
+    {
+      "path": "src/lib/doctor-authorizations.ts",
+      "bytes": 12938,
+      "sha256": "dec7d6924f593235effb752c59129892b602b7b6acc654c91a6ce3ff78baa9a5"
+    },
+    {
+      "path": "src/lib/auth/admin.ts",
+      "bytes": 2746,
+      "sha256": "6f176b322b9d521291608477e0f7874afc53cbf0c89314d70608c017464a7078"
+    },
+    {
+      "path": "src/app/api/admin/doctor-authorizations/route.ts",
+      "bytes": 2403,
+      "sha256": "f1fa70611bb94cc21e23eebf5a5e0c1802f478950285205af5f3c1029f9ddd7d"
+    },
+    {
+      "path": "src/app/api/doctor-status/route.ts",
+      "bytes": 1302,
+      "sha256": "81b80b4f3b6a9d385867b319d9c497474a9605494e26437a4ce5032ff5aa75af"
+    },
+    {
+      "path": "src/app/admin/doctors/page.tsx",
+      "bytes": 16903,
+      "sha256": "7672807f165bf4bcb57621534f1360851ae36a5a40cae7cee3e6d606514827b6"
+    },
+    {
+      "path": "src/app/doctor/layout.tsx",
+      "bytes": 21440,
+      "sha256": "2e3a30ded207163beb7f5e4d43cb8b329e68d27fb75fb3d5a6f90b4128c936eb"
+    },
+    {
+      "path": "src/app/doctor/page.tsx",
+      "bytes": 2400,
+      "sha256": "0b3486a5e6180e66df9ccaa81c0bc8ac8f63df496784089bc12e963eb7b37bd0"
+    },
+    {
+      "path": "src/components/doctor/InicioTab.tsx",
+      "bytes": 10267,
+      "sha256": "eb533c624b741ec19693d06a5f14025603b2532520ff28288c81d6bd4185ef99"
+    },
+    {
+      "path": "scripts/worker-doctor-authorizations.mjs",
+      "bytes": 19524,
+      "sha256": "52202e3f97259ddf1fe1278f77c5b649dce015fabfc2ab12a5d34b0fa2ef54c2"
+    },
+    {
+      "path": "scripts/lib/private-registry.mjs",
+      "bytes": 2707,
+      "sha256": "8c7b97f67cafe7a8e8f4250d7928b974f94ac79b0a19042901b1137f1b25f847"
+    },
+    {
+      "path": "src/__tests__/doctor-authorizations.test.ts",
+      "bytes": 18510,
+      "sha256": "5eb253d5cc2be5da5ded56031075dc17c3d363fdf011a29188d88c02b0dcec83"
+    },
+    {
+      "path": "src/__tests__/admin-private-routes.test.ts",
+      "bytes": 12492,
+      "sha256": "d0b5c1aaa307b83926c3ded831a3f7457c77c4474b9e1421d0c989779efaaea7"
+    },
+    {
+      "path": "scripts/worker-doctor-authorizations.test.mjs",
+      "bytes": 17441,
+      "sha256": "8717dadf72acfc1ab515f80ecb8a42cf41adb9a3204be4e8cb54ce49d4d07311"
+    }
+  ]
+}

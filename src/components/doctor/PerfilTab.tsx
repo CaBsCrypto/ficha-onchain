@@ -44,9 +44,7 @@ export function PerfilTab() {
   const [phone, setPhone] = useState('');
   const [centerName, setCenterName] = useState('');
   const [centerAddress, setCenterAddress] = useState('');
-  const [signatureUrl, setSignatureUrl] = useState('');
   const [bio, setBio] = useState('');
-  const [telemedicine, setTelemedicine] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,9 +72,7 @@ export function PerfilTab() {
         setPhone(p.phone ?? '');
         setCenterName(p.center_name ?? '');
         setCenterAddress(p.center_address ?? '');
-        setSignatureUrl(p.signature_url ?? '');
         setBio(p.bio ?? '');
-        setTelemedicine(Boolean(p.telemedicine));
         setMissing(false);
       }
     } catch {
@@ -91,6 +87,7 @@ export function PerfilTab() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (saving || missing || !name.trim()) return;
     setSaving(true);
     setError('');
     setSaved(false);
@@ -106,9 +103,7 @@ export function PerfilTab() {
           phone,
           center_name: centerName,
           center_address: centerAddress,
-          signature_url: signatureUrl,
           bio,
-          telemedicine,
         }),
       });
       const data = (await res.json()) as { data?: DoctorProfile; error?: string };
@@ -140,7 +135,8 @@ export function PerfilTab() {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-slate-800">Mi perfil</h2>
-        <p className="text-xs text-slate-400">{doctorEmail}</p>
+        <p className="break-all text-xs text-slate-500">{doctorEmail}</p>
+        <p className="mt-2 text-sm text-slate-600">Perfil de prueba creado por el administrador. Utiliza únicamente datos sintéticos; guardar cambios aquí no modifica tu autorización en Stellar.</p>
       </div>
 
       {loading ? (
@@ -157,31 +153,31 @@ export function PerfilTab() {
           )}
 
           <form onSubmit={handleSave} className="space-y-4">
-            {/* ── Identidad legal ── */}
+            {/* ── Perfil de prueba ── */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Identidad legal
+                Identificación del perfil de prueba
               </p>
               <p className="mb-4 text-xs text-slate-400">
-                Aparece en tus recetas y licencias. El nombre y el N° de registro se verifican
-                contra el registro on-chain.
+                Estos datos pertenecen al perfil de la aplicación. DoctorRegistryPrivate acredita
+                la autorización y vigencia de tu wallet mediante el expediente revisado por el administrador.
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Nombre completo" required>
+                <FormField label="Nombre de prueba" required>
                   <input value={name} onChange={(e) => { setName(e.target.value); dirty(); }}
-                    placeholder="Dr. Nombre Apellido" className={inputCls} />
+                    placeholder="Médico de prueba TrustLeaf" className={inputCls} />
                 </FormField>
                 <FormField label="Especialidad">
                   <input value={specialty} onChange={(e) => { setSpecialty(e.target.value); dirty(); }}
-                    placeholder="Ej: Medicina General" className={inputCls} />
+                    placeholder="Medicina general (prueba)" className={inputCls} />
                 </FormField>
-                <FormField label="N° registro (Superintendencia de Salud)">
+                <FormField label="Registro sintético">
                   <input value={licenseNum} onChange={(e) => { setLicenseNum(e.target.value); dirty(); }}
-                    placeholder="Ej: 123456" className={inputCls} />
+                    placeholder="TEST-STELLAR-REGISTRY" className={inputCls} />
                 </FormField>
-                <FormField label="RUT">
+                <FormField label="Identificador sintético">
                   <input value={rut} onChange={(e) => { setRut(e.target.value); dirty(); }}
-                    placeholder="12.345.678-9" className={inputCls} />
+                    placeholder="TEST-DOCTOR" className={inputCls} />
                 </FormField>
               </div>
             </div>
@@ -189,46 +185,27 @@ export function PerfilTab() {
             {/* ── Contacto y centro ── */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Contacto y centro de atención
+                Contacto y centro de prueba
               </p>
               <p className="mb-4 text-xs text-slate-400">
-                Membrete de la receta: dónde atiendes y cómo te contactan el paciente o la farmacia.
+                Referencias opcionales del perfil. No se incorporan al documento privado de la receta en este hito.
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Teléfono">
+                <FormField label="Teléfono de prueba (opcional)">
                   <input value={phone} onChange={(e) => { setPhone(e.target.value); dirty(); }}
-                    placeholder="+56 9 1234 5678" className={inputCls} />
+                    placeholder="Sin teléfono de contacto real" className={inputCls} />
                 </FormField>
-                <FormField label="Centro / clínica">
+                <FormField label="Centro sintético">
                   <input value={centerName} onChange={(e) => { setCenterName(e.target.value); dirty(); }}
-                    placeholder="Ej: Clínica Vitacura" className={inputCls} />
+                    placeholder="Centro de prueba TrustLeaf" className={inputCls} />
                 </FormField>
                 <div className="sm:col-span-2">
-                  <FormField label="Dirección del centro">
+                  <FormField label="Dirección sintética (opcional)">
                     <input value={centerAddress} onChange={(e) => { setCenterAddress(e.target.value); dirty(); }}
-                      placeholder="Av. Siempre Viva 742, Santiago" className={inputCls} />
+                      placeholder="Dirección de prueba" className={inputCls} />
                   </FormField>
                 </div>
               </div>
-            </div>
-
-            {/* ── Firma / sello ── */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Firma / sello
-              </p>
-              <p className="mb-4 text-xs text-slate-400">
-                URL de tu firma o sello digital, estampado en cada receta emitida.
-              </p>
-              <FormField label="URL de firma (imagen)">
-                <input value={signatureUrl} onChange={(e) => { setSignatureUrl(e.target.value); dirty(); }}
-                  placeholder="https://…/firma.png" className={inputCls} />
-              </FormField>
-              {signatureUrl.trim() !== '' && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={signatureUrl} alt="Vista previa de la firma"
-                  className="mt-3 h-16 rounded-lg border border-slate-200 bg-slate-50 object-contain px-2" />
-              )}
             </div>
 
             {/* ── Presentación ── */}
@@ -236,27 +213,16 @@ export function PerfilTab() {
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Presentación
               </p>
-              <FormField label="Biografía / presentación">
+              <FormField label="Presentación sintética">
                 <textarea value={bio} onChange={(e) => { setBio(e.target.value); dirty(); }}
-                  placeholder="Breve descripción para tus pacientes." rows={4} maxLength={2000}
+                  placeholder="Breve descripción del médico de prueba." rows={4} maxLength={2000}
                   className={textareaCls} />
                 <span className="mt-1 block text-right text-[10px] text-slate-400">{bio.length}/2000</span>
               </FormField>
-
-              <label className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
-                <span>
-                  <span className="block text-sm font-medium text-slate-700">Telemedicina</span>
-                  <span className="block text-xs text-slate-400">Habilita consultas por videollamada</span>
-                </span>
-                <button type="button" role="switch" aria-checked={telemedicine}
-                  onClick={() => { setTelemedicine((v) => !v); dirty(); }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${telemedicine ? 'bg-sky-500' : 'bg-slate-200'}`}>
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${telemedicine ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-              </label>
+              <p className="mt-3 text-xs text-slate-500">La firma de las recetas se realiza con tu wallet Stellar mediante Privy, al confirmar cada operación.</p>
             </div>
 
-            {error && <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
+            {error && <div role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
             {saved && (
               <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
                 Perfil guardado.
@@ -264,8 +230,8 @@ export function PerfilTab() {
             )}
 
             <div className="flex justify-end">
-              <button type="submit" disabled={saving}
-                className="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="submit" disabled={saving || missing || !name.trim()}
+                className="w-full rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                 {saving ? <span className="flex items-center justify-center gap-2"><Spinner /> Guardando…</span> : 'Guardar perfil'}
               </button>
             </div>
