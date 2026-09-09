@@ -5,7 +5,7 @@ import { usePortalWallet } from './WalletBoundary';
 import { portalApi, jsonBody } from './client';
 import { signingPayload } from './state';
 import { mergeOperation, recoverPrivateOperation, verifiedOperation } from './operation-recovery';
-import { portalErrorMessage } from './errors';
+import { operationNoticeDetail } from './errors';
 import type { OperationAction, PrivateOperation } from './types';
 
 export function usePrivateOperation(initialOperation?: PrivateOperation | null) {
@@ -71,12 +71,13 @@ export function ReceiptLink({ hash }: { hash?: string | null }) {
 export function OperationNotice({ operation }: { operation?: PrivateOperation | null }) {
   if (!operation) return null;
   try { verifiedOperation(operation); } catch { return <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">No se pudo verificar el estado de esta operación. Actualiza antes de continuar.</p>; }
+  const detail = operationNoticeDetail(operation);
   const labels: Record<PrivateOperation['state'], string> = { awaiting_signature: 'Pendiente de tu firma', submitted: 'Enviada · esperando confirmación', confirmed: 'Operación confirmada', failed: 'Operación fallida', cancelled: 'Operación cancelada' };
   const actionLabels: Record<OperationAction, string> = { consent: 'Permiso de emisión', withdraw_consent: 'Retirada del permiso', mint: 'Emisión de receta', activate: 'Activación', revoke: 'Revocación' };
   return <div role="status" className={`rounded-xl p-3 text-sm ${operation.state === 'confirmed' ? 'bg-emerald-50 text-emerald-800' : operation.state === 'failed' ? 'bg-rose-50 text-rose-800' : 'bg-sky-50 text-sky-800'}`}>
     <p className="font-medium">{actionLabels[operation.action]} · {labels[operation.state]}</p>
     {operation.state === 'submitted' && <p className="mt-1 text-xs">Puedes recargar. Recuperaremos esta misma operación.</p>}
-    {operation.errorCode && operation.state !== 'confirmed' && <p className="mt-1 text-xs">{portalErrorMessage(operation.errorCode)}</p>}
+    {detail && <p className="mt-1 text-xs">{detail}</p>}
     <ReceiptLink hash={operation.transactionHash} />
   </div>;
 }

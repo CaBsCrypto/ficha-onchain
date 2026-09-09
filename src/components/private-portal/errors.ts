@@ -1,3 +1,5 @@
+import type { PrivateOperation } from './types';
+
 const messages: Record<string, string> = {
   wallet_binding_changed: 'La asociación de tu cuenta cambió. Las operaciones están bloqueadas hasta revisarla.',
   wallet_binding_ambiguous: 'Tu cuenta necesita revisar su asociación Stellar. No se creará otra wallet.',
@@ -36,4 +38,20 @@ export function portalErrorMessage(code: string, status?: number) {
     status === 403 ? 'Tu cuenta no tiene permiso para esta acción.' :
     status === 409 ? 'El estado de la consulta cambió. Actualiza antes de volver a confirmar.' :
     'No pudimos verificar la operación. Actualiza el estado antes de intentarlo nuevamente.');
+}
+
+export function operationNoticeDetail(
+  operation: Pick<PrivateOperation, 'action' | 'state' | 'transactionHash' | 'errorCode'>,
+): string | null {
+  if (!operation.errorCode || operation.state === 'confirmed') return null;
+  const pendingReceipt = operation.state === 'submitted'
+    && /^[a-f0-9]{64}$/i.test(operation.transactionHash ?? '');
+  // Changed eligibility does not establish the result of this saved attempt.
+  if (pendingReceipt && operation.action === 'consent' && operation.errorCode === 'consent_already_active') {
+    return 'El permiso figura vigente. Seguimos comprobando el recibo de este intento; todavía no está confirmado.';
+  }
+  if (pendingReceipt && operation.action === 'activate' && operation.errorCode === 'prescription_not_activatable') {
+    return 'El estado o la vigencia de la receta cambió. Seguimos comprobando el recibo de este intento; todavía no está confirmado.';
+  }
+  return portalErrorMessage(operation.errorCode);
 }
