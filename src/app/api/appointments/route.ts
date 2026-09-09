@@ -1,171 +1,39 @@
-/**
- * GET    /api/appointments?doctorEmail=X   — list appointments for a doctor
- * GET    /api/appointments?patientEmail=X  — list appointments for a patient
- * POST   /api/appointments                 — create appointment
- * PATCH  /api/appointments                 — update status / notes
- * DELETE /api/appointments                 — delete appointment
- */
-import { getDb } from "@/lib/db";
-import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
-import { resolveOwnerEmail, requireActor } from "@/lib/auth/privy-auth";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-// ── GET ───────────────────────────────────────────────────────────────────────
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const doctorParam  = url.searchParams.get("doctorEmail")?.toLowerCase()  ?? "";
-  const patientParam = url.searchParams.get("patientEmail")?.toLowerCase() ?? "";
-
-  if (!doctorParam && !patientParam) {
-    return NextResponse.json({ error: "doctorEmail or patientEmail required" }, { status: 400 });
-  }
-
-  // The caller may only list their own agenda — as the doctor or as the patient
-  // named in the query. The param is trusted only in demo mode.
-  const owner = await resolveOwnerEmail(request, doctorParam || patientParam);
-  if ("error" in owner) return owner.error;
-  const doctorEmail  = doctorParam  ? owner.email : "";
-  const patientEmail = patientParam ? owner.email : "";
-
-  try {
-    const sql = getDb();
-
-    const rows = doctorEmail
-      ? await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link,
-                 started_at, consent_tx, consent_mode, consent_wallet, created_at
-          FROM appointments
-          WHERE doctor_email = ${doctorEmail}
-          ORDER BY date ASC, time_slot ASC
-        `
-      : await sql`
-          SELECT id, doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, status, meet_link,
-                 started_at, consent_tx, consent_mode, consent_wallet, created_at
-          FROM appointments
-          WHERE patient_email = ${patientEmail}
-          ORDER BY date ASC, time_slot ASC
-        `;
-
-    return NextResponse.json({ count: rows.length, appointments: rows });
-  } catch (err) {
-    console.error("[appointments GET]", err);
-    return NextResponse.json({ error: "DB error" }, { status: 500 });
-  }
+import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
+import { requireUser, unauthorized } from '@/lib/auth/privy-auth';
+import { isSameOrigin } from '@/lib/auth/same-origin';
+import { PrivateFlowError } from '@/lib/private-config';
+import { BookingPreparationError, bookingTransaction, changePrivateAppointment, createPrivateAppointment, listPrivateAppointments } from '@/lib/prescription-booking';
+export const runtime='nodejs';
+export const dynamic='force-dynamic';
+const json=(value:unknown,status=200)=>NextResponse.json(value,{status,headers:{'Cache-Control':'no-store'}});
+function failure(error:unknown){
+  if(error instanceof BookingPreparationError)return json({error:error.code},error.status);
+  if(error instanceof PrivateFlowError)return json({error:error.message},error.status);
+  if((error as {code?:string})?.code==='23505')return json({error:'slot_not_available'},409);
+  return json({error:'appointments_unavailable'},503);
 }
-
-// ── POST: create ──────────────────────────────────────────────────────────────
-export async function POST(request: Request) {
-  let body: {
-    doctorEmail?: unknown; patientEmail?: unknown; patientName?: unknown;
-    date?: unknown; timeSlot?: unknown; type?: unknown; motivo?: unknown; notes?: unknown;
-  };
-  try { body = (await request.json()) as typeof body; } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const doctorEmail  = String(body.doctorEmail  ?? "").trim().toLowerCase();
-  const patientEmail = String(body.patientEmail ?? "").trim().toLowerCase();
-  const patientName  = String(body.patientName  ?? "").trim();
-  const date         = String(body.date         ?? "").trim();
-  const timeSlot     = String(body.timeSlot     ?? "").trim();
-  const type         = String(body.type         ?? "Presencial").trim();
-  const motivo       = body.motivo ? String(body.motivo).trim() : null;
-  const notes        = body.notes  ? String(body.notes).trim()  : null;
-
-  if (!doctorEmail || !patientEmail || !date || !timeSlot) {
-    return NextResponse.json({ error: "doctorEmail, patientEmail, date, timeSlot required" }, { status: 400 });
-  }
-
-  // Either party to the appointment may create it: the patient booking with
-  // their doctor, or the doctor scheduling for their patient. A logged-in caller
-  // must be one of the two; demo mode passes through.
-  const actor = await requireActor(request, [doctorEmail, patientEmail]);
-  if ("error" in actor) return actor.error;
-
-  // A telemedicine appointment gets its own video room, stored on the row so it
-  // survives restarts and both portals read the same link. Jitsi rooms need no
-  // account or API — the random suffix keeps the URL unguessable.
-  const meetLink =
-    type === "Telemedicina"
-      ? `https://meet.jit.si/trustleaf-${randomUUID()}`
-      : null;
-
-  try {
-    const sql = getDb();
-    const [row] = await sql`
-      INSERT INTO appointments (doctor_email, patient_email, patient_name, date, time_slot, type, motivo, notes, meet_link)
-      VALUES (${doctorEmail}, ${patientEmail}, ${patientName}, ${date}, ${timeSlot}, ${type}, ${motivo}, ${notes}, ${meetLink})
-      RETURNING *
-    `;
-    return NextResponse.json({ success: true, appointment: row }, { status: 201 });
-  } catch (err) {
-    // uniq_appt_slot (migrate.mjs) rejects a second booking for the same
-    // doctor/date/time. Postgres raises 23505 (unique_violation); surface it as
-    // a 409 with a clear message instead of a generic 500 the UI can't explain.
-    if ((err as { code?: string })?.code === "23505") {
-      return NextResponse.json(
-        { error: "Ese horario ya fue reservado. Elige otro." },
-        { status: 409 },
-      );
-    }
-    console.error("[appointments POST]", err);
-    return NextResponse.json({ error: "DB error" }, { status: 500 });
-  }
+export async function GET(request:Request){
+  const actor=await requireUser(request);if(!actor?.email)return unauthorized();
+  const params=new URL(request.url).searchParams;
+  const legacyDoctor=params.get('doctorEmail'),legacyPatient=params.get('patientEmail');
+  if((legacyDoctor&&legacyPatient)||[legacyDoctor,legacyPatient].some(email=>email!==null&&email.toLowerCase()!==actor.email))return json({error:'forbidden'},403);
+  const role=params.get('role')??(legacyDoctor?'doctor':legacyPatient?'patient':null);
+  if(!['doctor','patient'].includes(role??''))return json({error:'role_required'},400);
+  try{return json(await listPrivateAppointments(getDb(),actor,role as 'doctor'|'patient'));}catch(error){return failure(error);}
 }
-
-// ── PATCH: update ─────────────────────────────────────────────────────────────
-export async function PATCH(request: Request) {
-  let body: { id?: unknown; status?: unknown; notes?: unknown; motivo?: unknown };
-  try { body = (await request.json()) as typeof body; } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+async function mutate(request:Request,patch:boolean){
+  const actor=await requireUser(request);if(!actor?.email)return unauthorized();
+  if(!isSameOrigin(request))return json({error:'forbidden'},403);
+  let body:Record<string,unknown>;
+  try{body=await request.json();if(!body||typeof body!=='object'||Array.isArray(body))throw Error();}catch{return json({error:'invalid_json'},400);}
+  if(patch){
+    if(Object.keys(body).some(k=>!['id','action'].includes(k))||!Number.isSafeInteger(body.id)||Number(body.id)<1||!['attend','start','complete','cancel'].includes(String(body.action)))return json({error:'invalid_appointment_action'},400);
+    try{return json(await bookingTransaction(sql=>changePrivateAppointment(sql,actor,Number(body.id),body.action as 'attend'|'start'|'complete'|'cancel')),body.action==='cancel'?202:200);}catch(error){return failure(error);}
   }
-
-  const id = Number(body.id);
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-
-  try {
-    const sql = getDb();
-    // Only a party to the appointment may edit it.
-    const [row] = await sql`SELECT doctor_email, patient_email FROM appointments WHERE id = ${id}`;
-    if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    const actor = await requireActor(request, [row.doctor_email as string, row.patient_email as string]);
-    if ("error" in actor) return actor.error;
-
-    if (body.status !== undefined) await sql`UPDATE appointments SET status = ${String(body.status)} WHERE id = ${id}`;
-    if (body.notes  !== undefined) await sql`UPDATE appointments SET notes  = ${body.notes ? String(body.notes) : null} WHERE id = ${id}`;
-    if (body.motivo !== undefined) await sql`UPDATE appointments SET motivo = ${body.motivo ? String(body.motivo) : null} WHERE id = ${id}`;
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[appointments PATCH]", err);
-    return NextResponse.json({ error: "DB error" }, { status: 500 });
-  }
+  if(Object.keys(body).some(k=>!['doctorId','date','timeSlot','type'].includes(k))||!Number.isSafeInteger(body.doctorId)||Number(body.doctorId)<1||typeof body.date!=='string'||typeof body.timeSlot!=='string'||(body.type!==undefined&&typeof body.type!=='string'))return json({error:'invalid_appointment'},400);
+  try{return json(await bookingTransaction(sql=>createPrivateAppointment(sql,actor,{doctorId:Number(body.doctorId),date:String(body.date),timeSlot:String(body.timeSlot),type:body.type as string|undefined})),201);}catch(error){return failure(error);}
 }
-
-// ── DELETE ────────────────────────────────────────────────────────────────────
-export async function DELETE(request: Request) {
-  let body: { id?: unknown };
-  try { body = (await request.json()) as typeof body; } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const id = Number(body.id);
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-
-  try {
-    const sql = getDb();
-    // Only a party to the appointment may delete it.
-    const [row] = await sql`SELECT doctor_email, patient_email FROM appointments WHERE id = ${id}`;
-    if (!row) return NextResponse.json({ success: true }); // already gone (idempotent)
-    const actor = await requireActor(request, [row.doctor_email as string, row.patient_email as string]);
-    if ("error" in actor) return actor.error;
-
-    await sql`DELETE FROM appointments WHERE id = ${id}`;
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[appointments DELETE]", err);
-    return NextResponse.json({ error: "DB error" }, { status: 500 });
-  }
-}
+export const POST=(request:Request)=>mutate(request,false);
+export const PATCH=(request:Request)=>mutate(request,true);
+export async function DELETE(){return json({error:'use_cancellation_action'},405);}

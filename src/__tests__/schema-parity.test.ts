@@ -74,4 +74,32 @@ describe("paridad de esquema entre migrate.mjs y /api/admin/migrate", () => {
     expect(diff(mjsCols, routeCols), "columnas SOLO en migrate.mjs — prod nunca las tendrá").toEqual([]);
     expect(diff(routeCols, mjsCols), "columnas SOLO en la ruta — dev nunca las tendrá").toEqual([]);
   });
+
+  const normalize = (value: string) => value.replace(/\s+/g, ' ').trim();
+  function statement(source: string, pattern: RegExp): string {
+    const found = source.match(pattern)?.[0];
+    expect(found, `Missing migration definition: ${pattern}`).toBeTruthy();
+    return normalize(found!);
+  }
+  it('mantiene las restricciones completas de las operaciones privadas, no sólo el nombre de tabla', () => {
+    const pattern = /CREATE TABLE IF NOT EXISTS private_operations \([\s\S]*?\)\s*(?=`)/;
+    expect(statement(MJS, pattern)).toBe(statement(ROUTE, pattern));
+    for (const name of ['private_operations_one_live_source','private_operations_appointment']) {
+      const index = new RegExp(`CREATE (?:UNIQUE )?INDEX IF NOT EXISTS ${name}[^\\x60]+`);
+      expect(statement(MJS, index)).toBe(statement(ROUTE, index));
+    }
+  });
+  it('mantiene tipos y valores iniciales de los snapshots y del historial firmado', () => {
+    const pattern = /ALTER TABLE (?:appointments|prescription_booking_requests) ADD COLUMN IF NOT EXISTS [^`]+/g;
+    const definitions = (source: string) => [...source.matchAll(pattern)].map(m => normalize(m[0])).sort();
+    expect(definitions(MJS)).toEqual(definitions(ROUTE));
+  });
+  it('mantiene idéntica la protección de participantes y cancelación reconciliada', () => {
+    const pattern = /CREATE OR REPLACE FUNCTION protect_prescription_appointment\(\)[\s\S]*?LANGUAGE plpgsql/;
+    const functionBody = statement(MJS, pattern);
+    expect(functionBody).toBe(statement(ROUTE, pattern));
+    expect(functionBody).toContain("b.state='revoked'");
+    expect(functionBody).toContain("b.attempts='[]'::jsonb");
+    expect(functionBody).toContain('NEW.attendance_user_id');
+  });
 });

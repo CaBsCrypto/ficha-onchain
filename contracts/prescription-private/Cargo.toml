@@ -1,0 +1,18 @@
+[package]
+name = "prescription-private"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+soroban-sdk = "22.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+doctor-registry-private = { path = "../doctor-registry-private", features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

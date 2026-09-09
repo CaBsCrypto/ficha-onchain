@@ -1,0 +1,47 @@
+# TrustLeaf Week 2 — public configuration template; contains no credentials.
+# Fill secret values only in an ignored local environment file or hosting secrets.
+# Do not commit a completed copy. This file is documentation, not auto-loaded.
+# The default pauses new business writes and transaction submission.
+TRUSTLEAF_PRIVATE_WRITES_ENABLED=false
+
+# local = existing Neon dev; preview = isolated preview branch;
+# test = a separate synthetic-data branch for the main application deployment.
+# Never reuse the historical production branch or share preview/main databases.
+TRUSTLEAF_ENV=local
+TRUSTLEAF_DB_HOST=ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech
+# Set a private PostgreSQL connection string whose hostname matches exactly.
+# For preview/test, replace BOTH DATABASE_URL and TRUSTLEAF_DB_HOST.
+DATABASE_URL=
+
+# ficha-onchain: use the same public application ID in browser and server.
+NEXT_PUBLIC_PRIVY_APP_ID=cmrix722m03d30clewd1fuffq
+PRIVY_APP_ID=cmrix722m03d30clewd1fuffq
+PRIVY_APP_SECRET=
+ADMIN_EMAILS=cabscryptocontacto@gmail.com
+
+# The active private services enforce these fixed Stellar Testnet contracts.
+DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID=CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2
+PRESCRIPTION_PRIVATE_CONTRACT_ID=CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE
+DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY=GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO
+BOOKING_AUTHORITY_PUBLIC_KEY=GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO
+NEXT_PUBLIC_STELLAR_NETWORK=testnet
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+
+# Server + local worker: fee payer secret, separate from the admin authority.
+RELAYER_SECRET=
+# Server + local worker: 32-byte encryption key encoded as 64 hexadecimal chars.
+# Preserve the key for each environment while its encrypted records are retained.
+TRUSTLEAF_DATA_KEY=
+
+# LOCAL WORKER ONLY: existing Stellar secure-store alias and configuration path.
+# Do not export the administrative secret to a file or to Vercel.
+DOCTOR_REGISTRY_ADMIN_ALIAS=trustleaf-testnet-admin-20260907
+STELLAR_CONFIG_DIR=
+
+# Authentication remains strict on active private routes regardless of legacy flags.
+TRUSTLEAF_REQUIRE_AUTH=true
+NEXT_PUBLIC_PASSKEY_ENABLED=false
+# Local diagnostic only; not a reviewer route or a deployed portal feature.
+TRUSTLEAF_PRIVY_SIGNING_CHECK=false
+# Ethereum and Solana auto-creation are off in AppPrivyProvider, not env toggles.
+# TRUSTLEAF_PRIVATE_PORTAL_ENABLED is obsolete as an operational safety switch.

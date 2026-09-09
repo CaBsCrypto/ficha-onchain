@@ -41,6 +41,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Private services, identity and worker tests
+        run: npm run test:private
+
       # NEXT_PUBLIC_* are inlined at build time. The real values live in Vercel;
       # here they only need to be present and well-formed so the build does not
       # throw (e.g. Privy rejects an empty appId while prerendering). These are
@@ -50,7 +53,9 @@ jobs:
           NEXT_PUBLIC_PRIVY_APP_ID: cmrix722m03d30clewd1fuffq
           NEXT_PUBLIC_STELLAR_NETWORK: testnet
           NEXT_PUBLIC_SOROBAN_RPC_URL: https://soroban-testnet.stellar.org
-          NEXT_PUBLIC_DOCTOR_REGISTRY_ID: CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O
-          NEXT_PUBLIC_PRESCRIPTION_ID: CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU
+          DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID: CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2
+          PRESCRIPTION_PRIVATE_CONTRACT_ID: CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE
+          TRUSTLEAF_PRIVATE_WRITES_ENABLED: "false"
+          TRUSTLEAF_REQUIRE_AUTH: "true"
           NEXT_PUBLIC_PASSKEY_ENABLED: "false"
         run: npm run build

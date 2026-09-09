@@ -44,6 +44,9 @@ function privyConfigured(): boolean {
 }
 
 export async function POST(request: Request) {
+  if (process.env.TRUSTLEAF_PRIVATE_PORTAL_ENABLED === 'true') {
+    return NextResponse.json({error:'private_prescription_flow_not_enabled'}, {status:409});
+  }
   if (privyConfigured()) {
     const user = await requireUser(request);
     if (!user) return unauthorized();
