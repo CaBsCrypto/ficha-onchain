@@ -59,7 +59,7 @@ function dataKey() {
 }
 export async function doctorAuthorizationDetails(sql: Sql, doctorId: number) {
   const d=await resolveDoctor(sql,doctorId), chain=await readPrivateDoctor(d.address);
-  const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC LIMIT 1`;
+  const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC,created_at DESC LIMIT 1`;
   let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier(d.doctor);
   if(stored){
     let plain:DoctorDossier|null=null;
@@ -115,7 +115,8 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
       FROM doctor_private_dossiers ds LEFT JOIN LATERAL (
         SELECT * FROM doctor_authorization_requests r WHERE r.dossier_id=ds.id ORDER BY r.created_at DESC LIMIT 1
       ) previous ON TRUE WHERE ds.network='testnet' AND ds.contract_id=${PRIVATE_REGISTRY}
-        AND ds.wallet=${d.address} AND ds.version=${method.targetVersion}`;
+        AND ds.wallet=${d.address} AND ds.version=${method.targetVersion}
+      ORDER BY ds.created_at DESC LIMIT 1`;
     if(stored){
       if(stored.state!=='failed' || stored.has_signed_attempt || stored.transaction_hash || stored.prepared_xdr ||
           stored.dossier_transaction_hash || stored.dossier_status!=='prepared')throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
