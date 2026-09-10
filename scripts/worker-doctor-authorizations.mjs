@@ -152,6 +152,10 @@ export function createStore(client) {
   const owns = job => [job.id, token];
   const identityJoin = `JOIN doctors d ON d.id=r.doctor_id AND LOWER(d.email)=r.doctor_email
     JOIN privy_stellar_wallet_bindings b ON b.app_id='${APP_ID}' AND b.user_id=r.doctor_user_id AND b.wallet_id=r.wallet_id AND b.address=r.wallet`;
+  const onboardingEligibility = `AND (r.method<>'authorize_doctor' OR EXISTS (
+    SELECT 1 FROM doctor_onboarding_requests o WHERE o.authorization_request_id=r.id
+      AND o.doctor_id=r.doctor_id AND o.state='authorization_pending'
+      AND o.privy_user_id=r.doctor_user_id AND o.wallet_id=r.wallet_id AND o.wallet=r.wallet))`;
   return {
     claim: async ({ signedOnly = false } = {}) => {
       const { rows } = await q(`WITH candidate AS (SELECT id FROM doctor_authorization_requests
@@ -169,14 +173,15 @@ export function createStore(client) {
     },
     eligible: async job => {
       const { rows } = await q(`SELECT r.id FROM doctor_authorization_requests r ${identityJoin}
-        WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW()`, owns(job));
+        WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW() ${onboardingEligibility}`, owns(job));
       return rows.length === 1;
     },
     prepared: async (job, prepared) => {
       await q('BEGIN');
       try {
         const locked = await q(`SELECT r.id FROM doctor_authorization_requests r ${identityJoin}
-          WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW() AND r.state='pending' AND r.transaction_hash IS NULL FOR UPDATE OF r,d,b`, owns(job));
+          WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW() AND r.state='pending' AND r.transaction_hash IS NULL
+          ${onboardingEligibility} FOR UPDATE OF r,d,b`, owns(job));
         if (locked.rows.length !== 1) throw Error('lease_or_identity_changed');
         const { rows } = await q(`UPDATE doctor_authorization_requests SET prepared_xdr=$3,transaction_hash=$4,state='submitted',error_code=NULL,updated_at=NOW()
           WHERE id=$1 AND lease_token=$2 RETURNING *`, [...owns(job), prepared.xdr, prepared.hash]);
@@ -202,6 +207,13 @@ export function createStore(client) {
           await q("UPDATE doctor_private_dossiers SET status='confirmed',transaction_hash=$2 WHERE id=$1", [job.dossier_id, job.transaction_hash]);
         }
         await q('UPDATE doctors SET status=$2,updated_at=NOW() WHERE id=$1', [job.doctor_id, doctorStatus]);
+        if (job.action === 'revoke') {
+          await q(`UPDATE doctor_onboarding_requests SET state='revoked',revoked_at=NOW(),updated_at=NOW()
+            WHERE id=(SELECT id FROM doctor_onboarding_requests WHERE doctor_id=$1 AND state='authorized' ORDER BY created_at DESC LIMIT 1)`, [job.doctor_id]);
+        } else {
+          await q(`UPDATE doctor_onboarding_requests SET state='authorized',authorized_at=NOW(),updated_at=NOW()
+            WHERE doctor_id=$1 AND authorization_request_id=$2 AND state='authorization_pending'`, [job.doctor_id, job.id]);
+        }
         await q('COMMIT');
       } catch (e) { await q('ROLLBACK'); throw e; }
     },

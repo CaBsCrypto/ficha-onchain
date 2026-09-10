@@ -7,7 +7,7 @@ vi.mock('@/lib/db',()=>({getDb:()=>Object.assign(mocks.sql,{query:mocks.query}),
 vi.mock('@/lib/doctor-authorizations',()=>({verifiedWallet:mocks.wallet,resolveDoctor:mocks.doctor,readPrivateDoctor:mocks.registry}));
 import { POST,DELETE,GET } from '@/app/api/prescription-bookings/route';
 import { POST as create, PATCH as change, GET as list, DELETE as remove } from '@/app/api/appointments/route';
-import { availableAppointmentSlots,changePrivateAppointment,createPrivateAppointment,preparePrescriptionBooking,requestBookingCancellation,validBookingDate } from '@/lib/prescription-booking';
+import { appointmentActionWindowMinutes,availableAppointmentSlots,changePrivateAppointment,createPrivateAppointment,preparePrescriptionBooking,requestBookingCancellation,validBookingDate } from '@/lib/prescription-booking';
 import { RX_PRIVATE,REGISTRY_PRIVATE,PRIVY_APP,PRIVATE_ADMIN } from '@/lib/private-config';
 import { createWalletChallenge,completeWalletChallenge } from '@/lib/stellar-wallet-binding';
 import { POST as challengePOST,PUT as challengePUT } from '@/app/api/stellar-wallet-binding/route';
@@ -114,6 +114,11 @@ describe('native Stellar booking preparation',()=>{
 });
 
 describe('attendance, consultation and cancellation transitions',()=>{
+  it('widens the action window only in isolated test environments',()=>{
+    expect(appointmentActionWindowMinutes({TRUSTLEAF_ENV:'preview',TRUSTLEAF_TEST_APPOINTMENT_WINDOW_MINUTES:'240'})).toBe(240);
+    expect(appointmentActionWindowMinutes({TRUSTLEAF_ENV:'production',TRUSTLEAF_TEST_APPOINTMENT_WINDOW_MINUTES:'240'})).toBe(30);
+    expect(appointmentActionWindowMinutes({TRUSTLEAF_ENV:'preview',TRUSTLEAF_TEST_APPOINTMENT_WINDOW_MINUTES:'999'})).toBe(30);
+  });
   it('records attendance without starting consultation or granting consent',async()=>{
     const waiting=appt({status:'scheduled',attendance_at:null,attendance_user_id:null,started_at:null,started_by:null});
     const attended={...waiting,attendance_at:'2026-09-09T13:00:00Z',attendance_user_id:patient.userId};

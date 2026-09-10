@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), getDb: vi.fn(), sql: vi.fn(), config: vi.fn(), details: vi.fn(),
-  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn() }));
+  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn(),
+  invite:vi.fn(),listOnboarding:vi.fn(),onboardingForDoctor:vi.fn(),doctorOnboardingView:vi.fn(),assertSubmitted:vi.fn(),markPending:vi.fn() }));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: mocks.requireUser,
   isDoctor: vi.fn(), authEnforced: () => false,
   unauthorized: () => Response.json({ error: 'unauthorized' }, { status: 401 }),
@@ -14,6 +15,11 @@ vi.mock('@/lib/doctor-authorizations', () => ({
   requestDoctorAuthorization: mocks.request, verifiedWallet: mocks.wallet, readPrivateDoctor: mocks.read,
   authorizationView: mocks.view, latestDoctorRequest: mocks.latest,
   DoctorAuthorizationError: class extends Error { constructor(message: string, public status = 409) { super(message); } },
+}));
+vi.mock('@/lib/doctor-onboarding', () => ({
+  createDoctorInvitation:mocks.invite,listDoctorOnboarding:mocks.listOnboarding,onboardingForDoctor:mocks.onboardingForDoctor,
+  doctorOnboardingView:mocks.doctorOnboardingView,
+  assertSubmittedOnboarding:mocks.assertSubmitted,markOnboardingAuthorizationPending:mocks.markPending,
 }));
 import { GET, POST } from '@/app/api/admin/doctor-authorizations/route';
 import { GET as doctorGET } from '@/app/api/doctor-status/route';
@@ -51,6 +57,12 @@ beforeEach(() => {
   mocks.read.mockResolvedValue({ authorized: true, authorization: { version: 1 } });
   mocks.view.mockReturnValue({ status: 'authorized', version: 1 });
   mocks.latest.mockResolvedValue(null);
+  mocks.invite.mockResolvedValue({doctor:{id:21,email:doctor.email,status:'pending'},onboarding:{id:'onboarding-1',state:'invited'}});
+  mocks.listOnboarding.mockResolvedValue([{id:21,email:doctor.email}]);
+  mocks.onboardingForDoctor.mockResolvedValue({id:'onboarding-1',state:'submitted'});
+  mocks.doctorOnboardingView.mockResolvedValue({wallet:'expected-stellar-wallet',onboarding:null});
+  mocks.assertSubmitted.mockResolvedValue({id:'onboarding-1',state:'submitted'});
+  mocks.markPending.mockResolvedValue(undefined);
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -113,6 +125,7 @@ describe('private admin request boundary', () => {
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ request: { id: 'request-1', state: 'pending', transactionHash: null } });
     expect(mocks.request).toHaveBeenCalledWith(mocks.sql, admin, 21, 'authorize');
+    expect(mocks.markPending).toHaveBeenCalledWith(mocks.sql, 'onboarding-1', 'request-1');
   });
   it.each(['config', 'database', 'provider'])('reports a %s failure without a simulated success or internal details', async dependency => {
     const secretError = new Error('sensitive provider or connection details');
@@ -236,10 +249,9 @@ describe('strict private admin profile and migration routes',()=>{
     expect(mocks.sql).not.toHaveBeenCalled();
   });
   it('creates only a pending profile with no wallet or authority supplied',async()=>{
-    mocks.sql.mockResolvedValue([{id:21,...profile,status:'pending'}]);
     const response=await profilesPOST(post(profile));
     expect(response.status).toBe(201);expect((await response.json()).doctor.status).toBe('pending');
-    expect(mocks.sql.mock.calls[0][0].join(' ')).toContain("'pending'");
+    expect(mocks.invite).toHaveBeenCalledWith(mocks.sql,admin,expect.objectContaining({email:doctor.email}));
     expect(mocks.request).not.toHaveBeenCalled();
   });
   it('does not reassign an existing doctor to another email',async()=>{

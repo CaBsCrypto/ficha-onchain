@@ -410,11 +410,17 @@ const STATEMENTS: Array<[string, string]> = [
     valid_until BIGINT NOT NULL,
     commitment TEXT NOT NULL,
     encrypted_dossier TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked')),
+    status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked', 'abandoned')),
     transaction_hash TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(network, contract_id, wallet, version)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`],
+  ["doctor_private_dossiers_drop_legacy_unique", `ALTER TABLE doctor_private_dossiers DROP CONSTRAINT IF EXISTS doctor_private_dossiers_network_contract_id_wallet_version_key`],
+  ["doctor_private_dossiers_drop_status_check", `ALTER TABLE doctor_private_dossiers DROP CONSTRAINT IF EXISTS doctor_private_dossiers_status_check`],
+  ["doctor_private_dossiers_status_check", `ALTER TABLE doctor_private_dossiers ADD CONSTRAINT doctor_private_dossiers_status_check
+    CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked', 'abandoned'))`],
+  ["doctor_private_dossiers_one_live_version", `CREATE UNIQUE INDEX IF NOT EXISTS doctor_private_dossiers_one_live_version
+    ON doctor_private_dossiers(network,contract_id,wallet,version)
+    WHERE status IN ('prepared','submitted','confirmed','revoked')`],
   ["stellar_binding_challenges", `CREATE TABLE IF NOT EXISTS stellar_binding_challenges (
     id UUID PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -468,6 +474,39 @@ const STATEMENTS: Array<[string, string]> = [
     UNIQUE (app_id,address),
     CHECK ((wallet_id IS NULL) = (address IS NULL))
   )`],
+  ["doctor_onboarding_requests", `CREATE TABLE IF NOT EXISTS doctor_onboarding_requests (
+    id UUID PRIMARY KEY,
+    doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    source TEXT NOT NULL CHECK (source IN ('application','invitation')),
+    email TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('invited','draft','submitted','changes_requested','rejected','authorization_pending','authorized','expired','revoked')),
+    invited_by TEXT,
+    invited_email TEXT,
+    privy_user_id TEXT,
+    wallet_id TEXT,
+    wallet TEXT,
+    expires_at TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    changes_requested_at TIMESTAMPTZ,
+    rejected_at TIMESTAMPTZ,
+    reopened_at TIMESTAMPTZ,
+    authorization_request_id UUID REFERENCES doctor_authorization_requests(id) ON DELETE RESTRICT,
+    authorized_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    reviewed_by TEXT,
+    reviewed_email TEXT,
+    review_note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((privy_user_id IS NULL AND wallet_id IS NULL AND wallet IS NULL) OR
+           (privy_user_id IS NOT NULL AND wallet_id IS NOT NULL AND wallet IS NOT NULL)),
+    CHECK ((source='invitation' AND invited_by IS NOT NULL AND expires_at IS NOT NULL) OR source='application')
+  )`],
+  ["doctor_onboarding_one_active_email", `CREATE UNIQUE INDEX IF NOT EXISTS doctor_onboarding_one_active_email
+    ON doctor_onboarding_requests ((LOWER(email)))
+    WHERE state IN ('invited','draft','submitted','changes_requested','authorization_pending')`],
+  ["doctor_onboarding_review_queue", `CREATE INDEX IF NOT EXISTS doctor_onboarding_review_queue
+    ON doctor_onboarding_requests (state, updated_at DESC)`],
   ["stellar_verified_bindings", `CREATE TABLE IF NOT EXISTS stellar_verified_bindings (
     email TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('doctor', 'patient')),

@@ -153,7 +153,7 @@ describe('durable authorization requests', () => {
     const result = await requestDoctorAuthorization(sql, actor, doctor.id, 'authorize');
     const params = query.mock.calls[0][1] as unknown[];
     const dossier = decryptDossier(String(params[6]), dataKey, String(params[0]));
-    expect(dossier).toMatchObject({ ...syntheticDossier(), network: 'testnet', contractId: PRIVATE_REGISTRY,
+    expect(dossier).toMatchObject({ ...syntheticDossier(doctor), network: 'testnet', contractId: PRIVATE_REGISTRY,
       wallet, version: 1, validUntil: now + 30 * 86400, reviewedBy: actor.userId });
     expect(commitmentFor(dossier)).toBe(params[5]);
     expect(String(params[6])).not.toContain(dossier.fullName);
@@ -224,6 +224,22 @@ describe('recovery of failed unsigned authorization requests', () => {
     expect(row.error_code).toBe('authority_signature_invalid');
     expect(mocks.read).toHaveBeenCalledTimes(1);
     expect(mocks.resolveWallet).toHaveBeenCalledTimes(1);
+  });
+  it('abandons only an unreadable unsigned dossier and prepares fresh evidence after key rotation', async () => {
+    const { row, dossier } = failedFixture();
+    row.encrypted_dossier = encryptDossier(dossier, '99'.repeat(32), 'existing-dossier');
+    const { sql, query } = arrange(row);
+    expect((await requestDoctorAuthorization(sql, actor, doctor.id, 'authorize')).request)
+      .toMatchObject({ id: 'retry-request', state: 'pending' });
+    const [statement, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(statement).toContain("SET status='abandoned'");
+    expect(statement).toContain('INSERT INTO doctor_private_dossiers');
+    expect(statement).toContain('INSERT INTO doctor_authorization_requests');
+    expect(params[0]).not.toBe('existing-dossier');
+    expect(params[5]).not.toBe(row.commitment);
+    expect(params[6]).not.toBe(row.encrypted_dossier);
+    expect(params[17]).toBe('existing-dossier');
+    expect(row.error_code).toBe('authority_signature_invalid');
   });
   it.each(['transaction_hash', 'prepared_xdr', 'dossier_transaction_hash', 'has_signed_attempt'])('never retries a saved or uncertain signed attempt indicated by %s', async field => {
     const { row } = failedFixture();
@@ -308,6 +324,22 @@ describe('private dossier review integrity', () => {
     expect(details.dossier).not.toHaveProperty('blinding');
     expect(JSON.stringify(details)).not.toContain(stored.encrypted_dossier);
     expect(details.authorization.status).toBe('authorized');
+  });
+  it('allows a fresh review only for an unreadable failed dossier that was never signed', async () => {
+    const { sql, tag } = makeSql();
+    const { stored, dossier } = dossierFixture();
+    stored.encrypted_dossier = encryptDossier(dossier, '88'.repeat(32), stored.id);
+    tag.mockResolvedValueOnce([doctor]).mockResolvedValueOnce([stored]).mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([]);
+    const details = await doctorAuthorizationDetails(sql, doctor.id);
+    expect(details.dossier).toEqual(syntheticDossier(doctor));
+    expect(JSON.stringify(details)).not.toContain(stored.encrypted_dossier);
+  });
+  it('blocks an unreadable dossier unless its failed attempt is proven unsigned', async () => {
+    const { sql, tag } = makeSql();
+    const { stored, dossier } = dossierFixture();
+    stored.encrypted_dossier = encryptDossier(dossier, '77'.repeat(32), stored.id);
+    tag.mockResolvedValueOnce([doctor]).mockResolvedValueOnce([stored]).mockResolvedValueOnce([]);
+    await expect(doctorAuthorizationDetails(sql, doctor.id)).rejects.toMatchObject({ status: 503, message: 'dossier_integrity_error' });
   });
   it.each(['commitment', 'wallet', 'contractId', 'version'])('rejects inconsistent dossier %s', field => {
     const { sql, tag } = makeSql();

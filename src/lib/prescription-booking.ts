@@ -30,6 +30,13 @@ export function validBookingDate(value: unknown): value is string {
 }
 export const validBookingTime = (value: unknown): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
+/** Keep the clinical default fixed; isolated test environments may widen it for guided demos. */
+export function appointmentActionWindowMinutes(env: NodeJS.ProcessEnv = process.env) {
+  if (!['preview', 'test'].includes(env.TRUSTLEAF_ENV ?? '')) return 30;
+  const configured = Number(env.TRUSTLEAF_TEST_APPOINTMENT_WINDOW_MINUTES ?? '30');
+  return Number.isSafeInteger(configured) && configured >= 30 && configured <= 360 ? configured : 30;
+}
+
 /** PostgreSQL supplies the clock and Santiago timezone, independent of the host. */
 export async function availableAppointmentSlots(sql: Sql, doctorEmail: string, date: string) {
   if (!validBookingDate(date)) throw new BookingPreparationError('invalid_date', 400);
@@ -182,13 +189,14 @@ export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: 
     const [completed] = await sql`UPDATE appointments SET status='completed',completed_at=NOW() WHERE id=${id} AND status='in_progress' RETURNING id`;
     if (!completed) throw new BookingPreparationError('consultation_not_open');
   } else {
+    const actionWindowMinutes = appointmentActionWindowMinutes();
     const [updated] = action === 'attend'
       ? await sql`UPDATE appointments SET attendance_at=COALESCE(attendance_at,NOW()),attendance_user_id=${actor.userId}
           WHERE id=${id} AND status IN ('scheduled','in_progress') AND date=(NOW() AT TIME ZONE 'America/Santiago')::date
-            AND date+time_slot::time<=(NOW() AT TIME ZONE 'America/Santiago')+INTERVAL '30 minutes' RETURNING *`
+            AND date+time_slot::time<=(NOW() AT TIME ZONE 'America/Santiago')+make_interval(mins=>${actionWindowMinutes}) RETURNING *`
       : await sql`UPDATE appointments SET status='in_progress',started_at=COALESCE(started_at,NOW()),started_by=${actor.userId}
           WHERE id=${id} AND status IN ('scheduled','in_progress') AND date=(NOW() AT TIME ZONE 'America/Santiago')::date
-            AND date+time_slot::time<=(NOW() AT TIME ZONE 'America/Santiago')+INTERVAL '30 minutes' RETURNING *`;
+            AND date+time_slot::time<=(NOW() AT TIME ZONE 'America/Santiago')+make_interval(mins=>${actionWindowMinutes}) RETURNING *`;
     if (!updated) throw new BookingPreparationError('consultation_outside_checkin_window');
     if (updated.attendance_at && updated.started_at) await preparePrescriptionBooking(sql, actor, id);
   }

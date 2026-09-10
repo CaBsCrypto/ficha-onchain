@@ -28,7 +28,7 @@ export async function verifiedWallet(sql: Sql, userId: string, email: string) {
   return resolveStellarWallet(sql, { getUser: id => p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId);
 }
 export async function resolveDoctor(sql: Sql, doctorId: number) {
-  const [doctor] = await sql`SELECT id,name,email,specialty,status FROM doctors WHERE id=${doctorId}`;
+  const [doctor] = await sql`SELECT id,name,email,specialty,license_num,rut,status FROM doctors WHERE id=${doctorId}`;
   if (!doctor) throw new DoctorAuthorizationError('doctor_not_found', 404);
   const user = await provider().getUserByEmail(String(doctor.email));
   if (!user) throw new DoctorAuthorizationError('doctor_privy_login_required');
@@ -49,8 +49,8 @@ export async function latestDoctorRequest(sql: Sql, wallet: string) {
   const [r] = await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${wallet} ORDER BY created_at DESC LIMIT 1`;
   return publicRequest(r);
 }
-export function syntheticDossier(): Pick<DoctorDossier,'fullName'|'license'|'specialty'|'verificationSource'> {
-  return {fullName:'Médico de prueba TrustLeaf',license:'TEST-STELLAR-REGISTRY',specialty:'Medicina general (prueba)',verificationSource:'Expediente sintético; no acredita habilitación profesional real'};
+export function syntheticDossier(doctor?: Record<string, unknown>): Pick<DoctorDossier,'fullName'|'license'|'specialty'|'verificationSource'> {
+  return {fullName:String(doctor?.name??'Médico de prueba TrustLeaf'),license:String(doctor?.license_num??'TEST-STELLAR-REGISTRY'),specialty:String(doctor?.specialty??'Medicina general (prueba)'),verificationSource:'Expediente sintético; no acredita habilitación profesional real'};
 }
 function dataKey() {
   const key=process.env.TRUSTLEAF_DATA_KEY;
@@ -59,12 +59,25 @@ function dataKey() {
 }
 export async function doctorAuthorizationDetails(sql: Sql, doctorId: number) {
   const d=await resolveDoctor(sql,doctorId), chain=await readPrivateDoctor(d.address);
-  const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC LIMIT 1`;
-  let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier();
+  const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC,created_at DESC LIMIT 1`;
+  let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier(d.doctor);
   if(stored){
-    const plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.id);
-    if(commitmentFor(plain)!==stored.commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY || plain.version!==Number(stored.version))throw new DoctorAuthorizationError('dossier_integrity_error',503);
-    const {blinding: _blinding,...safe}=plain; dossier=safe;
+    let plain:DoctorDossier|null=null;
+    try{
+      plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.id);
+    }catch{
+      // The administrator may review the current synthetic profile again only
+      // when the previous dossier never acquired a signature or transaction.
+      const [retryable]=await sql`SELECT 1 FROM doctor_authorization_requests
+        WHERE dossier_id=${stored.id} AND state='failed' AND prepared_xdr IS NULL AND transaction_hash IS NULL
+          AND error_code='dossier_invalid' AND (lease_until IS NULL OR lease_until<NOW())
+        ORDER BY created_at DESC LIMIT 1`;
+      if(!retryable)throw new DoctorAuthorizationError('dossier_integrity_error',503);
+    }
+    if(plain){
+      if(commitmentFor(plain)!==stored.commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY || plain.version!==Number(stored.version))throw new DoctorAuthorizationError('dossier_integrity_error',503);
+      const {blinding: _blinding,...safe}=plain; dossier=safe;
+    }
   }
   return {doctor:d.doctor,wallet:d.address,authorization:authorizationView(chain),request:await latestDoctorRequest(sql,d.address),dossier,syntheticOnly:true};
 }
@@ -90,6 +103,7 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
   let validUntil=action==='revoke'?chain.authorization!.valid_until:Math.floor(Date.now()/1000)+30*86400;
   let commitment=chain.authorization?.commitment??'', encrypted='';
   let previousRequestId: string | null = null;
+  let abandonedDossierId: string | null = null;
   if(dossierId){
     // Failed unsigned attempts retain their immutable dossier and error history.
     // A fresh request can reuse that evidence, but never an uncertain signature.
@@ -101,7 +115,8 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
       FROM doctor_private_dossiers ds LEFT JOIN LATERAL (
         SELECT * FROM doctor_authorization_requests r WHERE r.dossier_id=ds.id ORDER BY r.created_at DESC LIMIT 1
       ) previous ON TRUE WHERE ds.network='testnet' AND ds.contract_id=${PRIVATE_REGISTRY}
-        AND ds.wallet=${d.address} AND ds.version=${method.targetVersion}`;
+        AND ds.wallet=${d.address} AND ds.version=${method.targetVersion}
+      ORDER BY ds.created_at DESC LIMIT 1`;
     if(stored){
       if(stored.state!=='failed' || stored.has_signed_attempt || stored.transaction_hash || stored.prepared_xdr ||
           stored.dossier_transaction_hash || stored.dossier_status!=='prepared')throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
@@ -111,23 +126,53 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
           stored.doctor_user_id!==d.userId || stored.doctor_email!==d.doctor.email || stored.wallet_id!==d.walletId ||
           stored.wallet!==d.address || stored.contract_id!==PRIVATE_REGISTRY || stored.network!=='testnet')throw new DoctorAuthorizationError('failed_authorization_state_changed');
       if(Number(stored.dossier_valid_until)<=Math.floor(Date.now()/1000))throw new DoctorAuthorizationError('failed_dossier_expired');
-      let plain: DoctorDossier;
+      let plain: DoctorDossier | null=null;
       try{
         plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.dossier_record_id);
-        if(commitmentFor(plain)!==stored.dossier_commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY ||
-            plain.network!=='testnet' || plain.version!==method.targetVersion || plain.validUntil!==Number(stored.dossier_valid_until) ||
-            plain.reviewedBy!==actor.userId || stored.commitment!==stored.dossier_commitment ||
-            Number(stored.valid_until)!==plain.validUntil || Number(stored.dossier_version)!==plain.version)throw Error();
-      }catch{throw new DoctorAuthorizationError('dossier_integrity_error',503);}
-      previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
-      validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
+      }catch{
+        // A secret rotation can make an unsigned prepared dossier unreadable.
+        // Preserve the failed request, abandon only its never-signed dossier,
+        // and prepare fresh immutable evidence for this explicit admin retry.
+        abandonedDossierId=String(stored.dossier_record_id);dossierId=randomUUID();
+        validUntil=Math.floor(Date.now()/1000)+30*86400;
+        const replacement:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(d.doctor),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
+        commitment=commitmentFor(replacement);encrypted=encryptDossier(replacement,dataKey(),dossierId);
+      }
+      if(plain && (commitmentFor(plain)!==stored.dossier_commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY ||
+          plain.network!=='testnet' || plain.version!==method.targetVersion || plain.validUntil!==Number(stored.dossier_valid_until) ||
+          plain.reviewedBy!==actor.userId || stored.commitment!==stored.dossier_commitment ||
+          Number(stored.valid_until)!==plain.validUntil || Number(stored.dossier_version)!==plain.version))
+        throw new DoctorAuthorizationError('dossier_integrity_error',503);
+      if(!abandonedDossierId && plain){
+        previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
+        validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
+      }
     }else{
-      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
+      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(d.doctor),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
       commitment=commitmentFor(dossier);encrypted=encryptDossier(dossier,dataKey(),dossierId);
     }
   }
   try {
     const parameters=[dossierId,PRIVATE_REGISTRY,d.address,method.targetVersion,validUntil,commitment,encrypted,id,doctorId,actor.userId,actor.email,d.userId,d.doctor.email,d.walletId,action,method.method,method.expectedVersion];
+    if(abandonedDossierId){
+      const rows=await sql.query(`WITH abandoned AS (
+        UPDATE doctor_private_dossiers ds SET status='abandoned'
+        FROM doctor_authorization_requests r WHERE ds.id=$18::uuid AND r.dossier_id=ds.id
+          AND ds.status='prepared' AND ds.transaction_hash IS NULL
+          AND r.state='failed' AND r.prepared_xdr IS NULL AND r.transaction_hash IS NULL
+          AND (r.lease_until IS NULL OR r.lease_until<NOW())
+          AND r.requested_by=$10 AND r.requested_email=$11
+          AND r.doctor_id=$9 AND r.doctor_user_id=$12 AND r.doctor_email=$13 AND r.wallet_id=$14
+          AND r.wallet=$3 AND r.contract_id=$2 AND r.network='testnet'
+        RETURNING ds.id
+      ), dossier AS (
+        INSERT INTO doctor_private_dossiers(id,network,contract_id,wallet,version,valid_until,commitment,encrypted_dossier,status)
+        SELECT $1::uuid,'testnet',$2,$3,$4,$5,$6,$7,'prepared' FROM abandoned RETURNING id
+      ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state)
+        SELECT $8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,id,'pending' FROM dossier RETURNING *`,[...parameters,abandonedDossierId]);
+      if(!rows[0])throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
+      return {request:publicRequest(rows[0])};
+    }
     if(previousRequestId){
       const rows=await sql.query(`WITH retryable AS (
         SELECT ds.id FROM doctor_private_dossiers ds JOIN doctor_authorization_requests r ON r.dossier_id=ds.id

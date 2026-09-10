@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 
-interface Doctor { id: number; name: string; email: string; specialty: string | null; status: string; }
+interface Doctor { id: number; name: string; email: string; specialty: string | null; status: string; onboarding?: null | { id: string; source: 'application' | 'invitation'; state: string; reviewNote: string | null; }; }
 type Action = "authorize" | "renew" | "revoke";
 type AuthorizationStatus = "unregistered" | "authorized" | "expired" | "revoked" | "paused";
 interface AuthorizationRequest {
@@ -18,6 +18,7 @@ interface Review {
     fullName: string; license: string; specialty: string; verificationSource: string;
     reviewedBy: string; reviewedAt: string; version: number; validUntil: number;
   };
+  onboarding: null | { id: string; source: 'application' | 'invitation'; state: string; reviewNote: string | null; profile: null | { name: string; specialty: string; licenseNum: string; rut: string } };
   syntheticOnly: boolean;
 }
 const STATUS: Record<AuthorizationStatus, string> = {
@@ -25,6 +26,12 @@ const STATUS: Record<AuthorizationStatus, string> = {
   revoked: "Autorización revocada", paused: "Registro pausado",
 };
 const ACTION: Record<Action, string> = { authorize: "autorizar", renew: "renovar", revoke: "revocar" };
+const ONBOARDING_STATUS: Record<string, string> = {
+  invited: "Invitado", draft: "Perfil en preparación", submitted: "En revisión",
+  changes_requested: "Cambios solicitados", rejected: "Rechazado",
+  authorization_pending: "Autorización pendiente", authorized: "Autorizado",
+  expired: "Invitación vencida", revoked: "Autorización revocada",
+};
 const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30";
 const secondaryButton = "rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50";
 function expiry(timestamp: number | null) { return timestamp ? new Date(timestamp * 1000).toLocaleString("es-CL") : "—"; }
@@ -38,7 +45,7 @@ function requestError(status: number) {
 function AddDoctorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const lock = useRef(false);
-  const [form, setForm] = useState({ name: "", email: "", specialty: "", licenseNum: "", rut: "" });
+  const [form, setForm] = useState({ name: "", email: "", specialty: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { dialog.current?.showModal(); }, []);
@@ -59,23 +66,22 @@ function AddDoctorModal({ onClose, onCreated }: { onClose: () => void; onCreated
   }
   return (
     <dialog ref={dialog} onCancel={onClose} aria-labelledby="add-doctor-title" className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl bg-white p-6 shadow-xl backdrop:bg-slate-950/50">
-      <h2 id="add-doctor-title" className="text-lg font-semibold text-slate-800">Agregar médico de prueba</h2>
-      <p className="mt-1 text-sm text-slate-500">Crear el perfil no concede autorización para emitir.</p>
+      <h2 id="add-doctor-title" className="text-lg font-semibold text-slate-800">Invitar médico de prueba</h2>
+      <p className="mt-1 text-sm text-slate-500">La invitación aparecerá cuando esa cuenta ingrese con Privy. No concede autorización.</p>
       <form onSubmit={submit} className="mt-5 space-y-4">
         {([
           ["name", "Nombre", "text"], ["email", "Correo", "email"], ["specialty", "Especialidad", "text"],
-          ["licenseNum", "Registro de prueba", "text"], ["rut", "RUT sintético", "text"],
         ] as const).map(([key, label, type]) => (
           <label key={key} className="block text-xs font-medium text-slate-600">
             <span className="mb-1.5 block">{label}</span>
-            <input type={type} required={key === "name" || key === "email"} value={form[key]} className={inputClass}
+            <input type={type} required value={form[key]} className={inputClass}
               onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))} />
           </label>
         ))}
         {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
         <div className="flex justify-end gap-3">
           <button type="button" onClick={onClose} disabled={saving} className={secondaryButton}>Cancelar</button>
-          <button type="submit" disabled={saving} className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-50">{saving ? "Guardando…" : "Crear perfil"}</button>
+          <button type="submit" disabled={saving} className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-50">{saving ? "Guardando…" : "Crear invitación"}</button>
         </div>
       </form>
     </dialog>
@@ -89,6 +95,7 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
   const [refresh, setRefresh] = useState(0);
   const posting = useRef(false);
   const requestEpoch = useRef(0);
@@ -138,11 +145,23 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
       if (mounted.current) { setSaving(false); setRefresh((value) => value + 1); }
     }
   }
+  async function reviewOnboarding(action: 'request_changes' | 'reject' | 'reopen') {
+    if (posting.current || !review?.onboarding) return;
+    posting.current = true; setSaving(true); setError("");
+    try {
+      const response = await authedFetch('/api/admin/doctor-onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: review.onboarding.id, action, note: reviewNote.trim() }) });
+      const body = await response.json() as { onboarding?: Review['onboarding'] };
+      if (!response.ok || !body.onboarding) throw new Error(requestError(response.status));
+      if (mounted.current) { setReview(previous => previous ? { ...previous, onboarding: body.onboarding! } : previous); setReviewNote(""); setReviewed(false); }
+    } catch (err) { if (mounted.current) setError(err instanceof Error ? err.message : 'No se pudo actualizar la revisión.'); }
+    finally { posting.current = false; if (mounted.current) { setSaving(false); setRefresh(value => value + 1); } }
+  }
   const request = review?.request;
   const pending = request?.state === "pending" || request?.state === "submitted";
-  const blocked = saving || pending || !reviewed || !!error || !review?.wallet || !review?.dossier || review.authorization.status === "paused";
-  const status = review?.authorization.status;
   const primaryAction: Action = (review?.authorization.version ?? 0) > 0 ? "renew" : "authorize";
+  const onboardingReady = primaryAction !== 'authorize' || ['submitted', 'authorization_pending'].includes(review?.onboarding?.state ?? '');
+  const blocked = saving || pending || !reviewed || !!error || !review?.wallet || !review?.dossier || review.authorization.status === "paused" || !onboardingReady;
+  const status = review?.authorization.status;
   const hash = request?.transactionHash;
   return (
     <section aria-labelledby="doctor-review-title" className="rounded-2xl border border-sky-200 bg-white p-5 shadow-sm sm:p-6">
@@ -168,12 +187,27 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
             ))}
           </dl>
         </div>}
+        {review.onboarding && <div className="rounded-xl border border-slate-200 p-4 text-sm">
+          <p className="font-semibold text-slate-800">Alta iniciada por {review.onboarding.source === 'invitation' ? 'invitación administrativa' : 'solicitud del médico'}</p>
+          <p className="mt-1 text-slate-600">Estado: <strong>{ONBOARDING_STATUS[review.onboarding.state] ?? review.onboarding.state}</strong></p>
+          {review.onboarding.profile && <dl className="mt-3 grid gap-2 sm:grid-cols-2"><div><dt className="text-slate-500">Registro de prueba</dt><dd className="font-medium text-slate-700">{review.onboarding.profile.licenseNum}</dd></div><div><dt className="text-slate-500">RUT sintético</dt><dd className="font-medium text-slate-700">{review.onboarding.profile.rut}</dd></div></dl>}
+          {review.onboarding.reviewNote && <p className="mt-1 text-slate-500">Observación: {review.onboarding.reviewNote}</p>}
+          {['submitted','changes_requested','rejected'].includes(review.onboarding.state) && <div className="mt-3 space-y-3">
+            <label className="block text-xs font-medium text-slate-600"><span className="mb-1 block">Observación para el médico</span><textarea value={reviewNote} onChange={event => setReviewNote(event.target.value)} maxLength={500} className={`${inputClass} min-h-20`} /></label>
+            <div className="flex flex-wrap gap-2">
+              {review.onboarding.state === 'submitted' && <><button disabled={saving || !reviewNote.trim()} onClick={() => void reviewOnboarding('request_changes')} className={secondaryButton}>Solicitar cambios</button><button disabled={saving || !reviewNote.trim()} onClick={() => void reviewOnboarding('reject')} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 disabled:opacity-50">Rechazar</button></>}
+              {review.onboarding.state === 'changes_requested' && <button disabled={saving || !reviewNote.trim()} onClick={() => void reviewOnboarding('reject')} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 disabled:opacity-50">Rechazar</button>}
+              {review.onboarding.state === 'rejected' && <button disabled={saving} onClick={() => void reviewOnboarding('reopen')} className={secondaryButton}>Reabrir solicitud</button>}
+            </div>
+          </div>}
+        </div>}
         {request && <div role="status" className={`rounded-xl p-4 text-sm ${request.state === "confirmed" ? "bg-emerald-50 text-emerald-800" : request.state === "failed" ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}>
           <p className="font-semibold">{request.state === "confirmed" ? "Solicitud confirmada" : request.state === "failed" ? "Solicitud fallida" : "Solicitud pendiente"} · {ACTION[request.action]}</p>
           <p className="mt-1">{request.state === "pending" ? "Esperando al procesador administrativo. Si está apagado, la solicitud permanece pendiente." : request.state === "submitted" ? "Transacción enviada. Esperando su confirmación en Stellar Testnet." : request.state === "confirmed" ? "El recibo confirmó esta solicitud. El estado vigente aparece arriba." : "No se confirmó el cambio solicitado. Puedes actualizar el estado y volver a revisar."}</p>
           {hash && /^[a-f0-9]{64}$/i.test(hash) && <a href={`https://stellar.expert/explorer/testnet/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-semibold underline">Ver recibo en Stellar Testnet</a>}
         </div>}
-        {!pending && <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={saving || !!error || !review.dossier} className="mt-0.5 h-4 w-4 accent-sky-600" /><span>Revisé el expediente sintético y la cuenta del médico. Confirmo la acción que elija a continuación.</span></label>}
+        {!pending && onboardingReady && <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={saving || !!error || !review.dossier} className="mt-0.5 h-4 w-4 accent-sky-600" /><span>Revisé el expediente sintético, la identidad Privy y la wallet Stellar. Confirmo la acción que elija a continuación.</span></label>}
+        {!pending && !onboardingReady && primaryAction === 'authorize' && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">La autorización se habilitará cuando el médico envíe su perfil para revisión.</p>}
         <div className="flex flex-wrap gap-3">
           <button disabled={blocked} onClick={() => void submit(primaryAction)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Enviando solicitud…" : status === "revoked" ? "Confirmar nueva autorización" : primaryAction === "renew" ? "Confirmar renovación" : "Confirmar autorización"}</button>
           {review.authorization.version > 0 && status !== "revoked" && <button disabled={blocked} onClick={() => void submit("revoke")} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40">Confirmar revocación</button>}
@@ -191,6 +225,7 @@ export default function AdminDoctorsPage() {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Doctor | null>(null);
+  const [view, setView] = useState<'invitations' | 'review' | 'authorized' | 'all'>('review');
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -204,25 +239,30 @@ export default function AdminDoctorsPage() {
   }, []);
   useEffect(() => { void fetchDoctors(); }, [fetchDoctors]);
   const query = search.trim().toLowerCase();
-  const filtered = doctors.filter((doctor) => [doctor.name, doctor.email, doctor.specialty ?? ""].some((value) => value.toLowerCase().includes(query)));
+  const inView = (doctor: Doctor) => view === 'all' || (view === 'invitations'
+    ? ['invited','draft'].includes(doctor.onboarding?.state ?? '')
+    : view === 'review' ? ['submitted','changes_requested','rejected','authorization_pending'].includes(doctor.onboarding?.state ?? '')
+      : doctor.status === 'active' || doctor.onboarding?.state === 'authorized');
+  const filtered = doctors.filter((doctor) => inView(doctor) && [doctor.name, doctor.email, doctor.specialty ?? ""].some((value) => value.toLowerCase().includes(query)));
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-xl font-bold text-slate-800">Médicos</h1><p className="mt-1 text-sm text-slate-500">Autorizaciones en Stellar Testnet · Datos sintéticos</p></div>
-        <button onClick={() => setShowAdd(true)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">Agregar médico</button>
+        <button onClick={() => setShowAdd(true)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">Invitar médico</button>
       </div>
       {selected && <AuthorizationReview key={selected.id} doctor={selected} onClose={() => setSelected(null)} />}
       {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700"><p>{error}</p><button onClick={() => void fetchDoctors()} className="mt-2 font-semibold underline">Volver a cargar</button></div>}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Estados de alta médica">{([['invitations','Invitaciones'],['review','En revisión'],['authorized','Autorizados'],['all','Todos']] as const).map(([key,label]) => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)} className={view === key ? 'rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white' : secondaryButton}>{label}</button>)}</div>
       <label className="block"><span className="mb-2 block text-sm font-medium text-slate-600">Buscar médico</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo o especialidad" className={inputClass} /></label>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Cargando médicos…</p> : filtered.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{query ? "Sin resultados para esta búsqueda." : "No hay perfiles de médicos disponibles."}</p> : <ul className="divide-y divide-slate-100">{filtered.map((doctor) => (
           <li key={doctor.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div className="min-w-0"><p className="font-semibold text-slate-800">{doctor.name}</p><p className="break-all text-sm text-slate-500">{doctor.email}</p><p className="mt-1 text-xs text-slate-500">{doctor.specialty ?? "Especialidad sin registrar"}</p></div>
-            <button onClick={() => setSelected(doctor)} aria-expanded={selected?.id === doctor.id} className={secondaryButton}>Revisar autorización</button>
+            <div className="min-w-0"><p className="font-semibold text-slate-800">{doctor.name}</p><p className="break-all text-sm text-slate-500">{doctor.email}</p><p className="mt-1 text-xs text-slate-500">{doctor.specialty ?? "Especialidad sin registrar"}</p>{doctor.onboarding && <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{doctor.onboarding.source === 'invitation' ? 'Invitación' : 'Solicitud'} · {ONBOARDING_STATUS[doctor.onboarding.state] ?? doctor.onboarding.state}</p>}</div>
+            <button disabled={['invited','draft'].includes(doctor.onboarding?.state ?? '')} onClick={() => setSelected(doctor)} aria-expanded={selected?.id === doctor.id} className={secondaryButton}>{['invited','draft'].includes(doctor.onboarding?.state ?? '') ? 'Esperando al médico' : 'Revisar autorización'}</button>
           </li>
         ))}</ul>}
       </div>
-      {showAdd && <AddDoctorModal onClose={() => setShowAdd(false)} onCreated={() => void fetchDoctors()} />}
+      {showAdd && <AddDoctorModal onClose={() => setShowAdd(false)} onCreated={() => { setView('invitations'); void fetchDoctors(); }} />}
     </div>
   );
 }

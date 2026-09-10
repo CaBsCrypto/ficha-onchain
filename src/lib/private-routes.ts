@@ -2,7 +2,7 @@
 const pages=new Set(['/','/login','/doctor','/patient','/admin','/admin/doctors','/legal']);
 const api=new Set(['/api/privy/stellar-wallet','/api/doctor-status','/api/doctors','/api/appointments',
   '/api/prescription-bookings','/api/doctor/profile','/api/doctor/availability','/api/doctor/slots',
-  '/api/admin/whoami','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate',
+  '/api/doctor/onboarding','/api/admin/whoami','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/doctor-onboarding','/api/admin/migrate',
   '/api/private-prescriptions','/api/private-operations']);
 export function isPrivatePortalPath(pathname:string,localDiagnostic=false) {
   const path=pathname.replace(/\/+$/,'')||'/';
