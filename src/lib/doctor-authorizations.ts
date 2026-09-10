@@ -90,6 +90,7 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
   let validUntil=action==='revoke'?chain.authorization!.valid_until:Math.floor(Date.now()/1000)+30*86400;
   let commitment=chain.authorization?.commitment??'', encrypted='';
   let previousRequestId: string | null = null;
+  let abandonedDossierId: string | null = null;
   if(dossierId){
     // Failed unsigned attempts retain their immutable dossier and error history.
     // A fresh request can reuse that evidence, but never an uncertain signature.
@@ -111,16 +112,27 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
           stored.doctor_user_id!==d.userId || stored.doctor_email!==d.doctor.email || stored.wallet_id!==d.walletId ||
           stored.wallet!==d.address || stored.contract_id!==PRIVATE_REGISTRY || stored.network!=='testnet')throw new DoctorAuthorizationError('failed_authorization_state_changed');
       if(Number(stored.dossier_valid_until)<=Math.floor(Date.now()/1000))throw new DoctorAuthorizationError('failed_dossier_expired');
-      let plain: DoctorDossier;
+      let plain: DoctorDossier | null=null;
       try{
         plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.dossier_record_id);
-        if(commitmentFor(plain)!==stored.dossier_commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY ||
-            plain.network!=='testnet' || plain.version!==method.targetVersion || plain.validUntil!==Number(stored.dossier_valid_until) ||
-            plain.reviewedBy!==actor.userId || stored.commitment!==stored.dossier_commitment ||
-            Number(stored.valid_until)!==plain.validUntil || Number(stored.dossier_version)!==plain.version)throw Error();
-      }catch{throw new DoctorAuthorizationError('dossier_integrity_error',503);}
-      previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
-      validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
+      }catch{
+        // A secret rotation can make an unsigned prepared dossier unreadable.
+        // Preserve the failed request, abandon only its never-signed dossier,
+        // and prepare fresh immutable evidence for this explicit admin retry.
+        abandonedDossierId=String(stored.dossier_record_id);dossierId=randomUUID();
+        validUntil=Math.floor(Date.now()/1000)+30*86400;
+        const replacement:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(d.doctor),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
+        commitment=commitmentFor(replacement);encrypted=encryptDossier(replacement,dataKey(),dossierId);
+      }
+      if(plain && (commitmentFor(plain)!==stored.dossier_commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY ||
+          plain.network!=='testnet' || plain.version!==method.targetVersion || plain.validUntil!==Number(stored.dossier_valid_until) ||
+          plain.reviewedBy!==actor.userId || stored.commitment!==stored.dossier_commitment ||
+          Number(stored.valid_until)!==plain.validUntil || Number(stored.dossier_version)!==plain.version))
+        throw new DoctorAuthorizationError('dossier_integrity_error',503);
+      if(!abandonedDossierId && plain){
+        previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
+        validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
+      }
     }else{
       const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(d.doctor),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
       commitment=commitmentFor(dossier);encrypted=encryptDossier(dossier,dataKey(),dossierId);
@@ -128,6 +140,25 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
   }
   try {
     const parameters=[dossierId,PRIVATE_REGISTRY,d.address,method.targetVersion,validUntil,commitment,encrypted,id,doctorId,actor.userId,actor.email,d.userId,d.doctor.email,d.walletId,action,method.method,method.expectedVersion];
+    if(abandonedDossierId){
+      const rows=await sql.query(`WITH abandoned AS (
+        UPDATE doctor_private_dossiers ds SET status='abandoned'
+        FROM doctor_authorization_requests r WHERE ds.id=$18::uuid AND r.dossier_id=ds.id
+          AND ds.status='prepared' AND ds.transaction_hash IS NULL
+          AND r.state='failed' AND r.prepared_xdr IS NULL AND r.transaction_hash IS NULL
+          AND (r.lease_until IS NULL OR r.lease_until<NOW())
+          AND r.requested_by=$10 AND r.requested_email=$11
+          AND r.doctor_id=$9 AND r.doctor_user_id=$12 AND r.doctor_email=$13 AND r.wallet_id=$14
+          AND r.wallet=$3 AND r.contract_id=$2 AND r.network='testnet'
+        RETURNING ds.id
+      ), dossier AS (
+        INSERT INTO doctor_private_dossiers(id,network,contract_id,wallet,version,valid_until,commitment,encrypted_dossier,status)
+        SELECT $1::uuid,'testnet',$2,$3,$4,$5,$6,$7,'prepared' FROM abandoned RETURNING id
+      ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state)
+        SELECT $8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,id,'pending' FROM dossier RETURNING *`,[...parameters,abandonedDossierId]);
+      if(!rows[0])throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
+      return {request:publicRequest(rows[0])};
+    }
     if(previousRequestId){
       const rows=await sql.query(`WITH retryable AS (
         SELECT ds.id FROM doctor_private_dossiers ds JOIN doctor_authorization_requests r ON r.dossier_id=ds.id

@@ -560,11 +560,17 @@ step("private doctor dossiers", async () => {
     valid_until BIGINT NOT NULL,
     commitment TEXT NOT NULL,
     encrypted_dossier TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked')),
+    status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked', 'abandoned')),
     transaction_hash TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(network, contract_id, wallet, version)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+  await sql`ALTER TABLE doctor_private_dossiers DROP CONSTRAINT IF EXISTS doctor_private_dossiers_network_contract_id_wallet_version_key`;
+  await sql`ALTER TABLE doctor_private_dossiers DROP CONSTRAINT IF EXISTS doctor_private_dossiers_status_check`;
+  await sql`ALTER TABLE doctor_private_dossiers ADD CONSTRAINT doctor_private_dossiers_status_check
+    CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked', 'abandoned'))`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS doctor_private_dossiers_one_live_version
+    ON doctor_private_dossiers(network,contract_id,wallet,version)
+    WHERE status IN ('prepared','submitted','confirmed','revoked')`;
 });
 
 // Verified bindings are provisioned only after an independently verified wallet
@@ -637,7 +643,7 @@ step("doctor onboarding requests", async () => {
     reviewed_by TEXT,
     reviewed_email TEXT,
     review_note TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK ((privy_user_id IS NULL AND wallet_id IS NULL AND wallet IS NULL) OR
            (privy_user_id IS NOT NULL AND wallet_id IS NOT NULL AND wallet IS NOT NULL)),

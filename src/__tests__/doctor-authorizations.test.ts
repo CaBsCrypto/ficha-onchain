@@ -225,6 +225,22 @@ describe('recovery of failed unsigned authorization requests', () => {
     expect(mocks.read).toHaveBeenCalledTimes(1);
     expect(mocks.resolveWallet).toHaveBeenCalledTimes(1);
   });
+  it('abandons only an unreadable unsigned dossier and prepares fresh evidence after key rotation', async () => {
+    const { row, dossier } = failedFixture();
+    row.encrypted_dossier = encryptDossier(dossier, '99'.repeat(32), 'existing-dossier');
+    const { sql, query } = arrange(row);
+    expect((await requestDoctorAuthorization(sql, actor, doctor.id, 'authorize')).request)
+      .toMatchObject({ id: 'retry-request', state: 'pending' });
+    const [statement, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(statement).toContain("SET status='abandoned'");
+    expect(statement).toContain('INSERT INTO doctor_private_dossiers');
+    expect(statement).toContain('INSERT INTO doctor_authorization_requests');
+    expect(params[0]).not.toBe('existing-dossier');
+    expect(params[5]).not.toBe(row.commitment);
+    expect(params[6]).not.toBe(row.encrypted_dossier);
+    expect(params[17]).toBe('existing-dossier');
+    expect(row.error_code).toBe('authority_signature_invalid');
+  });
   it.each(['transaction_hash', 'prepared_xdr', 'dossier_transaction_hash', 'has_signed_attempt'])('never retries a saved or uncertain signed attempt indicated by %s', async field => {
     const { row } = failedFixture();
     row[field] = field === 'has_signed_attempt' ? true : 'saved-evidence';
