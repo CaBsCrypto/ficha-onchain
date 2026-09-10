@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { requirePrivyAdmin } from '@/lib/auth/admin';
 import { isSameOrigin } from '@/lib/auth/same-origin';
 import { assertPrivateEnvironment,assertPrivateWrites,PrivateFlowError } from '@/lib/private-config';
+import { createDoctorInvitation } from '@/lib/doctor-onboarding';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'no-store'}});
@@ -36,10 +37,8 @@ async function mutate(request:Request,edit:boolean){
   try{
     assertPrivateWrites();const sql=getDb();
     if(!edit){
-      const [doctor]=await sql`INSERT INTO doctors(name,email,specialty,license_num,rut,status)
-        VALUES(${name},${email},${specialty},${license},${rut},'pending') RETURNING id,name,email,specialty,license_num,rut,status,created_at`;
-      if(!doctor)return json({error:'doctor_not_created'},503);
-      return json({success:true,doctor},201);
+      const invitation=await createDoctorInvitation(sql,auth.user,{name,email,specialty,licenseNum:license,rut});
+      return json({success:true,...invitation},201);
     }
     // Profile editing cannot reassign a Privy identity or manufacture chain authorization.
     const [doctor]=await sql`UPDATE doctors SET name=COALESCE(${name},name),

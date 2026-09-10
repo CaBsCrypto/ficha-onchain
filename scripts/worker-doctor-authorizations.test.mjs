@@ -215,7 +215,18 @@ test('SQL eligibility uses verified binding and doctor email, not caller-editabl
   const store = createStore({ query: async (sql, values) => { calls.push([sql, values]); return { rows: [{ id: 'request' }], rowCount: 1 }; } });
   assert.equal(await store.eligible({ id: 'request' }), true);
   assert.match(calls[0][0], /privy_stellar_wallet_bindings/); assert.match(calls[0][0], /r.doctor_email/);
+  assert.match(calls[0][0], /doctor_onboarding_requests/); assert.match(calls[0][0], /authorize_doctor/);
   assert.doesNotMatch(calls[0][0], /registered_users/);
+});
+
+test('confirmed initial authorization completes the exact onboarding request', async () => {
+  const calls = [];
+  const store = createStore({ query: async (sql, values) => { calls.push([sql, values]); return { rows: [], rowCount: 1 }; } });
+  const job = fixture({ action: 'authorize', method: 'authorize_doctor', transaction_hash: 'authorize-hash' }).job;
+  await store.complete(job, 'active');
+  const update = calls.find(([sql]) => sql.includes("state='authorized'"));
+  assert.match(update[0], /authorization_request_id=\$2/);
+  assert.deepEqual(update[1], [job.doctor_id, job.id]);
 });
 
 test('revocation with no dossier_id updates exact historical dossier and retains its original receipt', async () => {

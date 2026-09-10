@@ -28,7 +28,7 @@ export async function verifiedWallet(sql: Sql, userId: string, email: string) {
   return resolveStellarWallet(sql, { getUser: id => p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId);
 }
 export async function resolveDoctor(sql: Sql, doctorId: number) {
-  const [doctor] = await sql`SELECT id,name,email,specialty,status FROM doctors WHERE id=${doctorId}`;
+  const [doctor] = await sql`SELECT id,name,email,specialty,license_num,rut,status FROM doctors WHERE id=${doctorId}`;
   if (!doctor) throw new DoctorAuthorizationError('doctor_not_found', 404);
   const user = await provider().getUserByEmail(String(doctor.email));
   if (!user) throw new DoctorAuthorizationError('doctor_privy_login_required');
@@ -49,8 +49,8 @@ export async function latestDoctorRequest(sql: Sql, wallet: string) {
   const [r] = await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${wallet} ORDER BY created_at DESC LIMIT 1`;
   return publicRequest(r);
 }
-export function syntheticDossier(): Pick<DoctorDossier,'fullName'|'license'|'specialty'|'verificationSource'> {
-  return {fullName:'Médico de prueba TrustLeaf',license:'TEST-STELLAR-REGISTRY',specialty:'Medicina general (prueba)',verificationSource:'Expediente sintético; no acredita habilitación profesional real'};
+export function syntheticDossier(doctor?: Record<string, unknown>): Pick<DoctorDossier,'fullName'|'license'|'specialty'|'verificationSource'> {
+  return {fullName:String(doctor?.name??'Médico de prueba TrustLeaf'),license:String(doctor?.license_num??'TEST-STELLAR-REGISTRY'),specialty:String(doctor?.specialty??'Medicina general (prueba)'),verificationSource:'Expediente sintético; no acredita habilitación profesional real'};
 }
 function dataKey() {
   const key=process.env.TRUSTLEAF_DATA_KEY;
@@ -60,7 +60,7 @@ function dataKey() {
 export async function doctorAuthorizationDetails(sql: Sql, doctorId: number) {
   const d=await resolveDoctor(sql,doctorId), chain=await readPrivateDoctor(d.address);
   const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC LIMIT 1`;
-  let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier();
+  let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier(d.doctor);
   if(stored){
     const plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.id);
     if(commitmentFor(plain)!==stored.commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY || plain.version!==Number(stored.version))throw new DoctorAuthorizationError('dossier_integrity_error',503);
@@ -122,7 +122,7 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
       previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
       validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
     }else{
-      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
+      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(d.doctor),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
       commitment=commitmentFor(dossier);encrypted=encryptDossier(dossier,dataKey(),dossierId);
     }
   }

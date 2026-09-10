@@ -153,7 +153,7 @@ describe('durable authorization requests', () => {
     const result = await requestDoctorAuthorization(sql, actor, doctor.id, 'authorize');
     const params = query.mock.calls[0][1] as unknown[];
     const dossier = decryptDossier(String(params[6]), dataKey, String(params[0]));
-    expect(dossier).toMatchObject({ ...syntheticDossier(), network: 'testnet', contractId: PRIVATE_REGISTRY,
+    expect(dossier).toMatchObject({ ...syntheticDossier(doctor), network: 'testnet', contractId: PRIVATE_REGISTRY,
       wallet, version: 1, validUntil: now + 30 * 86400, reviewedBy: actor.userId });
     expect(commitmentFor(dossier)).toBe(params[5]);
     expect(String(params[6])).not.toContain(dossier.fullName);

@@ -2,7 +2,7 @@
 
 import { usePrivy } from '@privy-io/react-auth';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
@@ -253,17 +253,79 @@ function GateShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The administrator creates the synthetic profile from the existing admin panel.
-function RegistrationPending({ email, onDone }: { email: string; onDone: () => void }) {
+type OnboardingState = 'invited' | 'draft' | 'submitted' | 'changes_requested' | 'rejected' | 'authorization_pending' | 'authorized' | 'expired' | 'revoked';
+interface OnboardingView {
+  id: string; source: 'application' | 'invitation'; state: OnboardingState; reviewNote: string | null;
+  profile: null | { name: string; specialty: string; licenseNum: string; rut: string };
+}
+
+function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void }) {
+  const [onboarding, setOnboarding] = useState<OnboardingView | null>(null);
+  const [form, setForm] = useState({ name: '', specialty: '', licenseNum: '', rut: '' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const accepting = useRef(false);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await authedFetch('/api/doctor/onboarding', { cache: 'no-store' });
+      const body = await response.json() as { onboarding?: OnboardingView | null; error?: string };
+      if (!response.ok) throw new Error(body.error ?? 'doctor_onboarding_unavailable');
+      if (body.onboarding?.state === 'invited' && !accepting.current) {
+        accepting.current = true;
+        const accepted = await authedFetch('/api/doctor/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_invitation' }) });
+        const acceptedBody = await accepted.json() as { onboarding?: OnboardingView; error?: string };
+        if (!accepted.ok || !acceptedBody.onboarding) throw new Error(acceptedBody.error ?? 'invitation_not_acceptable');
+        body.onboarding = acceptedBody.onboarding;
+        accepting.current = false;
+      }
+      setOnboarding(body.onboarding ?? null);
+      if (body.onboarding?.profile) setForm({
+        name: body.onboarding.profile.name ?? '', specialty: body.onboarding.profile.specialty ?? '',
+        licenseNum: body.onboarding.profile.licenseNum ?? '', rut: body.onboarding.profile.rut ?? '',
+      });
+      if (body.onboarding?.state === 'authorized') onDone();
+    } catch (cause) { accepting.current = false; setError(cause instanceof Error ? cause.message : 'doctor_onboarding_unavailable'); }
+    finally { setLoading(false); }
+  }, [onDone]);
+  useEffect(() => { void load(); }, [load]);
+  async function submit(action: 'save' | 'submit') {
+    if (saving) return;
+    setSaving(true); setError('');
+    try {
+      const response = await authedFetch('/api/doctor/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...form }) });
+      const body = await response.json() as { onboarding?: OnboardingView; error?: string };
+      if (!response.ok || !body.onboarding) throw new Error(body.error ?? 'doctor_onboarding_unavailable');
+      setOnboarding(body.onboarding);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'doctor_onboarding_unavailable'); }
+    finally { setSaving(false); }
+  }
+  const state = onboarding?.state;
+  const editable = !state || state === 'draft' || state === 'changes_requested';
+  const profileComplete = Object.values(form).every(value => value.trim().length > 0);
   return (
     <GateShell>
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-800">Perfil médico pendiente</h1>
+        <h1 className="text-xl font-semibold text-slate-800">Alta médica en TrustLeaf</h1>
         <p className="mt-2 break-all text-sm font-medium text-slate-700">{email}</p>
-        <p role="status" className="mt-3 text-sm text-slate-600">El administrador debe crear tu perfil sintético y revisar la autorización de esta cuenta. El acceso se habilitará después de confirmar su recibo en Stellar Testnet.</p>
-        <button onClick={onDone} className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600">
-          Comprobar estado
-        </button>
+        {loading && <p role="status" className="mt-4 text-sm text-slate-600">Preparando tu identidad y wallet Stellar…</p>}
+        {!loading && onboarding?.source === 'invitation' && <p className="mt-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">Invitación reconocida. Tu wallet Stellar quedó vinculada a esta cuenta.</p>}
+        {!loading && editable && <div className="mt-5 space-y-4">
+          <p className="text-sm text-slate-600">Completa el perfil con datos sintéticos. Enviar la solicitud no concede autorización.</p>
+          {state === 'changes_requested' && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">El administrador solicitó cambios{onboarding?.reviewNote ? `: ${onboarding.reviewNote}` : '.'}</p>}
+          {([['name','Nombre de prueba'],['specialty','Especialidad de prueba'],['licenseNum','Registro de prueba'],['rut','RUT sintético']] as const).map(([key,label]) => <label key={key} className="block text-xs font-medium text-slate-600">
+            <span className="mb-1.5 block">{label}</span><input required value={form[key]} onChange={event => setForm(previous => ({ ...previous, [key]: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30" />
+          </label>)}
+          <div className="flex flex-wrap gap-3"><button disabled={saving || !profileComplete} onClick={() => void submit('save')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">Guardar perfil</button><button disabled={saving || !profileComplete} onClick={() => void submit('submit')} className="flex-1 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Guardando…' : 'Enviar para revisión'}</button></div>
+        </div>}
+        {!loading && state === 'submitted' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Solicitud enviada.</strong> El administrador debe revisar el expediente sintético antes de autorizar.</p>}
+        {!loading && state === 'authorization_pending' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Autorización pendiente en Stellar.</strong> El acceso se habilitará cuando el worker confirme el recibo.</p>}
+        {!loading && state === 'rejected' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800"><strong>Solicitud rechazada.</strong> El administrador debe reabrirla antes de que puedas corregirla.{onboarding?.reviewNote ? ` Motivo: ${onboarding.reviewNote}` : ''}</p>}
+        {!loading && state === 'expired' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">La invitación venció. Solicita al administrador una nueva invitación.</p>}
+        {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">No se pudo completar el alta: {error}</p>}
+        {!editable && <button onClick={() => void load()} className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600">Comprobar estado</button>}
+        <p className="mt-4 text-xs text-slate-500">Una wallet Stellar por persona · Privy · Stellar Testnet</p>
       </div>
     </GateShell>
   );
@@ -297,7 +359,7 @@ function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' |
 }
 
 // ── Access gate: registro → pendiente → portal ─────────────────────────────────
-type DocStatus = 'loading' | 'unregistered' | 'pending' | 'active' | 'expired' | 'revoked' | 'paused' | 'error';
+type DocStatus = 'loading' | 'onboarding' | 'pending' | 'active' | 'expired' | 'revoked' | 'paused' | 'error';
 interface PrivateDoctorStatus {
   authorized: boolean;
   source: 'private_registry';
@@ -326,7 +388,7 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
         if (body.source !== 'private_registry' || !body.authorization) throw new Error('authorization_unverified');
         if (!alive) return;
         setRecord(body);
-        if (!body.doctor) setStatus('unregistered');
+        if (!body.doctor || (body.authorization.status === 'unregistered' && !body.pendingRequest)) setStatus('onboarding');
         else if (body.authorized && body.wallet && body.authorization.status === 'authorized' && (body.authorization.validUntil ?? 0) * 1000 > Date.now()) setStatus('active');
         else if (['expired', 'revoked', 'paused'].includes(body.authorization.status)) setStatus(body.authorization.status as 'expired' | 'revoked' | 'paused');
         else setStatus('pending');
@@ -347,7 +409,7 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (status === 'unregistered') return <RegistrationPending email={email ?? ''} onDone={check} />;
+  if (status === 'onboarding') return <DoctorOnboarding email={email ?? ''} onDone={check} />;
   if (status !== 'active' || !record) return <StatusScreen variant={status === 'active' ? 'error' : status} onRefresh={check} />;
   return <DoctorShell authorization={record}>{children}</DoctorShell>;
 }
