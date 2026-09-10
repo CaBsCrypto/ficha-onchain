@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), getDb: vi.fn(), sql: vi.fn(), config: vi.fn(), details: vi.fn(),
   request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn(),
-  invite:vi.fn(),listOnboarding:vi.fn(),onboardingForDoctor:vi.fn(),assertSubmitted:vi.fn(),markPending:vi.fn() }));
+  invite:vi.fn(),listOnboarding:vi.fn(),onboardingForDoctor:vi.fn(),doctorOnboardingView:vi.fn(),assertSubmitted:vi.fn(),markPending:vi.fn() }));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: mocks.requireUser,
   isDoctor: vi.fn(), authEnforced: () => false,
   unauthorized: () => Response.json({ error: 'unauthorized' }, { status: 401 }),
@@ -18,6 +18,7 @@ vi.mock('@/lib/doctor-authorizations', () => ({
 }));
 vi.mock('@/lib/doctor-onboarding', () => ({
   createDoctorInvitation:mocks.invite,listDoctorOnboarding:mocks.listOnboarding,onboardingForDoctor:mocks.onboardingForDoctor,
+  doctorOnboardingView:mocks.doctorOnboardingView,
   assertSubmittedOnboarding:mocks.assertSubmitted,markOnboardingAuthorizationPending:mocks.markPending,
 }));
 import { GET, POST } from '@/app/api/admin/doctor-authorizations/route';
@@ -59,6 +60,7 @@ beforeEach(() => {
   mocks.invite.mockResolvedValue({doctor:{id:21,email:doctor.email,status:'pending'},onboarding:{id:'onboarding-1',state:'invited'}});
   mocks.listOnboarding.mockResolvedValue([{id:21,email:doctor.email}]);
   mocks.onboardingForDoctor.mockResolvedValue({id:'onboarding-1',state:'submitted'});
+  mocks.doctorOnboardingView.mockResolvedValue({wallet:'expected-stellar-wallet',onboarding:null});
   mocks.assertSubmitted.mockResolvedValue({id:'onboarding-1',state:'submitted'});
   mocks.markPending.mockResolvedValue(undefined);
 });

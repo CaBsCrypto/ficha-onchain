@@ -367,6 +367,7 @@ interface PrivateDoctorStatus {
   doctor: { id: number; name: string; email: string } | null;
   authorization: { status: 'unregistered' | 'authorized' | 'expired' | 'revoked' | 'paused'; version: number; validUntil: number | null };
   pendingRequest?: { state: string } | null;
+  onboarding?: { state: OnboardingState; source: 'application' | 'invitation' } | null;
 }
 
 function DoctorAccessGate({ children }: { children: React.ReactNode }) {
@@ -388,7 +389,8 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
         if (body.source !== 'private_registry' || !body.authorization) throw new Error('authorization_unverified');
         if (!alive) return;
         setRecord(body);
-        if (!body.doctor || (body.authorization.status === 'unregistered' && !body.pendingRequest)) setStatus('onboarding');
+        if (body.onboarding && !['authorized','revoked'].includes(body.onboarding.state)) setStatus('onboarding');
+        else if (!body.doctor || (body.authorization.status === 'unregistered' && !body.pendingRequest)) setStatus('onboarding');
         else if (body.authorized && body.wallet && body.authorization.status === 'authorized' && (body.authorization.validUntil ?? 0) * 1000 > Date.now()) setStatus('active');
         else if (['expired', 'revoked', 'paused'].includes(body.authorization.status)) setStatus(body.authorization.status as 'expired' | 'revoked' | 'paused');
         else setStatus('pending');

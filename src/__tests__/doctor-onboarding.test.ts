@@ -7,7 +7,7 @@ vi.mock('@/lib/doctor-authorizations', () => ({ verifiedWallet: mocks.wallet }))
 
 import {
   acceptDoctorInvitation, assertSubmittedOnboarding, createDoctorInvitation, doctorOnboardingView,
-  markOnboardingAuthorizationPending, reviewDoctorOnboarding, saveDoctorApplication,
+  markOnboardingAuthorizationPending, reconcileAuthorizedDoctorOnboarding, reviewDoctorOnboarding, saveDoctorApplication,
 } from '@/lib/doctor-onboarding';
 
 const actor = { userId: 'did:privy:doctor', email: 'doctor@example.test' };
@@ -53,6 +53,15 @@ describe('doctor invitation acceptance', () => {
   it('rejects a changed Privy or wallet association on read', async () => {
     const query = vi.fn().mockResolvedValueOnce([{ ...onboarding, wallet_id: 'another-wallet' }]).mockResolvedValueOnce([doctor]);
     await expect(doctorOnboardingView(fakeSql(query), actor)).rejects.toMatchObject({ message: 'doctor_identity_mismatch', status: 403 });
+  });
+
+  it('reconciles an accepted invitation only for the same verified identity', async () => {
+    const authorized = { ...onboarding, source: 'invitation', state: 'authorized', authorized_at: new Date().toISOString() };
+    const query = vi.fn().mockResolvedValueOnce([authorized]).mockResolvedValueOnce([]).mockResolvedValueOnce([authorized]).mockResolvedValueOnce([{ ...doctor, status: 'active' }]);
+    const result = await reconcileAuthorizedDoctorOnboarding(fakeSql(query), actor);
+    expect(result).toMatchObject({ wallet: wallet.address, onboarding: { state: 'authorized' } });
+    expect(query.mock.calls[0][0]).toContain("state='authorized'");
+    expect(query.mock.calls[0][1]).toEqual([actor.email, actor.userId, wallet.walletId, wallet.address]);
   });
 });
 

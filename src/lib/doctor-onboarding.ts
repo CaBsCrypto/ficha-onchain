@@ -95,6 +95,27 @@ export async function acceptDoctorInvitation(sql: Sql, actor: AuthedUser) {
   return doctorOnboardingView(sql, actor);
 }
 
+export async function reconcileAuthorizedDoctorOnboarding(sql: Sql, actor: AuthedUser) {
+  const owner = await identity(sql, actor);
+  const rows = await sql.query<Row>(`UPDATE doctor_onboarding_requests SET
+      state='authorized',authorized_at=COALESCE(authorized_at,NOW()),updated_at=NOW()
+    WHERE id=(SELECT id FROM doctor_onboarding_requests WHERE LOWER(email)=LOWER($1)
+      ORDER BY created_at DESC LIMIT 1)
+      AND state IN ('draft','submitted','changes_requested','authorization_pending')
+      AND privy_user_id=$2 AND wallet_id=$3 AND wallet=$4
+    RETURNING *`, [owner.email, actor.userId, owner.walletId, owner.address]);
+  if (!rows[0]) {
+    const current = await latest(sql, owner.email);
+    if (current?.state !== 'authorized' || current.privy_user_id !== actor.userId ||
+        current.wallet_id !== owner.walletId || current.wallet !== owner.address) {
+      throw new PrivateFlowError('doctor_identity_mismatch', 403);
+    }
+  }
+  await sql.query(`UPDATE doctors SET status='active',updated_at=NOW()
+    WHERE LOWER(email)=LOWER($1)`, [owner.email]);
+  return doctorOnboardingView(sql, actor);
+}
+
 async function ensureApplication(sql: Sql, actor: AuthedUser, owner: Awaited<ReturnType<typeof identity>>, values: DoctorOnboardingProfile) {
   let current = await latest(sql, owner.email);
   if (current) return current;

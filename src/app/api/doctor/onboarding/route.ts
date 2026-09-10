@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
 import { privateApi, privateBody } from '@/lib/private-api';
-import { acceptDoctorInvitation, doctorOnboardingView, saveDoctorApplication } from '@/lib/doctor-onboarding';
+import { acceptDoctorInvitation, doctorOnboardingView, reconcileAuthorizedDoctorOnboarding, saveDoctorApplication } from '@/lib/doctor-onboarding';
+import { readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { PrivateFlowError } from '@/lib/private-config';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,10 @@ export function POST(request: Request) {
     const action = body.action;
     if (action === 'accept_invitation') {
       if (Object.keys(body).length !== 1) throw new PrivateFlowError('invalid_request', 400);
-      return acceptDoctorInvitation(getDb(), actor);
+      const sql = getDb();
+      const accepted = await acceptDoctorInvitation(sql, actor);
+      const chain = await readPrivateDoctor(accepted.wallet);
+      return chain.authorized ? reconcileAuthorizedDoctorOnboarding(sql, actor) : accepted;
     }
     if (action !== 'save' && action !== 'submit') throw new PrivateFlowError('invalid_onboarding_action', 400);
     return saveDoctorApplication(getDb(), actor, body, action === 'submit');
