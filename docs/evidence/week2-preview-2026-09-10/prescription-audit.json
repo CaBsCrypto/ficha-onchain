@@ -1,0 +1,57 @@
+{
+  "verifiedAt": "2026-09-10T04:28:09.709Z",
+  "environment": "preview",
+  "network": "testnet",
+  "storageReadLedger": 4598180,
+  "prescriptions": [
+    {
+      "appointmentId": 1,
+      "rxId": "5",
+      "status": "Active",
+      "mintHash": "4dd908c68526945a93bad6b798ba302f7470b0d6e804c06baa4254ac914c0e61",
+      "activateHash": "c988adadf21ba82a9d6429942f8ddaa325b8650816154f6ba3090e6835e9d854",
+      "commitment": "f9e4ddce9bf40fb6122ba029e13aa03e3ed9faef19aaf81b9f6e4f794bfa9fc5",
+      "bookingStatus": "Consumed",
+      "consentPresent": false,
+      "consultationCompleted": true,
+      "encryptedEnvelopePresent": true,
+      "documentCreatedBeforeMintIntent": true,
+      "documentOpenedByDoctor": true,
+      "documentOpenedByPatient": true
+    },
+    {
+      "appointmentId": 2,
+      "rxId": "6",
+      "status": "Revoked",
+      "mintHash": "2a02237b59226ba2102bad766d80ff9396c0577ea5c6006fd6409fb90f4e0b0b",
+      "activateHash": "00ba25dc1b76a839c7ff8d73aa6a6830ae82c3365a60a93f85f903423f5ecaed",
+      "revokeHash": "a9bf9924d1771a1a0caab654940ca6201f39478ccdc0c2866911fb530fb8decc",
+      "commitment": "25dbac97e669617c54c5121dec393b10f7e1f4011f4b97b5df9308b91ea26272",
+      "bookingStatus": "Consumed",
+      "consentPresent": false,
+      "consultationCompleted": true,
+      "encryptedEnvelopePresent": true,
+      "documentCreatedBeforeMintIntent": true,
+      "documentOpenedByDoctor": true,
+      "documentOpenedByPatient": true
+    }
+  ],
+  "snapshot": {
+    "completedAppointments": 2,
+    "cancelledAppointments": 1,
+    "confirmedUserOperations": 9,
+    "pendingAdminOperations": 0,
+    "pendingBookingOperations": 0,
+    "pendingUserOperations": 0,
+    "duplicateLiveSourceGroups": 0,
+    "cancelledAppointmentHasNoBookingOrPrescription": true
+  },
+  "checks": {
+    "participantsMatch": true,
+    "commitmentsMatchDatabaseMintAndStorage": true,
+    "prescriptionExpiriesMatch": true,
+    "bookingsConsumedOnChainAndDatabase": true,
+    "consentsConsumed": true,
+    "clinicalContentsReadByAudit": false
+  }
+}
