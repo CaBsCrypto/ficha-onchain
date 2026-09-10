@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-09-10T04:39:00Z",
+  "previewCommit": "dda4bf5cf9ee95cf21dc4e7d9248df162e755efe",
+  "testedApplicationCommit": "df812d84be6dbb05c0e7d68feebe20cceef2cc2c",
+  "documentationOnlyDifference": true,
+  "previousValidatedResults": {
+    "applicationTests": { "passed": 414, "suites": 34 },
+    "privateServiceTests": { "passed": 43, "failed": 0 },
+    "contractTests": { "passed": 11, "failed": 0 },
+    "typeScript": "passed",
+    "build": "passed"
+  },
+  "newControlledClientTests": {
+    "file": "src/__tests__/private-signing-component.test.ts",
+    "passed": 9,
+    "failed": 0,
+    "environment": "jsdom",
+    "scope": [
+      "Privy signature rejection and explicit retry",
+      "lost confirmation response and recovery without a new signature",
+      "double click in one render",
+      "submitted and confirmed replay",
+      "review cancellation before signing",
+      "both controlled cancellation-versus-mint outcomes",
+      "foreign operation ID rejection"
+    ],
+    "limitations": "Controlled provider and transport behavior; does not prove real PostgreSQL locking, a real Privy outage or on-chain ordering."
+  },
+  "finalWorkingTreeChecks": {
+    "applicationTests": { "passed": 423, "suites": 35, "excludedUnrelatedUntrackedFile": "src/__tests__/week1-security-integration.test.ts" },
+    "typeScript": "passed",
+    "build": "passed",
+    "buildNote": "Initial sandboxed build could not fetch Google Fonts; the authorized network-enabled retry completed successfully."
+  },
+  "pendingAtThisRecord": [
+    "Video URL",
+    "Formal reviewer acceptance"
+  ]
+}

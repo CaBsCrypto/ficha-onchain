@@ -8,21 +8,22 @@
 
 TrustLeaf connects doctor and patient portals to **two smart contracts on Stellar Testnet**. Patients book a consultation and separately authorize one prescription. Doctors issue, activate and revoke prescriptions using their own Stellar wallets through Privy. TrustLeaf's relayer pays network fees; users do not need an external wallet or XLM purchases.
 
-**Week 2 integration candidate — September 9, 2026.** Testnet and synthetic data only. The local doctor/patient walkthrough is complete, with one active prescription and one revoked prescription. Validation on the isolated deployment and the Week 2 video remain pending.
+**Week 2 validated preview — September 10, 2026.** Testnet and synthetic data only. Administrator, doctor and patient completed the deployed walkthrough. Prescription `#5` is active and prescription `#6` is revoked; both private documents were opened by their authorized participants. The Week 2 video and formal reviewer acceptance remain pending.
 
-[Week 2 operation and acceptance guide](./docs/sow-delivery/WEEK_2_PORTALS.md) · [Current configuration template](./config/testnet-config.example.txt) · [Week 1 evidence](#week-1-evidence--september-7-2026)
+[Week 2 reviewer page](./docs/sow-delivery/week2-review/TrustLeaf-Entrega-semana-2.html) · [Preview evidence](./docs/evidence/week2-preview-2026-09-10/README.md) · [Recording guide](./docs/sow-delivery/TrustLeaf-guia-video-semana-2.html) · [Current configuration template](./config/testnet-config.example.txt)
 
 </div>
 
 ## Current status
 
 - Three distinct test accounts have confirmed owner-signing probes with relayer-paid Testnet receipts: administrator, doctor and patient.
-- Administrative doctor authorization has been confirmed in `DoctorRegistryPrivate`. The doctor has entered the local portal with their own Privy session, seen the confirmed authorization and saved availability.
-- The doctor and patient interfaces are connected to the private booking, consent, prescription and recovery services. An isolated, empty Neon preview branch has been created and migrated.
-- The [local walkthrough and validation package](./docs/evidence/week2-portals-local-2026-09-09/README.md) records two completed consultations, one active prescription and one revoked prescription, separate consent and withdrawal, and private document access by the patient and issuing doctor. Unauthenticated requests were rejected. Local checks passed: **414 application tests, 43 private-service tests, 11 contract tests, TypeScript and build**; source versions and remote CI results are identified in the package.
-- **Still to validate:** access rejection for an unrelated authenticated identity and remaining failure scenarios; the complete walkthrough on the isolated preview and main test site; the recorded walkthrough and reviewer handoff.
+- Administrative doctor authorization is confirmed in `DoctorRegistryPrivate`. The same request moved from pending to confirmed with one transaction hash, and the doctor saw the current authorization in the deployed portal.
+- The isolated preview completed two independent consultations. The patient confirmed attendance and granted consent separately; the doctor issued and activated both prescriptions, then revoked `#6` while preserving its history.
+- The [preview evidence package](./docs/evidence/week2-preview-2026-09-10/README.md) records **12 successful receipts**, two consumed bookings, zero pending or duplicate operations, and encrypted-document persistence before each mint attempt. Doctor and patient opened both documents from their own sessions; the patient received no doctor-only controls.
+- Current checks pass: **423 application tests in 35 suites, 43 private-service tests, 11 contract tests, TypeScript and production build**. Nine new controlled client tests cover signature rejection, response loss, replay, double click and cancellation-versus-mint outcomes without presenting them as real provider outages or PostgreSQL races.
+- **Still pending for handoff:** attach the recorded Week 2 walkthrough and obtain formal reviewer acceptance. The main site is intentionally outside this preview-first delivery.
 
-These completed prerequisites do not close Week 2. Test results and browser receipts must be recorded against the version being reviewed; the Week 1 totals below are historical evidence.
+The preview is the reviewed environment for this cutoff. Its version, browser observations and receipts are recorded separately from the historical Week 1 evidence below.
 
 ## The two contracts
 

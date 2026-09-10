@@ -1,0 +1,31 @@
+{
+  "recordedAt": "2026-09-10T04:31:35.026Z",
+  "environment": "preview",
+  "network": "testnet",
+  "contracts": {
+    "doctorRegistry": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+    "prescriptions": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE"
+  },
+  "receipts": [
+    { "action": "renew_authorization", "appointmentId": null, "rxId": null, "hash": "05732ca162b062c7494e178688c2645b1c05dd0d0920d9e9fba18bb4cbb9574d", "status": "SUCCESS", "ledger": 4584628 },
+    { "action": "attest_booking", "appointmentId": 1, "rxId": null, "hash": "0351397bc7a95abbf5d707c18eb0ec5f71d9b181b5e3ceb4acc94fbb580c8dfa", "status": "SUCCESS", "ledger": 4584818 },
+    { "action": "attest_booking", "appointmentId": 2, "rxId": null, "hash": "a7bc8f4982c257d1bd8b64350bd249306ae461656a76a5fa4dbbc2a8a98274b2", "status": "SUCCESS", "ledger": 4584822 },
+    { "action": "authorize_prescriber", "appointmentId": 1, "rxId": null, "hash": "6268dd7ddede4e644db4e92d70168c285ef31b1976c2654b2a512209c3a1ec5b", "status": "SUCCESS", "ledger": 4584850 },
+    { "action": "revoke_consent", "appointmentId": 1, "rxId": null, "hash": "1ae3c03b5d455942ed62887b9f89862d490bbe151e6572fb61cb24b3b686d4b3", "status": "SUCCESS", "ledger": 4584868 },
+    { "action": "authorize_prescriber", "appointmentId": 1, "rxId": null, "hash": "dd3dfa46eab57853c9fbebd895b88aa8fd1220c42a576d09709fffb0e25e2654", "status": "SUCCESS", "ledger": 4584873 },
+    { "action": "authorize_prescriber", "appointmentId": 2, "rxId": null, "hash": "4eef0b33f72ae90ab8e7f1061f563b750e574ad463377916372390994930a72c", "status": "SUCCESS", "ledger": 4584881 },
+    { "action": "mint_prescription", "appointmentId": 1, "rxId": "5", "hash": "4dd908c68526945a93bad6b798ba302f7470b0d6e804c06baa4254ac914c0e61", "status": "SUCCESS", "ledger": 4584912 },
+    { "action": "mint_prescription", "appointmentId": 2, "rxId": "6", "hash": "2a02237b59226ba2102bad766d80ff9396c0577ea5c6006fd6409fb90f4e0b0b", "status": "SUCCESS", "ledger": 4584940 },
+    { "action": "activate", "appointmentId": 2, "rxId": "6", "hash": "00ba25dc1b76a839c7ff8d73aa6a6830ae82c3365a60a93f85f903423f5ecaed", "status": "SUCCESS", "ledger": 4584953 },
+    { "action": "revoke", "appointmentId": 2, "rxId": "6", "hash": "a9bf9924d1771a1a0caab654940ca6201f39478ccdc0c2866911fb530fb8decc", "status": "SUCCESS", "ledger": 4584958 },
+    { "action": "activate", "appointmentId": 1, "rxId": "5", "hash": "c988adadf21ba82a9d6429942f8ddaa325b8650816154f6ba3090e6835e9d854", "status": "SUCCESS", "ledger": 4584974 }
+  ],
+  "checks": {
+    "allSuccess": true,
+    "hashesUnique": true,
+    "exactContractsMethodsAndArguments": true,
+    "ownerSignaturesValid": true,
+    "expectedFeePayerAndRelaySignature": true,
+    "noRawSignaturesOrEnvelopesIncluded": true
+  }
+}

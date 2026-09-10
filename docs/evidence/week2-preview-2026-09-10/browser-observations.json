@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-09-10T04:31:35.026Z",
+  "environment": "preview",
+  "network": "testnet",
+  "sourceCommit": "dda4bf5cf9ee95cf21dc4e7d9248df162e755efe",
+  "roles": {
+    "administrator": {
+      "authorizationState": "confirmed",
+      "clinicalDocumentControlsVisible": false
+    },
+    "doctor": {
+      "authorizationShown": "confirmed",
+      "appointments": {
+        "completed": [1, 2],
+        "cancelled": [3]
+      },
+      "prescriptions": [
+        { "rxId": "5", "status": "Active", "documentOpened": true },
+        { "rxId": "6", "status": "Revoked", "documentOpened": true }
+      ]
+    },
+    "patient": {
+      "portal": "/patient?tab=recetas",
+      "prescriptions": [
+        { "rxId": "5", "status": "Active", "documentOpened": true, "receiptVisible": true },
+        { "rxId": "6", "status": "Revoked", "documentOpened": true, "receiptVisible": true }
+      ],
+      "doctorOnlyControlsVisible": false
+    }
+  },
+  "privacy": {
+    "documentsWereSynthetic": true,
+    "documentContentsIncluded": false,
+    "tokensOrCredentialsIncluded": false
+  },
+  "limitations": [
+    "The browser observation proves the rendered role-specific flow at the recorded time; RPC and database integrity are documented separately.",
+    "Absence of administrator clinical controls is complemented by automated route-authorization tests; no clinical document was opened from the administrator session.",
+    "Closing a confirmation modal is UI cancellation and is not reported as a live Privy signature rejection."
+  ]
+}
