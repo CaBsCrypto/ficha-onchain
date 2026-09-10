@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-09-10T04:40:00Z",
+  "algorithm": "SHA-256",
+  "files": [
+    { "name": "browser-observations.json", "size": 1530, "sha256": "ce02a7faab3d2117efaafa9dfdafecaa0d49e6991d5ae7a0616c59c8a6f7de16" },
+    { "name": "prescription-audit.json", "size": 2047, "sha256": "2e0fa6a9b9994a8d80ee1346c145c9fc9c483814881c4f41737e0a75c1830a3e" },
+    { "name": "preview-receipts.json", "size": 2786, "sha256": "7c8760d1598735f1213f8e80227c8e25996a6d30bf02101c02e499c2a31eb279" },
+    { "name": "README.md", "size": 3489, "sha256": "b5c3203251bae5e260a79927db65fab57887f32c867cbf280f11a00fecbb83ec" },
+    { "name": "validation-results.json", "size": 1593, "sha256": "4b60228b1460b08d623400848bf4cf87914860c3e757821760eeb644cbc4b5c3" }
+  ]
+}

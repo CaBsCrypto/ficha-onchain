@@ -27,10 +27,11 @@ const STORAGE_KEY = "ficha-lang";
 
 /**
  * Provides the active language + translation dictionary to the tree.
- * Persists the choice in localStorage and keeps <html lang> in sync.
+ * Persists the choice in localStorage without modifying the router's URL on mount.
  */
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Language>("en");
+  const [lang, setLangState] = useState<Language>("es");
+  const [resolved, setResolved] = useState(false);
 
   // Resolve the initial preference on mount (client only).
   // Priority: ?lang= query param > localStorage.
@@ -38,24 +39,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const fromQuery = new URLSearchParams(window.location.search).get("lang");
     if (fromQuery === "en" || fromQuery === "es") {
       setLangState(fromQuery);
+      setResolved(true);
       return;
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY) as Language | null;
+    let stored: Language | null = null;
+    try { stored = window.localStorage.getItem(STORAGE_KEY) as Language | null; } catch { /* Storage can be unavailable. */ }
     if (stored === "en" || stored === "es") {
       setLangState(stored);
     }
+    setResolved(true);
   }, []);
 
   useEffect(() => {
+    if (!resolved) return;
     document.documentElement.lang = lang;
-    window.localStorage.setItem(STORAGE_KEY, lang);
-    // Keep ?lang= in sync so the current language is shareable via URL.
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("lang") !== lang) {
-      url.searchParams.set("lang", lang);
-      window.history.replaceState(null, "", url);
-    }
-  }, [lang]);
+    try { window.localStorage.setItem(STORAGE_KEY, lang); } catch { /* Keep the in-memory preference. */ }
+  }, [lang, resolved]);
 
   const setLang = useCallback((next: Language) => setLangState(next), []);
   const toggle = useCallback(

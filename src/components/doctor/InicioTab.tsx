@@ -38,7 +38,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     ),
   },
   {
-    label: 'Nueva Receta',
+    label: 'Recetas privadas',
     href: '/doctor?tab=recetas',
     color: 'bg-emerald-500 hover:bg-emerald-600 text-white',
     icon: (
@@ -77,11 +77,8 @@ export function InicioTab() {
 
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [totalAppointments, setTotalAppointments] = useState(0);
-  const [rxCount, setRxCount] = useState<number | null>(null);
   const [licCount, setLicCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const demoDoctorWallet = process.env.NEXT_PUBLIC_DEMO_DOCTOR_WALLET ?? '';
 
   const today = new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -112,17 +109,7 @@ export function InicioTab() {
         setLicCount((j.data ?? []).filter((l) => l.status === 'signed' || l.status === 'active').length))
       .catch(() => setLicCount(0));
 
-    // Real prescription count — recetas are minted on-chain by the demo doctor
-    // wallet, so we list by that wallet rather than the logged-in email.
-    if (demoDoctorWallet) {
-      authedFetch(`/api/prescriptions?wallet=${encodeURIComponent(demoDoctorWallet)}&role=doctor`)
-        .then((r) => (r.ok ? r.json() : { prescriptions: [] }))
-        .then((j: { prescriptions?: unknown[] }) => setRxCount((j.prescriptions ?? []).length))
-        .catch(() => setRxCount(0));
-    } else {
-      setRxCount(0);
-    }
-  }, [doctorEmail, todayISO, demoDoctorWallet]);
+  }, [doctorEmail, todayISO]);
 
   const statsData = [
     {
@@ -137,9 +124,9 @@ export function InicioTab() {
       ),
     },
     {
-      label: 'Recetas emitidas',
-      value: rxCount === null ? '…' : String(rxCount),
-      sub: 'on-chain',
+      label: 'Recetas privadas',
+      value: 'Pendiente',
+      sub: 'Emisión desde el portal por habilitar',
       color: 'bg-emerald-50 text-emerald-600',
       icon: (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

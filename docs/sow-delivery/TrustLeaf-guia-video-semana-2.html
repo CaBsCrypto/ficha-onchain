@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TrustLeaf · Guía de video · Semana 2</title>
+  <style>
+    :root{color-scheme:dark;--bg:#071a1b;--card:#0d292a;--ink:#f1fbf7;--muted:#a9c7c1;--green:#47d7a0;--blue:#65b9ff;--orange:#ffb45e;--violet:#c69cff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#123b38 0,#071a1b 42%);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif}
+    main{width:min(920px,calc(100% - 28px));margin:28px auto 56px}.eyebrow{color:var(--green);font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.78rem}
+    h1{font-size:clamp(2rem,6vw,3.6rem);line-height:1.02;margin:.35rem 0 .65rem}p{color:var(--muted)}.meta{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 26px}.pill{background:#163a38;border:1px solid #27504c;border-radius:999px;padding:7px 12px;color:#d9f3ed}
+    .step{display:grid;grid-template-columns:100px 1fr;gap:18px;background:color-mix(in srgb,var(--card) 92%,transparent);border:1px solid #224644;border-radius:18px;padding:20px;margin:12px 0;box-shadow:0 12px 32px #0003}
+    .time{font-weight:900;color:var(--blue)}.step:nth-of-type(2) .time{color:var(--orange)}.step:nth-of-type(3) .time{color:var(--violet)}.step:nth-of-type(4) .time{color:var(--green)}.step:nth-of-type(5) .time{color:var(--blue)}.step:nth-of-type(6) .time{color:var(--orange)}
+    h2{margin:0 0 6px;font-size:1.05rem}.say{color:var(--ink);font-size:1.08rem;margin:0}.show{margin:.55rem 0 0;color:var(--muted);font-size:.92rem}.show b{color:var(--green)}
+    details{background:#0b2425;border:1px solid #224644;border-radius:14px;padding:14px 18px;margin-top:22px}summary{cursor:pointer;font-weight:800}li{margin:.45rem 0;color:var(--muted)}
+    button{margin-top:22px;border:0;border-radius:12px;padding:12px 17px;background:var(--green);color:#042019;font-weight:900;cursor:pointer}.status{display:inline-block;margin-left:10px;color:var(--muted);font-size:.9rem}
+    @media(max-width:620px){.step{grid-template-columns:1fr;gap:5px;padding:17px}.time{font-size:.88rem}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">TrustLeaf · Semana 2</div>
+  <h1>Guía breve para grabar el recorrido</h1>
+  <p>Guion de 90 segundos. Graba el preview en una sola ventana y evita mostrar correos completos, tokens, documentos clínicos o herramientas internas.</p>
+  <div class="meta"><span class="pill">Stellar Testnet</span><span class="pill">3 roles</span><span class="pill">2 consultas</span><span class="pill">1 activa · 1 revocada</span></div>
+
+  <section id="script">
+    <article class="step"><div class="time">0–8 s · Hook</div><div><h2>El resultado</h2><p class="say">“Esta semana convertimos los contratos de TrustLeaf en un recorrido usable: médico y paciente operan desde el portal, con Privy y sin comprar XLM.”</p><p class="show"><b>Muestra:</b> portada del preview y etiqueta Stellar Testnet.</p></div></article>
+    <article class="step"><div class="time">8–20 s · Acceso</div><div><h2>Identidad y autorización</h2><p class="say">“Cada persona conserva una sola wallet Stellar. El médico entra con su cuenta y el portal comprueba en cadena que su autorización está vigente.”</p><p class="show"><b>Muestra:</b> ingreso del médico y estado de autorización confirmado.</p></div></article>
+    <article class="step"><div class="time">20–38 s · Consulta</div><div><h2>Reserva y consentimiento separado</h2><p class="say">“El paciente reserva y confirma asistencia. El médico inicia la consulta. Recién después de acreditar la reserva, el paciente autoriza una emisión para ese médico y esa consulta.”</p><p class="show"><b>Muestra:</b> consulta, asistencia, inicio y modal de consentimiento. Remarca que asistir no concede permiso.</p></div></article>
+    <article class="step"><div class="time">38–57 s · Emisión</div><div><h2>Firma del médico</h2><p class="say">“El médico revisa el destinatario, firma la emisión con Privy y el relayer paga la comisión. La receta aparece registrada sólo cuando el recibo se confirma.”</p><p class="show"><b>Muestra:</b> revisión, confirmación y estado “Registrada · pendiente de activación”.</p></div></article>
+    <article class="step"><div class="time">57–75 s · Resultado</div><div><h2>Activación, lectura y revocación</h2><p class="say">“La activación requiere otra confirmación. El paciente abre su documento privado desde su propio portal. En una segunda consulta, el médico revoca otra receta y el historial permanece visible.”</p><p class="show"><b>Muestra:</b> receta #5 activa, apertura del paciente y receta #6 revocada. No enfoques el contenido del documento.</p></div></article>
+    <article class="step"><div class="time">75–90 s · Cierre</div><div><h2>Qué demuestra</h2><p class="say">“El preview demuestra los dos recorridos sin terminal: firmas de los propietarios, comisiones patrocinadas, dos contratos privados y estados reales en Stellar Testnet. Todo utiliza datos sintéticos.”</p><p class="show"><b>Muestra:</b> página de entrega con enlaces a evidencia y recibos.</p></div></article>
+  </section>
+
+  <button id="copy" type="button">Copiar guion</button><span class="status" id="status" aria-live="polite"></span>
+  <details><summary>Preguntas que pueden hacerte</summary><ul><li><b>¿Asistencia equivale a consentimiento?</b> No. Son acciones separadas y el permiso habilita una sola emisión.</li><li><b>¿Quién paga?</b> El relayer de TrustLeaf paga la comisión; médico y paciente firman sus propias acciones.</li><li><b>¿Qué queda público?</b> Direcciones, relaciones, compromisos, vencimientos y estados. El documento permanece cifrado fuera de cadena.</li><li><b>¿Por qué una activa y otra revocada?</b> Permite demostrar el ciclo y que la revocación conserva el historial.</li><li><b>¿Está listo para pacientes reales?</b> Es una validación técnica en Testnet con datos sintéticos.</li></ul></details>
+  <script>
+    const button=document.querySelector('#copy'),status=document.querySelector('#status');
+    button.addEventListener('click',async()=>{const text=[...document.querySelectorAll('.say')].map(x=>x.textContent).join('\n\n');try{await navigator.clipboard.writeText(text);status.textContent='Guion copiado';}catch{status.textContent='No se pudo copiar automáticamente';}});
+  </script>
+</main></body></html>
