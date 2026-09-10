@@ -133,4 +133,15 @@ describe('authorization handoff', () => {
     expect(query.mock.calls[0][0]).toContain("state='authorization_pending'");
     expect(query.mock.calls[0][1]).toEqual([id, 'request-1']);
   });
+
+  it('can replace only an unsigned failed handoff with a new pending request', async () => {
+    const query = vi.fn().mockResolvedValueOnce([{ id }]);
+    await markOnboardingAuthorizationPending(fakeSql(query), id, 'replacement-request');
+    const statement = String(query.mock.calls[0][0]);
+    expect(statement).toContain("previous.state='failed'");
+    expect(statement).toContain('previous.prepared_xdr IS NULL');
+    expect(statement).toContain('previous.transaction_hash IS NULL');
+    expect(statement).toContain("replacement.state='pending'");
+    expect(statement).toContain('authorization_request_id=$2');
+  });
 });

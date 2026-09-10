@@ -256,10 +256,16 @@ export async function assertSubmittedOnboarding(sql: Sql, doctorId: number) {
 }
 
 export async function markOnboardingAuthorizationPending(sql: Sql, onboardingId: string, authorizationRequestId: string) {
-  const rows = await sql.query<Row>(`UPDATE doctor_onboarding_requests SET state='authorization_pending',
-      authorization_request_id=COALESCE(authorization_request_id,$2),updated_at=NOW()
+  const rows = await sql.query<Row>(`UPDATE doctor_onboarding_requests o SET state='authorization_pending',
+      authorization_request_id=$2,updated_at=NOW()
     WHERE id=$1 AND ((state='submitted' AND authorization_request_id IS NULL)
-      OR (state='authorization_pending' AND authorization_request_id=$2)) RETURNING id`,
+      OR (state='authorization_pending' AND (authorization_request_id=$2 OR EXISTS (
+        SELECT 1 FROM doctor_authorization_requests previous,doctor_authorization_requests replacement
+        WHERE previous.id=o.authorization_request_id AND previous.state='failed'
+          AND previous.prepared_xdr IS NULL AND previous.transaction_hash IS NULL
+          AND replacement.id=$2 AND replacement.doctor_id=o.doctor_id AND replacement.state='pending'
+          AND replacement.prepared_xdr IS NULL AND replacement.transaction_hash IS NULL
+      )))) RETURNING id`,
   [onboardingId, authorizationRequestId]);
   if (!rows[0]) throw new PrivateFlowError('onboarding_state_changed', 409);
 }
