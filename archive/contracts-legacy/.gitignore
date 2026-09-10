@@ -1,0 +1,3 @@
+# Preserve generated historical snapshots locally without introducing build output.
+**/test_snapshots/
+**/target/

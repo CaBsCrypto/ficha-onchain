@@ -7,11 +7,13 @@
  * 1. Assembles a Decreto 41 compliant record, validates the mandatory fields,
  *    builds a canonical FHIR R4 Bundle and derives
  *    rx_hash = SHA-256(canonical bundle) — the 32-byte anchor stored on-chain.
- * 2. If DEMO_DOCTOR_SECRET is set, performs a REAL, gasless mint:
+ * 2. Explicit Testnet demo mode requires verified doctor identity, active DB
+ *    role, configured email/signer binding, and one configured synthetic patient.
+ *    Only then performs a REAL, gasless mint:
  *    the doctor keypair signs the invoke (satisfying require_auth, since the
  *    doctor is the tx source), then the relayer fee-bumps and submits it so the
  *    doctor spends no XLM. Returns the on-chain rx id + tx hash.
- * 3. Demo-only fallback when no signer or patient address is configured.
+ * 3. Explicit simulated mode never signs or writes the clinical log.
  *    Once a real mint is attempted, rejection/uncertainty returns an error,
  *    never simulated success. Callers must preserve issuance identity on retry.
  *
@@ -31,14 +33,14 @@ import {
   BASE_FEE,
   xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
+import { CONTRACT_IDS, NETWORK_PASSPHRASE, STELLAR_NETWORK, STELLAR_EXPERT_TX, isStellarAddress } from "@/lib/stellar/config";
 import { server, isDoctorAuthorized } from "@/lib/stellar/client";
 import { feeBumpAndSend, getDemoDoctorSecret } from "@/lib/stellar/server";
 import { withSignerLock } from "@/lib/stellar/serialize";
 import { canonicalize, validateDecreto41 } from "@/lib/decreto41";
 import { buildDecreto41Bundle } from "@/lib/fhir";
 import { getDb } from "@/lib/db";
-import { requireAuthOrDemo } from "@/lib/auth/privy-auth";
+import { requireUser, isDoctor, authEnforced, unauthorized, forbidden } from "@/lib/auth/privy-auth";
 import { isPrescriptionIssuance, type PrescriptionIssuance } from "@/lib/prescription-issuance";
 import type {
   Decreto41Prescription,
@@ -52,6 +54,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface MintBody {
+  mode?: "simulated" | "testnet-demo";
   issuance?: PrescriptionIssuance;
   /** On-chain patient wallet (G…) or demo name. */
   patient?: string;
@@ -90,16 +93,45 @@ interface MintBody {
 }
 
 async function handleMint(request: Request) {
-  // Issuing a prescription is a doctor action — guard it (demo mode passes through).
-  const gate = await requireAuthOrDemo(request);
-  if (gate) return gate.error;
-
+  if (process.env.TRUSTLEAF_PRIVATE_PORTAL_ENABLED === 'true') {
+    return NextResponse.json({error:'private_prescription_flow_not_enabled'}, {status:409});
+  }
   let body: MintBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  // Simulation is explicit and never uses a signer or writes clinical records.
+  const simulation = body.mode === "simulated";
+  const user = await requireUser(request);
+  if ((!simulation || authEnforced()) && !user?.email) return unauthorized();
+  let doctorSecret: string | undefined;
+  if (!simulation) {
+    if (body.mode !== "testnet-demo" || process.env.TRUSTLEAF_ENABLE_TESTNET_DEMO_MINT !== "true" || STELLAR_NETWORK !== "testnet") {
+      return NextResponse.json({ error: "Server signing is disabled" }, { status: 403 });
+    }
+    const email = process.env.TRUSTLEAF_DEMO_DOCTOR_EMAIL?.trim().toLowerCase();
+    if (!email || user!.email !== email || (body.doctorEmail != null && (typeof body.doctorEmail !== "string" || body.doctorEmail.trim().toLowerCase() !== email))) return forbidden();
+    try {
+      if (!await isDoctor(getDb(), user!)) return forbidden();
+    } catch {
+      return NextResponse.json({ error: "Doctor authorization unavailable" }, { status: 503 });
+    }
+    doctorSecret = getDemoDoctorSecret() ?? undefined;
+    try {
+      if (!doctorSecret || Keypair.fromSecret(doctorSecret).publicKey() !== process.env.TRUSTLEAF_DEMO_DOCTOR_WALLET || !process.env.TRUSTLEAF_DEMO_PATIENT_WALLET || body.patient !== process.env.TRUSTLEAF_DEMO_PATIENT_WALLET) return forbidden();
+    } catch { return forbidden(); }
+    // Audit attribution always comes from verified identity, never the body.
+    body.doctorEmail = user!.email!;
+  }
+
+  const stringFields = ["patient", "medication", "dosage", "notes", "patientName", "patientDocNumber", "patientBirthDate", "patientAddress", "patientPhone", "patientEmail", "doctorName", "doctorRut", "doctorSpecialty", "clinicName", "clinicRut", "diagnosis", "cie10Code", "representativeName", "representativeRut"] as const;
+  if (stringFields.some((key) => body[key] != null && typeof body[key] !== "string")) return NextResponse.json({ error: "Invalid text field" }, { status: 400 });
 
   const patient = (body.patient ?? "").trim();
   if (!isPrescriptionIssuance(body.issuance) || Date.parse(body.issuance.issuedAt) > Date.now() + 300_000) {
@@ -108,10 +140,13 @@ async function handleMint(request: Request) {
   const medication = (body.medication ?? "").trim();
   const dosage = (body.dosage ?? "").trim();
   // "Cantidad a dispensar" (Decreto 41) drives the on-chain units_total.
-  const quantity = Math.max(
-    1,
-    Math.floor(Number(body.quantity ?? body.units) || 1),
-  );
+  const quantity = Number(body.quantity ?? body.units ?? 1);
+  const refills = Number(body.refills ?? 0);
+  if ([body.quantity, body.units, body.refills].some((v) => v != null && typeof v !== "number" && typeof v !== "string")) return NextResponse.json({ error: "Invalid numeric field" }, { status: 400 });
+  const validityDays = Number(process.env.NEXT_PUBLIC_RX_VALIDITY_DAYS ?? 30);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 0xffffffff || !Number.isInteger(refills) || refills < 0 || refills > 0xffffffff) return NextResponse.json({ error: "Invalid quantity or refills" }, { status: 400 });
+  if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 3650) return NextResponse.json({ error: "Invalid prescription validity configuration" }, { status: 503 });
+  if (Date.parse(body.issuance.issuedAt) + validityDays * 86400000 <= Date.now()) return NextResponse.json({ error: "Issuance has expired" }, { status: 400 });
   const units = quantity;
 
   // 1. Assemble the Decreto 41 compliant record.
@@ -148,7 +183,7 @@ async function handleMint(request: Request) {
       diagnosis: (body.diagnosis ?? "").trim(),
       cie10Code: body.cie10Code?.trim() || undefined,
       quantity,
-      refills: Math.max(0, Math.floor(Number(body.refills) || 0)),
+      refills,
       prescriptionType: body.prescriptionType ?? "SIMPLE",
     },
     consent: {
@@ -180,7 +215,6 @@ async function handleMint(request: Request) {
   const rxHash = createHash("sha256").update(payload).digest(); // Buffer(32)
 
   const patientIsG = isStellarAddress(patient);
-  const doctorSecret = getDemoDoctorSecret();
 
   // Off-chain mirror of the issuance so /admin/historial can surface recetas
   // (the chain is the source of truth; this is only for observability). Never
@@ -228,12 +262,8 @@ async function handleMint(request: Request) {
   }
 
   // 3. Simulated fallback.
-  const reason = !doctorSecret
-    ? "no doctor signer configured (DEMO_DOCTOR_SECRET/RELAYER_SECRET)"
-    : "patient is not a Stellar address";
-  const sim = simulated(rxHash, reason);
-  await logPrescription(sim);
-  return NextResponse.json(sim);
+  if (!simulation) return NextResponse.json({ error: "Invalid configured demo patient" }, { status: 403 });
+  return NextResponse.json(simulated(rxHash, "explicit simulation; no transaction or clinical record written"));
 }
 
 export const POST = handleMint;

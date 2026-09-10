@@ -9,7 +9,7 @@
  * call `await ensureTable(sql)` on every request, paying a round-trip to Neon
  * to re-check a table that already existed.
  */
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { neon, Pool, neonConfig, type PoolClient, type NeonQueryFunction } from "@neondatabase/serverless";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -72,6 +72,12 @@ function dbHost(url: string): string {
  * Exported for direct unit testing.
  */
 export function assertDbSafe(url: string): void {
+  if (process.env.TRUSTLEAF_ENV) {
+    const actual = new URL(url).hostname;
+    if (!process.env.TRUSTLEAF_DB_HOST || actual !== process.env.TRUSTLEAF_DB_HOST || actual.includes('ep-rapid-shadow-ahq94785')) {
+      throw new Error('private_database_not_authorized');
+    }
+  }
   const guard = process.env.PROD_DB_HOST_GUARD;
   if (!guard) return; // guard not configured → no-op
   if (process.env.VERCEL_ENV !== "preview") return; // only guards preview deploys
@@ -79,6 +85,28 @@ export function assertDbSafe(url: string): void {
 }
 
 let cached: Sql | null = null;
+let connectionPool: Pool | null = null;
+
+/** Session connection for operations that must hold PostgreSQL row locks. */
+export async function getDbConnection(): Promise<PoolClient> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new DbNotConfiguredError();
+  assertDbSafe(url);
+  if (!connectionPool) {
+    neonConfig.webSocketConstructor = (await import('ws')).default;
+    connectionPool = new Pool({ connectionString: url });
+  }
+  return connectionPool.connect();
+}
+
+/** Adapt the existing connection; no second connector or implicit transaction. */
+export function sqlForConnection(client: PoolClient): Sql {
+  const query = async <T = Record<string, any>>(sql: string, values: any[] = []): Promise<T[]> =>
+    (await client.query(sql, values)).rows as T[];
+  const tagged = <T = Record<string, any>>(parts: TemplateStringsArray, ...values: any[]) =>
+    query<T>(parts.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, ''), values);
+  return Object.assign(tagged, { query });
+}
 
 /** Returns the shared Neon client. Throws DbNotConfiguredError if unconfigured. */
 export function getDb(): Sql {

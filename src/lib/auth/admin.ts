@@ -28,6 +28,14 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return Boolean(e) && adminEmails().includes(e!);
 }
 
+/** Private registry actions never accept the historical shared admin token. */
+export async function requirePrivyAdmin(request: Request) {
+  const user = await requireUser(request);
+  if (!user) return { error: unauthorized() };
+  if (!isAdminEmail(user.email)) return { error: forbidden() };
+  return { user };
+}
+
 /** Legacy token from the header or query string — NEVER the body. */
 function legacyToken(request: Request): string | null {
   const header = request.headers.get("x-admin-token");

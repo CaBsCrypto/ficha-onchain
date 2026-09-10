@@ -19,7 +19,11 @@
 import { NextResponse } from "next/server";
 import { dbNotConfiguredResponse } from "@/lib/api/errors";
 import { getDb } from "@/lib/db";
-import { resolveOwnerEmail } from "@/lib/auth/privy-auth";
+import { requireUser, unauthorized } from "@/lib/auth/privy-auth";
+import { isSameOrigin } from '@/lib/auth/same-origin';
+import { assertPrivateEnvironment } from '@/lib/private-config';
+import { resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
+import { bookingTransaction, BookingPreparationError } from '@/lib/prescription-booking';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,11 +54,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   // Identity comes from the token when present; the param is only trusted in
   // demo mode. A logged-in doctor can only read their own grid.
-  const owner = await resolveOwnerEmail(request, searchParams.get("doctorEmail"));
-  if ("error" in owner) return owner.error;
-  const doctorEmail = owner.email;
+  const actor = await requireUser(request); if (!actor?.email) return unauthorized();
+  if (searchParams.has('doctorEmail') && searchParams.get('doctorEmail')?.trim().toLowerCase() !== actor.email)
+    return NextResponse.json({error:'forbidden'},{status:403});
+  const doctorEmail = actor.email;
 
   try {
+    assertPrivateEnvironment();
     const sql = getDb();
     const rows = await sql`
       SELECT id, weekday, TO_CHAR(start_time, 'HH24:MI') AS start_time,
@@ -69,6 +75,8 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const actor = await requireUser(request); if (!actor?.email) return unauthorized();
+  if (!isSameOrigin(request)) return NextResponse.json({error:'forbidden'},{status:403});
   let body: { doctorEmail?: string; blocks?: unknown };
   try {
     body = await request.json();
@@ -76,9 +84,11 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const owner = await resolveOwnerEmail(request, body.doctorEmail);
-  if ("error" in owner) return owner.error;
-  const doctorEmail = owner.email;
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(k=>!['doctorEmail','blocks'].includes(k)))
+    return NextResponse.json({error:'invalid_request'},{status:400});
+  if (body.doctorEmail !== undefined && (typeof body.doctorEmail !== 'string' || body.doctorEmail.trim().toLowerCase() !== actor.email))
+    return NextResponse.json({error:'forbidden'},{status:403});
+  const doctorEmail = actor.email;
   if (!Array.isArray(body.blocks)) {
     return NextResponse.json({ error: "blocks must be an array" }, { status: 400 });
   }
@@ -86,6 +96,7 @@ export async function PUT(request: Request) {
   // ── Validate before touching the database ────────────────────────────────
   const blocks: Block[] = [];
   for (const [i, raw] of body.blocks.entries()) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return NextResponse.json({error:'invalid_block'},{status:400});
     const b = raw as Record<string, unknown>;
     const weekday = Number(b.weekday);
     const start_time = String(b.start_time ?? "");
@@ -122,21 +133,21 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const sql = getDb();
-    await sql`DELETE FROM doctor_availability WHERE LOWER(doctor_email) = ${doctorEmail}`;
-    for (const b of blocks) {
-      await sql`
-        INSERT INTO doctor_availability (doctor_email, weekday, start_time, end_time, slot_minutes)
-        VALUES (${doctorEmail}, ${b.weekday}, ${b.start_time}, ${b.end_time}, ${b.slot_minutes})`;
-    }
-    const rows = await sql`
-      SELECT id, weekday, TO_CHAR(start_time, 'HH24:MI') AS start_time,
-             TO_CHAR(end_time, 'HH24:MI') AS end_time, slot_minutes
-      FROM doctor_availability
-      WHERE LOWER(doctor_email) = ${doctorEmail}
-      ORDER BY weekday, start_time`;
+    const rows = await bookingTransaction(async sql => {
+      const [record] = await sql`SELECT id FROM doctors WHERE LOWER(email)=${doctorEmail} FOR UPDATE`;
+      if (!record) throw new BookingPreparationError('doctor_not_found',403);
+      const doctor = await resolveDoctor(sql,Number(record.id));
+      if (doctor.userId!==actor.userId || !(await readPrivateDoctor(doctor.address)).authorized)
+        throw new BookingPreparationError('doctor_not_authorized',403);
+      await sql`DELETE FROM doctor_availability WHERE LOWER(doctor_email) = ${doctorEmail}`;
+      for (const b of blocks) await sql`INSERT INTO doctor_availability (doctor_email,weekday,start_time,end_time,slot_minutes)
+        VALUES (${doctorEmail},${b.weekday},${b.start_time},${b.end_time},${b.slot_minutes})`;
+      return sql`SELECT id,weekday,TO_CHAR(start_time,'HH24:MI') AS start_time,TO_CHAR(end_time,'HH24:MI') AS end_time,slot_minutes
+        FROM doctor_availability WHERE LOWER(doctor_email)=${doctorEmail} ORDER BY weekday,start_time`;
+    });
     return NextResponse.json({ data: rows });
   } catch (err) {
+    if (err instanceof BookingPreparationError) return NextResponse.json({error:err.code},{status:err.status});
     return fail(err);
   }
 }

@@ -36,9 +36,9 @@ jobs:
         with:
           workspaces: contracts
 
-      # All four SOW contracts plus local cross-contract scenarios.
+      # Private prescription tests exercise the real private registry too.
       - name: Run test suite
-        run: cargo test --locked -p doctor-registry -p prescription-soulbound -p clinical-record -p document-soulbound -p trustleaf-e2e --verbose
+        run: cargo test --locked --workspace --verbose
 
   build:
     name: build WASM
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build contracts with Stellar CLI
         run: |
-          for p in doctor-registry prescription-soulbound clinical-record document-soulbound; do
+          for p in doctor-registry-private prescription-private; do
             stellar contract build --locked --package "$p" --out-dir dist
           done
           sha256sum dist/*.wasm > dist/SHA256SUMS

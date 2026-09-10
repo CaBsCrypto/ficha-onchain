@@ -245,13 +245,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clinical-record"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -471,28 +464,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dispensary-registry"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "dispense-record"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "doctor-registry"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "document-soulbound"
+name = "doctor-registry-private"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
@@ -953,10 +925,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "prescription-soulbound"
+name = "prescription-private"
 version = "0.1.0"
 dependencies = [
- "doctor-registry",
+ "doctor-registry-private",
  "soroban-sdk",
 ]
 
@@ -1575,15 +1547,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "trustleaf-e2e"
-version = "0.1.0"
-dependencies = [
- "doctor-registry",
- "prescription-soulbound",
- "soroban-sdk",
-]
 
 [[package]]
 name = "typenum"

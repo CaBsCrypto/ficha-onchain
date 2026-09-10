@@ -14,7 +14,9 @@
  */
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requirePrivyAdmin } from "@/lib/auth/admin";
+import { isSameOrigin } from '@/lib/auth/same-origin';
+import { assertPrivateEnvironment } from '@/lib/private-config';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +76,17 @@ const STATEMENTS: Array<[string, string]> = [
   ["appointments.consent_tx", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_tx TEXT`],
   ["appointments.consent_mode", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_mode TEXT`],
   ["appointments.consent_wallet", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS consent_wallet TEXT`],
+  ["appointments.doctor_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES doctors(id) ON DELETE RESTRICT`],
+  ["appointments.doctor_user_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_user_id TEXT`],
+  ["appointments.doctor_wallet_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_wallet_id TEXT`],
+  ["appointments.doctor_wallet", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_wallet TEXT`],
+  ["appointments.patient_user_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS patient_user_id TEXT`],
+  ["appointments.patient_wallet_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS patient_wallet_id TEXT`],
+  ["appointments.patient_wallet", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS patient_wallet TEXT`],
+  ["appointments.attendance_user_id", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS attendance_user_id TEXT`],
+  ["appointments.attendance_at", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS attendance_at TIMESTAMPTZ`],
+  ["appointments.started_by", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS started_by TEXT`],
+  ["appointments.completed_at", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`],
   ["appointments.uq_slot", `
     CREATE UNIQUE INDEX IF NOT EXISTS uniq_appt_slot
       ON appointments (doctor_email, date, time_slot)
@@ -387,22 +400,199 @@ const STATEMENTS: Array<[string, string]> = [
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`],
   ["patient_notifications.idx", `CREATE INDEX IF NOT EXISTS idx_patient_notifications_patient ON patient_notifications (patient_email, read, created_at DESC)`],
+  ["doctor_private_dossiers", `CREATE TABLE IF NOT EXISTS doctor_private_dossiers (
+    id UUID PRIMARY KEY,
+    network TEXT NOT NULL CHECK (network = 'testnet'),
+    contract_id TEXT NOT NULL,
+    wallet TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version > 0),
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    valid_until BIGINT NOT NULL,
+    commitment TEXT NOT NULL,
+    encrypted_dossier TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'confirmed', 'revoked')),
+    transaction_hash TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(network, contract_id, wallet, version)
+  )`],
+  ["stellar_binding_challenges", `CREATE TABLE IF NOT EXISTS stellar_binding_challenges (
+    id UUID PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('doctor', 'patient')),
+    wallet TEXT NOT NULL,
+    message TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    verified_signature TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`],
+  ["doctor_authorization_requests", `CREATE TABLE IF NOT EXISTS doctor_authorization_requests (
+    id UUID PRIMARY KEY,
+    doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    requested_by TEXT NOT NULL,
+    requested_email TEXT NOT NULL,
+    doctor_user_id TEXT NOT NULL,
+    doctor_email TEXT NOT NULL,
+    wallet_id TEXT NOT NULL,
+    wallet TEXT NOT NULL,
+    network TEXT NOT NULL CHECK (network='testnet'),
+    contract_id TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('authorize','renew','revoke')),
+    method TEXT NOT NULL CHECK (method IN ('authorize_doctor','renew_authorization','reauthorize_doctor','revoke_doctor')),
+    expected_version INTEGER NOT NULL CHECK (expected_version>=0),
+    target_version INTEGER NOT NULL CHECK (target_version>0),
+    commitment TEXT NOT NULL CHECK (commitment ~ '^[0-9a-f]{64}$'),
+    valid_until BIGINT NOT NULL,
+    dossier_id UUID REFERENCES doctor_private_dossiers(id) ON DELETE RESTRICT,
+    state TEXT NOT NULL CHECK (state IN ('pending','submitted','confirmed','failed')),
+    prepared_xdr TEXT,
+    transaction_hash TEXT,
+    error_code TEXT,
+    lease_token UUID,
+    lease_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    CHECK ((prepared_xdr IS NULL)=(transaction_hash IS NULL))
+  )`],
+  ["doctor_authorization_one_pending", `CREATE UNIQUE INDEX IF NOT EXISTS doctor_authorization_one_pending ON doctor_authorization_requests(contract_id,wallet) WHERE state IN ('pending','submitted')`],
+  ["privy_stellar_wallet_bindings", `CREATE TABLE IF NOT EXISTS privy_stellar_wallet_bindings (
+    app_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    wallet_id TEXT,
+    address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (app_id,user_id),
+    UNIQUE (app_id,wallet_id),
+    UNIQUE (app_id,address),
+    CHECK ((wallet_id IS NULL) = (address IS NULL))
+  )`],
+  ["stellar_verified_bindings", `CREATE TABLE IF NOT EXISTS stellar_verified_bindings (
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('doctor', 'patient')),
+    user_id TEXT NOT NULL,
+    wallet TEXT NOT NULL,
+    verification_reference TEXT NOT NULL,
+    verified_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    PRIMARY KEY (email, role),
+    UNIQUE (wallet)
+  )`],
+  ["prescription_booking_requests", `CREATE TABLE IF NOT EXISTS prescription_booking_requests (
+    appointment_id INTEGER PRIMARY KEY REFERENCES appointments(id) ON DELETE RESTRICT,
+    issuance_id TEXT NOT NULL UNIQUE CHECK (issuance_id ~ '^[0-9a-f]{64}$'),
+    network TEXT NOT NULL CHECK (network = 'testnet'),
+    contract_id TEXT NOT NULL,
+    patient_requested_by TEXT NOT NULL,
+    patient_email TEXT NOT NULL,
+    doctor_email TEXT NOT NULL,
+    patient_wallet TEXT NOT NULL,
+    doctor_wallet TEXT NOT NULL,
+    valid_until BIGINT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('prepared', 'submitted', 'confirmed', 'cancel_requested', 'revoked', 'consumed', 'failed')),
+    transaction_hash TEXT,
+    lease_token UUID,
+    lease_until TIMESTAMPTZ,
+    prepared_xdr TEXT,
+    tx_kind TEXT CHECK (tx_kind IN ('attest', 'revoke')),
+    last_error TEXT,
+    attestation_hash TEXT,
+    revocation_hash TEXT,
+    cancellation_requested_by TEXT,
+    cancellation_requested_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`],
+  ["prescription_booking_requests.doctor_user_id", `ALTER TABLE prescription_booking_requests ADD COLUMN IF NOT EXISTS doctor_user_id TEXT`],
+  ["prescription_booking_requests.doctor_wallet_id", `ALTER TABLE prescription_booking_requests ADD COLUMN IF NOT EXISTS doctor_wallet_id TEXT`],
+  ["prescription_booking_requests.patient_wallet_id", `ALTER TABLE prescription_booking_requests ADD COLUMN IF NOT EXISTS patient_wallet_id TEXT`],
+  ["prescription_booking_requests.attempts", `ALTER TABLE prescription_booking_requests ADD COLUMN IF NOT EXISTS attempts JSONB NOT NULL DEFAULT '[]'::jsonb`],
+  ["prescription_booking_guard.function", `CREATE OR REPLACE FUNCTION protect_prescription_appointment() RETURNS trigger AS $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM prescription_booking_requests WHERE appointment_id = OLD.id) THEN
+      IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'prescription_booking_locked' USING ERRCODE = '23514'; END IF;
+      IF ROW(NEW.doctor_id,NEW.doctor_email,NEW.patient_email,NEW.doctor_user_id,NEW.patient_user_id,
+        NEW.doctor_wallet_id,NEW.patient_wallet_id,NEW.doctor_wallet,NEW.patient_wallet,NEW.date,NEW.time_slot,
+        NEW.attendance_user_id,NEW.attendance_at,NEW.started_by,NEW.started_at)
+        IS DISTINCT FROM ROW(OLD.doctor_id,OLD.doctor_email,OLD.patient_email,OLD.doctor_user_id,OLD.patient_user_id,
+        OLD.doctor_wallet_id,OLD.patient_wallet_id,OLD.doctor_wallet,OLD.patient_wallet,OLD.date,OLD.time_slot,
+        OLD.attendance_user_id,OLD.attendance_at,OLD.started_by,OLD.started_at) THEN
+        RAISE EXCEPTION 'prescription_booking_locked' USING ERRCODE = '23514';
+      END IF;
+      IF NEW.status='cancelled' AND OLD.status<>'cancelled' AND NOT EXISTS (
+        SELECT 1 FROM prescription_booking_requests b WHERE b.appointment_id=OLD.id
+          AND (b.state='revoked' OR (b.state='failed' AND b.last_error='cancelled_before_attestation'
+            AND b.transaction_hash IS NULL AND b.prepared_xdr IS NULL AND b.attestation_hash IS NULL AND b.attempts='[]'::jsonb))
+      ) THEN RAISE EXCEPTION 'booking_cancellation_pending' USING ERRCODE = '23514'; END IF;
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`],
+  ["prescription_booking_guard.drop_trigger", `DROP TRIGGER IF EXISTS protect_prescription_appointment ON appointments`],
+  ["prescription_booking_guard.trigger", `CREATE TRIGGER protect_prescription_appointment BEFORE UPDATE OR DELETE ON appointments
+    FOR EACH ROW EXECUTE FUNCTION protect_prescription_appointment()`],
+  ["private_prescriptions", `CREATE TABLE IF NOT EXISTS private_prescriptions (
+    id UUID PRIMARY KEY,
+    network TEXT NOT NULL CHECK (network = 'testnet'),
+    contract_id TEXT NOT NULL,
+    appointment_id INTEGER NOT NULL REFERENCES prescription_booking_requests(appointment_id),
+    issuance_id TEXT NOT NULL UNIQUE REFERENCES prescription_booking_requests(issuance_id),
+    doctor_wallet TEXT NOT NULL,
+    patient_wallet TEXT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    commitment TEXT NOT NULL CHECK (commitment ~ '^[0-9a-f]{64}$'),
+    ciphertext TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('prepared', 'submitted', 'confirmed')),
+    transaction_hash TEXT,
+    rx_id BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (state <> 'confirmed' OR (transaction_hash IS NOT NULL AND rx_id IS NOT NULL)),
+    UNIQUE(network, contract_id, rx_id)
+  )`],
+  ["private_operations", `CREATE TABLE IF NOT EXISTS private_operations (
+    id UUID PRIMARY KEY,
+    actor_user_id TEXT NOT NULL,
+    actor_email TEXT NOT NULL,
+    wallet_id TEXT NOT NULL,
+    source_wallet TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('consent','withdraw_consent','mint','activate','revoke')),
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE RESTRICT,
+    prescription_id UUID REFERENCES private_prescriptions(id) ON DELETE RESTRICT,
+    contract_id TEXT NOT NULL,
+    method TEXT NOT NULL,
+    expected JSONB NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('awaiting_signature','submitted','confirmed','failed','cancelled')),
+    unsigned_xdr TEXT NOT NULL,
+    signing_hash TEXT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    signed_xdr TEXT,
+    transaction_hash TEXT,
+    error_code TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    CHECK ((signed_xdr IS NULL)=(transaction_hash IS NULL))
+  )`],
+  ["private_operations_one_live_source", `CREATE UNIQUE INDEX IF NOT EXISTS private_operations_one_live_source ON private_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`],
+  ["private_operations_appointment", `CREATE INDEX IF NOT EXISTS private_operations_appointment ON private_operations(appointment_id)`],
 ];
 
 export async function POST(request: Request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePrivyAdmin(request);
   if ("error" in auth) return auth.error;
+  if (!isSameOrigin(request)) return NextResponse.json({error:'forbidden'},{status:403});
+  try { assertPrivateEnvironment(); } catch { return NextResponse.json({error:'private_environment_mismatch'},{status:503}); }
 
   let body: { confirm?: unknown };
   try { body = (await request.json()) as typeof body; } catch { body = {}; }
-  if (body.confirm !== "MIGRATE") {
+  if (!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(key=>key!=='confirm') || body.confirm !== "MIGRATE") {
     return NextResponse.json({ error: "confirmation_required", hint: "send confirm:'MIGRATE'" }, { status: 400 });
   }
 
   let sql;
   try { sql = getDb(); } catch (err) {
-    console.error("[admin/migrate]", err);
-    return NextResponse.json({ error: "DB error" }, { status: 500 });
+    return NextResponse.json({ error: "migration_database_unavailable" }, { status: 503 });
   }
 
   const ran: string[] = [];
@@ -411,8 +601,8 @@ export async function POST(request: Request) {
     try {
       await sql.query(stmt);
       ran.push(step);
-    } catch (err) {
-      failed.push({ step, error: err instanceof Error ? err.message : String(err) });
+    } catch {
+      failed.push({ step, error: 'migration_step_failed' });
     }
   }
 
@@ -425,5 +615,5 @@ export async function POST(request: Request) {
     ran,
     failed,
     tables: (tables as Array<{ table_name: string }>).map((t) => t.table_name),
-  });
+  }, { status: failed.length ? 503 : 200, headers: {'Cache-Control':'no-store'} });
 }
