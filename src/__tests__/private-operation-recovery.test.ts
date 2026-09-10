@@ -82,7 +82,7 @@ describe('Monotonic UI state and reviewer-visible errors', () => {
   it('never accepts an unknown operation state', () => expect(() => verifiedOperation({ ...confirmed, state: 'optimistic_success' })).toThrow());
   it('explains a prepared document conflict without offering to overwrite it', () => expect(portalErrorMessage('private_prescription_already_prepared')).toContain('Revisar y continuar emisión'));
   it('explains the check-in window and paused writes using the actual server error names', () => {
-    expect(portalErrorMessage('consultation_outside_checkin_window')).toContain('30 minutos');
+    expect(portalErrorMessage('consultation_outside_checkin_window')).toContain('ventana configurada');
     expect(portalErrorMessage('private_writes_paused')).toContain('temporalmente deshabilitadas');
   });
   it('does not expose unrecognized provider payloads in an error message', () => expect(portalErrorMessage('secret provider payload')).not.toContain('secret provider payload'));
