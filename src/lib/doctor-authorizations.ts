@@ -62,9 +62,22 @@ export async function doctorAuthorizationDetails(sql: Sql, doctorId: number) {
   const [stored]=await sql`SELECT * FROM doctor_private_dossiers WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} ORDER BY version DESC LIMIT 1`;
   let dossier: Omit<DoctorDossier,'blinding'> | ReturnType<typeof syntheticDossier> = syntheticDossier(d.doctor);
   if(stored){
-    const plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.id);
-    if(commitmentFor(plain)!==stored.commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY || plain.version!==Number(stored.version))throw new DoctorAuthorizationError('dossier_integrity_error',503);
-    const {blinding: _blinding,...safe}=plain; dossier=safe;
+    let plain:DoctorDossier|null=null;
+    try{
+      plain=decryptDossier(stored.encrypted_dossier,dataKey(),stored.id);
+    }catch{
+      // The administrator may review the current synthetic profile again only
+      // when the previous dossier never acquired a signature or transaction.
+      const [retryable]=await sql`SELECT 1 FROM doctor_authorization_requests
+        WHERE dossier_id=${stored.id} AND state='failed' AND prepared_xdr IS NULL AND transaction_hash IS NULL
+          AND error_code='dossier_invalid' AND (lease_until IS NULL OR lease_until<NOW())
+        ORDER BY created_at DESC LIMIT 1`;
+      if(!retryable)throw new DoctorAuthorizationError('dossier_integrity_error',503);
+    }
+    if(plain){
+      if(commitmentFor(plain)!==stored.commitment || plain.wallet!==d.address || plain.contractId!==PRIVATE_REGISTRY || plain.version!==Number(stored.version))throw new DoctorAuthorizationError('dossier_integrity_error',503);
+      const {blinding: _blinding,...safe}=plain; dossier=safe;
+    }
   }
   return {doctor:d.doctor,wallet:d.address,authorization:authorizationView(chain),request:await latestDoctorRequest(sql,d.address),dossier,syntheticOnly:true};
 }

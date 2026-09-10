@@ -325,6 +325,22 @@ describe('private dossier review integrity', () => {
     expect(JSON.stringify(details)).not.toContain(stored.encrypted_dossier);
     expect(details.authorization.status).toBe('authorized');
   });
+  it('allows a fresh review only for an unreadable failed dossier that was never signed', async () => {
+    const { sql, tag } = makeSql();
+    const { stored, dossier } = dossierFixture();
+    stored.encrypted_dossier = encryptDossier(dossier, '88'.repeat(32), stored.id);
+    tag.mockResolvedValueOnce([doctor]).mockResolvedValueOnce([stored]).mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([]);
+    const details = await doctorAuthorizationDetails(sql, doctor.id);
+    expect(details.dossier).toEqual(syntheticDossier(doctor));
+    expect(JSON.stringify(details)).not.toContain(stored.encrypted_dossier);
+  });
+  it('blocks an unreadable dossier unless its failed attempt is proven unsigned', async () => {
+    const { sql, tag } = makeSql();
+    const { stored, dossier } = dossierFixture();
+    stored.encrypted_dossier = encryptDossier(dossier, '77'.repeat(32), stored.id);
+    tag.mockResolvedValueOnce([doctor]).mockResolvedValueOnce([stored]).mockResolvedValueOnce([]);
+    await expect(doctorAuthorizationDetails(sql, doctor.id)).rejects.toMatchObject({ status: 503, message: 'dossier_integrity_error' });
+  });
   it.each(['commitment', 'wallet', 'contractId', 'version'])('rejects inconsistent dossier %s', field => {
     const { sql, tag } = makeSql();
     const { stored, dossier } = dossierFixture();
