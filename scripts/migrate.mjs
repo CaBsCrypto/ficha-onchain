@@ -643,7 +643,7 @@ step("doctor onboarding requests", async () => {
     reviewed_by TEXT,
     reviewed_email TEXT,
     review_note TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK ((privy_user_id IS NULL AND wallet_id IS NULL AND wallet IS NULL) OR
            (privy_user_id IS NOT NULL AND wallet_id IS NOT NULL AND wallet IS NOT NULL)),
