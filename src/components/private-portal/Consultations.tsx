@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { jsonBody, portalApi, santiagoToday, usePortalData } from './client';
 import { ConsultationDetail } from './ConsultationDetail';
 import type { PortalRole, PrivateAppointment } from './types';
@@ -12,9 +12,24 @@ function BookingForm({ onSaved, onClose }: { onSaved: (id: number) => void; onCl
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const lock = useRef(false);
-  const slots = usePortalData<{ data: { slots: { time: string; available: boolean }[]; time_off?: string | null } }>(doctorId && date ? `/api/doctor/slots?doctorId=${doctorId}&date=${date}` : null, 0);
+  type SlotResult = { data: { date: string | null; slots: { time: string; available: boolean }[] } };
+  const [query, setQuery] = useState({ date: santiagoToday(), next: true, revision: 0 });
+  const [slotState, setSlotState] = useState<{data: SlotResult | null; loading: boolean; error: string}>({data: null, loading: false, error: ''});
+  const requestVersion = useRef(0);
+  const clearSlots = () => { requestVersion.current++; setTime(''); setSlotState({data:null,loading:true,error:''}); };
+  const slots = { ...slotState, refresh: () => { clearSlots(); setQuery(q => ({...q,revision:q.revision+1})); } };
+  useEffect(() => {
+    if (!doctorId || !query.date) { setSlotState({data:null,loading:false,error:''}); return; }
+    const version = ++requestVersion.current;
+    const controller = new AbortController();
+    setSlotState({data:null,loading:true,error:''});
+    void portalApi<SlotResult>(`/api/doctor/slots?doctorId=${doctorId}&date=${query.date}${query.next ? '&nextAvailable=true' : ''}`, {signal:controller.signal})
+      .then(data => { if (version !== requestVersion.current) return; setSlotState({data,loading:false,error:''}); if(query.next && data.data.date) setDate(data.data.date); })
+      .catch(failure => { if(version === requestVersion.current) setSlotState({data:null,loading:false,error:failure instanceof Error ? failure.message : 'No se pudo consultar la agenda.'}); });
+    return () => { requestVersion.current++; controller.abort(); };
+  }, [doctorId, query]);
   async function reserve(event: React.FormEvent) {
-    event.preventDefault(); if (lock.current || !time || !doctorId || !slots.data || slots.error) return;
+    event.preventDefault(); if (lock.current || slots.loading || !time || !doctorId || !slots.data || slots.error) return;
     lock.current = true; setBusy(true); setError('');
     try {
       const result = await portalApi<{ appointment: PrivateAppointment }>('/api/appointments', jsonBody({ doctorId: Number(doctorId), date, timeSlot: time, type: 'Presencial' }));
@@ -26,12 +41,13 @@ function BookingForm({ onSaved, onClose }: { onSaved: (id: number) => void; onCl
   return <form onSubmit={reserve} className="space-y-4 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-900">Reservar consulta de prueba</h2><button type="button" onClick={onClose} disabled={busy} className="text-sm text-slate-500 underline">Cerrar</button></div>
     <p className="text-sm text-slate-500">Tu cuenta será el paciente de esta reserva. Fechas y horas de Chile.</p>
-    <label className="block text-sm text-slate-600">Médico<select required value={doctorId} onChange={e => { setDoctorId(e.target.value); setTime(''); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5"><option value="">Selecciona un médico autorizado</option>{doctors.data?.doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.name}{doctor.specialty ? ` · ${doctor.specialty}` : ''}</option>)}</select></label>
+    <label className="block text-sm text-slate-600">Médico<select required value={doctorId} onChange={e => { clearSlots(); setDoctorId(e.target.value); const today = santiagoToday(); setDate(today); setQuery({date:today,next:true,revision:0}); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5"><option value="">Selecciona un médico autorizado</option>{doctors.data?.doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.name}{doctor.specialty ? ` · ${doctor.specialty}` : ''}</option>)}</select></label>
     {doctors.error && <p role="alert" className="text-sm text-rose-700">{doctors.error} <button type="button" onClick={doctors.refresh} className="underline">Reintentar</button></p>}
-    <label className="block text-sm text-slate-600">Fecha<input type="date" min={santiagoToday()} required value={date} onChange={e => { setDate(e.target.value); setTime(''); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5" /></label>
-    {doctorId && <div><p className="mb-2 text-sm text-slate-600">Horario disponible</p>{slots.loading ? <p role="status" className="text-sm text-slate-500">Consultando agenda…</p> : slots.error ? <p role="alert" className="text-sm text-rose-700">{slots.error}</p> : slots.data?.data.slots.length ? <div className="flex flex-wrap gap-2">{slots.data.data.slots.filter(slot => slot.available).map(slot => <button type="button" key={slot.time} aria-pressed={time === slot.time} onClick={() => setTime(slot.time)} className={`rounded-xl border px-4 py-2 text-sm font-semibold ${time === slot.time ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-200 text-slate-700'}`}>{slot.time}</button>)}</div> : <p className="text-sm text-amber-700">No hay horas disponibles. Elige otra fecha.</p>}</div>}
+    <label className="block text-sm text-slate-600">Fecha<input type="date" min={santiagoToday()} required value={date} onChange={e => { clearSlots(); setDate(e.target.value); setQuery({date:e.target.value,next:false,revision:0}); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5" /></label>
+    {doctorId && <div><p className="mb-2 text-sm text-slate-600">Horario disponible</p>{slots.loading ? <p role="status" className="text-sm text-slate-500">Consultando agenda…</p> : slots.error ? <p role="alert" className="text-sm text-rose-700">{slots.error} <button type="button" onClick={slots.refresh} className="underline">Reintentar</button></p> : slots.data?.data.slots.length ? <div className="flex flex-wrap gap-2">{slots.data.data.slots.filter(slot => slot.available).map(slot => <button type="button" key={slot.time} aria-pressed={time === slot.time} onClick={() => setTime(slot.time)} className={`rounded-xl border px-4 py-2 text-sm font-semibold ${time === slot.time ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-200 text-slate-700'}`}>{slot.time}</button>)}</div> : <div className="text-sm text-amber-700"><p>{query.next ? "No hay horas disponibles en los próximos 90 días." : "No hay horas disponibles para la fecha elegida."}</p>{!query.next && <button type="button" className="mt-2 underline" onClick={() => { clearSlots(); setQuery(q => ({...q,next:true})); }}>Ir a la próxima fecha disponible</button>}</div>}</div>}
+    {query.next && !slots.loading && !slots.error && slots.data?.data.date && <p role="status" className="text-sm text-emerald-700">Próxima disponibilidad: {new Intl.DateTimeFormat("es-CL", {timeZone:"UTC",weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date(`${slots.data.data.date}T12:00:00Z`))}</p>}
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
-    <button disabled={busy || !time || !doctorId || !!slots.error || !!doctors.error} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Reservando…' : 'Confirmar reserva'}</button>
+    <button disabled={busy || slots.loading || !time || !doctorId || !!slots.error || !!doctors.error} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Reservando…' : 'Confirmar reserva'}</button>
   </form>;
 }
 export function PrivateConsultations({ role }: { role: PortalRole }) {

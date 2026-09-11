@@ -19,6 +19,6 @@ export async function GET(request:Request){
     const doctor=await resolveDoctor(sql,Number(id));
     if(!(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)})))return NextResponse.json({error:'doctor_not_authorized'},{status:403});
     // Never expose another patient's occupied slot or identity, including ?all=1.
-    return NextResponse.json({data:await availableAppointmentSlots(sql,String(doctor.doctor.email),date)},{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({data:await availableAppointmentSlots(sql,String(doctor.doctor.email),date,p.get('nextAvailable')==='true')},{headers:{'Cache-Control':'no-store'}});
   }catch(error){return NextResponse.json({error:error instanceof BookingPreparationError?error.code:'slots_unavailable'}, {status:error instanceof BookingPreparationError?error.status:503});}
 }

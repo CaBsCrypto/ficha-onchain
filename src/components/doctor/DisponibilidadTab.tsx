@@ -60,6 +60,9 @@ export function DisponibilidadTab() {
 
   // Availability state
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
+  const [savedBlocks, setSavedBlocks] = useState<AvailabilityBlock[] | null>(null);
+  const fingerprint = (items: AvailabilityBlock[]) => JSON.stringify(items.map(b => `${b.weekday}:${b.start_time}:${b.end_time}:${b.slot_minutes}`).sort());
+  const dirty = savedBlocks !== null && fingerprint(blocks) !== fingerprint(savedBlocks);
   const [savingGrid, setSavingGrid] = useState(false);
   const [gridError, setGridError] = useState('');
   const [gridSaved, setGridSaved] = useState(false);
@@ -81,6 +84,7 @@ export function DisponibilidadTab() {
       const aRes = await authedFetch(`/api/doctor/availability?doctorEmail=${encodeURIComponent(doctorEmail)}`);
       const aData = await aRes.json() as { data?: AvailabilityBlock[]; error?: string };
       if (aRes.ok) {
+        setSavedBlocks(aData.data ?? []);
         setBlocks((aData.data ?? []).map((b) => ({
           weekday: b.weekday,
           start_time: b.start_time,
@@ -100,6 +104,7 @@ export function DisponibilidadTab() {
 
   // ── Availability grid helpers ────────────────────────────────────────────────
   function addBlock() {
+    if (savingGrid) return;
     setGridSaved(false);
     setGridError('');
     if (draftEnd <= draftStart) {
@@ -127,11 +132,14 @@ export function DisponibilidadTab() {
   }
 
   function removeBlock(target: AvailabilityBlock) {
+    if (savingGrid) return;
     setGridSaved(false);
     setBlocks((prev) => prev.filter((b) => b !== target));
   }
 
   async function handleSaveGrid() {
+    if (!dirty || savingGrid || loading) return;
+    if (!blocks.length && !window.confirm("Quitar toda la disponibilidad. Las citas existentes se conservarán. ¿Continuar?")) return;
     setSavingGrid(true);
     setGridError('');
     setGridSaved(false);
@@ -153,6 +161,7 @@ export function DisponibilidadTab() {
         end_time: b.end_time,
         slot_minutes: b.slot_minutes,
       })));
+      setSavedBlocks(data.data ?? []);
       setGridSaved(true);
     } catch {
       setGridError('Error de conexión — revisa tu red');
@@ -265,7 +274,7 @@ export function DisponibilidadTab() {
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {grouped.length === 0 ? (
                 <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400 sm:col-span-2 lg:col-span-3">
-                  Aún no has agregado bloques de disponibilidad.
+                  Completa el horario y pulsa Agregar bloque.
                 </p>
               ) : (
                 grouped.map((g) => (
@@ -305,7 +314,7 @@ export function DisponibilidadTab() {
             )}
             {gridSaved && (
               <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                Disponibilidad guardada.
+                Disponibilidad guardada · {savedBlocks?.length ?? 0} bloques semanales.
               </div>
             )}
 
@@ -313,7 +322,7 @@ export function DisponibilidadTab() {
               <button
                 type="button"
                 onClick={() => void handleSaveGrid()}
-                disabled={savingGrid}
+                disabled={savingGrid || loading || !dirty}
                 className="w-full rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 {savingGrid ? (
