@@ -38,8 +38,8 @@ it('rejects a stale reviewed revision before renewal', async () => {
   await expect(requestReviewedDoctorAuthorization(sql, actor, 1, 'renew', 'revision-1')).rejects.toThrow('onboarding_state_changed');
   expect(m.request).not.toHaveBeenCalled();
 });
-it('preserves renewal for a previously approved profile without onboarding', async () => {
-  m.query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 1, status: 'active' }]).mockResolvedValueOnce([]);
+it.each(['active','blocked'])('preserves renewal for a previously approved %s profile without onboarding', async status => {
+  m.query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 1, status }]).mockResolvedValueOnce([]);
   await requestReviewedDoctorAuthorization(sql, actor, 1, 'renew');
   expect(m.request).toHaveBeenCalledWith(sql, actor, 1, 'renew', { transactional: true });
 });

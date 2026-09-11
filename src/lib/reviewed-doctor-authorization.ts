@@ -25,7 +25,7 @@ export async function requestReviewedDoctorAuthorization(sql: Sql, actor: Authed
       return requestDoctorAuthorization(tx, actor, doctorId, action, { submission, transactional: true });
     }
     // Preserve previously approved profiles, but never authorize a legacy pending insert.
-    if (submissionId || !['active', 'revoked', 'expired'].includes(doctor.status)) throw new PrivateFlowError('onboarding_submission_required');
+    if (submissionId || !['active', 'blocked', 'revoked', 'expired'].includes(doctor.status)) throw new PrivateFlowError('onboarding_submission_required');
     return requestDoctorAuthorization(tx, actor, doctorId, action, { transactional: true });
   });
 }
