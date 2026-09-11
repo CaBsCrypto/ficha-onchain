@@ -10,6 +10,7 @@
  * to re-check a table that already existed.
  */
 import { neon, Pool, neonConfig, type PoolClient, type NeonQueryFunction } from "@neondatabase/serverless";
+import { databaseConnectionString } from '@/lib/database-config';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -89,7 +90,7 @@ let connectionPool: Pool | null = null;
 
 /** Session connection for operations that must hold PostgreSQL row locks. */
 export async function getDbConnection(): Promise<PoolClient> {
-  const url = process.env.DATABASE_URL;
+  const url = databaseConnectionString();
   if (!url) throw new DbNotConfiguredError();
   assertDbSafe(url);
   if (!connectionPool) {
@@ -110,7 +111,7 @@ export function sqlForConnection(client: PoolClient): Sql {
 
 /** Returns the shared Neon client. Throws DbNotConfiguredError if unconfigured. */
 export function getDb(): Sql {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const url = databaseConnectionString();
   if (!url) throw new DbNotConfiguredError();
   assertDbSafe(url); // fail closed: a preview must never reach the prod DB
   if (!cached) {
@@ -122,5 +123,5 @@ export function getDb(): Sql {
 
 /** True when a connection string exists — for routes that degrade to demo mode. */
 export function isDbConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL ?? process.env.POSTGRES_URL);
+  return Boolean(databaseConnectionString());
 }
