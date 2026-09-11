@@ -2,7 +2,7 @@
 
 import { usePrivy } from '@privy-io/react-auth';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
@@ -253,196 +253,94 @@ function GateShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DoctorOnboardingForm({ email, onDone }: { email: string; onDone: () => void }) {
-  const [form, setForm] = useState({
-    name: '',
-    specialty: '',
-    licenseNum: '',
-    rut: '',
-    phone: '',
-    centerName: '',
-  });
+type OnboardingState = 'invited' | 'draft' | 'submitted' | 'changes_requested' | 'rejected' | 'authorization_pending' | 'authorized' | 'expired' | 'revoked';
+interface OnboardingView {
+  id: string; source: 'application' | 'invitation'; state: OnboardingState; reviewNote: string | null;
+  profile: null | { name: string; specialty: string; licenseNum: string; rut: string };
+}
+
+function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void }) {
+  const [onboarding, setOnboarding] = useState<OnboardingView | null>(null);
+  const [form, setForm] = useState({ name: '', specialty: '', licenseNum: '', rut: '' });
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [demoFilled, setDemoFilled] = useState(false);
-
   function fillDemoProfile() {
-    setForm({
-      name: 'Médico de prueba TrustLeaf',
-      specialty: 'Medicina general · Demo',
-      licenseNum: 'DEMO-REG-001',
-      rut: 'DEMO-NO-VALIDO',
-      phone: '+56 9 0000 0000',
-      centerName: 'Consulta de prueba TrustLeaf',
-    });
-    setError('');
-    setDemoFilled(true);
+    setForm({ name: 'Médico de prueba TrustLeaf', specialty: 'Medicina general · Demo', licenseNum: 'DEMO-REG-001', rut: 'DEMO-NO-VALIDO' });
+    setError(''); setDemoFilled(true);
   }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (saving || !form.name.trim()) return;
-    setSaving(true);
-    setError('');
+  const accepting = useRef(false);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
     try {
-      const res = await authedFetch('/api/doctors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          specialty: form.specialty.trim() || undefined,
-          licenseNum: form.licenseNum.trim() || undefined,
-          rut: form.rut.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          centerName: form.centerName.trim() || undefined,
-        }),
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok) {
-        if (data.error === 'doctor_already_registered') {
-          onDone();
-          return;
-        }
-        throw new Error(data.error === 'invalid_doctor_profile' ? 'Por favor completa los campos requeridos correctamente.' : 'No se pudo enviar la solicitud. Inténtalo nuevamente.');
+      const response = await authedFetch('/api/doctor/onboarding', { cache: 'no-store' });
+      const body = await response.json() as { onboarding?: OnboardingView | null; error?: string };
+      if (!response.ok) throw new Error(body.error ?? 'doctor_onboarding_unavailable');
+      if (body.onboarding?.state === 'invited' && !accepting.current) {
+        accepting.current = true;
+        const accepted = await authedFetch('/api/doctor/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_invitation' }) });
+        const acceptedBody = await accepted.json() as { onboarding?: OnboardingView; error?: string };
+        if (!accepted.ok || !acceptedBody.onboarding) throw new Error(acceptedBody.error ?? 'invitation_not_acceptable');
+        body.onboarding = acceptedBody.onboarding;
+        accepting.current = false;
       }
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al procesar la solicitud.');
-    } finally {
-      setSaving(false);
-    }
+      setOnboarding(body.onboarding ?? null);
+      if (body.onboarding?.profile) setForm({
+        name: body.onboarding.profile.name ?? '', specialty: body.onboarding.profile.specialty ?? '',
+        licenseNum: body.onboarding.profile.licenseNum ?? '', rut: body.onboarding.profile.rut ?? '',
+      });
+      if (body.onboarding?.state === 'authorized') onDone();
+    } catch (cause) { accepting.current = false; setError(cause instanceof Error ? cause.message : 'doctor_onboarding_unavailable'); }
+    finally { setLoading(false); }
+  }, [onDone]);
+  useEffect(() => { void load(); }, [load]);
+  async function submit(action: 'save' | 'submit') {
+    if (saving) return;
+    setSaving(true); setError('');
+    try {
+      const response = await authedFetch('/api/doctor/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...form }) });
+      const body = await response.json() as { onboarding?: OnboardingView; error?: string };
+      if (!response.ok || !body.onboarding) throw new Error(body.error ?? 'doctor_onboarding_unavailable');
+      setOnboarding(body.onboarding);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'doctor_onboarding_unavailable'); }
+    finally { setSaving(false); }
   }
-
+  const state = onboarding?.state;
+  const editable = !state || state === 'draft' || state === 'changes_requested';
+  const profileComplete = Object.values(form).every(value => value.trim().length > 0);
   return (
     <GateShell>
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 font-semibold">
-            🩺
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-800">Acreditación Médica</h1>
-            <p className="text-xs text-slate-500">Solicitud de acceso profesional a TrustLeaf</p>
-          </div>
-        </div>
-
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-800">Alta médica en TrustLeaf</h1>
         <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-xs text-sky-900">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <p className="font-medium">Identidad vinculada</p>
-            <button type="button" disabled={saving} onClick={fillDemoProfile}
+            {!loading && editable && <button type="button" disabled={saving} onClick={fillDemoProfile}
               className="rounded-md px-2 py-2 text-xs font-medium text-sky-700 underline decoration-sky-300 underline-offset-4 transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-50">
               Rellenar datos de prueba
-            </button>
+            </button>}
           </div>
-          <p className="mt-0.5 break-all text-sky-700 font-mono">{email}</p>
-          {demoFilled && <p role="status" className="mt-2 text-xs text-slate-600">Datos sintéticos cargados. Puedes editarlos antes de enviar la solicitud.</p>}
+          <p className="mt-0.5 break-all font-mono text-sky-700">{email}</p>
+          {demoFilled && editable && <p role="status" className="mt-2 text-xs text-slate-600">Datos sintéticos cargados. Puedes editarlos antes de enviar la solicitud.</p>}
         </div>
-
-        <form onSubmit={submit} className="mt-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Nombre completo <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ej. Dr. Carlos Silva M."
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Especialidad <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Medicina General"
-                value={form.specialty}
-                onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                RUT / Identificación <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. 12.345.678-9"
-                value={form.rut}
-                onChange={(e) => setForm((p) => ({ ...p, rut: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Nº Registro / Licencia <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. RNPI Nº 123456"
-                value={form.licenseNum}
-                onChange={(e) => setForm((p) => ({ ...p, licenseNum: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Teléfono de contacto
-              </label>
-              <input
-                type="tel"
-                placeholder="+56 9 1234 5678"
-                value={form.phone}
-                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Centro Médico o Consulta
-            </label>
-            <input
-              type="text"
-              placeholder="Ej. Centro Médico Central / Consulta Privada"
-              value={form.centerName}
-              onChange={(e) => setForm((p) => ({ ...p, centerName: e.target.value }))}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-            />
-          </div>
-
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Al registrarte, se generará un expediente cifrado. Un administrador validará tus credenciales y emitirá tu autorización on-chain en Stellar Soroban.
-          </p>
-
-          {error && (
-            <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={saving || !form.name.trim() || !form.specialty.trim() || !form.licenseNum.trim() || !form.rut.trim()}
-            className="w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? 'Enviando solicitud…' : 'Solicitar acreditación'}
-          </button>
-        </form>
+        {loading && <p role="status" className="mt-4 text-sm text-slate-600">Preparando tu identidad y wallet Stellar…</p>}
+        {!loading && onboarding?.source === 'invitation' && <p className="mt-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">Invitación reconocida. Tu wallet Stellar quedó vinculada a esta cuenta.</p>}
+        {!loading && editable && <div className="mt-5 space-y-4">
+          <p className="text-sm text-slate-600">Completa el perfil con datos sintéticos. Enviar la solicitud no concede autorización.</p>
+          {state === 'changes_requested' && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">El administrador solicitó cambios{onboarding?.reviewNote ? `: ${onboarding.reviewNote}` : '.'}</p>}
+          {([['name','Nombre de prueba'],['specialty','Especialidad de prueba'],['licenseNum','Registro de prueba'],['rut','RUT sintético']] as const).map(([key,label]) => <label key={key} className="block text-xs font-medium text-slate-600">
+            <span className="mb-1.5 block">{label}</span><input required value={form[key]} onChange={event => setForm(previous => ({ ...previous, [key]: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30" />
+          </label>)}
+          <div className="flex flex-wrap gap-3"><button disabled={saving || !profileComplete} onClick={() => void submit('save')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">Guardar perfil</button><button disabled={saving || !profileComplete} onClick={() => void submit('submit')} className="flex-1 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Guardando…' : 'Enviar para revisión'}</button></div>
+        </div>}
+        {!loading && state === 'submitted' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Solicitud enviada.</strong> El administrador debe revisar el expediente sintético antes de autorizar.</p>}
+        {!loading && state === 'authorization_pending' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Autorización pendiente en Stellar.</strong> El acceso se habilitará cuando el worker confirme el recibo.</p>}
+        {!loading && state === 'rejected' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800"><strong>Solicitud rechazada.</strong> El administrador debe reabrirla antes de que puedas corregirla.{onboarding?.reviewNote ? ` Motivo: ${onboarding.reviewNote}` : ''}</p>}
+        {!loading && state === 'expired' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">La invitación venció. Solicita al administrador una nueva invitación.</p>}
+        {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">No se pudo completar el alta: {error}</p>}
+        {!editable && <button onClick={() => void load()} className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600">Comprobar estado</button>}
+        <p className="mt-4 text-xs text-slate-500">Una wallet Stellar por persona · Privy · Stellar Testnet</p>
       </div>
     </GateShell>
   );
@@ -451,7 +349,7 @@ function DoctorOnboardingForm({ email, onDone }: { email: string; onDone: () => 
 // ── Status screens (pending / blocked) ─────────────────────────────────────────
 function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' | 'revoked' | 'paused' | 'error'; onRefresh: () => void }) {
   const descriptions = {
-    pending: ['Solicitud en revisión', 'Tu perfil profesional ha sido recibido. El administrador debe validar tu expediente y emitir tu autorización on-chain en Stellar Testnet.'],
+    pending: ['Autorización pendiente', 'La autorización del administrador debe confirmarse en Stellar antes de habilitar tu acceso. Si el procesador está apagado, la solicitud permanece pendiente.'],
     expired: ['Autorización vencida', 'Solicita al administrador la renovación. Tu acceso se habilitará cuando se confirme en Stellar.'],
     revoked: ['Autorización revocada', 'El registro confirma que tu permiso fue revocado. Contacta al administrador para revisar tu autorización.'],
     paused: ['Registro pausado', 'El registro de médicos está pausado. Las operaciones permanecen deshabilitadas.'],
@@ -466,9 +364,9 @@ function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' |
         </div>
         <h1 className="mt-4 text-xl font-semibold text-slate-800">{title}</h1>
         <p role="status" className="mt-2 text-sm text-slate-500">{description}</p>
-        <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
-          Comprobar estado
-        </button>
+          <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
+            Comprobar estado
+          </button>
         <p className="mt-4 text-xs text-slate-400">DoctorRegistryPrivate · Stellar Testnet</p>
       </div>
     </GateShell>
@@ -476,14 +374,15 @@ function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' |
 }
 
 // ── Access gate: registro → pendiente → portal ─────────────────────────────────
-type DocStatus = 'loading' | 'unregistered' | 'pending' | 'active' | 'expired' | 'revoked' | 'paused' | 'error';
+type DocStatus = 'loading' | 'onboarding' | 'pending' | 'active' | 'expired' | 'revoked' | 'paused' | 'error';
 interface PrivateDoctorStatus {
   authorized: boolean;
   source: 'private_registry';
   wallet: string;
-  doctor: { id: number; name: string; email: string } | null;
+  doctor: { id: number; name: string; email: string; status: string } | null;
   authorization: { status: 'unregistered' | 'authorized' | 'expired' | 'revoked' | 'paused'; version: number; validUntil: number | null };
   pendingRequest?: { state: string } | null;
+  onboarding?: { state: OnboardingState; source: 'application' | 'invitation' } | null;
 }
 
 function DoctorAccessGate({ children }: { children: React.ReactNode }) {
@@ -505,7 +404,8 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
         if (body.source !== 'private_registry' || !body.authorization) throw new Error('authorization_unverified');
         if (!alive) return;
         setRecord(body);
-        if (!body.doctor) setStatus('unregistered');
+        if (body.onboarding && !['authorized','revoked'].includes(body.onboarding.state)) setStatus('onboarding');
+        else if (!body.doctor || (!body.onboarding && body.doctor.status === 'pending' && !body.pendingRequest) || (body.authorization.status === 'unregistered' && !body.pendingRequest)) setStatus('onboarding');
         else if (body.authorized && body.wallet && body.authorization.status === 'authorized' && (body.authorization.validUntil ?? 0) * 1000 > Date.now()) setStatus('active');
         else if (['expired', 'revoked', 'paused'].includes(body.authorization.status)) setStatus(body.authorization.status as 'expired' | 'revoked' | 'paused');
         else setStatus('pending');
@@ -526,7 +426,7 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (status === 'unregistered') return <DoctorOnboardingForm email={email ?? ''} onDone={check} />;
+  if (status === 'onboarding') return <DoctorOnboarding email={email ?? ''} onDone={check} />;
   if (status !== 'active' || !record) return <StatusScreen variant={status === 'active' ? 'error' : status} onRefresh={check} />;
   return <DoctorShell authorization={record}>{children}</DoctorShell>;
 }
@@ -548,5 +448,5 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  return <WalletBoundary key={user?.id} role="doctor"><DoctorAccessGate>{children}</DoctorAccessGate></WalletBoundary>;
+  return <WalletBoundary role="doctor" key={user?.id}><DoctorAccessGate>{children}</DoctorAccessGate></WalletBoundary>;
 }
