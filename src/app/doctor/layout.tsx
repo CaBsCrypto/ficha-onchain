@@ -253,17 +253,175 @@ function GateShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The administrator creates the synthetic profile from the existing admin panel.
-function RegistrationPending({ email, onDone }: { email: string; onDone: () => void }) {
+function DoctorOnboardingForm({ email, onDone }: { email: string; onDone: () => void }) {
+  const [form, setForm] = useState({
+    name: '',
+    specialty: '',
+    licenseNum: '',
+    rut: '',
+    phone: '',
+    centerName: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (saving || !form.name.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await authedFetch('/api/doctors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          specialty: form.specialty.trim() || undefined,
+          licenseNum: form.licenseNum.trim() || undefined,
+          rut: form.rut.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          centerName: form.centerName.trim() || undefined,
+        }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok) {
+        if (data.error === 'doctor_already_registered') {
+          onDone();
+          return;
+        }
+        throw new Error(data.error === 'invalid_doctor_profile' ? 'Por favor completa los campos requeridos correctamente.' : 'No se pudo enviar la solicitud. Inténtalo nuevamente.');
+      }
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al procesar la solicitud.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <GateShell>
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-800">Perfil médico pendiente</h1>
-        <p className="mt-2 break-all text-sm font-medium text-slate-700">{email}</p>
-        <p role="status" className="mt-3 text-sm text-slate-600">El administrador debe crear tu perfil sintético y revisar la autorización de esta cuenta. El acceso se habilitará después de confirmar su recibo en Stellar Testnet.</p>
-        <button onClick={onDone} className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600">
-          Comprobar estado
-        </button>
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 font-semibold">
+            🩺
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-800">Acreditación Médica</h1>
+            <p className="text-xs text-slate-500">Solicitud de acceso profesional a TrustLeaf</p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-xs text-sky-900">
+          <p className="font-medium">Identidad vinculada</p>
+          <p className="mt-0.5 break-all text-sky-700 font-mono">{email}</p>
+        </div>
+
+        <form onSubmit={submit} className="mt-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Nombre completo <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ej. Dr. Carlos Silva M."
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Especialidad <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Medicina General"
+                value={form.specialty}
+                onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                RUT / Identificación <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. 12.345.678-9"
+                value={form.rut}
+                onChange={(e) => setForm((p) => ({ ...p, rut: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Nº Registro / Licencia <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. RNPI Nº 123456"
+                value={form.licenseNum}
+                onChange={(e) => setForm((p) => ({ ...p, licenseNum: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Teléfono de contacto
+              </label>
+              <input
+                type="tel"
+                placeholder="+56 9 1234 5678"
+                value={form.phone}
+                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Centro Médico o Consulta
+            </label>
+            <input
+              type="text"
+              placeholder="Ej. Centro Médico Central / Consulta Privada"
+              value={form.centerName}
+              onChange={(e) => setForm((p) => ({ ...p, centerName: e.target.value }))}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+            />
+          </div>
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Al registrarte, se generará un expediente cifrado. Un administrador validará tus credenciales y emitirá tu autorización on-chain en Stellar Soroban.
+          </p>
+
+          {error && (
+            <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving || !form.name.trim() || !form.specialty.trim() || !form.licenseNum.trim() || !form.rut.trim()}
+            className="w-full rounded-xl bg-sky-500 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? 'Enviando solicitud…' : 'Solicitar acreditación'}
+          </button>
+        </form>
       </div>
     </GateShell>
   );
@@ -272,7 +430,7 @@ function RegistrationPending({ email, onDone }: { email: string; onDone: () => v
 // ── Status screens (pending / blocked) ─────────────────────────────────────────
 function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' | 'revoked' | 'paused' | 'error'; onRefresh: () => void }) {
   const descriptions = {
-    pending: ['Autorización pendiente', 'La autorización del administrador debe confirmarse en Stellar antes de habilitar tu acceso. Si el procesador está apagado, la solicitud permanece pendiente.'],
+    pending: ['Solicitud en revisión', 'Tu perfil profesional ha sido recibido. El administrador debe validar tu expediente y emitir tu autorización on-chain en Stellar Testnet.'],
     expired: ['Autorización vencida', 'Solicita al administrador la renovación. Tu acceso se habilitará cuando se confirme en Stellar.'],
     revoked: ['Autorización revocada', 'El registro confirma que tu permiso fue revocado. Contacta al administrador para revisar tu autorización.'],
     paused: ['Registro pausado', 'El registro de médicos está pausado. Las operaciones permanecen deshabilitadas.'],
@@ -287,9 +445,9 @@ function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' |
         </div>
         <h1 className="mt-4 text-xl font-semibold text-slate-800">{title}</h1>
         <p role="status" className="mt-2 text-sm text-slate-500">{description}</p>
-          <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
-            Comprobar estado
-          </button>
+        <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
+          Comprobar estado
+        </button>
         <p className="mt-4 text-xs text-slate-400">DoctorRegistryPrivate · Stellar Testnet</p>
       </div>
     </GateShell>
@@ -347,7 +505,7 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (status === 'unregistered') return <RegistrationPending email={email ?? ''} onDone={check} />;
+  if (status === 'unregistered') return <DoctorOnboardingForm email={email ?? ''} onDone={check} />;
   if (status !== 'active' || !record) return <StatusScreen variant={status === 'active' ? 'error' : status} onRefresh={check} />;
   return <DoctorShell authorization={record}>{children}</DoctorShell>;
 }
