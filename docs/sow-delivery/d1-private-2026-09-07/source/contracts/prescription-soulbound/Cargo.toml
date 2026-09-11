@@ -1,0 +1,25 @@
+[package]
+name = "prescription-soulbound"
+version = "0.1.0"
+edition = "2021"
+description = "Soulbound (non-transferable) prescription records for TrustLeaf"
+license = "MIT"
+
+[lib]
+# `lib` sits alongside `cdylib` so the contract type can be imported as a path
+# dependency by the cross-contract integration tests in `contracts/e2e`.
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+soroban-sdk = "22.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+# mint_prescription calls the registry to check the doctor is authorized, so the
+# tests need a real one deployed rather than a generated address.
+doctor-registry = { path = "../doctor-registry", features = ["testutils"] }
+
+[features]
+# Lets a downstream test crate build this contract against Soroban's test host
+# so it can `env.register(PrescriptionSoulbound, ())` in integration tests.
+testutils = ["soroban-sdk/testutils"]

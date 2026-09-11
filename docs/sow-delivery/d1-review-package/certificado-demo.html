@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TrustLeaf · Certificado de demostración D1</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf1ee;color:#17372d;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;padding:32px 18px}main{max-width:900px;margin:auto}header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:20px}.brand{font-size:25px;font-weight:700;letter-spacing:-1px}.meta{font-size:13px;color:#4d6258}.paper{background:#fff;border:1px solid #c9d7cf;border-radius:12px;overflow:hidden;box-shadow:0 12px 38px #17372d0c}.warning{background:#ffecc0;color:#533800;padding:15px 26px;font-weight:750;text-align:center;letter-spacing:.04em;font-size:14px}.content{padding:34px 38px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#52685b}h1{font-size:34px;line-height:1.2;margin:9px 0 10px;letter-spacing:-.8px}p{margin:0 0 16px}.sub{color:#4d6258}.states{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:26px 0}.state{padding:18px;border:1px solid #c9d7cf;border-radius:8px;background:#f4f8f5}.state.tech{background:#fffaf0;border-color:#dec897}.label{display:block;color:#4d6258;font-size:13px;margin-bottom:5px}.value{display:block;font-size:20px;font-weight:650}.small{font-size:13px;color:#4d6258;margin:5px 0 0}h2{font-size:17px;margin:26px 0 12px}.details{display:grid;grid-template-columns:1fr 1fr;gap:18px 26px;border-top:1px solid #dce5df;border-bottom:1px solid #dce5df;padding:20px 0}.details p{margin:0}.ref{font-family:ui-monospace,Consolas,monospace;font-size:14px;overflow-wrap:anywhere}.private{padding:18px 20px;background:#f3f6f4;border-left:3px solid #397459;margin:22px 0}.private p{margin:4px 0 0}.verification{display:grid;grid-template-columns:1fr 150px;gap:24px;align-items:center}.placeholder{padding:10px 0;border-bottom:1px solid #e1e7e3;font-size:14px}.placeholder span{display:block;color:#675015;font-size:13px}.qr{min-height:144px;border:2px dashed #9daaa2;border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px;background:#f7f9f7;color:#536158;font-size:13px}.qr strong{font-size:25px;font-weight:500}.foot{margin-top:26px;padding-top:18px;border-top:1px solid #dce5df;font-size:13px;color:#4d6258}.review{font-size:13px;color:#4d6258;margin:16px 4px} @media(max-width:600px){body{padding:18px 10px}.content{padding:24px 20px}header{align-items:flex-start}.meta{text-align:right}.states,.details,.verification{grid-template-columns:1fr}h1{font-size:28px}.qr{min-height:110px}.warning{padding:14px 16px}}@media print{body{background:white;padding:0}.paper{box-shadow:none}.review{display:none}.content{padding:24px}.warning{border:2px solid #533800}.states,.verification{break-inside:avoid}}
+</style>
+</head>
+<body><main>
+<header><div class="brand">TrustLeaf</div><div class="meta">Anexo visual · D1<br>Propuesta para revisión</div></header>
+<article class="paper" aria-label="Certificado ficticio de demostración">
+<div class="warning">DEMOSTRACIÓN — NO VÁLIDO PARA USO CLÍNICO</div>
+<div class="content">
+<div class="eyebrow">Datos exclusivamente ficticios</div>
+<h1>Constancia de receta</h1>
+<p class="sub">Vista conceptual del registro y su verificación técnica.</p>
+<div class="states">
+<section class="state" aria-label="Estado de receta simulado"><span class="label">Estado de receta</span><span class="value">Active · simulado</span><p class="small">Ejemplo visual. No acredita una receta real.</p></section>
+<section class="state tech" aria-label="Verificación técnica pendiente"><span class="label">Verificación técnica</span><span class="value">Pendiente</span><p class="small">Sin evidencia vinculada. Sin validación nueva.</p></section>
+</div>
+<div class="details">
+<p><span class="label">Paciente ficticio</span>Persona Ejemplo A</p>
+<p><span class="label">Profesional ficticio</span>Profesional Ejemplo B</p>
+<p><span class="label">Referencia interna ficticia</span><span class="ref">DEMO-RECETA-001</span></p>
+<p><span class="label">Fecha ficticia de emisión</span>01 de enero de 2030</p>
+<p><span class="label">Titularidad propuesta</span>Emisión inicial al paciente · no transferible</p>
+<p><span class="label">Red prevista para D1</span>Stellar Testnet · despliegue sin verificar</p>
+</div>
+<section class="private"><strong>Contenido clínico · acceso privado propuesto</strong><p>No se muestran medicamentos, diagnósticos ni datos personales reales. La lectura requeriría autenticación y autorización para esta receta.</p></section>
+<h2>Referencias de verificación</h2>
+<div class="verification"><div>
+<div class="placeholder">DoctorRegistry<span>PLACEHOLDER · ID y enlace Testnet pendientes</span></div>
+<div class="placeholder">PrescriptionSoulbound<span>PLACEHOLDER · ID y enlace Testnet pendientes</span></div>
+<div class="placeholder">Acceso privado a la receta<span>PLACEHOLDER · enlace no implementado</span></div>
+</div><div class="qr" role="img" aria-label="Espacio reservado para QR, no escaneable"><strong>QR</strong>PLACEHOLDER<br>No escaneable<br>Sin destino</div></div>
+<footer class="foot">Esta imagen no prueba seguridad, despliegue ni validez clínica y no convierte datos médicos en públicos. El acceso privado es una propuesta, no una función implementada. D1 permanece pendiente de evidencia y aceptación.</footer>
+</div></article>
+<p class="review">Revisión de diseño: jerarquía de estados, campos visibles y tratamiento del acceso privado. Sin firmas ni sello de auditoría.</p>
+</main></body></html>

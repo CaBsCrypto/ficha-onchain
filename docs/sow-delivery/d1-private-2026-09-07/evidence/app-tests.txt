@@ -1,0 +1,13 @@
+
+ RUN  v4.1.10 C:/Users/MGC/Desktop/Dev/ficha-onchain
+
+···········stderr | src/__tests__/at-rest-crypto.test.ts > cifrado at-rest > cifrado sin key configurada degrada a claro; descifrado sin key LANZA
+[at-rest] TRUSTLEAF_DATA_KEY no está configurada — el contenido clínico se guarda EN CLARO.
+
+······························································································································
+
+ Test Files  23 passed (23)
+      Tests  137 passed (137)
+   Start at  04:53:01
+   Duration  2.91s (transform 3.90s, setup 0ms, import 10.60s, tests 445ms, environment 4ms)
+

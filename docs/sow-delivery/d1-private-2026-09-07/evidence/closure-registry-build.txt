@@ -1,0 +1,23 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=doctor-registry-private\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+    Finished `release` profile [optimized] target(s) in 0.87s
+ℹ️  Build Summary:
+    Wasm File: target\wasm32v1-none\release\doctor_registry_private.wasm (5134 bytes optimized (original size was 5982 bytes))
+    Wasm Hash: b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02
+    Wasm Size: 5134 bytes optimized (original size was 5982 bytes)
+    Exported Functions: 14 found
+      • _
+      • __constructor
+      • accept_admin
+      • authorize_doctor
+      • get_admin
+      • get_authorization
+      • interface_version
+      • is_authorized
+      • pause
+      • propose_admin
+      • reauthorize_doctor
+      • renew_authorization
+      • revoke_doctor
+      • unpause
+✅ Build Complete
+

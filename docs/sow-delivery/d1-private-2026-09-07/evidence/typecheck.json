@@ -1,0 +1,6 @@
+{
+  "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+  "exitCode": 0,
+  "observed": "2026-09-07",
+  "output": "Sin errores"
+}

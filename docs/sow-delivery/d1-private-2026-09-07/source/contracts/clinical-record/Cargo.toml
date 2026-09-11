@@ -1,0 +1,22 @@
+[package]
+name = "clinical-record"
+version = "0.1.0"
+edition = "2021"
+description = "Patient-owned FHIR clinical history anchored on-chain (Phase 1)"
+license = "MIT"
+
+[lib]
+# `lib` sits alongside `cdylib` so the contract type can be imported as a path
+# dependency by the cross-contract integration tests in `contracts/e2e`.
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+soroban-sdk = "22.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+
+[features]
+# Lets a downstream test crate build this contract against Soroban's test host
+# so it can `env.register(ClinicalRecord, ())` in integration tests.
+testutils = ["soroban-sdk/testutils"]

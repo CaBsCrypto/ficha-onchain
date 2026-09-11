@@ -1,0 +1,38 @@
+{
+  "network": "testnet",
+  "role": "Proposed common deployer and initial administrator for the next TrustLeaf contract generation",
+  "address": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "cliAlias": "trustleaf-testnet-admin-20260907",
+  "cliConfigDirectory": "C:\\Users\\MGC\\.config\\stellar",
+  "keyStorage": "Windows OS secure store via Stellar CLI --secure-store",
+  "independentRecoveryBackup": "not created or verified in this task",
+  "existsOnTestnet": true,
+  "nativeBalanceAtVerification": "10000.0000000",
+  "fundingSource": "Stellar Testnet Friendbot",
+  "fundingTransaction": "5c54324cf9f38e4f567e7dc0d7241605d772e0a9956471d0d8d3ba606e0eb3e6",
+  "fundingSuccessful": true,
+  "verifiedAt": "2026-09-07T04:19:07.318Z",
+  "verificationSource": "https://horizon-testnet.stellar.org/accounts/GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "contractsDeployedByThisTask": [
+    {
+      "name": "DoctorRegistry",
+      "id": "CBIBRPVCPIT2IZP35JRMB44URLXGFBYXBHR46HRZKUHJL4AEOLGVEAEK",
+      "transaction": "bba4e233953a61ec8fc3b8f7e1a503ce84f5e0404c177a6aa42e7186a7a4dfb8"
+    },
+    {
+      "name": "DoctorRegistryPrivate",
+      "id": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "transaction": "6d49372a261c59736ea1219d10148afb54d3c828b691e4441622bc591ef756f4"
+    }
+  ],
+  "administrativeRolesAssignedByThisTask": [
+    {
+      "name": "DoctorRegistry",
+      "id": "CBIBRPVCPIT2IZP35JRMB44URLXGFBYXBHR46HRZKUHJL4AEOLGVEAEK",
+      "role": "admin",
+      "verified": true
+    }
+  ],
+  "existingRelayerUnchanged": true,
+  "importedIntoFreighter": false
+}

@@ -1,0 +1,377 @@
+{
+  "evidenceDate": "2026-09-07",
+  "inventoryDate": "2026-09-08",
+  "provenance": "Contract names are present in the historical contract test report. Application names were collected without executing tests from the available source on 2026-09-08 using vitest list, excluding the 9 later Privy signing tests. The historical application report records 137 passed tests across 23 files, but not their individual names; this inventory does not establish exact historical identity for every case.",
+  "scope": "Application inventory includes historical modules, regression tests and reproduction of known findings. Inclusion does not certify a module as delivered, a defect as fixed, browser validation or clinical readiness.",
+  "historicalApplicationReport": "app-tests.txt",
+  "historicalContractReport": "closure-contract-tests.txt",
+  "contracts": [
+    {
+      "title": "DoctorRegistryPrivate",
+      "source": "source/contracts/doctor-registry-private/src/test.rs",
+      "tests": [
+        [
+          "administrative_writes_require_signature",
+          "Escrituras administrativas con firma",
+          "Rechaza autorización, pausa y propuesta de administrador sin la firma requerida."
+        ],
+        [
+          "admin_transfer_requires_acceptance",
+          "Cambio de administrador con aceptación",
+          "La propuesta no cambia al administrador; la nueva cuenta debe aceptar con su firma."
+        ],
+        [
+          "pause_does_not_prevent_revocation",
+          "Revocación disponible durante la pausa",
+          "La pausa impide considerar al médico autorizado y permite revocarlo."
+        ],
+        [
+          "lifecycle_and_expiry",
+          "Vigencia y ciclo de autorización",
+          "Comprueba autorización, renovación, vencimiento, revocación y reautorización."
+        ]
+      ]
+    },
+    {
+      "title": "PrescriptionPrivate v2",
+      "source": "source/contracts/prescription-private/src/test.rs",
+      "tests": [
+        [
+          "only_patient_can_authorize_or_revoke_consent",
+          "Firma del paciente para el consentimiento",
+          "Autorizar y revocar consentimiento exigen la firma del paciente."
+        ],
+        [
+          "booking_requires_authority_signature_and_exact_arguments",
+          "Reserva firmada por su autoridad",
+          "Comprueba el firmante de la reserva y los argumentos exactos que autoriza."
+        ],
+        [
+          "signatures_expiry_and_blocking",
+          "Firmas, vencimiento y bloqueo",
+          "Comprueba requisitos de firma, estados y vencimiento de la receta."
+        ],
+        [
+          "only_the_authorized_doctors_signature_can_issue_to_the_signed_recipient",
+          "Firma del médico y destinatario exacto",
+          "El administrador, el pagador y el paciente no sustituyen la firma del médico emisor."
+        ],
+        [
+          "authorized_private_issuance_lifecycle_and_duplicates",
+          "Ciclo de receta y prevención de duplicados",
+          "Comprueba Registered → Active → Revoked y el rechazo de una emisión duplicada."
+        ],
+        [
+          "patient_consent_is_scoped_revocable_expiring_and_single_use",
+          "Consentimiento específico y de un solo uso",
+          "Verifica médico y paciente, revocación, vencimiento y consumo del consentimiento."
+        ],
+        [
+          "direct_mint_requires_matching_live_booking_and_consumes_it_atomically",
+          "Reserva coincidente y consumo al emitir",
+          "Rechaza reservas ausentes, revocadas, vencidas o de otras cuentas; consume la reserva al emitir."
+        ]
+      ]
+    }
+  ],
+  "application": [
+    {
+      "file": "src/__tests__/prescription-bookings.test.ts",
+      "title": "Reservas para recetas privadas",
+      "sourceSha256": "a5c7162e8f89af1ba320d0c18b2b1707c5b814eb4e3e74f593300b53a4aecac9",
+      "tests": [
+        "strict prescription booking routes > denies anonymous requests even with demo enabled",
+        "strict prescription booking routes > requires explicit patient request and rejects caller-selected wallets",
+        "strict prescription booking routes > fails closed for missing contract and an ineligible reservation",
+        "strict prescription booking routes > returns persistent issuance on retry without claiming a signature or transaction",
+        "strict prescription booking routes > reports cancellation as pending, not revoked",
+        "strict prescription booking routes > does not return another participant's missing record",
+        "verified wallet ownership challenge > accepts a signature only for the exact challenge and preserves issuer identity",
+        "verified wallet ownership challenge > rejects another key or an altered challenge before consuming it",
+        "verified wallet ownership challenge > rejects expired/replayed/other-session challenges and loses concurrent consumption safely"
+      ]
+    },
+    {
+      "file": "src/__tests__/mint-idempotency.test.ts",
+      "title": "Emisión y reintentos",
+      "sourceSha256": "8a5f248e7f997ca05c69360918bda9cf9ed245328a234173ff7b8ca6e77fd105",
+      "tests": [
+        "mint retry identity > keeps the same hash after the clock advances and JSON keys change order",
+        "mint retry identity > permits a distinct issuance of the same treatment",
+        "mint retry identity > rejects callers without a stable identity before signing or logging",
+        "mint retry identity > returns conflict for contract duplicate without simulated success or retry",
+        "mint retry identity > does not convert a rejected authorized-path call into simulated success",
+        "mint retry identity > restores pending identity and refuses edited payloads while outcome is uncertain",
+        "mint retry identity > rejects anonymous real signing",
+        "mint retry identity > allows verified configured doctor and synthetic patient with mocked signing",
+        "mint retry identity > rejects a patient role and forged doctor email",
+        "mint retry identity > rejects unconfigured patient, signer mismatch, and disabled optin",
+        "mint retry identity > explicit simulation never reads a signer or writes records",
+        "mint retry identity > rejects invalid quantities and expired issuance"
+      ]
+    },
+    {
+      "file": "src/__tests__/week1-security-integration.test.ts",
+      "title": "Integración y reproducción de hallazgos",
+      "sourceSha256": "75fa397baee630de68b639e0ee7375b91d63292a7567c6efeab8da9ae4a27f4f",
+      "tests": [
+        "strict auth rejects anonymous callers before the signing boundary",
+        "a verified non-doctor is rejected before the server signer even when demo signing is enabled",
+        "the display expiry ignores an explicit earlier chain expiry",
+        "the public verifier calls a Registered prescription active before activation"
+      ]
+    },
+    {
+      "file": "src/__tests__/prescription-hash.test.ts",
+      "title": "Identidad del documento de receta",
+      "sourceSha256": "c6cecb4c1511568934e3c10a92b160618acc0c481f6a83cf143ef4c9f5dd0cdd",
+      "tests": [
+        "prescription rx_hash > is deterministic for the same content",
+        "prescription rx_hash > is independent of object key insertion order",
+        "prescription rx_hash > changes when the clinical content changes",
+        "prescription rx_hash > produces a 32-byte (64 hex char) SHA-256 digest"
+      ]
+    },
+    {
+      "file": "src/__tests__/serialize.test.ts",
+      "title": "Operaciones concurrentes",
+      "sourceSha256": "646496ab4d542e99d3aa76ad1cad8e8dd6bffa5459cfd7c32cd3d2bb1fb89cb9",
+      "tests": [
+        "withSignerLock > serializes tasks queued under the same key (no overlap)",
+        "withSignerLock > runs tasks under different keys concurrently",
+        "withSignerLock > returns the task's resolved value",
+        "withSignerLock > a rejected task does not break the chain for the next waiter"
+      ]
+    },
+    {
+      "file": "src/__tests__/privy-email.test.ts",
+      "title": "Identidad por correo",
+      "sourceSha256": "c67dab2838bd1248aeb270a9f5f056fd6b93406e77741335ef19571da8e5430c",
+      "tests": [
+        "privyEmail > resolves the email-OTP address",
+        "privyEmail > resolves a Google OAuth email when email.address is absent",
+        "privyEmail > resolves a LinkedIn OAuth email",
+        "privyEmail > scans linkedAccounts for an email field",
+        "privyEmail > prefers the direct email over an OAuth account",
+        "privyEmail > returns null for a null user",
+        "privyEmail > returns null when no email is present anywhere"
+      ]
+    },
+    {
+      "file": "src/__tests__/at-rest-crypto.test.ts",
+      "title": "Cifrado de almacenamiento histórico",
+      "sourceSha256": "90673f3cd66e8d6dcdae94b09265d4f991ede59fa12297c13995348f5a5760f8",
+      "tests": [
+        "cifrado at-rest > roundtrip: cifra y descifra texto clínico con tildes y saltos",
+        "cifrado at-rest > es idempotente: cifrar lo ya cifrado no lo doble-cifra",
+        "cifrado at-rest > legacy en claro pasa intacto en lectura (rollout incremental)",
+        "cifrado at-rest > null y vacío pasan sin tocar",
+        "cifrado at-rest > un byte alterado revienta, no devuelve basura creíble (GCM)",
+        "cifrado at-rest > cifrado sin key configurada degrada a claro; descifrado sin key LANZA",
+        "cifrado at-rest > una key de formato inválido lanza con instrucciones"
+      ]
+    },
+    {
+      "file": "src/__tests__/api-key.test.ts",
+      "title": "Claves de acceso a la API",
+      "sourceSha256": "245509cc2fc211f62105b13a7caf6502076b5341c4c54d1d840a2d5591af60a4",
+      "tests": [
+        "hashApiKey > is deterministic and 64-char hex",
+        "hashApiKey > differs per key",
+        "envFromKey > maps the prefix to an env",
+        "envFromKey > returns null for a foreign key shape",
+        "extractApiKey > reads Authorization: Bearer",
+        "extractApiKey > is case-insensitive on the scheme",
+        "extractApiKey > falls back to x-api-key",
+        "extractApiKey > returns null when absent",
+        "hasScope > matches an exact scope",
+        "hasScope > does not match a scope it lacks",
+        "hasScope > honors the wildcard",
+        "hasScope > denies when scopes are empty"
+      ]
+    },
+    {
+      "file": "src/__tests__/db-guard.test.ts",
+      "title": "Separación de bases de datos",
+      "sourceSha256": "91e0c5d0c2ba4b2460258ba78cb0e6c4b4efe760ce7afdccea25b9306989192e",
+      "tests": [
+        "assertDbSafe > no-op when the guard is not configured",
+        "assertDbSafe > no-op in production even pointing at the prod host",
+        "assertDbSafe > no-op locally (VERCEL_ENV unset)",
+        "assertDbSafe > THROWS on a preview pointing at the guarded prod host",
+        "assertDbSafe > allows a preview pointing at a non-prod host",
+        "assertDbSafe > error message names the host but not the credentials"
+      ]
+    },
+    {
+      "file": "src/__tests__/schema-parity.test.ts",
+      "title": "Coherencia de las migraciones",
+      "sourceSha256": "e66ee78583c9d395446af8d39d00b083b91f003399bdf690301bf363e20fafb5",
+      "tests": [
+        "paridad de esquema entre migrate.mjs y /api/admin/migrate > las extracciones encuentran esquema real (anti-CRLF, anti-regex-muerto)",
+        "paridad de esquema entre migrate.mjs y /api/admin/migrate > toda tabla del script existe en la ruta de prod, y viceversa",
+        "paridad de esquema entre migrate.mjs y /api/admin/migrate > toda columna del script existe en la ruta de prod, y viceversa"
+      ]
+    },
+    {
+      "file": "src/__tests__/rut-hash.test.ts",
+      "title": "Identificadores de paciente",
+      "sourceSha256": "46eab3ea09ad607ca8c565a4c2b32b9dc8118977fa735978bbdc48b7d043d848",
+      "tests": [
+        "hashRut > is deterministic for the same RUT + pepper",
+        "hashRut > maps formatted and bare forms of the same RUT to the same key",
+        "hashRut > returns a 64-char lowercase hex digest",
+        "hashRut > changes when the pepper changes (keyed, not plain hash)",
+        "hashRut > rejects an invalid RUT (bad check digit)",
+        "hashRut > fails closed when the pepper is missing",
+        "hashRut > fails closed when the pepper is too short",
+        "tryHashRut > returns the hash for a valid RUT",
+        "tryHashRut > returns null for an invalid RUT instead of throwing",
+        "tryHashRut > still throws when the pepper is missing (config bug, not bad input)"
+      ]
+    },
+    {
+      "file": "src/__tests__/verify-url.test.ts",
+      "title": "Enlaces de verificación",
+      "sourceSha256": "c7ed19bef9e6bdf26ed4dfe2d8741bc0a727324479a30b217178586e05a32bf1",
+      "tests": [
+        "buildVerifyUrl > builds a /verify URL with the token query-encoded",
+        "buildVerifyUrl > does not double up slashes when origin has a trailing slash",
+        "buildVerifyUrl > percent-encodes tokens containing URL-reserved characters",
+        "parseVerifyToken > extracts the token from an absolute verifier URL",
+        "parseVerifyToken > round-trips with buildVerifyUrl (decodes encoded tokens)",
+        "parseVerifyToken > extracts the token from a relative path + query",
+        "parseVerifyToken > accepts a bare query string",
+        "parseVerifyToken > accepts a bare token pasted by hand",
+        "parseVerifyToken > ignores unrelated query params",
+        "parseVerifyToken > returns null for a URL with no token",
+        "parseVerifyToken > returns null for empty / whitespace input"
+      ]
+    },
+    {
+      "file": "src/__tests__/nav-links.test.ts",
+      "title": "Navegación",
+      "sourceSha256": "f9e5d2b62a535ff773f216899fc96a1a627157db553d856a5b24a9ef28cd21b1",
+      "tests": [
+        "enlaces de navegación > encuentra los enlaces del Navbar",
+        "enlaces de navegación > todo href interno apunta a una ruta que existe",
+        "enlaces de navegación > no quedan superficies de demostración enlazadas"
+      ]
+    },
+    {
+      "file": "src/__tests__/dias-habiles.test.ts",
+      "title": "Cálculo de días hábiles",
+      "sourceSha256": "dc5ec1ffefd35eb6bbca0bb9ac2131cb46f7056cf24afa4bb896a69fbe3f7396",
+      "tests": [
+        "addBusinessDays > salta el fin de semana: viernes + 1 hábil = lunes",
+        "addBusinessDays > desde un sábado, 1 hábil cae el lunes siguiente",
+        "addBusinessDays > 5 hábiles desde un lunes = lunes siguiente",
+        "addBusinessDays > 15 hábiles = 3 semanas calendario cuando parte en día de semana",
+        "addBusinessDays > no muta la fecha original",
+        "dueDateFromSent > aplica el plazo legal de 15 días hábiles",
+        "businessDaysUntil > cuenta solo días de semana",
+        "businessDaysUntil > devuelve 0 cuando el plazo ya venció",
+        "businessDaysUntil > la hora del día no resta un día completo",
+        "businessDaysUntil > un plazo completo recién enviado muestra 15 hábiles"
+      ]
+    },
+    {
+      "file": "src/__tests__/demo-notice-banner.test.ts",
+      "title": "Avisos de demostración",
+      "sourceSha256": "d41fd8db933d3192f3b8e45b2fc1b6b793492052aaf2b28e9ab83c7f7d5705f8",
+      "tests": [
+        "DemoNoticeBanner (Technical Honesty Standard) > contiene los textos clave de honestidad técnica y transparencia"
+      ]
+    },
+    {
+      "file": "src/__tests__/patient-onboarding.test.ts",
+      "title": "Introducción del paciente",
+      "sourceSha256": "e3ea075dac14c0ac3950c2ebeb08761a911a2ee06481b8dfbf1da3b176811852",
+      "tests": [
+        "Patient Onboarding Wizard (Phase 2 UX) > contiene los 3 pasos explicativos del modelo de soberanía de datos"
+      ]
+    },
+    {
+      "file": "src/__tests__/anchor-contract.test.ts",
+      "title": "Anclajes de ficha · histórico",
+      "sourceSha256": "a3034c792b4167c87a17e199f3868bc42c7c475da1448297623006f3ca459a6d",
+      "tests": [
+        "resolveAnchorContract > con RUT válido usa el contrato por-paciente y el owner sandbox",
+        "resolveAnchorContract > sin email cae al demo con warn",
+        "resolveAnchorContract > sin fila en patient_health_records cae al demo con warn",
+        "resolveAnchorContract > con RUT inválido cae al demo (nunca crea un registro basura)",
+        "resolveAnchorContract > si la DB falla cae al demo sin lanzar",
+        "resolveAnchorContract > si el registro queda sin provisionar (deploy fallido) cae al demo",
+        "resolveAnchorContract > si ensureSandboxRecord lanza (p. ej. RutError por pepper) cae al demo",
+        "resolveAnchorContract > sin secreto configurado devuelve ownerSecret undefined (→ simulated)"
+      ]
+    },
+    {
+      "file": "src/__tests__/mcp-tools.test.ts",
+      "title": "Herramientas MCP · histórico",
+      "sourceSha256": "943617be3f04b004bd6c3537d7d48d72704d484197aa163ebb46017d36ec0ee8",
+      "tests": [
+        "ALLOWED_KINDS > es exactamente la lista acordada",
+        "ALLOWED_KINDS > no contiene términos clínicos ni diagnósticos",
+        "ALLOWED_KINDS > mantiene DocumentReference como válvula de escape",
+        "validación de argumentos > requireString rechaza por tipo en vez de coercionar",
+        "validación de argumentos > anchor_record valida kind contra la lista y content como string",
+        "registro de tools > las tools de aprobación simulada siguen fuera del registro",
+        "registro de tools > GET responde 405 (spec Streamable HTTP, sin stream SSE)",
+        "registro de tools > toda tool protegida declara un scope"
+      ]
+    },
+    {
+      "file": "src/__tests__/fhir.test.ts",
+      "title": "Documentos FHIR · histórico",
+      "sourceSha256": "a51c0d020d2b1d9ec68d72b97793d0facb37e31615cbed631069818d7ebddeef",
+      "tests": [
+        "buildDecreto41Bundle > produces a valid FHIR R4 document Bundle",
+        "buildDecreto41Bundle > includes Patient, Practitioner, Organization, Condition and MedicationRequest",
+        "buildDecreto41Bundle > appends a Consent entry only when consent is granted"
+      ]
+    },
+    {
+      "file": "src/__tests__/health-alerts-and-notifications.test.ts",
+      "title": "Alertas y notificaciones · histórico",
+      "sourceSha256": "7c115efadb7f5c98239cd88c50cf627f995e8f285004648842ed1dcea10e8406",
+      "tests": [
+        "Health Alerts & Notifications Engine (Phase 4) > genera notificación Ley 20.584 cuando un médico accede a la ficha",
+        "Health Alerts & Notifications Engine (Phase 4) > detecta tendencias al alza en laboratorios y genera alerta preventiva",
+        "Health Alerts & Notifications Engine (Phase 4) > genera aviso para solicitudes de ficha próximas a vencer (Ley 20.584 art. 13)"
+      ]
+    },
+    {
+      "file": "src/__tests__/ai-chat-rag.test.ts",
+      "title": "Asistente de ficha · histórico",
+      "sourceSha256": "c4d69db10d4b92e43dcb8db38389f7df9ecbfe8351c552131d210c221b8f20f6",
+      "tests": [
+        "AI Record RAG Chat (Phase 5) > responde consulta sobre recetas incluyendo citaciones verificadas",
+        "AI Record RAG Chat (Phase 5) > declara explícitamente cuando la información consultada NO figura en la ficha",
+        "AI Record RAG Chat (Phase 5) > incluye citación directa en el resultado del fallback heurístico RAG"
+      ]
+    },
+    {
+      "file": "src/__tests__/ai-explain-and-timeline.test.ts",
+      "title": "Explicaciones y cronología · histórico",
+      "sourceSha256": "67a5db83ed1760261f3dd3b3673eb0c7f9d38b9e368f3ba048fc5b0cbe33dae3",
+      "tests": [
+        "Patient Explainer (Phase 3 IA) > genera explicación en lenguaje sencillo para Creatinina",
+        "Patient Explainer (Phase 3 IA) > genera explicación en lenguaje sencillo para Glicemia",
+        "Patient Explainer (Phase 3 IA) > genera explicación en lenguaje sencillo para Losartán",
+        "Patient Explainer (Phase 3 IA) > incluye SIEMPRE el aviso médico obligatorio no negociable"
+      ]
+    },
+    {
+      "file": "src/__tests__/ai-extract.test.ts",
+      "title": "Extracción de documentos · histórico",
+      "sourceSha256": "67eac2d96911ad002bb0958c7b80d8b94b67ffe908af293954e4b8586af12e7b",
+      "tests": [
+        "Document Extraction (Offline / Heuristic Fallback) > extrae correctamente resultados de laboratorio para exámenes de sangre / creatinina",
+        "Document Extraction (Offline / Heuristic Fallback) > extrae medicamentos y diagnósticos para recetas médicas de Losartán",
+        "Document Extraction (Offline / Heuristic Fallback) > extrae sugerencias válidas para informes de imagenología",
+        "Document Extraction (Offline / Heuristic Fallback) > garantiza que los kinds sugeridos pertenezcan a la lista FHIR válida"
+      ]
+    }
+  ]
+}

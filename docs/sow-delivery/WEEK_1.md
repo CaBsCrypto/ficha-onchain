@@ -1,5 +1,7 @@
 # Semana 1 — validación y despliegue Testnet
 
+> Reconciliación posterior: [estado y pendientes](SOW_WEEK_1_RECONCILIATION.md). Los resultados inferiores acreditan la versión histórica; no prueban correcciones locales ni cierre de seguridad sin reservas.
+
 Actualizado: 2026-09-06. Fuente oficial confirmada por el dueño: [Instawards SOW](https://docs.google.com/document/d/1XML0J7ujjBHb9gaNzfEtNjxV7qqzMnMoIZ_EbgMyocs/edit?tab=t.0), Deliverable 1 y Week 1.
 
 ## Resultado

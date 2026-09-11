@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "./SectionHeading";
@@ -21,29 +22,50 @@ function CheckList({ points, tone }: { points: readonly string[]; tone: "clinica
 }
 
 export function AudienceSection() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   return (
     <section className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
       <SectionHeading kicker={t.audience.kicker} title={t.audience.title} />
 
       <div className="mt-14 grid gap-6 md:grid-cols-2">
         <Reveal>
-          <div className="h-full rounded-3xl border border-clinical/15 bg-gradient-to-br from-clinical-50/70 to-white p-8">
-            <span className="inline-flex rounded-xl bg-clinical/10 px-3 py-1 text-sm font-semibold text-clinical-600">
-              {t.audience.doctors.title}
-            </span>
-            <CheckList points={t.audience.doctors.points} tone="clinical" />
+          <div className="flex h-full flex-col justify-between rounded-3xl border border-clinical/15 bg-gradient-to-br from-clinical-50/70 to-white p-8 shadow-sm">
+            <div>
+              <span className="inline-flex rounded-xl bg-clinical/10 px-3 py-1 text-sm font-semibold text-clinical-600">
+                {t.audience.doctors.title}
+              </span>
+              <CheckList points={t.audience.doctors.points} tone="clinical" />
+            </div>
+            <div className="mt-8 pt-6 border-t border-clinical/10">
+              <Link
+                href="/login?role=doctor"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-clinical-600 hover:text-clinical-700"
+              >
+                {lang === "es" ? "Ingresar al portal médico" : "Enter doctor portal"} →
+              </Link>
+            </div>
           </div>
         </Reveal>
         <Reveal delay={0.1}>
-          <div className="h-full rounded-3xl border border-mint/15 bg-gradient-to-br from-mint-50/70 to-white p-8">
-            <span className="inline-flex rounded-xl bg-mint/10 px-3 py-1 text-sm font-semibold text-mint">
-              {t.audience.patients.title}
-            </span>
-            <CheckList points={t.audience.patients.points} tone="mint" />
+          <div className="flex h-full flex-col justify-between rounded-3xl border border-mint/15 bg-gradient-to-br from-mint-50/70 to-white p-8 shadow-sm">
+            <div>
+              <span className="inline-flex rounded-xl bg-mint/10 px-3 py-1 text-sm font-semibold text-mint">
+                {t.audience.patients.title}
+              </span>
+              <CheckList points={t.audience.patients.points} tone="mint" />
+            </div>
+            <div className="mt-8 pt-6 border-t border-mint/10">
+              <Link
+                href="/login?role=patient"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-mint-700 hover:text-mint-800"
+              >
+                {lang === "es" ? "Ingresar al portal del paciente" : "Enter patient portal"} →
+              </Link>
+            </div>
           </div>
         </Reveal>
       </div>
     </section>
   );
 }
+
