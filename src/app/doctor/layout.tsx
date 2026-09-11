@@ -264,6 +264,20 @@ function DoctorOnboardingForm({ email, onDone }: { email: string; onDone: () => 
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [demoFilled, setDemoFilled] = useState(false);
+
+  function fillDemoProfile() {
+    setForm({
+      name: 'Médico de prueba TrustLeaf',
+      specialty: 'Medicina general · Demo',
+      licenseNum: 'DEMO-REG-001',
+      rut: 'DEMO-NO-VALIDO',
+      phone: '+56 9 0000 0000',
+      centerName: 'Consulta de prueba TrustLeaf',
+    });
+    setError('');
+    setDemoFilled(true);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -313,8 +327,15 @@ function DoctorOnboardingForm({ email, onDone }: { email: string; onDone: () => 
         </div>
 
         <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-xs text-sky-900">
-          <p className="font-medium">Identidad vinculada</p>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <p className="font-medium">Identidad vinculada</p>
+            <button type="button" disabled={saving} onClick={fillDemoProfile}
+              className="rounded-md px-2 py-2 text-xs font-medium text-sky-700 underline decoration-sky-300 underline-offset-4 transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-50">
+              Rellenar datos de prueba
+            </button>
+          </div>
           <p className="mt-0.5 break-all text-sky-700 font-mono">{email}</p>
+          {demoFilled && <p role="status" className="mt-2 text-xs text-slate-600">Datos sintéticos cargados. Puedes editarlos antes de enviar la solicitud.</p>}
         </div>
 
         <form onSubmit={submit} className="mt-5 space-y-4">
