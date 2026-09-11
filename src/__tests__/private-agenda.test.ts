@@ -22,11 +22,17 @@ describe('private agenda API',()=>{
     for(const handler of [availability,slots,doctors,register])expect((await handler(new Request('http://localhost/api/test'))).status).toBe(401);
     expect((await saveAvailability(put({blocks}))).status).toBe(401);expect(mocks.sql).not.toHaveBeenCalled();
   });
-  it('rejects another doctor’s schedule and forbids public self-approval',async()=>{
+  it('rejects another doctor’s schedule and forbids duplicate registration',async()=>{
     expect((await availability(new Request('http://localhost/api/doctor/availability?doctorEmail=foreign@example.test'))).status).toBe(403);
     expect((await saveAvailability(put({doctorEmail:'foreign@example.test',blocks}))).status).toBe(403);
-    expect((await register(put({name:'Fake doctor',email:actor.email})) ).status).toBe(409);
-    expect(mocks.sql).not.toHaveBeenCalled();
+    mocks.sql.mockResolvedValueOnce([{id:10,status:'pending'}]);
+    expect((await register(put({name:'Fake doctor',email:actor.email}))).status).toBe(409);
+  });
+  it('creates pending doctor application for authenticated self-onboarding',async()=>{
+    mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([{id:10,name:'Dr. Test',status:'pending'}]);
+    const res = await register(put({name:'Dr. Test',specialty:'Medicina General',licenseNum:'12345',rut:'12.345.678-9'}));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({success:true,doctor:{id:10,name:'Dr. Test',status:'pending'}});
   });
   it('rejects forged schedule bodies and overlapping blocks before mutation',async()=>{
     for(const body of [{doctorEmail:42,blocks},{blocks:[null]},{blocks:[blocks[0],blocks[0]]}])expect((await saveAvailability(put(body))).status).toBeGreaterThanOrEqual(400);
