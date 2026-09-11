@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { requirePrivyAdmin } from "@/lib/auth/admin";
-import { assertPrivateEnvironment, PrivateFlowError } from '@/lib/private-config';
+import { assertPrivateEnvironment, privateEnvironmentChecks, PrivateFlowError } from '@/lib/private-config';
 import { accessErrorResponse } from '@/lib/auth/access-error';
 
 export const runtime = "nodejs";
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   }
   try { assertPrivateEnvironment(); }
   catch (error) {
+    console.warn('[private-environment-checks]', privateEnvironmentChecks());
     return accessErrorResponse(error instanceof PrivateFlowError && error.message === 'private_configuration_mismatch'
       ? 'private_configuration_mismatch' : 'private_environment_mismatch', 503, 'configuration');
   }
