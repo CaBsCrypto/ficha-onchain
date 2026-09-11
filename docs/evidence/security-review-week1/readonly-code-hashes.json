@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-09-07T02:01:38.997Z",
+  "network": "testnet",
+  "sourceCommit": "22d546e852d3a2f6dd6d0731512c8c0f6d542cf9",
+  "localRebuiltRxHash": "bd9d0b97d800b45909ccc13da1613c47d15aa75b8ae88389ab2c178db908343e",
+  "contracts": [
+    {
+      "id": "CBOJSLG2XQZNQ6G6Q4VGN2SOFOEUCRDMBDWS7HVOQTGWTOIWGWNQSLCU",
+      "hash": "bd9d0b97d800b45909ccc13da1613c47d15aa75b8ae88389ab2c178db908343e",
+      "latestLedger": 4544582,
+      "liveUntilLedgerSeq": 4650535
+    },
+    {
+      "id": "CC246CYKOEAZVKWEJGOXTKW436LYYLR2EHKFD2WFGABXGSFX2UEX2X2O",
+      "hash": "cc832c816bcb11286dcd0151328231700d5489a276692f0c0ece623a2c4437c8",
+      "latestLedger": 4544582,
+      "liveUntilLedgerSeq": 4650558
+    }
+  ]
+}

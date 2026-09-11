@@ -1,0 +1,62 @@
+{
+  "run": "9b38716f-e60d-47fd-a260-555a90eb74d2",
+  "recordedAt": "2026-09-07T05:56:44.273Z",
+  "devHostVerified": true,
+  "stellarTransactions": 0,
+  "results": [
+    {
+      "name": "migration tables and enabled protection trigger",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "same signed challenge concurrent completion has one winner",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "wallet uniqueness rejects another identity atomically",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "concurrent preparation returns one stable issuance and expiry",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "another patient cannot prepare a matching-looking reservation",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "legacy update and delete rejected for protected booking",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "cancellation preceding preparation prevents eligibility",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    },
+    {
+      "name": "waiting legacy mutation sees committed booking and is rejected",
+      "status": "passed",
+      "environment": "real_neon_dev"
+    }
+  ],
+  "cleanupVerified": true,
+  "failure": null,
+  "migration": {
+    "step": "prescription booking preparation",
+    "applied": true,
+    "target": "Neon development (host verified)",
+    "otherStepsExecuted": false
+  },
+  "sourceHashes": {
+    "scripts/migrate.mjs": "52aae996e32e68d43ae4bf2b2142a97573c83b1598906a7da1533410311da75a",
+    "scripts/validate-prescription-bookings-db.mjs": "03e0545d362bcd638eb44b7b4e322a47b03c92ec20b4d4a8a40e8b6475fc9813",
+    "src/lib/prescription-booking.ts": "5b134e1a9b6f18c071fc89dbb3547a822bbc0f20e77ffae437b1129cdc6939f0",
+    "src/lib/stellar-wallet-binding.ts": "b342351fa4a129e362b2a002a45e463286a8a3872fb07d84e6614dbe9e5af1e5"
+  }
+}

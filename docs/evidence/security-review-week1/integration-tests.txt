@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 C:/Users/MGC/Desktop/Dev/ficha-onchain
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  23:14:23
+   Duration  517ms (transform 83ms, setup 0ms, import 363ms, tests 20ms, environment 0ms)
+
