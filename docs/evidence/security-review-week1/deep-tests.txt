@@ -1,0 +1,29 @@
+warn: could not canonicalize path C:\Users\MGC
+   Compiling doctor-registry v0.1.0 (C:\Users\MGC\Desktop\Dev\ficha-onchain\contracts\doctor-registry)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.51s
+     Running tests\deep_security.rs (contracts\target\debug\deps\deep_security-8750fee2b917dd28.exe)
+
+running 4 tests
+test scoped_admin_authorization_cannot_be_retargeted_to_another_doctor ... ok
+test ordinary_reads_and_revocation_do_not_extend_persistent_ttl ... ok
+test rotation_rejects_old_admin_even_with_old_admin_authorization ... ok
+test reregistration_restores_authority_with_retained_permissions_by_design ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\deep_security.rs (contracts\target\debug\deps\deep_security-c21ee8d0163103ac.exe)
+
+running 10 tests
+test unavailable_registry_fails_closed_and_writes_no_prescription_or_index ... ok
+test signed_outsiders_cannot_activate_revoke_or_impersonate_admin_or_doctor ... ok
+test lifecycle_updates_extend_record_only_not_instance_index_or_dedupe ... ok
+test missing_signatures_fail_closed_for_all_mutations ... ok
+test specific_auth_unregistered_attacker_burns_and_prevents_both_remedies ... ok
+test revoked_doctor_cannot_mint_but_existing_rx_remains_activatable_and_revocable ... ok
+test max_units_arithmetic_and_insufficient_balance_are_safe ... ok
+test exact_expiry_blocks_dispensing_without_state_changes ... ok
+test positive_partial_withdrawal_also_disagrees_with_validity ... ok
+test duplicate_key_survives_all_reachable_statuses ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+

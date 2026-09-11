@@ -1,0 +1,27 @@
+{
+  "network": "testnet",
+  "status": "deployed_admin_and_usage_verified",
+  "admin": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "sourceAlias": "trustleaf-testnet-admin-20260907",
+  "salt": "f1803e0c0e9f9eb570f2a65dd7ff4c5b85508bd443012a74582a6787100f9600",
+  "wasm": "contracts/target/wasm32v1-none/release/doctor_registry.wasm",
+  "wasmSha256": "e5219533028cb9b4e6bc9734babb1a60b296300a9e68b955ee232465755248fb",
+  "preparedAt": "2026-09-07T04:36:55.157Z",
+  "validation": {
+    "registryUnit": 14,
+    "prescriptionUnit": 20,
+    "registryPrescriptionIntegration": 3,
+    "networkVerification": {
+      "method": "stellar contract invoke get_admin --send no",
+      "result": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+      "verifiedAt": "2026-09-07T04:38:59.921Z"
+    },
+    "independentAudit": "not performed",
+    "usageEvidence": "doctor-registry-usage.json"
+  },
+  "contractId": "CBIBRPVCPIT2IZP35JRMB44URLXGFBYXBHR46HRZKUHJL4AEOLGVEAEK",
+  "uploadTransaction": "e3ccb98c8d3206c4e3cffbdf1fbdc91d2b84689f481793518ae556387df0be78",
+  "deploymentTransaction": "bba4e233953a61ec8fc3b8f7e1a503ce84f5e0404c177a6aa42e7186a7a4dfb8",
+  "deployedAt": "2026-09-07T04:37:29.255Z",
+  "sourceSha256": "6e861f007c60035bdb6f0932ba8a97810fe3fd7e9f1368eacc97786854f0e4ee"
+}

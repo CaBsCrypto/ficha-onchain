@@ -1,0 +1,26 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/MGC/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --locked --manifest-path=prescription-private\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+    Finished `release` profile [optimized] target(s) in 0.25s
+ℹ️  Build Summary:
+    Wasm File: target\wasm32v1-none\release\prescription_private.wasm (11358 bytes optimized (original size was 13488 bytes))
+    Wasm Hash: 4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c
+    Wasm Size: 11358 bytes optimized (original size was 13488 bytes)
+    Exported Functions: 17 found
+      • _
+      • __constructor
+      • activate
+      • attest_booking
+      • authorize_prescriber
+      • block
+      • get_admin
+      • get_booking
+      • get_booking_authority
+      • get_prescription
+      • get_registry
+      • interface_version
+      • is_valid
+      • mint_prescription
+      • revoke
+      • revoke_booking
+      • revoke_consent
+✅ Build Complete
+

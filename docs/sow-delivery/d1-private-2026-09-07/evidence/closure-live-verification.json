@@ -1,0 +1,84 @@
+{
+  "checkedAt": "2026-09-07T07:54:35.788Z",
+  "network": "testnet",
+  "contracts": [
+    {
+      "id": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "wasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02"
+    },
+    {
+      "id": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "wasmHash": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c"
+    }
+  ],
+  "receipts": [
+    {
+      "name": "doctorApproval",
+      "hash": "114abb0d7daa9672b8bdacabdf95b925abdb152e20157dfbbe187145f4eb3650",
+      "status": "SUCCESS",
+      "ledger": 4547691
+    },
+    {
+      "name": "booking",
+      "hash": "1930f88b1b04515c21c8f84cc221b2f7417932f38a635345fb492392587cbb21",
+      "status": "SUCCESS",
+      "ledger": 4547692
+    },
+    {
+      "name": "consent",
+      "hash": "b0289a388c5196e0458a19a0885641f525a38733bc0ddda438bf26771132cfb7",
+      "status": "SUCCESS",
+      "ledger": 4547693
+    },
+    {
+      "name": "mint",
+      "hash": "0e7102c770d100ea6b5f9aa375992dbbc76534535f48822fb066afca2cd672c8",
+      "status": "SUCCESS",
+      "ledger": 4547694
+    }
+  ],
+  "relay": [
+    {
+      "name": "consent",
+      "status": "SUCCESS",
+      "hash": "561212a59f59a11b47055aefdb259b276d44526809d67d899f5b37ac3b1c32d5",
+      "feeBump": true,
+      "expectedFeeSource": true
+    },
+    {
+      "name": "attest",
+      "status": "SUCCESS",
+      "hash": "e8f2870114a4b207ee9efa30c37d79c50e870946ee9261f89c1757f5767380df",
+      "feeBump": true,
+      "expectedFeeSource": true
+    },
+    {
+      "name": "mint",
+      "status": "SUCCESS",
+      "hash": "3404c01dd3c6ec508f1b783b5434db594641cc826511cfbe85bf1d0cce83d27a",
+      "feeBump": true,
+      "expectedFeeSource": true
+    },
+    {
+      "name": "cancelConsent",
+      "status": "SUCCESS",
+      "hash": "26d55144efff36b000753f86d6fe60613fdd913f2720810bc0edcc40cd91f90e",
+      "feeBump": true,
+      "expectedFeeSource": true
+    },
+    {
+      "name": "cancelAttest",
+      "status": "SUCCESS",
+      "hash": "45194522c60f3eb489353ed2270749b0e9de252e38955623b80f51f5232dc696",
+      "feeBump": true,
+      "expectedFeeSource": true
+    },
+    {
+      "name": "cancelBooking",
+      "status": "SUCCESS",
+      "hash": "de8888e5b0b1ca47661e2ea38e678023fbca373a247a9a88824f4c710f4c276e",
+      "feeBump": true,
+      "expectedFeeSource": true
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[package]
+name = "document-soulbound"
+version = "0.1.0"
+edition = "2021"
+description = "General-purpose soulbound document NFT for TrustLeaf (medical certs, professional licenses, mental health certs)"
+license = "MIT"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+soroban-sdk = "22.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

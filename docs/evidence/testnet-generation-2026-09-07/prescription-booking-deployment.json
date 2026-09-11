@@ -1,0 +1,22 @@
+{
+  "network": "testnet",
+  "contractId": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+  "admin": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "bookingAuthority": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "registry": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "wasmSha256": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c",
+  "salt": "8b20da01f2a7a7a82eec1b13d58388db237b3376ba3e54b11a6dc932ff905ed1",
+  "uploadTransaction": "793849f1aef90998f8ec555ea36a5c283c1f04290c27088cd38051192d67e64c",
+  "deploymentTransaction": "f00e0e30e42123e9058b88478091ecc794123dc6688c8fddb25843e0ad036401",
+  "status": "receipts_confirmed",
+  "receipts": {
+    "uploadTransaction": {
+      "status": "SUCCESS",
+      "ledger": 4547594
+    },
+    "deploymentTransaction": {
+      "status": "SUCCESS",
+      "ledger": 4547595
+    }
+  }
+}

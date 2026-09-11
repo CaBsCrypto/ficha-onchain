@@ -1,0 +1,21 @@
+{
+  "network": "testnet",
+  "status": "deployed_three_encrypted_dossiers_verified",
+  "admin": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+  "salt": "2009982423865d7225f2147926a759beabaf5c1ffb3928a96e95755a9c562c73",
+  "wasm": "contracts/target/wasm32v1-none/release/doctor_registry_private.wasm",
+  "wasmSha256": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+  "contractId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "uploadTransaction": "215fa84694324891bfba90fd77bed39ed3bc2dd7c5aaf715fd6a6ee780525e13",
+  "deploymentTransaction": "6d49372a261c59736ea1219d10148afb54d3c828b691e4441622bc591ef756f4",
+  "validation": {
+    "contractUnitTests": 4,
+    "cryptoTests": 2,
+    "prescriptionIntegrationTests": 1,
+    "database": "Neon dev only",
+    "threeDatabaseCommitmentsMatchTestnet": true,
+    "zkEnabled": false,
+    "appIntegrated": false
+  },
+  "sourceSha256": "7c0f33113eb48db4343595c304a5142b34ac9d4a39d53f3346f93b6de5251622"
+}

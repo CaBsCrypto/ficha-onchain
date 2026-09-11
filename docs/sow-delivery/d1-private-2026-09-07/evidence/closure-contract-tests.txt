@@ -1,0 +1,36 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.90s
+     Running unittests src\lib.rs (target\debug\deps\doctor_registry_private-2b0da6359479dfc0.exe)
+
+running 4 tests
+test test::administrative_writes_require_signature ... ok
+test test::admin_transfer_requires_acceptance ... ok
+test test::pause_does_not_prevent_revocation ... ok
+test test::lifecycle_and_expiry ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src\lib.rs (target\debug\deps\prescription_private-0d1a23bafaf8f180.exe)
+
+running 7 tests
+test test::only_patient_can_authorize_or_revoke_consent ... ok
+test test::booking_requires_authority_signature_and_exact_arguments ... ok
+test test::signatures_expiry_and_blocking ... ok
+test test::only_the_authorized_doctors_signature_can_issue_to_the_signed_recipient ... ok
+test test::authorized_private_issuance_lifecycle_and_duplicates ... ok
+test test::patient_consent_is_scoped_revocable_expiring_and_single_use ... ok
+test test::direct_mint_requires_matching_live_booking_and_consumes_it_atomically ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+   Doc-tests doctor_registry_private
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests prescription_private
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

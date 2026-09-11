@@ -1,0 +1,282 @@
+[
+  {
+    "path": "CHANGELOG-SEMANA-1.md",
+    "bytes": 9690,
+    "sha256": "1912013aca936dedf7eb910af067013b3d8efb2b96837a7a38f9cdd1328d0518"
+  },
+  {
+    "path": "doctor-registry-private-codigo.html",
+    "bytes": 15075,
+    "sha256": "0d64262f6b7446c32866a85e3437ef136c4874863f508f2508ced32e3f314df5"
+  },
+  {
+    "path": "evidence/app-tests.txt",
+    "bytes": 738,
+    "sha256": "b36f54564be9ab1abf147e54b5d29da17c33847113883ec13da37edf459b6e6a"
+  },
+  {
+    "path": "evidence/closure-contract-tests.txt",
+    "bytes": 1543,
+    "sha256": "88d3d2128129a1ea3a5fdfa4ac1b2ab76634215a08d8080211975be0daf2f1d3"
+  },
+  {
+    "path": "evidence/closure-live-verification.json",
+    "bytes": 2380,
+    "sha256": "62d3eaf4fe7ef87e320b883a3f93d742e612b154e9f7c55d7e52b4deb548b21b"
+  },
+  {
+    "path": "evidence/closure-prescription-build.txt",
+    "bytes": 1090,
+    "sha256": "eda72802381f0a430c5b0366cd8d39726fad196faa160cdfae4cd8a51a0cd6b0"
+  },
+  {
+    "path": "evidence/closure-registry-build.txt",
+    "bytes": 1023,
+    "sha256": "424929e97cd5447f5e1bac4e631c0fd2a8df7b648aedeeb08c30928765690475"
+  },
+  {
+    "path": "evidence/test-case-inventory.json",
+    "bytes": 20630,
+    "sha256": "06551db42ce79048bee6f08ca8b4f24fa3e79f8ce6aefbcb5b4b7927ab90bfcb"
+  },
+  {
+    "path": "evidence/TrustLeaf-evidencia-validaciones.json",
+    "bytes": 4470,
+    "sha256": "435ba2783686e9f1d2d407d057ca396a419f57b53640006b0d8ed6cbea675889"
+  },
+  {
+    "path": "evidence/typecheck.json",
+    "bytes": 156,
+    "sha256": "7145fd93ce666704ab4752d8c7bb8e0e4de14add804109e5ca17b60fac017e93"
+  },
+  {
+    "path": "LEER-PRIMERO.md",
+    "bytes": 6061,
+    "sha256": "2e23a9507fa129ee7ed4dbe0938a28f86486480859c67938351453edcbfe541d"
+  },
+  {
+    "path": "NOTION-ENTREGA-SEMANA-1.md",
+    "bytes": 12186,
+    "sha256": "fd37d6bd49258bbc2fd50a96e47940401df25730601662bd8bcf88106ac168bb"
+  },
+  {
+    "path": "prescription-private-codigo.html",
+    "bytes": 24395,
+    "sha256": "391950124366696fb37084ab10d59a4601b01a1d2612538aa762abd349eb6357"
+  },
+  {
+    "path": "RESUMEN-PRESENTACION.md",
+    "bytes": 2102,
+    "sha256": "25b1f33350afb6b86d95aae4d2d50f2328a75857ddb5f67d907d66a7c7258e52"
+  },
+  {
+    "path": "source-manifest.json",
+    "bytes": 5076,
+    "sha256": "f119ba6308d637685b8ccdb452ad4b02ca96ba4db073064541e5cc8a38865f9e"
+  },
+  {
+    "path": "source/contracts/Cargo.lock",
+    "bytes": 44238,
+    "sha256": "1d22a8fd1da7563891c26830df4cb5fbb43cd5458888924a51410d93c36b8865"
+  },
+  {
+    "path": "source/contracts/Cargo.toml",
+    "bytes": 694,
+    "sha256": "8f4fb4d95de09090f436cc453db12100f0a43d2b022817767476ca9a977b741d"
+  },
+  {
+    "path": "source/contracts/clinical-record/Cargo.toml",
+    "bytes": 676,
+    "sha256": "275701de252ebccd4f8568b9eaba3ebfde0b14b3226b37b8c1c5e5274bdd75c0"
+  },
+  {
+    "path": "source/contracts/clinical-record/src/lib.rs",
+    "bytes": 7323,
+    "sha256": "f871ce709060634b4a7dafd85b1d7f1ebdeca6c5bf109c0f12c6b79c45a18d9f"
+  },
+  {
+    "path": "source/contracts/clinical-record/src/test.rs",
+    "bytes": 4048,
+    "sha256": "b5f7b640d4e94c31c5c5b8c2ba9ee3ea17933c85e926a40123b09cf955621203"
+  },
+  {
+    "path": "source/contracts/dispensary-registry/Cargo.toml",
+    "bytes": 683,
+    "sha256": "72c4d09292ff94feaa897324e355ee05341b1de72808e3192748f9e61dd7c7d0"
+  },
+  {
+    "path": "source/contracts/dispensary-registry/src/lib.rs",
+    "bytes": 4147,
+    "sha256": "1ba9acd5f71548f20cf0c4f062105965f372030f8c6957c133f4a36c38eba139"
+  },
+  {
+    "path": "source/contracts/dispense-record/Cargo.toml",
+    "bytes": 676,
+    "sha256": "d2e4b0a6411e520866088259ef5d0c94fd91a75148fbc7c7c189eef5859724e0"
+  },
+  {
+    "path": "source/contracts/dispense-record/src/lib.rs",
+    "bytes": 6463,
+    "sha256": "1bd2090660e963f775af4f05196272044dd84674d63a623e19709721f095f9f3"
+  },
+  {
+    "path": "source/contracts/doctor-registry-private/Cargo.toml",
+    "bytes": 304,
+    "sha256": "f288b7244dd6a509e8c961e1d75a847df8452dced1a17d45af6ca8c6579ee8fe"
+  },
+  {
+    "path": "source/contracts/doctor-registry-private/src/lib.rs",
+    "bytes": 5035,
+    "sha256": "7c0f33113eb48db4343595c304a5142b34ac9d4a39d53f3346f93b6de5251622"
+  },
+  {
+    "path": "source/contracts/doctor-registry-private/src/test.rs",
+    "bytes": 2730,
+    "sha256": "97b828fbdbcc7b10604769bf853e6c89b848338bcf47994658ee9de84a6f3893"
+  },
+  {
+    "path": "source/contracts/doctor-registry/Cargo.toml",
+    "bytes": 669,
+    "sha256": "8d3ea31dc8c006ac792682ab3ec0478922ba1041a8547e0d600b47c0fc7489f7"
+  },
+  {
+    "path": "source/contracts/doctor-registry/src/lib.rs",
+    "bytes": 10292,
+    "sha256": "6e861f007c60035bdb6f0932ba8a97810fe3fd7e9f1368eacc97786854f0e4ee"
+  },
+  {
+    "path": "source/contracts/doctor-registry/src/test.rs",
+    "bytes": 10382,
+    "sha256": "5e08194e41ba3169774c39bfebea4b95fc5d46b16befaa4a02dcfa958abaafcd"
+  },
+  {
+    "path": "source/contracts/doctor-registry/tests/deep_security.rs",
+    "bytes": 4674,
+    "sha256": "07d2caa25b7c43a6fa9f5b3f18f97a2f87d30fbe73285be907ad6f6ba3c69ad2"
+  },
+  {
+    "path": "source/contracts/doctor-registry/tests/security_review.rs",
+    "bytes": 2159,
+    "sha256": "a9d5f78e5b741749286290ec7063314530496c05a55b92d22f33403d895d1f7b"
+  },
+  {
+    "path": "source/contracts/document-soulbound/Cargo.toml",
+    "bytes": 428,
+    "sha256": "75e5f284bdcd92135d7a04bd5f00b6a5d3d26e82855fb26a2c0ea6968db6c7e8"
+  },
+  {
+    "path": "source/contracts/document-soulbound/src/lib.rs",
+    "bytes": 8952,
+    "sha256": "98c0f8e302b6aa2dfa618a7bd7608a25ea4314ab5a74f9c8c30c88b6dbe35d59"
+  },
+  {
+    "path": "source/contracts/document-soulbound/src/test.rs",
+    "bytes": 3203,
+    "sha256": "69c699ef6e4e4de55c0fed31c67accde3b5ab6ea1b9137421fc58147709f76a1"
+  },
+  {
+    "path": "source/contracts/e2e/Cargo.toml",
+    "bytes": 858,
+    "sha256": "e2cd2495da2cc23620d20594888361351101b1f35b73d7f6aed18159b9867760"
+  },
+  {
+    "path": "source/contracts/e2e/src/lib.rs",
+    "bytes": 337,
+    "sha256": "6d4bd1b88b9676c06401dae3eb53f15d89896a334571b4534c5b8f96fb0796f6"
+  },
+  {
+    "path": "source/contracts/e2e/tests/e2e.rs",
+    "bytes": 6283,
+    "sha256": "1c2cc0f1e4f3f84e93ed3105555fa34117439abe06bf094704898a8b61c171d7"
+  },
+  {
+    "path": "source/contracts/e2e/tests/private_registry.rs",
+    "bytes": 1492,
+    "sha256": "1777fa25e6b8d79f7a191c784f5f48828fbd0e1bcef913e6e84b3e0cc9766115"
+  },
+  {
+    "path": "source/contracts/prescription-private/Cargo.toml",
+    "bytes": 393,
+    "sha256": "29949d5cb0a7d055d97f8ade6aa3ca855bc13bb966ca5678fbb8d284e70b1a71"
+  },
+  {
+    "path": "source/contracts/prescription-private/src/lib.rs",
+    "bytes": 9800,
+    "sha256": "a69467273fe321de1db45f7b97ca62b1d5cb432c82a52f3ec776712f7e79e26c"
+  },
+  {
+    "path": "source/contracts/prescription-private/src/test.rs",
+    "bytes": 11836,
+    "sha256": "036d6e8df1d7c1fed6c0137f1e924fcb0be82455d802b0faac0fe48abd7fe85a"
+  },
+  {
+    "path": "source/contracts/prescription-soulbound/Cargo.toml",
+    "bytes": 938,
+    "sha256": "6d94387dd239af03076f1003c935b09e74dd29095f7346ad36a08ebea6adf3b5"
+  },
+  {
+    "path": "source/contracts/prescription-soulbound/src/lib.rs",
+    "bytes": 20224,
+    "sha256": "35a3348ff83fbbef1c8efc2dd70bf21031064a980cd324b2289258083c7ebb31"
+  },
+  {
+    "path": "source/contracts/prescription-soulbound/src/test.rs",
+    "bytes": 19026,
+    "sha256": "4ff9eaf28498158b45e2e07e44f06c4acf48a660630805f17523e4b41a1875cc"
+  },
+  {
+    "path": "source/contracts/prescription-soulbound/tests/audit_security.rs",
+    "bytes": 4147,
+    "sha256": "c36f3e0e075c327a004bc2efff073d0f06b36963eedb5036c36eb50f46aca4c2"
+  },
+  {
+    "path": "source/contracts/prescription-soulbound/tests/deep_security.rs",
+    "bytes": 10608,
+    "sha256": "2b1a8b0b341a09d0034ece5aa0222aa1d6bd3963b7d6c47581d63d58aa9376ed"
+  },
+  {
+    "path": "SOW_WEEK_1_SOURCE.md",
+    "bytes": 2642,
+    "sha256": "d8d68e99ea5375cba6f6723557a2a990e301ac4c5d5c42d75e963b1f391d7e03"
+  },
+  {
+    "path": "TrustLeaf-dos-contratos.html",
+    "bytes": 458782,
+    "sha256": "6a9c33b97fb16812b1db03855842b2d18fbd2c64ac6f9a2e1fcf7793eea990a1"
+  },
+  {
+    "path": "TrustLeaf-flujo.html",
+    "bytes": 4054,
+    "sha256": "f1ece3aa381d4efb7612cd05439cd6073da44e4332eb0ec458a5b26f3f510718"
+  },
+  {
+    "path": "TrustLeaf-guia-presentador.html",
+    "bytes": 24302,
+    "sha256": "18aa067a3c1692ef10fd6f8a713ac61efb521de27342a67a88c9af1944dda1a0"
+  },
+  {
+    "path": "TrustLeaf-mini-guion.md",
+    "bytes": 1540,
+    "sha256": "ad9ff7d73cd21bf066682bea9ea4d41f1e3752ae2104cd1d23fd3a9984173e7b"
+  },
+  {
+    "path": "TrustLeaf-preguntas.html",
+    "bytes": 6969,
+    "sha256": "e152cd5402a0792b13ac0045cc5a2ef1c7497cdea070158297381a2a397d6206"
+  },
+  {
+    "path": "TrustLeaf-transacciones-de-prueba.html",
+    "bytes": 48461,
+    "sha256": "2088e325b9f0ef089b42ec3223e674d1dff202b00490e8197c17d5343f8fd5c5"
+  },
+  {
+    "path": "wasm/doctor_registry_private.wasm",
+    "bytes": 5134,
+    "sha256": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02"
+  },
+  {
+    "path": "wasm/prescription_private.wasm",
+    "bytes": 11358,
+    "sha256": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c"
+  }
+]

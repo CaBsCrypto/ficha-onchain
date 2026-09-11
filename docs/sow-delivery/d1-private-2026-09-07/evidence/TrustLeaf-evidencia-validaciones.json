@@ -1,0 +1,145 @@
+{
+  "network": "testnet",
+  "evidenceDate": "2026-09-07",
+  "scope": "Service CLI E2E with synthetic enrollment; not browser/Privy or production readiness",
+  "notice": "Reporte local guardado. Los rechazos por simulación no generan una transacción publicada.",
+  "receiptAudit": [
+    {
+      "name": "doctorApproval",
+      "hash": "114abb0d7daa9672b8bdacabdf95b925abdb152e20157dfbbe187145f4eb3650",
+      "ledger": 4547691,
+      "signer": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+      "method": "authorize_doctor",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "booking",
+      "hash": "1930f88b1b04515c21c8f84cc221b2f7417932f38a635345fb492392587cbb21",
+      "ledger": 4547692,
+      "signer": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+      "method": "attest_booking",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "consent",
+      "hash": "b0289a388c5196e0458a19a0885641f525a38733bc0ddda438bf26771132cfb7",
+      "ledger": 4547693,
+      "signer": "GBBAAKF3Z6BHACXRS6FRRJIHR4UVXTSXGCLYWNHHUAE2D3BM733NXIJ2",
+      "method": "authorize_prescriber",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "mint",
+      "hash": "0e7102c770d100ea6b5f9aa375992dbbc76534535f48822fb066afca2cd672c8",
+      "ledger": 4547694,
+      "signer": "GAAG2XS7WM332FV5WOXXE4BZ56LVA474AZB4QDYPSSWJ3FLLLYH7ZZI2",
+      "method": "mint_prescription",
+      "status": "SUCCESS"
+    }
+  ],
+  "completionChecks": [
+    "database_same_issuance_and_participants",
+    "binding_signature_patient",
+    "binding_signature_doctor",
+    "both_bindings_present",
+    "ciphertext_to_chain_integrity",
+    "doctor_still_authorized_with_private_dossier",
+    "confirmed_signature_and_exact_public_arguments_doctorApproval",
+    "confirmed_signature_and_exact_public_arguments_booking",
+    "confirmed_signature_and_exact_public_arguments_consent",
+    "confirmed_signature_and_exact_public_arguments_mint",
+    "unauthorized_doctor_rejected",
+    "patient_without_consent_rejected"
+  ],
+  "serviceChecks": {
+    "private_contract_configuration": {
+      "passed": true,
+      "at": "2026-09-07T06:20:36.873Z"
+    },
+    "signed_wallet_bindings": {
+      "passed": true,
+      "at": "2026-09-07T06:20:38.073Z"
+    },
+    "trustleaf_signed_encrypted_dossier_matches": {
+      "passed": true,
+      "at": "2026-09-07T06:20:42.874Z"
+    },
+    "other_patient_cannot_prepare_booking": {
+      "passed": true,
+      "at": "2026-09-07T06:20:43.513Z"
+    },
+    "database_booking_attested": {
+      "passed": true,
+      "at": "2026-09-07T06:20:49.397Z"
+    },
+    "missing_consent_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:20:50.413Z"
+    },
+    "issued_to_bound_patient_with_stored_commitment": {
+      "passed": true,
+      "at": "2026-09-07T06:20:57.995Z"
+    },
+    "same_booking_consumed": {
+      "passed": true,
+      "at": "2026-09-07T06:20:58.284Z"
+    },
+    "patient_decrypts_own_prescription": {
+      "passed": true,
+      "at": "2026-09-07T06:20:58.904Z"
+    },
+    "read_proof_replay_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:20:58.904Z"
+    },
+    "unrelated_identity_cannot_read": {
+      "passed": true,
+      "at": "2026-09-07T06:20:59.163Z"
+    },
+    "database_contains_ciphertext": {
+      "passed": true,
+      "at": "2026-09-07T06:20:59.323Z"
+    },
+    "same_issuance_replay_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:20:59.491Z"
+    }
+  },
+  "contractChecks": {
+    "interface_v2": {
+      "passed": true,
+      "at": "2026-09-07T06:14:31.328Z"
+    },
+    "explicit_booking_authority": {
+      "passed": true,
+      "at": "2026-09-07T06:14:31.631Z"
+    },
+    "no_booking_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:13:52.526Z",
+      "kind": "RPC simulation rejection, not submitted transaction"
+    },
+    "correct_issuer_and_recipient": {
+      "passed": true,
+      "at": "2026-09-07T06:14:37.801Z"
+    },
+    "private_commitment_matches": {
+      "passed": true,
+      "at": "2026-09-07T06:14:37.802Z"
+    },
+    "booking_consumed": {
+      "passed": true,
+      "at": "2026-09-07T06:14:38.040Z"
+    },
+    "duplicate_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:14:38.244Z",
+      "kind": "RPC simulation rejection, not submitted transaction"
+    },
+    "revoked_booking_rejected": {
+      "passed": true,
+      "at": "2026-09-07T06:14:52.979Z",
+      "kind": "RPC simulation rejection, not submitted transaction"
+    }
+  }
+}

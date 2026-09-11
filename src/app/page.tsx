@@ -13,3 +13,4 @@ export default function Home() {
     <Link href="/login?role=admin" className="mt-5 inline-block text-sm font-medium text-sky-700 underline">Acceso de administración</Link>
   </div></main></>;
 }
+
