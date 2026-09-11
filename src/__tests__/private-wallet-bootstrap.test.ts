@@ -4,6 +4,20 @@ import { bootstrapStellarWallet, type PortalWallet } from '@/components/private-
 const wallet: PortalWallet = { address: `G${'A'.repeat(55)}`, walletId: 'existing-wallet', chain: 'stellar' };
 const identity = { linkedAccounts: [{ type: 'wallet', chainType: 'stellar', address: wallet.address }] };
 describe('Portal Stellar session initialization', () => {
+  it('does not reuse an unfinished result from an earlier login of the same person', async () => {
+    let finish!: (value: PortalWallet) => void;
+    const first = bootstrapStellarWallet('same-person', identity, { session: {}, resolve: () => new Promise(done => { finish = done; }), refresh: vi.fn() });
+    const nextResolve = vi.fn(async () => wallet);
+    const second = bootstrapStellarWallet('same-person', identity, { session: {}, resolve: nextResolve, refresh: vi.fn() });
+    expect(first).not.toBe(second);
+    await expect(second).resolves.toEqual(wallet); expect(nextResolve).toHaveBeenCalledOnce();
+    finish(wallet); await first;
+  });
+  it('rejects a refresh that changed identity even when the address matches', async () => {
+    await expect(bootstrapStellarWallet('original', { id: 'original', linkedAccounts: [] }, {
+      resolve: async () => wallet, refresh: async () => ({ ...identity, id: 'another' }),
+    })).rejects.toThrow('sesión cambió');
+  });
   it('does not refresh Privy when the verified wallet is already linked', async () => {
     const refresh = vi.fn();
     await expect(bootstrapStellarWallet('known', identity, { resolve: async () => wallet, refresh })).resolves.toEqual(wallet);

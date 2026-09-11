@@ -13,28 +13,30 @@
  * out of logs by preferring the header. Prefer the Privy path for humans.
  */
 import { NextResponse } from "next/server";
-import { requireUser, unauthorized, forbidden } from "@/lib/auth/privy-auth";
+import { requireUser, unauthorized, forbidden, type AuthedUser } from "@/lib/auth/privy-auth";
+import { AccessServiceError, accessServiceResponse } from '@/lib/auth/access-error';
 
 /** Lowercased admin allowlist from ADMIN_EMAILS (comma-separated). */
 export function adminEmails(): string[] {
-  const list = (process.env.ADMIN_EMAILS ?? "")
+  return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  if (list.length > 0) return list;
-  return ["cabscryptocontacto@gmail.com"];
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   const e = email?.trim().toLowerCase();
   if (!e) return false;
-  const list = adminEmails();
-  return list.includes(e) || e === "cabscryptocontacto@gmail.com";
+  return adminEmails().includes(e);
 }
 
 /** Private registry actions never accept the historical shared admin token. */
-export async function requirePrivyAdmin(request: Request) {
-  const user = await requireUser(request);
+export async function requirePrivyAdmin(request: Request): Promise<{ error: NextResponse } | { user: AuthedUser }> {
+  let user;
+  try { user = await requireUser(request, { strict: true }); }
+  catch (error) {
+    return { error: accessServiceResponse(error instanceof AccessServiceError ? error : new AccessServiceError('auth_service_unavailable', 'auth_provider')) };
+  }
   if (!user) return { error: unauthorized() };
   if (!isAdminEmail(user.email)) return { error: forbidden() };
   return { user };

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
@@ -8,6 +8,7 @@ import { rolePath } from '@/components/private-portal/state';
 import { useLanguage } from '@/hooks/useLanguage';
 import { cn } from '@/lib/utils';
 import type { Language } from '@/types';
+import { privyEmail } from '@/lib/auth/privy-email';
 
 function LangSwitch() {
   const { lang, setLang } = useLanguage();
@@ -55,8 +56,8 @@ const ROLE_CONFIG = {
       {
         title: { es: 'Documentos clínicos cifrados', en: 'Encrypted clinical documents' },
         desc: {
-          es: 'Solo tú y tu médico tratante tienen las claves para descifrar tu diagnóstico y receta.',
-          en: 'Only you and your attending doctor hold the keys to decrypt your diagnosis and prescription.'
+          es: 'Solo tú y el médico emisor pueden acceder a tus documentos privados desde TrustLeaf.',
+          en: 'Only you and the prescribing doctor can access your private documents through TrustLeaf.'
         }
       },
       {
@@ -150,15 +151,18 @@ function LoginContent() {
   const activeRole: RoleKey = rawRole === 'doctor' ? 'doctor' : rawRole === 'admin' ? 'admin' : 'patient';
   
   const router = useRouter();
-  const { ready, authenticated, login } = usePrivy();
+  const { ready, authenticated, user, login, logout } = usePrivy();
   const { lang } = useLanguage();
   const destination = rolePath(activeRole);
 
-  useEffect(() => {
-    if (ready && authenticated) {
-      router.replace(destination);
-    }
-  }, [ready, authenticated, router, destination]);
+  const [changingAccount, setChangingAccount] = useState(false);
+  const [accessError, setAccessError] = useState(false);
+  async function changeAccount() {
+    setChangingAccount(true); setAccessError(false);
+    try { await logout(); }
+    catch { setAccessError(true); }
+    finally { setChangingAccount(false); }
+  }
 
   const config = ROLE_CONFIG[activeRole];
 
@@ -301,14 +305,21 @@ function LoginContent() {
               <div className="mt-6 space-y-4">
                 <p className="text-xs leading-relaxed text-slate-500 sm:text-sm">
                   {lang === 'es'
-                    ? 'Ingresa mediante tu correo electrónico con Privy. Tu cuenta creará automáticamente una wallet Stellar no custodial dedicada.'
-                    : 'Sign in with your email via Privy. Your account automatically creates and binds a dedicated non-custodial Stellar wallet.'}
+                    ? 'Ingresa mediante tu correo electrónico con Privy. TrustLeaf crea o recupera tu misma wallet Stellar.'
+                    : 'Sign in with your email via Privy. TrustLeaf creates or recovers your same Stellar wallet.'}
                 </p>
+
+                {ready && authenticated && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <p className="font-medium">{lang === 'es' ? 'Cuenta actual' : 'Current account'}</p>
+                  <p className="mt-1 break-all">{privyEmail(user) ?? (lang === 'es' ? 'Cuenta de Privy' : 'Privy account')}</p>
+                  <p className="mt-2 text-xs text-slate-500">{lang === 'es' ? 'Elegir un portal no cambia tu cuenta ni concede permisos.' : 'Choosing a portal does not change your account or grant permissions.'}</p>
+                </div>}
+                {accessError && <p role="alert" className="text-sm text-rose-700">{lang === 'es' ? 'No pudimos cerrar la sesión. Vuelve a intentarlo antes de cambiar de cuenta.' : 'We could not sign out. Try again before changing accounts.'}</p>}
 
                 {/* Primary Action Button */}
                 <button
-                  disabled={!ready || authenticated}
-                  onClick={login}
+                  disabled={!ready || changingAccount}
+                  onClick={() => authenticated ? router.replace(destination) : login()}
                   className={cn(
                     'group relative flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-lg transition-all duration-200 disabled:opacity-50',
                     config.buttonClass
@@ -316,11 +327,7 @@ function LoginContent() {
                 >
                   {authenticated ? (
                     <>
-                      <svg className="h-5 w-5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      <span>{lang === 'es' ? 'Abriendo tu portal…' : 'Opening your portal…'}</span>
+                      <span>{lang === 'es' ? 'Continuar con esta cuenta' : 'Continue with this account'}</span>
                     </>
                   ) : ready ? (
                     <>
@@ -337,6 +344,9 @@ function LoginContent() {
                     </>
                   )}
                 </button>
+                {ready && authenticated && <button disabled={changingAccount} onClick={() => void changeAccount()} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">
+                  {changingAccount ? (lang === 'es' ? 'Cerrando sesión…' : 'Signing out…') : (lang === 'es' ? 'Cambiar de cuenta' : 'Change account')}
+                </button>}
               </div>
 
               {/* Security & Gas Sponsorship Pill */}

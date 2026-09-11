@@ -40,6 +40,8 @@ beforeEach(() => {
   vi.stubEnv('TRUSTLEAF_PRIVATE_PORTAL_ENABLED', 'true');
   vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED','true');
   vi.stubEnv('TRUSTLEAF_ENV','local');
+  vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK','testnet');
+  vi.stubEnv('NEXT_PUBLIC_SOROBAN_RPC_URL','https://soroban-testnet.stellar.org');
   vi.stubEnv('TRUSTLEAF_DB_HOST','ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech');
   vi.stubEnv('DATABASE_URL','postgres://test:test@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test');
   vi.stubEnv('VERCEL_ENV','');
@@ -60,6 +62,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe('private registry configuration and identity', () => {
   it.each([
+    ['TRUSTLEAF_ENV', 'production', 'private_environment_mismatch'],
     ['TRUSTLEAF_DB_HOST', 'production.example.test', 'private_environment_mismatch'],
     ['DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID', 'old-contract', 'private_configuration_mismatch'],
     ['DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY', 'another-admin', 'private_configuration_mismatch'],

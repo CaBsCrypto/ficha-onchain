@@ -21,6 +21,7 @@
  */
 import { PrivyClient } from "@privy-io/server-auth";
 import { NextResponse } from "next/server";
+import { AccessServiceError } from '@/lib/auth/access-error';
 
 export interface AuthedUser {
   /** Privy DID, e.g. "did:privy:cmrixg4c702vy0cjmt0jsyt8s" */
@@ -36,7 +37,7 @@ function getPrivy(): PrivyClient {
     const appId = process.env.PRIVY_APP_ID ?? process.env.NEXT_PUBLIC_PRIVY_APP_ID;
     const secret = process.env.PRIVY_APP_SECRET;
     if (!appId || !secret) {
-      throw new Error("PRIVY_APP_ID / PRIVY_APP_SECRET are not set");
+      throw new AccessServiceError('auth_configuration_missing', 'configuration');
     }
     client = new PrivyClient(appId, secret);
   }
@@ -56,14 +57,43 @@ function extractToken(request: Request): string | null {
  * Returns null on any failure — missing token, invalid signature, expired,
  * Privy unreachable. Callers must treat null as "denied", never as "allow".
  */
-export async function requireUser(request: Request): Promise<AuthedUser | null> {
+const INVALID_TOKEN_CODES = new Set([
+  'ERR_JWT_EXPIRED', 'ERR_JWT_CLAIM_VALIDATION_FAILED', 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED',
+  'ERR_JWS_INVALID', 'ERR_JWT_INVALID', 'ERR_JOSE_ALG_NOT_ALLOWED',
+]);
+function providerUnavailable(error: unknown): AccessServiceError {
+  if (error instanceof AccessServiceError) return error;
+  const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+  return status === 401 || status === 403
+    ? new AccessServiceError('auth_configuration_invalid', 'configuration')
+    : new AccessServiceError('auth_service_unavailable', 'auth_provider');
+}
+
+/** Verify the session without conflating a provider/configuration outage with an invalid JWT. */
+export async function requirePrivySession(request: Request): Promise<{ userId: string } | null> {
   const token = extractToken(request);
   if (!token) return null;
-
   try {
+    const claims = await getPrivy().verifyAuthToken(token);
+    return { userId: claims.userId };
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+    if (typeof code === 'string' && INVALID_TOKEN_CODES.has(code)) return null;
+    throw providerUnavailable(error);
+  }
+}
+
+export async function requireUser(request: Request, options: { strict?: boolean } = {}): Promise<AuthedUser | null> {
+  try {
+    const claims = await requirePrivySession(request);
+    if (!claims) return null;
     const privy = getPrivy();
-    const claims = await privy.verifyAuthToken(token);
-    const user = await privy.getUser(claims.userId);
+    let user;
+    try { user = await privy.getUser(claims.userId); }
+    catch (error) {
+      if (error && typeof error === 'object' && 'status' in error && error.status === 404) return null;
+      throw providerUnavailable(error);
+    }
 
     // Resolve the user's email across login methods. Email-OTP accounts store it
     // under `.address`; OAuth accounts (Google, etc.) under `.email`. Looking
@@ -78,9 +108,10 @@ export async function requireUser(request: Request): Promise<AuthedUser | null> 
 
     return { userId: claims.userId, email };
   } catch (err) {
-    // Includes an unreachable Privy. Failing closed is deliberate: a network
-    // problem must not read as "this request is fine".
-    console.error("[auth] token verification failed:", err);
+    const failure = providerUnavailable(err);
+    if (options.strict) throw failure;
+    // Keep the historical nullable contract, without logging credentials or provider payloads.
+    console.warn('[auth]', { category: failure.category, code: failure.code });
     return null;
   }
 }

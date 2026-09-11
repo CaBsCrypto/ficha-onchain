@@ -24,5 +24,12 @@ function setup(count = 0) {
   it('never retries uncertain provider creation',async()=>{const s=setup();s.create.mockRejectedValue(new Error('timeout'));await expect(s.run(true)).rejects.toThrow('timeout');await expect(s.run(true)).rejects.toThrow('wallet_creation_pending');expect(s.create).toHaveBeenCalledTimes(1);});
   it('recovers a lost response from the linked wallet',async()=>{const s=setup();s.create.mockImplementation(async()=>{s.wallets.push({type:'wallet',chainType:'stellar',id:'lost',address:Keypair.random().publicKey()});throw new Error('timeout');});await expect(s.run(true)).rejects.toThrow();expect((await s.run(true)).walletId).toBe('lost');expect(s.create).toHaveBeenCalledTimes(1);});
   it('blocks removal and replacement of a saved wallet',async()=>{const s=setup(1);await s.run();s.wallets[0]={...s.wallets[0],id:'changed'};await expect(s.run(true)).rejects.toThrow('wallet_binding_changed');});
-  it('preserves the saved wallet if extra wallets appear',async()=>{const s=setup(1);const first=await s.run();s.wallets.push({type:'wallet',chainType:'stellar',id:'extra',address:Keypair.random().publicKey()});expect(await s.run()).toEqual(first);});
+  it('blocks extra Stellar wallets even with a saved binding without replacing or recreating it',async()=>{
+    const s=setup(1),first=await s.run();
+    s.wallets.push({type:'wallet',chainType:'stellar',id:'extra',address:Keypair.random().publicKey()});
+    await expect(s.run(true)).rejects.toThrow('wallet_binding_ambiguous');
+    expect(s.create).not.toHaveBeenCalled();
+    s.wallets.pop();
+    expect(await s.run()).toEqual(first);
+  });
  });

@@ -22,7 +22,7 @@ const appt=(extra:Record<string,unknown>={})=>({id:11,doctor_id:10,doctor_email:
 const booking=(extra:Record<string,unknown>={})=>({appointment_id:11,issuance_id:'ab'.repeat(32),state:'prepared',valid_until:2_000_000_000,patient_wallet:patientAddress,doctor_wallet:doctorAddress,contract_id:RX_PRIVATE,...extra});
 beforeEach(()=>{
   vi.resetAllMocks();
-  const env={TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
+  const env={NEXT_PUBLIC_STELLAR_NETWORK:'testnet',NEXT_PUBLIC_SOROBAN_RPC_URL:'https://soroban-testnet.stellar.org',TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
     DATABASE_URL:'postgres://test:test@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test',PRIVY_APP_ID:PRIVY_APP,NEXT_PUBLIC_PRIVY_APP_ID:PRIVY_APP,
     DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:REGISTRY_PRIVATE,PRESCRIPTION_PRIVATE_CONTRACT_ID:RX_PRIVATE,DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:PRIVATE_ADMIN,BOOKING_AUTHORITY_PUBLIC_KEY:PRIVATE_ADMIN,
     TRUSTLEAF_PRIVATE_WRITES_ENABLED:'true',TRUSTLEAF_REQUIRE_AUTH:'false',VERCEL_ENV:''};
