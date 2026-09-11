@@ -33,6 +33,30 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 // ── DisponibilidadTab ─────────────────────────────────────────────────────────
 export function DisponibilidadTab() {
   const doctorEmail = usePrivyEmail() ?? '';
+  const [dateGuide, setDateGuide] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    function refreshDates() {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(new Date());
+      const part = (name: string) => Number(parts.find(p => p.type === name)?.value);
+      const today = new Date(Date.UTC(part('year'), part('month') - 1, part('day')));
+      const format = new Intl.DateTimeFormat('es-CL', {
+        timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric',
+      });
+      setDateGuide(Object.fromEntries(DISPLAY_ORDER.map(weekday => {
+        const offset = (weekday - today.getUTCDay() + 7) % 7;
+        const date = new Date(today);
+        date.setUTCDate(date.getUTCDate() + offset);
+        return [weekday, `${format.format(date)}${offset === 0 ? ' · hoy' : ''}`];
+      })));
+    }
+    refreshDates();
+    const timer = window.setInterval(refreshDates, 60_000);
+    window.addEventListener('focus', refreshDates);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshDates); };
+  }, []);
 
   // Availability state
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
@@ -178,7 +202,7 @@ export function DisponibilidadTab() {
               Disponibilidad semanal
             </p>
             <p className="mb-4 text-xs text-slate-400">
-              Define bloques recurrentes por día. Los pacientes reservarán dentro de estos horarios.
+              Los horarios se repiten cada semana. La fecha junto a cada día indica su próxima ocurrencia, incluido hoy, como guía; no limita el bloque a esa fecha.
             </p>
 
             {/* Add block row */}
@@ -191,7 +215,7 @@ export function DisponibilidadTab() {
                     className={selectCls}
                   >
                     {DISPLAY_ORDER.map((wd) => (
-                      <option key={wd} value={wd}>{WEEKDAYS[wd]}</option>
+                      <option key={wd} value={wd}>{WEEKDAYS[wd]}{dateGuide[wd] ? ` · ${dateGuide[wd]}` : ''}</option>
                     ))}
                   </select>
                 </FormField>
@@ -248,6 +272,7 @@ export function DisponibilidadTab() {
                   <div key={g.weekday} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {WEEKDAYS[g.weekday]}
+                      {dateGuide[g.weekday] && <span className="mt-1 block font-normal normal-case tracking-normal">{dateGuide[g.weekday]}</span>}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {g.items.map((b, i) => (
