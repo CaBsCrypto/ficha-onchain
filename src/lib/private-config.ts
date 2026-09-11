@@ -1,4 +1,5 @@
 import { PRIVATE_REGISTRY_ID } from '../../scripts/lib/private-registry.mjs';
+import { databaseConnectionString } from '@/lib/database-config';
 
 export const REGISTRY_PRIVATE = PRIVATE_REGISTRY_ID;
 export const RX_PRIVATE = 'CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE';
@@ -12,7 +13,7 @@ export function assertPrivateEnvironment() {
   let host = '';
   let protocol = '';
   try {
-    const database = new URL(e.DATABASE_URL ?? '');
+    const database = new URL(databaseConnectionString(e) ?? '');
     host = database.hostname; protocol = database.protocol;
   } catch { /* rejected below */ }
   const localDev = /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(host);
@@ -41,12 +42,12 @@ export function assertPrivateWrites() {
 export function privateEnvironmentChecks() {
   const e = process.env;
   let database: URL | null = null;
-  try { database = new URL(e.DATABASE_URL ?? ''); } catch { /* reported as false */ }
+  try { database = new URL(databaseConnectionString(e) ?? ''); } catch { /* reported as false */ }
   const host = database?.hostname ?? '';
   const localDev = /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(host);
   return {
     environmentAllowed: ['local', 'preview', 'test'].includes(e.TRUSTLEAF_ENV ?? ''),
-    databasePresent: !!e.DATABASE_URL,
+    databasePresent: !!databaseConnectionString(e),
     databaseParseable: !!database,
     databaseProtocol: ['postgres:', 'postgresql:'].includes(database?.protocol ?? ''),
     databaseHostConfigured: !!e.TRUSTLEAF_DB_HOST,

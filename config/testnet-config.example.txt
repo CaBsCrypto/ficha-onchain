@@ -12,6 +12,12 @@ TRUSTLEAF_DB_HOST=ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech
 # Set a private PostgreSQL connection string whose hostname matches exactly.
 # For preview/test, replace BOTH DATABASE_URL and TRUSTLEAF_DB_HOST.
 DATABASE_URL=
+# Hosting can set TRUSTLEAF_DATABASE_URL to isolate the portal from a managed
+# DATABASE_URL integration. The app and its guard use that value exclusively
+# when present; an empty or mismatched value blocks access rather than falling back.
+# Store it as a secret with the same connection used by the local worker's
+# DATABASE_URL and the same hostname as TRUSTLEAF_DB_HOST. Omit it locally.
+# TRUSTLEAF_DATABASE_URL=<the environment's private PostgreSQL connection>
 
 # ficha-onchain: use the same public application ID in browser and server.
 NEXT_PUBLIC_PRIVY_APP_ID=cmrix722m03d30clewd1fuffq
