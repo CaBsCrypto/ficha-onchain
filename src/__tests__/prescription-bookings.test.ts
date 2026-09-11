@@ -160,6 +160,16 @@ describe('attendance, consultation and cancellation transitions',()=>{
 });
 
 describe('server-validated agenda',()=>{
+  it('returns the next date and search limit without patient details',async()=>{
+    mocks.query.mockResolvedValueOnce([{date:'2026-09-14',time:'09:00',slot_minutes:30,patient_name:'private'}]).mockResolvedValueOnce([{search_until:'2026-12-10'}]);
+    const result=await availableAppointmentSlots(sql(),doctor.email,'2026-09-11',true);
+    expect(result).toEqual({date:'2026-09-14',search_until:'2026-12-10',slots:[{time:'09:00',available:true}],time_off:null});
+    expect(mocks.query.mock.calls[0][1]).toEqual([doctor.email,'2026-09-11',true]);
+  });
+  it('returns a null date when no future slots exist',async()=>{
+    mocks.query.mockResolvedValueOnce([]).mockResolvedValueOnce([{search_until:'2026-12-10'}]);
+    expect(await availableAppointmentSlots(sql(),doctor.email,'2026-09-11',true)).toEqual({date:null,search_until:'2026-12-10',slots:[],time_off:null});
+  });
   it.each(['2026-02-30','2026-13-01','09/09/2026','2026-09-09; DROP TABLE appointments'])('rejects invalid calendar dates: %s',value=>expect(validBookingDate(value)).toBe(false));
   it('accepts a real leap day',()=>expect(validBookingDate('2028-02-29')).toBe(true));
   it('uses the Santiago database clock and never returns occupied patient identities',async()=>{

@@ -32,17 +32,26 @@ export function validBookingDate(value: unknown): value is string {
 export const validBookingTime = (value: unknown): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
 /** PostgreSQL supplies the clock and Santiago timezone, independent of the host. */
-export async function availableAppointmentSlots(sql: Sql, doctorEmail: string, date: string) {
+export async function availableAppointmentSlots(sql: Sql, doctorEmail: string, date: string, nextAvailable = false) {
   if (!validBookingDate(date)) throw new BookingPreparationError('invalid_date', 400);
-  const slots = await sql.query(`SELECT DISTINCT TO_CHAR(slot,'HH24:MI') AS time,av.slot_minutes,true AS available
-    FROM doctor_availability av CROSS JOIN LATERAL generate_series(
-      $2::date+av.start_time,$2::date+av.end_time-make_interval(mins=>av.slot_minutes),
+  const slots = await sql.query(`WITH free AS (SELECT DISTINCT day::date AS date, TO_CHAR(slot,'HH24:MI') AS time,av.slot_minutes,true AS available
+    FROM generate_series(CASE WHEN $3::boolean THEN GREATEST($2::date,(NOW() AT TIME ZONE 'America/Santiago')::date) ELSE $2::date END,CASE WHEN $3::boolean THEN (NOW() AT TIME ZONE 'America/Santiago')::date+90 ELSE $2::date END,INTERVAL '1 day') day
+    JOIN doctor_availability av ON av.weekday=EXTRACT(DOW FROM day)
+    CROSS JOIN LATERAL generate_series(
+      day::date+av.start_time,day::date+av.end_time-make_interval(mins=>av.slot_minutes),
       make_interval(mins=>av.slot_minutes)) slot
-    WHERE LOWER(av.doctor_email)=$1 AND av.weekday=EXTRACT(DOW FROM $2::date)
-      AND slot>=(NOW() AT TIME ZONE 'America/Santiago') AND $2::date<=(NOW() AT TIME ZONE 'America/Santiago')::date+90
-      AND NOT EXISTS(SELECT 1 FROM doctor_time_off off WHERE LOWER(off.doctor_email)=$1 AND off.date=$2::date)
-      AND NOT EXISTS(SELECT 1 FROM appointments a WHERE LOWER(a.doctor_email)=$1 AND a.date=$2::date
-        AND a.time_slot=TO_CHAR(slot,'HH24:MI') AND a.status<>'cancelled') ORDER BY time`, [doctorEmail, date]);
+    WHERE LOWER(av.doctor_email)=$1
+      AND slot>=(NOW() AT TIME ZONE 'America/Santiago') AND day::date<=(NOW() AT TIME ZONE 'America/Santiago')::date+90
+      AND NOT EXISTS(SELECT 1 FROM doctor_time_off off WHERE LOWER(off.doctor_email)=$1 AND off.date=day::date)
+      AND NOT EXISTS(SELECT 1 FROM appointments a WHERE LOWER(a.doctor_email)=$1 AND a.date=day::date
+        AND a.time_slot=TO_CHAR(slot,'HH24:MI') AND a.status<>'cancelled'))
+    SELECT TO_CHAR(date,'YYYY-MM-DD') AS date,time,slot_minutes,true AS available FROM free
+    WHERE date=(SELECT MIN(date) FROM free) ORDER BY time`, [doctorEmail, date, nextAvailable]);
+  if (nextAvailable) {
+    const [limit] = await sql.query(`SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Santiago')::date+90,'YYYY-MM-DD') AS search_until`);
+    return { date: slots[0]?.date ?? null, search_until: limit.search_until,
+      slots: slots.map(s => ({ time: s.time, available: true })), time_off: null };
+  }
   return { date, weekday: new Date(`${date}T12:00:00Z`).getUTCDay(), slot_minutes: slots[0]?.slot_minutes ?? null,
     slots: slots.map(s => ({ time: s.time, available: true })), time_off: null };
 }
