@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { authedFetch } from "@/lib/auth/authed-fetch";
+import { accessApi, accessFailure, AccessError } from "@/components/private-portal/access-client";
+import { privyEmail } from "@/lib/auth/privy-email";
 import { cn } from "@/lib/utils";
 
 // ── Auth context ──────────────────────────────────────────────────────────────
@@ -61,21 +62,21 @@ const primaryBtnStyle = {
 } as const;
 
 // ── Login (Privy) ──────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+function LoginScreen() {
   return (
     <Gate>
       <p className="mb-4 text-sm text-white/60">
         Ingresa con tu cuenta. Solo los administradores autorizados pueden entrar al panel.
       </p>
-      <button onClick={onLogin} className={primaryBtn} style={primaryBtnStyle}>
+      <Link href="/login?role=admin" className={`${primaryBtn} block text-center`} style={primaryBtnStyle}>
         Entrar con mi cuenta
-      </button>
+      </Link>
     </Gate>
   );
 }
 
 // ── Access denied (logged in, not on the allowlist) ────────────────────────────
-function DeniedScreen({ onLogout }: { onLogout: () => void }) {
+function AccessProblem({ error, email, onRetry, onLogout }: { error: AccessError; email: string; onRetry: () => void; onLogout: () => void }) {
   return (
     <Gate>
       <div className="space-y-4 text-center">
@@ -84,14 +85,15 @@ function DeniedScreen({ onLogout }: { onLogout: () => void }) {
             className="h-5 w-5 text-rose-400" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-white">Acceso denegado</p>
-          <p className="mt-1 text-xs text-white/50">
-            Tu cuenta no está autorizada como administrador.
-          </p>
+          <p className="text-sm font-semibold text-white">{error.status === 403 ? 'Acceso denegado' : error.status === 401 ? 'Vuelve a ingresar' : 'No pudimos verificar el acceso'}</p>
+          <p className="mt-2 break-all text-xs text-white/70">Cuenta actual: {email || 'Cuenta de Privy'}</p>
+          <p role="alert" className="mt-2 text-sm text-white/70">{error.status === 403 ? 'Esta cuenta no está autorizada como administrador.' : error.message}</p>
+          {error.reference && <p className="mt-2 text-xs text-white/60">Referencia: {error.reference}</p>}
         </div>
+        {error.status !== 401 && error.status !== 403 && <button onClick={onRetry} className={primaryBtn} style={primaryBtnStyle}>Volver a consultar</button>}
         <button onClick={onLogout}
           className="w-full rounded-xl border border-white/15 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/5">
-          Cerrar sesión
+          {error.status === 401 ? 'Volver a ingresar con Privy' : 'Cambiar de cuenta'}
         </button>
       </div>
     </Gate>
@@ -191,38 +193,41 @@ function AdminShell({ email, logout, children }: { email: string; logout: () => 
 }
 
 // ── Root layout ───────────────────────────────────────────────────────────────
-type Phase = "checking" | "anon" | "admin" | "denied";
+function AdminAccessGate({ children }: { children: React.ReactNode }) {
+  const { user, logout } = usePrivy();
+  const router = useRouter();
+  const [phase, setPhase] = useState<'checking' | 'admin' | 'error'>('checking');
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<AccessError | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    let current = true;
+    const controller = new AbortController();
+    setPhase("checking");
+    if (!leaving) void accessApi<{ admin: boolean; email: string }>('/api/admin/whoami', { signal: controller.signal }).then(result => {
+      if (result.admin !== true || typeof result.email !== 'string' || !result.email) throw new AccessError(503, 'access_unverified', 'ACCESS-UNVERIFIED');
+      if (current) { setEmail(result.email); setPhase('admin'); }
+    }).catch(failure => {
+      if (current) { setError(accessFailure(failure)); setPhase('error'); }
+    });
+    return () => { current = false; controller.abort(); };
+  }, [revision, leaving]);
+
+  async function changeAccount() {
+    setLeaving(true);
+    try { await logout(); router.replace('/login?role=admin'); }
+    catch (failure) { setLeaving(false); setError(accessFailure(failure)); setPhase('error'); }
+  }
+  if (leaving || phase === 'checking') return <Loading />;
+  if (phase === 'error' && error) return <AccessProblem error={error} email={privyEmail(user) ?? ''} onRetry={() => setRevision(value => value + 1)} onLogout={() => void changeAccount()} />;
+  return <AdminShell email={email} logout={() => void changeAccount()}>{children}</AdminShell>;
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated, login, logout } = usePrivy();
-  const [phase, setPhase] = useState<Phase>("checking");
-  const [email, setEmail] = useState("");
-
-  // Ask the server whether the logged-in Privy user is on the admin allowlist.
-  const verify = useCallback(async () => {
-    try {
-      const res = await authedFetch("/api/admin/whoami");
-      if (res.ok) {
-        const j = (await res.json()) as { email?: string };
-        setEmail(j.email ?? "");
-        setPhase("admin");
-      } else {
-        setPhase("denied");
-      }
-    } catch {
-      setPhase("denied");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    if (!authenticated) { setPhase("anon"); return; }
-    setPhase("checking");
-    void verify();
-  }, [ready, authenticated, verify]);
-
-  if (!ready || phase === "checking") return <Loading />;
-  if (phase === "anon") return <LoginScreen onLogin={() => void login()} />;
-  if (phase === "denied") return <DeniedScreen onLogout={() => void logout()} />;
-  return <AdminShell email={email} logout={() => void logout()}>{children}</AdminShell>;
+  const { ready, authenticated, user } = usePrivy();
+  if (!ready) return <Loading />;
+  if (!authenticated || !user) return <LoginScreen />;
+  // Remount synchronously on identity changes, before an old response can expose the panel.
+  return <AdminAccessGate key={user.id}>{children}</AdminAccessGate>;
 }

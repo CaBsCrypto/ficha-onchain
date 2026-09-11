@@ -38,6 +38,8 @@ beforeEach(() => {
   vi.stubEnv('ADMIN_EMAILS', 'admin@example.test');
   vi.stubEnv('WAITLIST_ADMIN_TOKEN', 'old-admin-token');
   vi.stubEnv('TRUSTLEAF_REQUIRE_AUTH', 'false');
+  vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'testnet');
+  vi.stubEnv('NEXT_PUBLIC_SOROBAN_RPC_URL', 'https://soroban-testnet.stellar.org');
   const env={TRUSTLEAF_PRIVATE_WRITES_ENABLED:'true',TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
     DATABASE_URL:'postgres://test:test@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test',VERCEL_ENV:'',PRIVY_APP_ID:PRIVY_APP,NEXT_PUBLIC_PRIVY_APP_ID:PRIVY_APP,
     DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:REGISTRY_PRIVATE,PRESCRIPTION_PRIVATE_CONTRACT_ID:RX_PRIVATE,DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:PRIVATE_ADMIN,BOOKING_AUTHORITY_PUBLIC_KEY:PRIVATE_ADMIN};

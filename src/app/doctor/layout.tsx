@@ -527,5 +527,5 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  return <WalletBoundary key={user?.id}><DoctorAccessGate>{children}</DoctorAccessGate></WalletBoundary>;
+  return <WalletBoundary key={user?.id} role="doctor"><DoctorAccessGate>{children}</DoctorAccessGate></WalletBoundary>;
 }

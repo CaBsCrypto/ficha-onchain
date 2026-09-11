@@ -15,7 +15,7 @@ const req=(method='GET',body:unknown={bio:'Updated synthetic profile'},origin='h
   method,headers:{host:'localhost:3002',origin,'content-type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(body)})});
 beforeEach(()=>{
   vi.resetAllMocks();
-  const env={TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
+  const env={NEXT_PUBLIC_STELLAR_NETWORK:'testnet',NEXT_PUBLIC_SOROBAN_RPC_URL:'https://soroban-testnet.stellar.org',TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
     DATABASE_URL:'postgresql://test:test@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test',PRIVY_APP_ID:PRIVY_APP,NEXT_PUBLIC_PRIVY_APP_ID:PRIVY_APP,
     DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:REGISTRY_PRIVATE,PRESCRIPTION_PRIVATE_CONTRACT_ID:RX_PRIVATE,DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:PRIVATE_ADMIN,
     BOOKING_AUTHORITY_PUBLIC_KEY:PRIVATE_ADMIN,TRUSTLEAF_PRIVATE_WRITES_ENABLED:'true',VERCEL_ENV:'',TRUSTLEAF_REQUIRE_AUTH:'false'};

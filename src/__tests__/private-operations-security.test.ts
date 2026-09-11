@@ -38,7 +38,7 @@ function saved(action:PrivateAction='consent',signed=false) {
 
 beforeEach(()=>{
   vi.clearAllMocks();
-  const env={TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
+  const env={NEXT_PUBLIC_STELLAR_NETWORK:'testnet',NEXT_PUBLIC_SOROBAN_RPC_URL:'https://soroban-testnet.stellar.org',TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
     DATABASE_URL:'postgresql://test:test@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test',PRIVY_APP_ID:PRIVY_APP,NEXT_PUBLIC_PRIVY_APP_ID:PRIVY_APP,
     DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:REGISTRY_PRIVATE,PRESCRIPTION_PRIVATE_CONTRACT_ID:RX_PRIVATE,DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:PRIVATE_ADMIN,
     BOOKING_AUTHORITY_PUBLIC_KEY:PRIVATE_ADMIN,RELAYER_SECRET:payer.secret(),TRUSTLEAF_PRIVATE_WRITES_ENABLED:'true',VERCEL_ENV:''};

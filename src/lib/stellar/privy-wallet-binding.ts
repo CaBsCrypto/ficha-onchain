@@ -14,13 +14,14 @@ export interface WalletProvider {
 export async function resolveStellarWallet(sql: Sql, provider: WalletProvider, appId: string, userId: string, allowCreate = false): Promise<{walletId:string;address:string;chain:'stellar';created:false}> {
   const rows = await sql<Binding>`SELECT wallet_id, address FROM privy_stellar_wallet_bindings WHERE app_id=${appId} AND user_id=${userId}`;
   const linked = (await provider.getUser(userId)).linkedAccounts.filter(w => w.type === 'wallet' && w.chainType === 'stellar');
+  // A saved association never makes a newly ambiguous provider identity safe to use.
+  if (linked.length > 1) throw new WalletBindingError('wallet_binding_ambiguous');
   const saved = rows[0];
   let wallet: Wallet | undefined;
   if (saved?.wallet_id) {
     wallet = linked.find(w => w.id === saved.wallet_id && w.address === saved.address);
     if (!wallet) throw new WalletBindingError('wallet_binding_changed');
   } else {
-    if (linked.length > 1) throw new WalletBindingError('wallet_binding_ambiguous');
     wallet = linked[0];
   }
   if (!wallet) {
