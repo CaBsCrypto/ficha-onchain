@@ -1,3 +1,4 @@
+import { isApprovedDoctor } from '@/lib/doctor-access';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { requireUser, unauthorized } from '@/lib/auth/privy-auth';
@@ -16,7 +17,7 @@ export async function GET(request:Request){
     if(id===null){const [row]=await sql`SELECT id FROM doctors WHERE LOWER(email)=${p.get('doctorEmail')?.trim().toLowerCase()??''}`;id=row?.id??null;}
     if(!Number.isSafeInteger(id)||Number(id)<1)return NextResponse.json({error:'invalid_doctor'},{status:400});
     const doctor=await resolveDoctor(sql,Number(id));
-    if(!(await readPrivateDoctor(doctor.address)).authorized)return NextResponse.json({error:'doctor_not_authorized'},{status:403});
+    if(!(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)})))return NextResponse.json({error:'doctor_not_authorized'},{status:403});
     // Never expose another patient's occupied slot or identity, including ?all=1.
     return NextResponse.json({data:await availableAppointmentSlots(sql,String(doctor.doctor.email),date)},{headers:{'Cache-Control':'no-store'}});
   }catch(error){return NextResponse.json({error:error instanceof BookingPreparationError?error.code:'slots_unavailable'}, {status:error instanceof BookingPreparationError?error.status:503});}

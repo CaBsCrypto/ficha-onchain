@@ -152,6 +152,24 @@ export function createStore(client) {
   const owns = job => [job.id, token];
   const identityJoin = `JOIN doctors d ON d.id=r.doctor_id AND LOWER(d.email)=r.doctor_email
     JOIN privy_stellar_wallet_bindings b ON b.app_id='${APP_ID}' AND b.user_id=r.doctor_user_id AND b.wallet_id=r.wallet_id AND b.address=r.wallet`;
+  const reviewed = async (job, lock = false) => {
+    const { rows } = await q(`SELECT o.*,s.privy_user_id AS submission_user,s.wallet_id AS submission_wallet_id,
+      s.wallet AS submission_wallet,s.email AS submission_email
+      FROM doctor_onboarding_requests o LEFT JOIN doctor_onboarding_submissions s ON s.id=o.current_submission_id AND s.onboarding_id=o.id
+      WHERE o.doctor_id=$1 ORDER BY o.created_at DESC,o.id DESC LIMIT 1${lock ? ' FOR UPDATE OF o' : ''}`, [job.doctor_id]);
+    const current = rows[0];
+    if (!current) {
+      if (job.onboarding_submission_id) return false;
+      const profile = await q('SELECT status FROM doctors WHERE id=$1', [job.doctor_id]);
+      return ['active', 'blocked', 'revoked', 'expired'].includes(profile.rows[0]?.status);
+    }
+    if (!job.onboarding_submission_id || current.current_submission_id !== job.onboarding_submission_id ||
+        current.submission_user !== job.doctor_user_id || current.submission_wallet_id !== job.wallet_id ||
+        current.submission_wallet !== job.wallet || current.submission_email !== job.doctor_email ||
+        current.privy_user_id !== job.doctor_user_id || current.wallet_id !== job.wallet_id || current.wallet !== job.wallet) return false;
+    if (current.state === 'authorization_pending') return current.authorization_request_id === job.id && job.action !== 'revoke';
+    return ['authorized', 'revoked'].includes(current.state) && ['renew', 'revoke'].includes(job.action);
+  };
   return {
     claim: async ({ signedOnly = false } = {}) => {
       const { rows } = await q(`WITH candidate AS (SELECT id FROM doctor_authorization_requests
@@ -170,7 +188,7 @@ export function createStore(client) {
     eligible: async job => {
       const { rows } = await q(`SELECT r.id FROM doctor_authorization_requests r ${identityJoin}
         WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW()`, owns(job));
-      return rows.length === 1;
+      return rows.length === 1 && await reviewed(job);
     },
     prepared: async (job, prepared) => {
       await q('BEGIN');
@@ -178,6 +196,7 @@ export function createStore(client) {
         const locked = await q(`SELECT r.id FROM doctor_authorization_requests r ${identityJoin}
           WHERE r.id=$1 AND r.lease_token=$2 AND r.lease_until>NOW() AND r.state='pending' AND r.transaction_hash IS NULL FOR UPDATE OF r,d,b`, owns(job));
         if (locked.rows.length !== 1) throw Error('lease_or_identity_changed');
+        if (!(await reviewed(job, true))) throw Error('doctor_binding_changed');
         const { rows } = await q(`UPDATE doctor_authorization_requests SET prepared_xdr=$3,transaction_hash=$4,state='submitted',error_code=NULL,updated_at=NOW()
           WHERE id=$1 AND lease_token=$2 RETURNING *`, [...owns(job), prepared.xdr, prepared.hash]);
         if (job.action !== 'revoke') await q("UPDATE doctor_private_dossiers SET status='submitted',transaction_hash=$2 WHERE id=$1", [job.dossier_id, prepared.hash]);
@@ -202,6 +221,18 @@ export function createStore(client) {
           await q("UPDATE doctor_private_dossiers SET status='confirmed',transaction_hash=$2 WHERE id=$1", [job.dossier_id, job.transaction_hash]);
         }
         await q('UPDATE doctors SET status=$2,updated_at=NOW() WHERE id=$1', [job.doctor_id, doctorStatus]);
+        if (job.onboarding_submission_id) {
+          // A confirmed receipt is reconciled even if eligibility changed after submission.
+          // Only the exact reviewed revision may inherit that receipt.
+          const updated = await q(`UPDATE doctor_onboarding_requests SET state=$3,authorization_request_id=$4,updated_at=NOW()
+            WHERE doctor_id=$1 AND current_submission_id=$2 AND privy_user_id=$5 AND wallet_id=$6 AND wallet=$7
+              AND (authorization_request_id=$4 OR state IN ('authorized','revoked')) RETURNING id`,
+          [job.doctor_id, job.onboarding_submission_id, job.action === 'revoke' ? 'revoked' : 'authorized', job.id,
+            job.doctor_user_id, job.wallet_id, job.wallet]);
+          if (updated.rows.length === 1) await q(`INSERT INTO doctor_onboarding_events(id,onboarding_id,actor_user_id,actor_email,state,note)
+            VALUES($1,$2,$3,$4,$5,$6)`, [randomUUID(), updated.rows[0].id, job.requested_by, job.requested_email,
+            job.action === 'revoke' ? 'revoked' : 'authorized', 'Confirmed Stellar Testnet receipt']);
+        }
         await q('COMMIT');
       } catch (e) { await q('ROLLBACK'); throw e; }
     },

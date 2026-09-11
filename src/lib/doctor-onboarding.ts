@@ -92,7 +92,7 @@ async function event(sql: Sql, onboardingId: unknown, actor: AuthedUser, state: 
   await sql.query(`INSERT INTO doctor_onboarding_events(id,onboarding_id,actor_user_id,actor_email,state,note)
     VALUES($1,$2,$3,$4,$5,$6)`, [randomUUID(), onboardingId, actor.userId, actor.email, state, note]);
 }
-async function submission(sql: Sql, current: Row): Promise<FrozenDoctorSubmission> {
+export async function readDoctorSubmission(sql: Sql, current: Row): Promise<FrozenDoctorSubmission> {
   if (!current.current_submission_id) return fail('onboarding_submission_missing');
   const [row] = await sql.query<Row>(`SELECT * FROM doctor_onboarding_submissions
     WHERE id=$1 AND onboarding_id=$2`, [current.current_submission_id, current.id]);
@@ -102,6 +102,7 @@ async function submission(sql: Sql, current: Row): Promise<FrozenDoctorSubmissio
     owner: { userId: String(row.privy_user_id), email: String(row.email), walletId: String(row.wallet_id), address: String(row.wallet) },
     profile: decryptProfile(row.encrypted_profile, 'submission', String(row.id)) };
 }
+const submission = readDoctorSubmission;
 async function publicView(sql: Sql, row: Row | undefined, doctor: Row | undefined) {
   if (!row) return null;
   let profile = cleanDoctorProfile({ name: doctor?.name, specialty: doctor?.specialty ?? '',

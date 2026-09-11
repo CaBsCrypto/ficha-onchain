@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), getDb: vi.fn(), sql: vi.fn(), config: vi.fn(), details: vi.fn(),
-  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn() }));
+  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn(),onboarding:vi.fn(),list:vi.fn(),invite:vi.fn(),approved:vi.fn() }));
+vi.mock('@/lib/reviewed-doctor-authorization',()=>({requestReviewedDoctorAuthorization:mocks.request}));
+vi.mock('@/lib/doctor-onboarding',()=>({onboardingForDoctor:mocks.onboarding,listDoctorOnboarding:mocks.list,createDoctorInvitation:mocks.invite,isDoctorLocallyApproved:mocks.approved}));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: mocks.requireUser,
   isDoctor: vi.fn(), authEnforced: () => false,
   unauthorized: () => Response.json({ error: 'unauthorized' }, { status: 401 }),
@@ -19,7 +21,7 @@ import { GET, POST } from '@/app/api/admin/doctor-authorizations/route';
 import { GET as doctorGET } from '@/app/api/doctor-status/route';
 import { requirePrivyAdmin } from '@/lib/auth/admin';
 import { DoctorAuthorizationError } from '@/lib/doctor-authorizations';
-import { RX_PRIVATE,REGISTRY_PRIVATE,PRIVY_APP,PRIVATE_ADMIN } from '@/lib/private-config';
+import { RX_PRIVATE,REGISTRY_PRIVATE,PRIVY_APP,PRIVATE_ADMIN,assertPrivateWrites } from '@/lib/private-config';
 import { GET as profilesGET,POST as profilesPOST,PATCH as profilesPATCH,DELETE as profilesDELETE } from '@/app/api/admin/doctors/route';
 import { POST as migratePOST } from '@/app/api/admin/migrate/route';
 import { GET as whoamiGET } from '@/app/api/admin/whoami/route';
@@ -53,6 +55,8 @@ beforeEach(() => {
   mocks.read.mockResolvedValue({ authorized: true, authorization: { version: 1 } });
   mocks.view.mockReturnValue({ status: 'authorized', version: 1 });
   mocks.latest.mockResolvedValue(null);
+  mocks.onboarding.mockResolvedValue(null);mocks.list.mockResolvedValue([]);mocks.approved.mockResolvedValue(true);
+  mocks.invite.mockImplementation(async (_sql,_actor,profile)=>{assertPrivateWrites();return {doctor:{id:21,...profile,status:'pending'},onboarding:{state:'invited'}};});
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -114,7 +118,7 @@ describe('private admin request boundary', () => {
     const response = await POST(post());
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ request: { id: 'request-1', state: 'pending', transactionHash: null } });
-    expect(mocks.request).toHaveBeenCalledWith(mocks.sql, admin, 21, 'authorize');
+    expect(mocks.request).toHaveBeenCalledWith(mocks.sql, admin, 21, 'authorize', undefined);
   });
   it.each(['config', 'database', 'provider'])('reports a %s failure without a simulated success or internal details', async dependency => {
     const secretError = new Error('sensitive provider or connection details');
@@ -205,13 +209,13 @@ describe('private portal blocks legacy authorization and issuance', () => {
     const { PATCH } = await import('@/app/api/admin/doctors/route');
     const response = await PATCH(post({ id: 21, status: 'active' }));
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: 'use_private_registry_authorization' });
+    expect(await response.json()).toEqual({ error: 'use_doctor_onboarding_review' });
     expect(mocks.sql).not.toHaveBeenCalled();
   });
 });
 
 describe('strict private admin profile and migration routes',()=>{
-  const profile={name:'Synthetic doctor',email:'doctor@example.test',specialty:'Test only',licenseNum:'TEST-ONLY',rut:''};
+  const profile={name:'Synthetic doctor',email:'doctor@example.test',specialty:'Test only'};
   it('rejects the old token on every active admin entrypoint',async()=>{
     mocks.requireUser.mockResolvedValue(null);
     for(const handler of [profilesGET,profilesPOST,profilesPATCH,profilesDELETE,migratePOST,whoamiGET]){
@@ -228,31 +232,32 @@ describe('strict private admin profile and migration routes',()=>{
   it.each(['true','false'])('forbids status bypass and deletion regardless of the old flag=%s',async flag=>{
     vi.stubEnv('TRUSTLEAF_PRIVATE_PORTAL_ENABLED',flag);
     const response=await profilesPATCH(post({id:21,status:'active'}));
-    expect(response.status).toBe(409);expect(await response.json()).toEqual({error:'use_private_registry_authorization'});
+    expect(response.status).toBe(409);expect(await response.json()).toEqual({error:'use_doctor_onboarding_review'});
     expect((await profilesDELETE(post({id:21}))).status).toBe(405);
     expect(mocks.sql).not.toHaveBeenCalled();
   });
   it.each(['wallet','walletId','userId','source_wallet','doctor_user_id','contractId'])('rejects caller-selected identity %s on creation and editing',async key=>{
     expect((await profilesPOST(post({...profile,[key]:'forged'}))).status).toBe(400);
-    expect((await profilesPATCH(post({id:21,name:'Test',[key]:'forged'}))).status).toBe(400);
+    expect((await profilesPATCH(post({id:21,name:'Test',[key]:'forged'}))).status).toBe(409);
     expect(mocks.sql).not.toHaveBeenCalled();
   });
   it('creates only a pending profile with no wallet or authority supplied',async()=>{
     mocks.sql.mockResolvedValue([{id:21,...profile,status:'pending'}]);
     const response=await profilesPOST(post(profile));
     expect(response.status).toBe(201);expect((await response.json()).doctor.status).toBe('pending');
-    expect(mocks.sql.mock.calls[0][0].join(' ')).toContain("'pending'");
+    expect(mocks.invite).toHaveBeenCalledWith(mocks.sql,admin,profile);
+    expect((await profilesGET(new Request('http://localhost/api/admin/doctors'))).status).toBe(200);
     expect(mocks.request).not.toHaveBeenCalled();
   });
   it('does not reassign an existing doctor to another email',async()=>{
     mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([{id:21}]);
     const response=await profilesPATCH(post({id:21,name:'Test',email:'another@example.test'}));
-    expect(response.status).toBe(409);expect(await response.json()).toEqual({error:'doctor_identity_change_not_allowed'});
-    expect(mocks.sql.mock.calls[0][0].join(' ')).not.toMatch(/SET\s+email\s*=/i);
+    expect(response.status).toBe(409);expect(await response.json()).toEqual({error:'use_doctor_onboarding_review'});
+    expect(mocks.sql).not.toHaveBeenCalled();
   });
-  it('does not report success for an absent profile',async()=>{
+  it('rejects legacy editing even for an absent profile',async()=>{
     mocks.sql.mockResolvedValue([]);
-    expect((await profilesPATCH(post({id:123,name:'Test'}))).status).toBe(404);
+    expect((await profilesPATCH(post({id:123,name:'Test'}))).status).toBe(409);
   });
   it('blocks new profiles while leaving private profile reads available when writes are paused',async()=>{
     vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED','false');

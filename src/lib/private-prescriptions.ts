@@ -3,6 +3,7 @@ import type { PoolClient } from '@neondatabase/serverless';
 import { getDb, getDbConnection, sqlForConnection } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, readPrivateDoctor } from '@/lib/doctor-authorizations';
+import { isApprovedDoctor } from '@/lib/doctor-access';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/private-chain';
 import { encryptPrescription, decryptPrescription, prescriptionCommitment } from '../../scripts/lib/private-prescription.mjs';
@@ -41,6 +42,11 @@ export async function verifyParticipants(client:PoolClient,b:PrivateRow) {
   const doctor=await verifiedWallet(sql,b.doctor_user_id,b.doctor_email);
   const patient=await verifiedWallet(sql,b.patient_requested_by,b.patient_email);
   if(doctor.address!==b.doctor_wallet||doctor.walletId!==b.doctor_wallet_id||patient.address!==b.patient_wallet||patient.walletId!==b.patient_wallet_id)throw new PrivateFlowError('booking_identity_changed');
+}
+export async function assertReviewedPrescriber(client:PoolClient,appointment:PrivateRow,b:PrivateRow) {
+  if (!await isApprovedDoctor(sqlForConnection(client),Number(appointment.doctor_id),{
+    userId:b.doctor_user_id,email:b.doctor_email,walletId:b.doctor_wallet_id,address:b.doctor_wallet,
+  })) throw new PrivateFlowError('doctor_not_authorized',403);
 }
 export async function assertBookingReady(appointment:PrivateRow,b:PrivateRow|undefined,chain=createPrivateChain()) {
   if(!b||b.state!=='confirmed'||!b.attestation_hash||b.cancellation_requested_at||Number(b.valid_until)<=Date.now()/1000||
@@ -125,6 +131,7 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
     const {appointment,booking,prescription}=await loadPrivateContext(client,actor,appointmentId,true);
     if(actor.email!==appointment.doctor_email||!booking||actor.userId!==booking.doctor_user_id||wallet.address!==booking.doctor_wallet)throw new PrivateFlowError('forbidden',403);
     const chain=createPrivateChain();await chain.verifyDeployment();await verifyParticipants(client,booking);
+    await assertReviewedPrescriber(client,appointment,booking);
     await assertBookingReady(appointment,booking,chain);
     if(prescription) {
       const plain=decryptPrescription(prescription.ciphertext,encryptionKey(),storageContext(prescription.id));

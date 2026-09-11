@@ -1,10 +1,12 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-const mocks=vi.hoisted(()=>({user:vi.fn(),sql:vi.fn(),query:vi.fn(),tx:vi.fn(),release:vi.fn(),doctor:vi.fn(),registry:vi.fn()}));
+const mocks=vi.hoisted(()=>({user:vi.fn(),sql:vi.fn(),query:vi.fn(),tx:vi.fn(),release:vi.fn(),doctor:vi.fn(),registry:vi.fn(),apply:vi.fn()}));
+vi.mock('@/lib/doctor-onboarding',()=>({saveDoctorApplication:mocks.apply,isDoctorLocallyApproved:async()=>true}));
 vi.mock('@/lib/auth/privy-auth',()=>({requireUser:mocks.user,unauthorized:()=>Response.json({error:'unauthorized'},{status:401})}));
 vi.mock('@/lib/db',()=>({getDb:()=>Object.assign(mocks.sql,{query:mocks.query}),getDbConnection:async()=>({query:mocks.tx,release:mocks.release}),sqlForConnection:()=>Object.assign(mocks.sql,{query:mocks.query})}));
 vi.mock('@/lib/api/errors',()=>({dbNotConfiguredResponse:()=>null}));
 vi.mock('@/lib/doctor-authorizations',()=>({resolveDoctor:mocks.doctor,readPrivateDoctor:mocks.registry,verifiedWallet:vi.fn(),DoctorAuthorizationError:class extends Error{}}));
-vi.mock('@/lib/private-config',()=>({assertPrivateEnvironment:vi.fn(),assertPrivateWrites:vi.fn(),PRIVY_APP:'app',RX_PRIVATE:'private-contract'}));
+vi.mock('@/lib/private-config',async original=>({...await original<typeof import('@/lib/private-config')>(),assertPrivateEnvironment:vi.fn(),assertPrivateWrites:vi.fn(),PRIVY_APP:'app',RX_PRIVATE:'private-contract'}));
+import { PrivateFlowError } from '@/lib/private-config';
 import {GET as availability,PUT as saveAvailability} from '@/app/api/doctor/availability/route';
 import {GET as slots} from '@/app/api/doctor/slots/route';
 import {GET as doctors,POST as register} from '@/app/api/doctors/route';
@@ -25,14 +27,15 @@ describe('private agenda API',()=>{
   it('rejects another doctor’s schedule and forbids duplicate registration',async()=>{
     expect((await availability(new Request('http://localhost/api/doctor/availability?doctorEmail=foreign@example.test'))).status).toBe(403);
     expect((await saveAvailability(put({doctorEmail:'foreign@example.test',blocks}))).status).toBe(403);
-    mocks.sql.mockResolvedValueOnce([{id:10,status:'pending'}]);
+    mocks.apply.mockRejectedValueOnce(new PrivateFlowError('onboarding_state_changed'));
     expect((await register(put({name:'Fake doctor',email:actor.email}))).status).toBe(409);
   });
   it('creates pending doctor application for authenticated self-onboarding',async()=>{
-    mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([{id:10,name:'Dr. Test',status:'pending'}]);
+    mocks.apply.mockResolvedValue({profile:{id:10,name:'Dr. Test',status:'pending'},onboarding:{state:'submitted'}});
     const res = await register(put({name:'Dr. Test',specialty:'Medicina General',licenseNum:'12345',rut:'12.345.678-9'}));
-    expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({success:true,doctor:{id:10,name:'Dr. Test',status:'pending'}});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({success:true,doctor:{id:10,name:'Dr. Test',status:'pending'},onboarding:{state:'submitted'}});
+    expect(mocks.apply).toHaveBeenCalledWith(expect.anything(),actor,expect.objectContaining({name:'Dr. Test'}),true);
   });
   it('rejects forged schedule bodies and overlapping blocks before mutation',async()=>{
     for(const body of [{doctorEmail:42,blocks},{blocks:[null]},{blocks:[blocks[0],blocks[0]]}])expect((await saveAvailability(put(body))).status).toBeGreaterThanOrEqual(400);
