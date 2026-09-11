@@ -5,6 +5,7 @@ const mocks=vi.hoisted(()=>({user:vi.fn(),sql:vi.fn(),query:vi.fn(),connectionQu
 vi.mock('@/lib/auth/privy-auth',()=>({requireUser:mocks.user,unauthorized:()=>Response.json({error:'unauthorized'},{status:401})}));
 vi.mock('@/lib/db',()=>({getDb:()=>Object.assign(mocks.sql,{query:mocks.query}),getDbConnection:async()=>({query:mocks.connectionQuery,release:mocks.release}),sqlForConnection:()=>Object.assign(mocks.sql,{query:mocks.query})}));
 vi.mock('@/lib/doctor-authorizations',()=>({verifiedWallet:mocks.wallet,resolveDoctor:mocks.doctor,readPrivateDoctor:mocks.registry}));
+vi.mock('@/lib/doctor-onboarding',()=>({isDoctorLocallyApproved:async()=>true}));
 import { POST,DELETE,GET } from '@/app/api/prescription-bookings/route';
 import { POST as create, PATCH as change, GET as list, DELETE as remove } from '@/app/api/appointments/route';
 import { availableAppointmentSlots,changePrivateAppointment,createPrivateAppointment,preparePrescriptionBooking,requestBookingCancellation,validBookingDate } from '@/lib/prescription-booking';

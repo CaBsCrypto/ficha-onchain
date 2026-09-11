@@ -212,10 +212,28 @@ test('SQL store rolls back confirmation after lease loss and retains envelope fi
 
 test('SQL eligibility uses verified binding and doctor email, not caller-editable user profile', async () => {
   const calls = [];
-  const store = createStore({ query: async (sql, values) => { calls.push([sql, values]); return { rows: [{ id: 'request' }], rowCount: 1 }; } });
+  const store = createStore({ query: async (sql, values) => {
+    calls.push([sql, values]);
+    return { rows: sql.includes('FROM doctor_onboarding_requests') ? [] : sql.startsWith('SELECT status') ? [{ status: 'active' }] : [{ id: 'request' }], rowCount: 1 };
+  } });
   assert.equal(await store.eligible({ id: 'request' }), true);
   assert.match(calls[0][0], /privy_stellar_wallet_bindings/); assert.match(calls[0][0], /r.doctor_email/);
   assert.doesNotMatch(calls[0][0], /registered_users/);
+});
+
+test('reviewed eligibility requires the exact submission, owner and pending approval request', async () => {
+  const job = { id: 'request', doctor_id: 1, onboarding_submission_id: 'revision', doctor_user_id: 'owner', wallet_id: 'wallet-id', wallet: doctor, doctor_email: 'test@example.test', action: 'authorize' };
+  const valid = { state: 'authorization_pending', authorization_request_id: job.id, current_submission_id: 'revision',
+    privy_user_id: 'owner', wallet_id: 'wallet-id', wallet: doctor, submission_user: 'owner', submission_wallet_id: 'wallet-id', submission_wallet: doctor, submission_email: job.doctor_email };
+  for (const [override, expected] of [[{}, true], [{ current_submission_id: 'stale' }, false], [{ state: 'changes_requested' }, false], [{ authorization_request_id: 'other' }, false], [{ submission_user: 'other' }, false]]) {
+    const store = createStore({ query: async sql => ({ rows: sql.includes('FROM doctor_onboarding_requests') ? [{ ...valid, ...override }] : [{ id: job.id }] }) });
+    assert.equal(await store.eligible(job), expected);
+  }
+});
+
+test('legacy pending profiles cannot be signed without a reviewed onboarding revision', async () => {
+  const store = createStore({ query: async sql => ({ rows: sql.includes('FROM doctor_onboarding_requests') ? [] : sql.startsWith('SELECT status') ? [{ status: 'pending' }] : [{ id: 'request' }] }) });
+  assert.equal(await store.eligible({ id: 'request', doctor_id: 1 }), false);
 });
 
 test('revocation with no dossier_id updates exact historical dossier and retains its original receipt', async () => {

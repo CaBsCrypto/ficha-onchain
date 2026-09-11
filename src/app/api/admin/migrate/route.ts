@@ -576,6 +576,59 @@ const STATEMENTS: Array<[string, string]> = [
   )`],
   ["private_operations_one_live_source", `CREATE UNIQUE INDEX IF NOT EXISTS private_operations_one_live_source ON private_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`],
   ["private_operations_appointment", `CREATE INDEX IF NOT EXISTS private_operations_appointment ON private_operations(appointment_id)`],
+  ["doctor_onboarding_0", `CREATE TABLE IF NOT EXISTS doctor_onboarding_requests (
+    id UUID PRIMARY KEY,
+    doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    source TEXT NOT NULL CHECK (source IN ('application','invitation')),
+    email TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('invited','draft','submitted','changes_requested','rejected','authorization_pending','authorized','expired','revoked')),
+    invited_by TEXT,
+    invited_email TEXT,
+    privy_user_id TEXT,
+    wallet_id TEXT,
+    wallet TEXT,
+    expires_at TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    changes_requested_at TIMESTAMPTZ,
+    rejected_at TIMESTAMPTZ,
+    reopened_at TIMESTAMPTZ,
+    authorization_request_id UUID REFERENCES doctor_authorization_requests(id) ON DELETE RESTRICT,
+    authorized_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    reviewed_by TEXT,
+    reviewed_email TEXT,
+    review_note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((privy_user_id IS NULL AND wallet_id IS NULL AND wallet IS NULL) OR
+           (privy_user_id IS NOT NULL AND wallet_id IS NOT NULL AND wallet IS NOT NULL)),
+    CHECK ((source='invitation' AND invited_by IS NOT NULL AND expires_at IS NOT NULL) OR source='application')
+  )`],
+  ["doctor_onboarding_1", `CREATE UNIQUE INDEX IF NOT EXISTS doctor_onboarding_one_active_email
+    ON doctor_onboarding_requests ((LOWER(email)))
+    WHERE state IN ('invited','draft','submitted','changes_requested','authorization_pending')`],
+  ["doctor_onboarding_2", `CREATE INDEX IF NOT EXISTS doctor_onboarding_review_queue
+    ON doctor_onboarding_requests (state, updated_at DESC)`],
+  ["doctor_onboarding_3", `ALTER TABLE doctor_onboarding_requests ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ`],
+  ["doctor_onboarding_4", `ALTER TABLE doctor_onboarding_requests ADD COLUMN IF NOT EXISTS encrypted_draft TEXT`],
+  ["doctor_onboarding_5", `CREATE TABLE IF NOT EXISTS doctor_onboarding_submissions (
+ id UUID PRIMARY KEY, onboarding_id UUID NOT NULL REFERENCES doctor_onboarding_requests(id) ON DELETE RESTRICT,
+ revision INTEGER NOT NULL CHECK (revision>0), privy_user_id TEXT NOT NULL, email TEXT NOT NULL,
+ wallet_id TEXT NOT NULL, wallet TEXT NOT NULL, encrypted_profile TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(onboarding_id,revision)
+)`],
+  ["doctor_onboarding_6", `ALTER TABLE doctor_onboarding_requests ADD COLUMN IF NOT EXISTS current_submission_id UUID REFERENCES doctor_onboarding_submissions(id) ON DELETE RESTRICT`],
+  ["doctor_onboarding_7", `ALTER TABLE doctor_authorization_requests ADD COLUMN IF NOT EXISTS onboarding_submission_id UUID REFERENCES doctor_onboarding_submissions(id) ON DELETE RESTRICT`],
+  ["doctor_onboarding_8", `CREATE TABLE IF NOT EXISTS doctor_onboarding_events (
+ id UUID PRIMARY KEY, onboarding_id UUID NOT NULL REFERENCES doctor_onboarding_requests(id) ON DELETE RESTRICT,
+ actor_user_id TEXT NOT NULL, actor_email TEXT NOT NULL, state TEXT NOT NULL, note TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`],
+  ["doctor_onboarding_9", `CREATE OR REPLACE FUNCTION trustleaf_preserve_onboarding_submission() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN RAISE EXCEPTION 'onboarding_submission_immutable'; END $$`],
+  ["doctor_onboarding_10", `DROP TRIGGER IF EXISTS doctor_onboarding_submission_immutable ON doctor_onboarding_submissions`],
+  ["doctor_onboarding_11", `CREATE TRIGGER doctor_onboarding_submission_immutable BEFORE UPDATE OR DELETE ON doctor_onboarding_submissions
+ FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_onboarding_submission()`],
 ];
 
 export async function POST(request: Request) {

@@ -5,7 +5,7 @@ import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { ACTION_METHODS, assertUnsignedOperation, createPrivateChain, sponsorOwnerSignature, type ExpectedOperation, type PrivateAction } from '@/lib/stellar/private-chain';
-import { assertBookingReady, expectedBooking, loadPrivateContext, privateActorWallet, publicOperation, verifyParticipants, type PrivateRow } from '@/lib/private-prescriptions';
+import { assertBookingReady, assertReviewedPrescriber, expectedBooking, loadPrivateContext, privateActorWallet, publicOperation, verifyParticipants, type PrivateRow } from '@/lib/private-prescriptions';
 import type { PoolClient } from '@neondatabase/serverless';
 
 async function operationContext(client:PoolClient,actor:AuthedUser,action:PrivateAction,appointmentId:number,prescriptionId:string|null) {
@@ -20,6 +20,7 @@ async function operationContext(client:PoolClient,actor:AuthedUser,action:Privat
 async function assertEligible(client:PoolClient,actor:AuthedUser,action:PrivateAction,context:Awaited<ReturnType<typeof loadPrivateContext>>,chain=createPrivateChain(),resubmitting=false) {
   const {appointment,booking:b,prescription:p}=context;
   await verifyParticipants(client,b);await chain.verifyDeployment();
+  if (['mint','activate','revoke'].includes(action)) await assertReviewedPrescriber(client,appointment,b);
   const expected:ExpectedOperation={...expectedBooking(b),...(p?{commitment:p.commitment,expiresAt:Number(p.expires_at),rxId:p.rx_id?String(p.rx_id):undefined}:{})};
   if(action==='consent'||action==='mint') {
     await assertBookingReady(appointment,b,chain);

@@ -1,3 +1,4 @@
+import { isApprovedDoctor } from '@/lib/doctor-access';
 import { randomBytes } from 'node:crypto';
 import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
@@ -89,7 +90,7 @@ export async function createPrivateAppointment(sql: Sql, actor: AuthedUser,
   const doctor = await resolveDoctor(sql, input.doctorId);
   if (doctor.userId === actor.userId) throw new BookingPreparationError('distinct_participants_required', 403);
   const patient = await verifiedWallet(sql, actor.userId, actor.email);
-  if (!(await readPrivateDoctor(doctor.address)).authorized) throw new BookingPreparationError('doctor_not_authorized', 403);
+  if (!(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)}))) throw new BookingPreparationError('doctor_not_authorized', 403);
   // Availability updates lock this same doctor row; slot selection cannot race a grid replacement.
   const [locked] = await sql`SELECT id FROM doctors WHERE id=${input.doctorId} AND LOWER(email)=${doctor.doctor.email} FOR UPDATE`;
   if (!locked) throw new BookingPreparationError('doctor_identity_changed', 409);
@@ -114,7 +115,7 @@ export async function preparePrescriptionBooking(sql: Sql, actor: AuthedUser, ap
   const doctor = await verifiedWallet(sql, a.doctor_user_id, a.doctor_email);
   if (patient.walletId !== a.patient_wallet_id || patient.address !== a.patient_wallet || doctor.walletId !== a.doctor_wallet_id || doctor.address !== a.doctor_wallet)
     throw new BookingPreparationError('appointment_wallet_changed', 403);
-  if (!(await readPrivateDoctor(doctor.address)).authorized) throw new BookingPreparationError('doctor_not_authorized', 403);
+  if (!(await isApprovedDoctor(sql,Number(a.doctor_id),{...doctor,userId:a.doctor_user_id,email:a.doctor_email}))) throw new BookingPreparationError('doctor_not_authorized', 403);
   const [row] = await sql`INSERT INTO prescription_booking_requests(appointment_id,issuance_id,network,contract_id,
     patient_requested_by,patient_email,doctor_email,patient_wallet,doctor_wallet,doctor_user_id,doctor_wallet_id,patient_wallet_id,valid_until,state)
     SELECT a.id,${randomBytes(32).toString('hex')},'testnet',${RX_PRIVATE},a.patient_user_id,a.patient_email,a.doctor_email,
@@ -174,7 +175,7 @@ export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: 
   if (a[`${role}_user_id`] !== actor.userId || a[`${role}_email`] !== actor.email) throw new BookingPreparationError('wrong_consultation_role', 403);
   const wallet = await verifiedWallet(sql, actor.userId, actor.email!);
   if (wallet.walletId !== a[`${role}_wallet_id`] || wallet.address !== a[`${role}_wallet`]) throw new BookingPreparationError('appointment_wallet_changed', 403);
-  if (role === 'doctor' && !(await readPrivateDoctor(wallet.address)).authorized) throw new BookingPreparationError('doctor_not_authorized', 403);
+  if (role === 'doctor' && !(await isApprovedDoctor(sql,Number(a.doctor_id),{...wallet,userId:actor.userId,email:actor.email!}))) throw new BookingPreparationError('doctor_not_authorized', 403);
   if (['cancelled','cancel_requested','completed'].includes(a.status)) throw new BookingPreparationError('consultation_not_open');
   if (action === 'complete') {
     const [b] = await sql`SELECT state FROM prescription_booking_requests WHERE appointment_id=${id} FOR UPDATE`;

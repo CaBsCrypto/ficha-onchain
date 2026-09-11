@@ -48,9 +48,14 @@ export function PUT(request: Request) {
       phone=COALESCE(${value('phone')},phone), center_name=COALESCE(${value('center_name')},center_name),
       center_address=COALESCE(${value('center_address')},center_address), signature_url=COALESCE(${value('signature_url')},signature_url),
       updated_at=NOW() WHERE id=${Number(profile.id)} AND LOWER(email)=${actor.email}
+      AND (NOT EXISTS(SELECT 1 FROM doctor_onboarding_requests o WHERE o.doctor_id=doctors.id)
+        OR (COALESCE(${value('name')},name) IS NOT DISTINCT FROM name
+          AND COALESCE(${value('specialty')},specialty) IS NOT DISTINCT FROM specialty
+          AND COALESCE(${value('rut')},rut) IS NOT DISTINCT FROM rut
+          AND COALESCE(${value('license_num')},license_num) IS NOT DISTINCT FROM license_num))
       RETURNING id, name, email, specialty, bio, telemedicine, license_num,
         rut, phone, center_name, center_address, signature_url, status, created_at`;
-    if (!updated) throw new PrivateFlowError('doctor_not_found', 404);
+    if (!updated) throw new PrivateFlowError('use_doctor_onboarding_review', 409);
     return { data: updated };
   });
 }

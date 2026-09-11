@@ -5,5 +5,5 @@ export interface DoctorDossier {
   reviewedAt: string; blinding: string;
 }
 export function commitmentFor(dossier: DoctorDossier): string;
-export function encryptDossier(dossier: DoctorDossier, key: string, context: string): string;
-export function decryptDossier(encoded: string, key: string, context: string): DoctorDossier;
+export function encryptDossier<T extends object>(dossier: T, key: string, context: string): string;
+export function decryptDossier<T = DoctorDossier>(encoded: string, key: string, context: string): T;

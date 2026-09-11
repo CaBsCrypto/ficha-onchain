@@ -1,3 +1,4 @@
+import { isApprovedDoctor } from '@/lib/doctor-access';
 /**
  * GET /api/doctor/availability?doctorEmail=X
  * PUT /api/doctor/availability
@@ -137,7 +138,7 @@ export async function PUT(request: Request) {
       const [record] = await sql`SELECT id FROM doctors WHERE LOWER(email)=${doctorEmail} FOR UPDATE`;
       if (!record) throw new BookingPreparationError('doctor_not_found',403);
       const doctor = await resolveDoctor(sql,Number(record.id));
-      if (doctor.userId!==actor.userId || !(await readPrivateDoctor(doctor.address)).authorized)
+      if (doctor.userId!==actor.userId || !(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)})))
         throw new BookingPreparationError('doctor_not_authorized',403);
       await sql`DELETE FROM doctor_availability WHERE LOWER(doctor_email) = ${doctorEmail}`;
       for (const b of blocks) await sql`INSERT INTO doctor_availability (doctor_email,weekday,start_time,end_time,slot_minutes)

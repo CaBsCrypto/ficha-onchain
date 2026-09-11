@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { PrivyClient } from '@privy-io/server-auth';
 import type { Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
+import type { FrozenDoctorSubmission } from '@/lib/doctor-onboarding';
 import { resolveStellarWallet } from '@/lib/stellar/privy-wallet-binding';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError } from '@/lib/private-config';
 import { readAuthorization } from '../../scripts/lib/private-registry.mjs';
@@ -78,11 +79,14 @@ export function chooseAuthorizationMethod(action: string, chain: Awaited<ReturnT
   if(action==='revoke' && a && !a.revoked)return {method:'revoke_doctor',expectedVersion:a.version,targetVersion:a.version};
   throw new DoctorAuthorizationError('action_does_not_match_registry_state');
 }
-export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, doctorId: number, action: string) {
+export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, doctorId: number, action: string,
+  options: { submission?: FrozenDoctorSubmission; transactional?: boolean } = {}) {
   try { assertPrivateWrites(); }
   catch (error) { throw new DoctorAuthorizationError(error instanceof PrivateFlowError ? error.message : 'private_configuration_mismatch',503); }
   const d=await resolveDoctor(sql,doctorId);
-  const pending=async()=>{const [r]=await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} AND state IN ('pending','submitted') LIMIT 1`;if(r && r.action!==action)throw new DoctorAuthorizationError('another_action_pending');return publicRequest(r);};
+  const snapshot=options.submission;
+  if(snapshot && (snapshot.owner.userId!==d.userId || snapshot.owner.walletId!==d.walletId || snapshot.owner.address!==d.address || snapshot.owner.email!==String(d.doctor.email).toLowerCase()))throw new DoctorAuthorizationError('onboarding_submission_mismatch');
+  const pending=async()=>{const [r]=await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} AND state IN ('pending','submitted') LIMIT 1`;if(r && r.action!==action)throw new DoctorAuthorizationError('another_action_pending');if(r && (r.onboarding_submission_id??null)!==(snapshot?.id??null))throw new DoctorAuthorizationError('onboarding_submission_mismatch');return publicRequest(r);};
   const existing=await pending(); if(existing)return {request:existing};
   const chain=await readPrivateDoctor(d.address), method=chooseAuthorizationMethod(action,chain);
   const id=randomUUID();
@@ -107,6 +111,7 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
           stored.dossier_transaction_hash || stored.dossier_status!=='prepared')throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
       if(stored.requested_by!==actor.userId || stored.requested_email!==actor.email)throw new DoctorAuthorizationError('retry_requires_original_reviewer',403);
       if(stored.action!==action || stored.method!==method.method || Number(stored.expected_version)!==method.expectedVersion ||
+          (stored.onboarding_submission_id??null)!==(snapshot?.id??null) ||
           Number(stored.target_version)!==method.targetVersion || Number(stored.doctor_id)!==doctorId ||
           stored.doctor_user_id!==d.userId || stored.doctor_email!==d.doctor.email || stored.wallet_id!==d.walletId ||
           stored.wallet!==d.address || stored.contract_id!==PRIVATE_REGISTRY || stored.network!=='testnet')throw new DoctorAuthorizationError('failed_authorization_state_changed');
@@ -122,7 +127,9 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
       previousRequestId=String(stored.id);dossierId=String(stored.dossier_record_id);
       validUntil=plain.validUntil;commitment=stored.dossier_commitment;encrypted=stored.encrypted_dossier;
     }else{
-      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...syntheticDossier(),reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
+      const profile=snapshot?{fullName:snapshot.profile.name,license:snapshot.profile.licenseNum,specialty:snapshot.profile.specialty,
+        verificationSource:`Expediente sintético; no acredita habilitación profesional real. Identificación de prueba: ${snapshot.profile.rut}`} : syntheticDossier();
+      const dossier:DoctorDossier={schemaVersion:1,network:'testnet',contractId:PRIVATE_REGISTRY,wallet:d.address,version:method.targetVersion,validUntil,...profile,reviewedBy:actor.userId,reviewedAt:new Date().toISOString(),blinding:randomBytes(32).toString('hex')};
       commitment=commitmentFor(dossier);encrypted=encryptDossier(dossier,dataKey(),dossierId);
     }
   }
@@ -138,8 +145,8 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
           AND ds.valid_until=$5 AND ds.valid_until>EXTRACT(EPOCH FROM NOW())
           AND NOT EXISTS(SELECT 1 FROM doctor_authorization_requests signed WHERE signed.dossier_id=ds.id
             AND (signed.transaction_hash IS NOT NULL OR signed.prepared_xdr IS NOT NULL)) FOR UPDATE OF r,ds
-      ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state)
-        SELECT $8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,id,'pending' FROM retryable RETURNING *`,[...parameters,previousRequestId]);
+      ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state,onboarding_submission_id)
+        SELECT $8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,id,'pending',$19::uuid FROM retryable RETURNING *`,[...parameters,previousRequestId,snapshot?.id??null]);
       if(!rows[0])throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
       return {request:publicRequest(rows[0])};
     }
@@ -147,9 +154,9 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
     const rows=await sql.query(`WITH dossier AS (
       INSERT INTO doctor_private_dossiers(id,network,contract_id,wallet,version,valid_until,commitment,encrypted_dossier,status)
       SELECT $1::uuid,'testnet',$2,$3,$4,$5,$6,$7,'prepared' WHERE $1::uuid IS NOT NULL RETURNING id
-    ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state)
-      VALUES($8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,(SELECT id FROM dossier),'pending') RETURNING *`,
-      parameters);
+    ) INSERT INTO doctor_authorization_requests(id,doctor_id,requested_by,requested_email,doctor_user_id,doctor_email,wallet_id,wallet,network,contract_id,action,method,expected_version,target_version,commitment,valid_until,dossier_id,state,onboarding_submission_id)
+      VALUES($8::uuid,$9,$10,$11,$12,$13,$14,$3,'testnet',$2,$15,$16,$17,$4,$6,$5,(SELECT id FROM dossier),'pending',$18::uuid) RETURNING *`,
+      [...parameters,snapshot?.id??null]);
     return {request:publicRequest(rows[0])};
-  }catch(error){const raced=await pending();if(raced)return {request:raced};throw error;}
+  }catch(error){if(options.transactional)throw error;const raced=await pending();if(raced)return {request:raced};throw error;}
 }
