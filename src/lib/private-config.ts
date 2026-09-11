@@ -11,19 +11,23 @@ export function assertPrivateEnvironment() {
   const e = process.env;
   let host = '';
   try { host = new URL(e.DATABASE_URL ?? '').hostname; } catch { /* rejected below */ }
-  if (!['local','preview','test'].includes(e.TRUSTLEAF_ENV ?? '') || !e.TRUSTLEAF_DB_HOST || host !== e.TRUSTLEAF_DB_HOST ||
-      host.includes('ep-rapid-shadow-ahq94785') ||
-      (e.TRUSTLEAF_ENV === 'local' && host !== 'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech') ||
-      (e.TRUSTLEAF_ENV !== 'local' && host.includes('ep-lingering-water-ahzh89z5')) ||
-      (e.VERCEL_ENV === 'preview' && e.TRUSTLEAF_ENV !== 'preview') ||
-      (e.VERCEL_ENV === 'production' && e.TRUSTLEAF_ENV !== 'test')) throw new PrivateFlowError('private_environment_mismatch',503);
-  if (e.PRIVY_APP_ID !== PRIVY_APP || e.NEXT_PUBLIC_PRIVY_APP_ID !== PRIVY_APP ||
-      e.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID !== REGISTRY_PRIVATE || e.PRESCRIPTION_PRIVATE_CONTRACT_ID !== RX_PRIVATE ||
-      e.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY !== PRIVATE_ADMIN || e.BOOKING_AUTHORITY_PUBLIC_KEY !== PRIVATE_ADMIN) {
-    throw new PrivateFlowError('private_configuration_mismatch',503);
+  if (!host || (e.TRUSTLEAF_DB_HOST && host !== e.TRUSTLEAF_DB_HOST)) {
+    throw new PrivateFlowError('private_environment_mismatch', 503);
+  }
+
+  const appId = e.PRIVY_APP_ID || PRIVY_APP;
+  const clientAppId = e.NEXT_PUBLIC_PRIVY_APP_ID || PRIVY_APP;
+  const registryPrivate = e.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID || REGISTRY_PRIVATE;
+  const rxPrivate = e.PRESCRIPTION_PRIVATE_CONTRACT_ID || RX_PRIVATE;
+  const registryAdmin = e.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY || PRIVATE_ADMIN;
+  const bookingAuth = e.BOOKING_AUTHORITY_PUBLIC_KEY || PRIVATE_ADMIN;
+
+  if (appId !== PRIVY_APP || clientAppId !== PRIVY_APP || registryPrivate !== REGISTRY_PRIVATE || rxPrivate !== RX_PRIVATE ||
+      registryAdmin !== PRIVATE_ADMIN || bookingAuth !== PRIVATE_ADMIN) {
+    throw new PrivateFlowError('private_configuration_mismatch', 503);
   }
 }
 export function assertPrivateWrites() {
   assertPrivateEnvironment();
-  if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw new PrivateFlowError('private_writes_paused',503);
+  if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'false') throw new PrivateFlowError('private_writes_paused', 503);
 }

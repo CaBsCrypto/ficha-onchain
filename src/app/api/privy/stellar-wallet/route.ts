@@ -9,9 +9,10 @@ async function handle(req: NextRequest, allowCreate: boolean) {
   if (allowCreate && !isSameOrigin(req)) return NextResponse.json({error:'forbidden'}, {status:403});
   const token = req.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
   if (!token) return NextResponse.json({error:'unauthorized'}, {status:401});
-  const appId = process.env.PRIVY_APP_ID;
-  if (!appId || appId !== process.env.NEXT_PUBLIC_PRIVY_APP_ID || !process.env.PRIVY_APP_SECRET) return NextResponse.json({error:'configuration_missing'}, {status:503});
-  const privy = new PrivyClient(appId, process.env.PRIVY_APP_SECRET);
+  const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'cmrix722m03d30clewd1fuffq';
+  const secret = process.env.PRIVY_APP_SECRET;
+  if (!secret) return NextResponse.json({error:'configuration_missing'}, {status:503});
+  const privy = new PrivyClient(appId, secret);
   let userId: string;
   try { userId = (await privy.verifyAuthToken(token)).userId; }
   catch { return NextResponse.json({error:'unauthorized'}, {status:401}); }

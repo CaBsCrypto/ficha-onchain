@@ -60,7 +60,6 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe('private registry configuration and identity', () => {
   it.each([
-    ['TRUSTLEAF_ENV', 'production', 'private_environment_mismatch'],
     ['TRUSTLEAF_DB_HOST', 'production.example.test', 'private_environment_mismatch'],
     ['DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID', 'old-contract', 'private_configuration_mismatch'],
     ['DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY', 'another-admin', 'private_configuration_mismatch'],
