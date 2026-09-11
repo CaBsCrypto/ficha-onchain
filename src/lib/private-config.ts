@@ -37,3 +37,24 @@ export function assertPrivateWrites() {
   assertPrivateEnvironment();
   if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw new PrivateFlowError('private_writes_paused', 503);
 }
+/** Safe diagnostics: presence/equality only, never configuration values. */
+export function privateEnvironmentChecks() {
+  const e = process.env;
+  let database: URL | null = null;
+  try { database = new URL(e.DATABASE_URL ?? ''); } catch { /* reported as false */ }
+  const host = database?.hostname ?? '';
+  const localDev = /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(host);
+  return {
+    environmentAllowed: ['local', 'preview', 'test'].includes(e.TRUSTLEAF_ENV ?? ''),
+    databasePresent: !!e.DATABASE_URL,
+    databaseParseable: !!database,
+    databaseProtocol: ['postgres:', 'postgresql:'].includes(database?.protocol ?? ''),
+    databaseHostConfigured: !!e.TRUSTLEAF_DB_HOST,
+    databaseHostMatches: !!host && host === e.TRUSTLEAF_DB_HOST,
+    databaseNeon: /^[a-z0-9.-]+\.neon\.tech$/.test(host),
+    historicalDatabaseExcluded: !host.includes('ep-rapid-shadow-ahq94785'),
+    localDatabaseSeparated: e.TRUSTLEAF_ENV === 'local' ? localDev : !localDev,
+    previewEnvironmentMatches: e.VERCEL_ENV !== 'preview' || e.TRUSTLEAF_ENV === 'preview',
+    productionEnvironmentMatches: e.VERCEL_ENV !== 'production' || e.TRUSTLEAF_ENV === 'test',
+  };
+}
