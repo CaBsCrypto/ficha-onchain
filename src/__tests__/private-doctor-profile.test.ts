@@ -66,12 +66,19 @@ describe('private doctor profile boundary',()=>{
     expect(response.status).toBe(200);expect(await response.json()).toEqual({data:profile});
     const update=mocks.sql.mock.calls.find(([query])=>query.join('').startsWith('UPDATE'))!;
     expect(update[0].join('')).toContain('WHERE id=');expect(update[0].join('')).toContain('AND LOWER(email)=');
-    expect(update.slice(-2)).toEqual([21,actor.email]);expect(update).toContain('synthetic');expect(update).toContain(false);
+    expect(update.slice(-6,-4)).toEqual([21,actor.email]);expect(update).toContain('synthetic');expect(update).toContain(false);
+    expect(update[0].join('')).toContain('doctor_onboarding_requests');
     expect(update[0].join('')).not.toMatch(/SET\s+status|,\s*status\s*=/);
   });
   it('returns no profile for an unregistered participant and never creates one via PUT',async()=>{
     mocks.sql.mockResolvedValue([]);
     expect(await (await GET(req())).json()).toEqual({data:null});expect((await PUT(req('PUT'))).status).toBe(404);
     expect(mocks.doctor).not.toHaveBeenCalled();
+  });
+  it('reports a review conflict when the guarded profile update is rejected',async()=>{
+    mocks.sql.mockResolvedValueOnce([profile]).mockResolvedValueOnce([]);
+    const response=await PUT(req('PUT',{name:'Changed during review'}));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({error:'use_doctor_onboarding_review'});
   });
 });
