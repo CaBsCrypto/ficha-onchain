@@ -47,6 +47,10 @@ export function operationNoticeDetail(
   const pendingReceipt = operation.state === 'submitted'
     && /^[a-f0-9]{64}$/i.test(operation.transactionHash ?? '');
   // Changed eligibility does not establish the result of this saved attempt.
+  if (pendingReceipt && operation.action === 'mint'
+    && ['consent_required', 'booking_not_ready', 'prescription_not_ready'].includes(operation.errorCode)) {
+    return 'La reserva o el permiso cambiaron después del envío. Seguimos comprobando el recibo de este mismo intento; todavía no está confirmado.';
+  }
   if (pendingReceipt && operation.action === 'consent' && operation.errorCode === 'consent_already_active') {
     return 'El permiso figura vigente. Seguimos comprobando el recibo de este intento; todavía no está confirmado.';
   }
