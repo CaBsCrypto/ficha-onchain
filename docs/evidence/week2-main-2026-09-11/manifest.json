@@ -3,23 +3,23 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 1945,
-      "sha256": "ca1c9195292dc379eaf2be4000cd52ac8fb77471449cc9870f08e585e59578ca"
+      "bytes": 1944,
+      "sha256": "1e900cc5cf21596f3e1a274fe96bc6c60bb2e771e2aa6d9122bb41afc0f9f4fc"
     },
     {
       "path": "booking-ui-validation.json",
-      "bytes": 1296,
-      "sha256": "1287263f41a7b0bd026eaa7e5d2e63550cac84692208d2ccd221d938a6022ba6"
+      "bytes": 1263,
+      "sha256": "0ee9aa2802c5dba509dc9a4d3ca27951f43fff3ef374403baaddc77ab53125af"
     },
     {
       "path": "consent-ui-validation.json",
-      "bytes": 1054,
-      "sha256": "d5dda9dac7aee1668e4b24b4ca54d42aa78fdab6b8821f5f73986a3f0a5a0296"
+      "bytes": 1032,
+      "sha256": "caabd97f323d9cf2bfff44d32656b6fd5fcf9ae66d9aae5c010c4c25461532cb"
     },
     {
       "path": "prescription-ui-validation.json",
-      "bytes": 1684,
-      "sha256": "dbaab615a0da4fad04d73d9cdedb45771f7d0c267bf84cc189bd22dbd14d9601"
+      "bytes": 1641,
+      "sha256": "ee45b218098bf17d2f017dfd951636dc28156ec3564270e889dd697c4d2e1300"
     },
     {
       "path": "independent-chain-audit.json",
@@ -36,5 +36,6 @@
       "bytes": 44314,
       "sha256": "c4c12ee7e9d7209b4554b1e9df5556983964ec0367abe96beddc2998c0b52307"
     }
-  ]
+  ],
+  "byteSource": "Git repository blobs (canonical line endings), excluding this manifest"
 }

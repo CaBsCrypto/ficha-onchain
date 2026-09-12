@@ -56,4 +56,3 @@ El corte anterior se conserva abajo como histórico; sus recibos no se atribuyen
 - [PR #102 — portales y retirada del legado](https://github.com/CaBsCrypto/ficha-onchain/pull/102).
 
 El preview es el entorno de entrega de este corte. El sitio principal y la aceptación formal corresponden a una etapa posterior. El video se incorporará cuando el responsable complete la grabación sobre la versión fijada.
-
