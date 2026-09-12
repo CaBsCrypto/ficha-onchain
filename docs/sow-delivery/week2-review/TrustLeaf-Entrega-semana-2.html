@@ -45,22 +45,22 @@
   <header class="wrap">
     <div class="brandline"><div class="brand">Trust<span>Leaf</span></div><div class="edition">SOW · Entregable 2</div></div>
     <h1>Semana 2 · Portales de médico y paciente</h1>
-    <p class="subtitle">Stellar Testnet · Datos sintéticos · Actualización del <time datetime="2026-09-10">10 de septiembre de 2026</time></p>
+    <p class="subtitle">Stellar Testnet · Datos sintéticos · Actualización del <time datetime="2026-09-11">11 de septiembre de 2026</time></p>
     <p class="lead">Emitir, gestionar y consultar recetas desde la interfaz, con una wallet Stellar propia y las comisiones pagadas por TrustLeaf.</p>
   </header>
-  <main class="wrap">
+  <main class="wrap"><p class="note consent-note"><strong>Validación final en curso.</strong> Recibos y lectura autorizada comprobados. Faltan pruebas remotas de acceso indebido autenticado, promoción de la corrección PR #118 y video. No se declara aún el cierre del entregable.</p>
     <section class="panel application" id="aplicacion" aria-labelledby="aplicacion-titulo">
       <div>
-        <div class="eyebrow">Aplicación desplegada · Preview aislado</div>
+        <div class="eyebrow">Aplicación desplegada · Main · Entorno de prueba</div>
         <h2 id="aplicacion-titulo">Acceso para la demostración guiada</h2>
         <p>Médico y paciente ingresan con Privy y confirman sus acciones dentro de TrustLeaf. Cada uno firma con su propia wallet Stellar.</p>
       </div>
       <div>
         <nav class="actions" aria-label="Accesos a los portales de prueba">
-          <a class="button" href="https://trustleaf-demo-git-cod-50a880-cabscryptocontacto-6028s-projects.vercel.app/login?role=doctor">Portal del médico</a>
-          <a class="button secondary" href="https://trustleaf-demo-git-cod-50a880-cabscryptocontacto-6028s-projects.vercel.app/login?role=patient">Portal del paciente</a>
+          <a class="button" href="https://trustleaf-demo.vercel.app/login?role=doctor">Portal del médico</a>
+          <a class="button secondary" href="https://trustleaf-demo.vercel.app/login?role=patient">Portal del paciente</a>
         </nav>
-        <p class="version">Versión del preview: <a href="https://github.com/CaBsCrypto/ficha-onchain/commit/dda4bf5cf9ee95cf21dc4e7d9248df162e755efe"><code>dda4bf5</code></a> · Revisión acompañada, con cuentas de prueba.</p>
+        <p class="version">Versión del recorrido en main: <a href="https://github.com/CaBsCrypto/ficha-onchain/commit/6392e18cfe86ae665c82757917709221c0b02cd5"><code>6392e18</code></a> · Revisión acompañada, con cuentas de prueba.</p>
       </div>
     </section>
 
@@ -90,10 +90,10 @@
     </section>
 
     <section class="section" aria-labelledby="resultado-titulo">
-      <div class="section-head"><h2 id="resultado-titulo">Recorrido verificado en el preview</h2><span class="badge">12 recibos SUCCESS</span></div>
+      <div class="section-head"><h2 id="resultado-titulo">Recorrido observado en main</h2><span class="badge">12 recibos SUCCESS</span></div>
       <div class="grid">
-        <article class="card"><div class="result-head"><h3>Receta 5</h3><span class="badge">Active · Activa</span></div><p>Emitida y activada por el médico. El paciente consultó su estado y abrió el documento privado.</p></article>
-        <article class="card"><div class="result-head"><h3>Receta 6</h3><span class="badge revoked">Revoked · Revocada</span></div><p>Emitida, activada y revocada por el médico. El paciente abrió el documento conservado en su historial.</p></article>
+        <article class="card"><div class="result-head"><h3>Receta 7</h3><span class="badge">Active · Activa</span></div><p>Emitida y activada por el médico. El paciente consultó su estado y abrió el documento privado.</p></article>
+        <article class="card"><div class="result-head"><h3>Receta 8</h3><span class="badge revoked">Revoked · Revocada</span></div><p>Emitida, activada y revocada por el médico. El paciente abrió el documento conservado en su historial.</p></article>
       </div>
       <p class="result-note">Dos consultas completadas, documentos cifrados antes de emitir y cero operaciones pendientes o duplicadas en el corte final. Médico y paciente abrieron ambos documentos con sus propias sesiones; el paciente no tuvo controles de activación ni revocación.</p>
     </section>
@@ -104,12 +104,12 @@
         <article class="card">
           <h3>Registro de médicos</h3><div class="contract-name">DoctorRegistryPrivate</div>
           <p>Conserva la autorización, vigencia y revocación del médico. El administrador revisa y aprueba; la autoridad contractual procesa su solicitud.</p>
-          <nav class="links" aria-label="Registro de médicos"><a href="https://stellar.expert/explorer/testnet/contract/CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2">Ver contrato</a><a href="https://github.com/CaBsCrypto/ficha-onchain/blob/dda4bf5cf9ee95cf21dc4e7d9248df162e755efe/contracts/doctor-registry-private/src/lib.rs">Ver código</a></nav>
+          <nav class="links" aria-label="Registro de médicos"><a href="https://stellar.expert/explorer/testnet/contract/CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2">Ver contrato</a><a href="https://github.com/CaBsCrypto/ficha-onchain/blob/6392e18cfe86ae665c82757917709221c0b02cd5/contracts/doctor-registry-private/src/lib.rs">Ver código</a></nav>
         </article>
         <article class="card">
           <h3>Recetas privadas</h3><div class="contract-name">PrescriptionPrivate v2</div>
           <p>Vincula reserva y consentimiento con una emisión; consulta el registro médico y conserva los estados de la receta.</p>
-          <nav class="links" aria-label="Recetas privadas"><a href="https://stellar.expert/explorer/testnet/contract/CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE">Ver contrato</a><a href="https://github.com/CaBsCrypto/ficha-onchain/blob/dda4bf5cf9ee95cf21dc4e7d9248df162e755efe/contracts/prescription-private/src/lib.rs">Ver código</a></nav>
+          <nav class="links" aria-label="Recetas privadas"><a href="https://stellar.expert/explorer/testnet/contract/CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE">Ver contrato</a><a href="https://github.com/CaBsCrypto/ficha-onchain/blob/6392e18cfe86ae665c82757917709221c0b02cd5/contracts/prescription-private/src/lib.rs">Ver código</a></nav>
         </article>
       </div>
     </section>
@@ -118,9 +118,9 @@
       <div class="section-head"><h2 id="evidencia-titulo">Evidencia para la revisión</h2></div>
       <div class="evidence">
         <div>
-          <h3>Paquete del preview</h3>
+          <h3>Paquete de main</h3>
           <p>Doce recibos confirmados: renovación médica, dos reservas, cuatro acciones de consentimiento y cinco de recetas. El paquete distingue auditoría de cadena, observaciones del navegador y pruebas controladas.</p>
-          <nav class="links" aria-label="Evidencia del preview"><a href="../../evidence/week2-preview-2026-09-10/README.md">Abrir paquete de evidencia</a><a href="../../evidence/week2-preview-2026-09-10/preview-receipts.json">Consultar los 12 recibos</a></nav>
+          <nav class="links" aria-label="Evidencia de main"><a href="../../evidence/week2-main-2026-09-11/README.md">Abrir paquete de evidencia</a><a href="../../evidence/week2-main-2026-09-11/independent-chain-audit.json">Consultar los 12 recibos</a></nav>
         </div>
         <div>
           <h3>Video de médico y paciente</h3>
@@ -133,8 +133,8 @@
         <div class="detail-body">
           <p>El recorrido local del 9 de septiembre acredita dos consultas, lectura de ambos documentos por médico y paciente, y 11 recibos de transacciones. Es evidencia de un entorno distinto del preview.</p>
           <p>En esa validación se aprobaron <strong>414 pruebas de aplicación, 43 de servicios privados y 11 contractuales</strong>, además de TypeScript y build. Los resultados identifican sus versiones y las comprobaciones de CI; no son una nueva ejecución del 10 de septiembre.</p>
-          <p>El corte final de la rama aprueba <strong>423 pruebas de aplicación en 35 suites</strong>, TypeScript y build. Incluye nueve pruebas nuevas de cliente con proveedores controlados para rechazo de firma, reintentos, respuesta perdida y otros casos; no representan caídas reales de Privy o RPC ni una prueba de concurrencia real en la base.</p>
-          <nav class="links" aria-label="Validaciones existentes"><a href="../../evidence/week2-preview-2026-09-10/validation-results.json">Ver resultados y límites</a><a href="../../evidence/week2-portals-local-2026-09-09/README.md">Ver antecedente local</a></nav>
+          <p>La corrección PR #118 aprueba localmente <strong>536 pruebas de aplicación, 45 privadas y 11 contractuales</strong>, TypeScript y build. Incluye pruebas con proveedores controlados para rechazo de firma, reintentos, respuesta perdida y otros casos; no representan caídas reales de Privy o RPC ni una prueba de concurrencia real en la base.</p>
+          <nav class="links" aria-label="Validaciones existentes"><a href="../../evidence/week2-main-2026-09-11/final-test-results.json">Ver resultados y límites</a><a href="../../evidence/week2-portals-local-2026-09-09/README.md">Ver antecedente local</a></nav>
         </div>
       </details>
       <div class="privacy">

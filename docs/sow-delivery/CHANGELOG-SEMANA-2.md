@@ -1,3 +1,14 @@
+# Actualización de main · 11 de septiembre de 2026
+
+- Recorrido real de main: recetas #7 activa y #8 revocada; lectura de ambos documentos por médico y paciente.
+- Auditoría independiente: 12 recibos, firmas y comisiones verificadas, compromisos recomputados, reservas consumidas y sin operaciones pendientes ni hashes duplicados en el corte.
+- Rechazo sin sesión en ambos documentos (401). Acceso administrativo desde paciente rechazado en navegador.
+- PR #118 fusionada: aclaración de avisos mientras se reconcilia una emisión enviada. 536 pruebas de aplicación, 45 privadas, 11 contractuales, TypeScript y build aprobados.
+- Pendientes: solicitudes autenticadas sobre documentos ajenos y acciones de otro rol en main, comprobación final del despliegue, video y aceptación formal.
+
+El corte anterior se conserva abajo como histórico; sus recibos no se atribuyen a main.
+
+---
 # TrustLeaf — Changelog de semana 2
 
 **Corte:** 10 de septiembre de 2026<br>
@@ -45,3 +56,4 @@
 - [PR #102 — portales y retirada del legado](https://github.com/CaBsCrypto/ficha-onchain/pull/102).
 
 El preview es el entorno de entrega de este corte. El sitio principal y la aceptación formal corresponden a una etapa posterior. El video se incorporará cuando el responsable complete la grabación sobre la versión fijada.
+

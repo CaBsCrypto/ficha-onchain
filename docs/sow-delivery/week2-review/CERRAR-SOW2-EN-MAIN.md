@@ -1,52 +1,26 @@
-# Cierre final SOW 2 · Semana 2 en `main`
+# Checklist de cierre · Semana 2
 
-## 1) Estado actual del código
+Aplicación: https://trustleaf-demo.vercel.app · Stellar Testnet · Datos sintéticos.
 
-- Rama de trabajo actual: `codex/week2-private-portals`.
-- Estado `main`: `c704bfc`.
-- Confirmado: la rama contiene los bloques funcionales de PR #101 y #102 y el cierre documental de semana 2 (commits `7c2ff26`, `df812d8`, `58d0df0`, `dda4bf5`, `b8effe2`).
-- Faltante para cerrar: confirmar PR #105 en el repositorio y que `main` reciba el merge final con evidencia de despliegue + grabación.
+El recorrido del 11 de septiembre de 2026 se ejecutó en main, versión `6392e18cfe86ae665c82757917709221c0b02cd5`. La receta **#7 está activa** y la **#8 revocada**. Médico y paciente abrieron ambos documentos desde sus sesiones. Las consultas finalizaron.
 
-## 2) Entorno de grabación objetivo
+La [auditoría independiente](../../evidence/week2-main-2026-09-11/independent-chain-audit.json) verificó **12 recibos**, firmas, argumentos, comisiones del relayer, compromisos de documentos y reservas consumidas. No encontró operaciones pendientes ni hashes duplicados en el corte. [Paquete y límites](../../evidence/week2-main-2026-09-11/README.md).
 
-- URL canónica: `https://trustleaf-demo.vercel.app`
-- Entorno: `TRUSTLEAF_ENV=test`
-- Base de datos: rama Neon exclusiva de pruebas para `main`.
-- Contratos: `DoctorRegistryPrivate` + `PrescriptionPrivate v2`.
-- Wallet: Privy (`ficha-onchain`) con una wallet Stellar por usuario.
-- Relayer: firma y paga comisión; el usuario firma su operación.
+## Antes de grabar
 
-## 3) Recorrido final en `main` (3 cuentas)
+- [x] Reserva, asistencia separada de consentimiento, inicio y acreditación.
+- [x] Consentimiento, retirada y nueva autorización.
+- [x] Emisión, activación, revocación, lectura de ambos participantes y estados persistentes.
+- [x] Auditoría de recibos y rechazo de documentos sin sesión.
+- [ ] Solicitudes autenticadas de administrador y usuario ajeno contra documentos en main.
+- [ ] Solicitud médica desde paciente rechazada por el servidor en main.
+- [ ] Promoción y comprobación remota de la corrección del aviso durante confirmación (PR #118).
+- [ ] Grabación nueva y enlace de video.
 
-1. Admin autoriza médico.
-2. Médico entra y comprueba estado.
-3. Paciente realiza dos reservas.
-4. Paciente confirma asistencia.
-5. Médico inicia ambas consultas.
-6. Worker acredita reservas.
-7. Paciente autoriza consulta A y consulta B, retira y reautoriza en una.
-8. Médico emite ambas, activa ambas.
-9. Médico revoca una.
-10. Paciente ve estado y abre documento de la receta activa y la revocada.
+La corrección aprobó localmente 536 pruebas de aplicación, 45 privadas, 11 contractuales, TypeScript y build. Los fallos simulados de proveedores y recuperación no se presentan como observaciones de navegador. El ensayo aún no se declara aprobado para entrega.
 
-Requisito de UI: estado visible de cada operación en `Pendiente / Confirmada / Error recuperable`.
+## Grabación
 
-## 4) Evidencia mínima a adjuntar
+El usuario operará administrador, médico y paciente con cuentas separadas. Se crearán consultas sintéticas nuevas; no se reutilizarán las reservas consumidas de #7 y #8. Secuencia: alta/aprobación médica, agenda, reserva, asistencia, inicio, acreditación, consentimiento separado, emisión, activación, lectura y revocación. OTP fuera del video. La reserva contractual dura 30 minutos desde su acreditación.
 
-- 5 acciones en cadena en `main`: `authorize_doctor` (si aplica), dos `attest_booking`, dos `mint_prescription` y al menos dos activaciones/revocación según el caso.
-- Recibos de la sesión completa y captura de pantallas de autorización / emisión / activación / revocación.
-- Resultado final: 1 receta activa + 1 revocada.
-- Resultados de pruebas y build del tag de cierre.
-
-## 5) Cierres de control
-
-- Sin transacciones duplicadas en doble clic.
-- Consentimiento retirado antes de emisión bloquea esa acción.
-- Wallet distinta/ambigua para rol no permite operación.
-- Worker caído/reiniciado: operación pendiente recuperable, nunca "éxito simulado".
-
-## 6) Entregables de revisión
-
-- Página de revisores actualizada con link main.
-- Nota de grabación actualizada con secuencia y límites.
-- PR documental final con estos cambios y el estado de cierre.
+La autoridad administrativa permanece en el equipo local. Si el worker está apagado, las solicitudes esperan; no representan éxito. El video y la aceptación formal siguen pendientes. No habilita atención clínica real.

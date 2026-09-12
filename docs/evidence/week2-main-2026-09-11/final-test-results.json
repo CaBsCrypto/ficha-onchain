@@ -1,0 +1,1115 @@
+{
+  "checkedAt": "2026-09-12T00:38:38.939Z",
+  "testedCommit": "72f57cfe3277b64d25953991278f5bc66166f14e",
+  "mergedCommit": "9a44103c966d0f7629c3f3292df445b6ef36095a",
+  "application": {
+    "passed": 536,
+    "failed": 0
+  },
+  "privateTests": {
+    "passed": 45,
+    "failed": 0
+  },
+  "contractTests": {
+    "passed": 11,
+    "failed": 0
+  },
+  "typescript": "passed",
+  "build": "passed after network-enabled retry for Google Fonts",
+  "ci": "https://github.com/CaBsCrypto/ficha-onchain/actions/runs/34662009552",
+  "pr": "https://github.com/CaBsCrypto/ficha-onchain/pull/118",
+  "controlledTests": [
+    {
+      "name": "Administrator access recovery distinguishes a service outage from denied permission, preserving identity and a safe reference",
+      "status": "passed"
+    },
+    {
+      "name": "Administrator access recovery offers reauthentication on 401 while preserving the admin destination",
+      "status": "passed"
+    },
+    {
+      "name": "Administrator access recovery reserves access denied for 403",
+      "status": "passed"
+    },
+    {
+      "name": "Administrator access recovery offers retry for a network failure without logging out",
+      "status": "passed"
+    },
+    {
+      "name": "Administrator access recovery ignores an old successful authorization after changing user",
+      "status": "passed"
+    },
+    {
+      "name": "Administrator access recovery does not expose the old panel after logout with an authorization response in flight",
+      "status": "passed"
+    },
+    {
+      "name": "Wallet access recovery keeps a 503 recoverable with its reference and current identity",
+      "status": "passed"
+    },
+    {
+      "name": "Wallet access recovery does not show an old wallet response after a different session logs in",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization accepts the allowlisted Privy identity without a shared token",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization does not accept a legacy token from header without a valid session",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization does not accept a legacy token from query without a valid session",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization denies another authenticated role even with the legacy token: 'doctor@example.test'",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization denies another authenticated role even with the legacy token: 'patient@example.test'",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin authorization rejects missing or invalid sessions even while legacy demo mode is enabled",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects caller-supplied xdr before preparing anything",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects caller-supplied hash before preparing anything",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects caller-supplied wallet before preparing anything",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects caller-supplied contractId before preparing anything",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects caller-supplied method before preparing anything",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 0",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 1",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 2",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 3",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 4",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 5",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 6",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary requires a valid resource, supported action and explicit synthetic confirmation 7",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a non-object body 0",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a non-object body 1",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a non-object body 2",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects malformed JSON",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a foreign or missing origin: https://other.example.test",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a foreign or missing origin: http://localhost:4444",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary rejects a foreign or missing origin: ",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary acknowledges only the durable pending request, never an authorization success",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary reports a config failure without a simulated success or internal details",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary reports a database failure without a simulated success or internal details",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary reports a provider failure without a simulated success or internal details",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary preserves a recoverable pending-action conflict as HTTP 409",
+      "status": "passed"
+    },
+    {
+      "name": "private admin request boundary protects private review from caching and does not return another doctor for an invalid ID",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry rejects unauthenticated access without a demo doctor",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry rejects a query selecting somebody else’s wallet",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry checks the authenticated doctor’s verified wallet and returns a noncached registry result",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry does not grant doctor access to a patient without a doctor record",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry keeps a unregistered doctor unauthorized",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry keeps a expired doctor unauthorized",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry keeps a revoked doctor unauthorized",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry keeps a paused doctor unauthorized",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry fails closed when wallet is unavailable",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry fails closed when rpc is unavailable",
+      "status": "passed"
+    },
+    {
+      "name": "doctor entry authorization against the private registry fails closed when database is unavailable",
+      "status": "passed"
+    },
+    {
+      "name": "private portal blocks legacy authorization and issuance blocks legacy mint in simulated mode before signing or database writes",
+      "status": "passed"
+    },
+    {
+      "name": "private portal blocks legacy authorization and issuance blocks legacy mint in testnet-demo mode before signing or database writes",
+      "status": "passed"
+    },
+    {
+      "name": "private portal blocks legacy authorization and issuance blocks legacy activation instead of returning a simulated success",
+      "status": "passed"
+    },
+    {
+      "name": "private portal blocks legacy authorization and issuance prevents the legacy doctor status update from bypassing a confirmed registry request",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects the old token on every active admin entrypoint",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects a patient even when they supply the old shared token",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes forbids status bypass and deletion regardless of the old flag=true",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes forbids status bypass and deletion regardless of the old flag=false",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity wallet on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity walletId on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity userId on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity source_wallet on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity doctor_user_id on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects caller-selected identity contractId on creation and editing",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes creates only a pending profile with no wallet or authority supplied",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes does not reassign an existing doctor to another email",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes rejects legacy editing even for an absent profile",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes blocks new profiles while leaving private profile reads available when writes are paused",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes uses the real environment guard and does not touch another database",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes requires same origin and exact migration confirmation before executing SQL",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes allows a reviewed schema migration while application writes are paused",
+      "status": "passed"
+    },
+    {
+      "name": "strict private admin profile and migration routes returns failure without provider details when a migration statement fails",
+      "status": "passed"
+    },
+    {
+      "name": "preserves local configuration while excluding POSTGRES_URL fallback for private environments",
+      "status": "passed"
+    },
+    {
+      "name": "requires a confirmed local review even when the chain would authorize the wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for TRUSTLEAF_ENV",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for TRUSTLEAF_DB_HOST",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for PRIVY_APP_ID",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity fails closed for NEXT_PUBLIC_PRIVY_APP_ID",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity pauses new authorizations while retaining access to current pending receipts",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity rejects a changed Privy email before resolving a wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private registry configuration and identity propagates an ambiguous or changed wallet binding without a registry operation",
+      "status": "passed"
+    },
+    {
+      "name": "durable authorization requests stores an encrypted synthetic dossier bound to wallet, version and requesting admin before any broadcast",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests reuses the unchanged dossier in a fresh request and retains the failed request and its error",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests never retries a saved or uncertain signed attempt indicated by transaction_hash",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests never retries a saved or uncertain signed attempt indicated by prepared_xdr",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests never retries a saved or uncertain signed attempt indicated by dossier_transaction_hash",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests never retries a saved or uncertain signed attempt indicated by has_signed_attempt",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests requires the original reviewer instead of attributing old evidence to a different administrator",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests rejects changed doctor_user_id in the failed request",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests rejects changed wallet_id in the failed request",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests rejects changed method in the failed request",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests rejects changed expected_version in the failed request",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests does not silently extend the lifetime of an expired review",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests checks the encrypted reviewer identity independently of the request metadata",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests rejects recovery when the chain has advanced since the unsigned failure",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests does not claim a successful retry if its atomic eligibility check no longer matches",
+      "status": "passed"
+    },
+    {
+      "name": "recovery of failed unsigned authorization requests returns the concurrent winning retry without duplicating the dossier",
+      "status": "passed"
+    },
+    {
+      "name": "private dossier review integrity allows review but omits the blinding secret and encrypted envelope from its response",
+      "status": "passed"
+    },
+    {
+      "name": "private dossier review integrity rejects inconsistent dossier commitment",
+      "status": "passed"
+    },
+    {
+      "name": "private dossier review integrity rejects inconsistent dossier wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private dossier review integrity rejects inconsistent dossier contractId",
+      "status": "passed"
+    },
+    {
+      "name": "private dossier review integrity rejects inconsistent dossier version",
+      "status": "passed"
+    },
+    {
+      "name": "onboarding transaction and ownership boundaries rejects a changed wallet before accepting an already claimed invitation",
+      "status": "passed"
+    },
+    {
+      "name": "onboarding transaction and ownership boundaries blocks a duplicate invitation without replacing the process",
+      "status": "passed"
+    },
+    {
+      "name": "buildDecreto41Bundle appends a Consent entry only when consent is granted",
+      "status": "passed"
+    },
+    {
+      "name": "mint retry identity returns conflict for contract duplicate without simulated success or retry",
+      "status": "passed"
+    },
+    {
+      "name": "native Stellar booking preparation returns the same issuance and expiry after a retry without claiming consent",
+      "status": "passed"
+    },
+    {
+      "name": "native Stellar booking preparation rejects replaced wallet ownership before enqueueing",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions records attendance without starting consultation or granting consent",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions enqueues exactly one booking when the doctor starts an attended consultation",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions rejects the wrong actor for { userId: 'did:privy:doctor', email: 'doctor@example.test' } attend",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions rejects the wrong actor for { userId: 'did:privy:patient', email: 'patient@example.test' } start",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions rejects the wrong actor for { userId: 'did:privy:patient', email: 'patient@example.test' } complete",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions does not succeed when the check-in window predicate updates no rows",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions records cancellation as pending until the worker reconciles its attestation",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions can cancel a reservation that has never acquired a chain booking",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions refuses cancellation after issuance consumed the booking",
+      "status": "passed"
+    },
+    {
+      "name": "attendance, consultation and cancellation transitions does not complete a consultation before its issuance is confirmed",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login rejects absent sessions before external services for admin",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login rejects absent sessions before external services for wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login distinguishes invalid token ERR_JWT_EXPIRED from provider outage",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login distinguishes invalid token ERR_JWS_SIGNATURE_VERIFICATION_FAILED from provider outage",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login distinguishes invalid token ERR_JWS_INVALID from provider outage",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login reports Privy verify outages as recoverable service failures without raw logs",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login reports Privy user outages as recoverable service failures without raw logs",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login reports missing server credentials as configuration failure",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login does not mistake a provider API credential rejection for a user token rejection",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login does not preserve a hardcoded administrator after removing it from the allowlist",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login does not grant administrator access when the allowlist is empty",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login allows an explicitly listed administrator while writes are paused",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login reports environment mismatch instead of denying the administrator role",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login classifies database failures separately from wallet provider failures",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login classifies a wallet provider failure without replacing the wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login keeps a mismatched saved wallet blocked and reports its binding code",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login recovers the same verified Stellar wallet after an unavailable database",
+      "status": "passed"
+    },
+    {
+      "name": "private entry diagnostics after Privy login keeps requireUser nullable for existing callers while offering a strict mode",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API requires Privy login on directory, slots, schedule and registration",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API rejects another doctor’s schedule and forbids duplicate registration",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API creates pending doctor application for authenticated self-onboarding",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API rejects forged schedule bodies and overlapping blocks before mutation",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API requires the verified doctor and registry approval before replacing availability",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API keeps the whole previous schedule when the second insert fails",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API commits a verified schedule exactly once and returns the saved grid",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API does not list a doctor whose database role is active but registry authorization is revoked",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API does not present a provider failure as an empty successful directory",
+      "status": "passed"
+    },
+    {
+      "name": "private agenda API never exposes occupied-patient data for ?all=1 and uses the selected doctor ID",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration accepts the complete local development environment",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration accepts an isolated preview database for Vercel preview",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration accepts an isolated test database for Vercel production",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration accepts the unpooled local endpoint and the postgresql scheme used by the worker",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a https database URL before connecting even with the expected host",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a http database URL before connecting even with the expected host",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a non-Neon host database.example.test even when explicitly configured",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a non-Neon host isolated.neon.tech.attacker.test even when explicitly configured",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing TRUSTLEAF_ENV",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing TRUSTLEAF_DB_HOST",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing DATABASE_URL",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing PRIVY_APP_ID instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing NEXT_PUBLIC_PRIVY_APP_ID instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing PRESCRIPTION_PRIVATE_CONTRACT_ID instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing BOOKING_AUTHORITY_PUBLIC_KEY instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing NEXT_PUBLIC_STELLAR_NETWORK instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects missing NEXT_PUBLIC_SOROBAN_RPC_URL instead of substituting configuration",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration keeps new writes paused for  while allowing reads",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration keeps new writes paused for false while allowing reads",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration keeps new writes paused for TRUE while allowing reads",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration keeps new writes paused for 1 while allowing reads",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration keeps new writes paused for undefined while allowing reads",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration does not use the local database as preview",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration does not use the local database as test",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects the historical database even when its configured hostname matches",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects Vercel preview configured as test",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects Vercel production configured as preview",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a different network configuration: NEXT_PUBLIC_STELLAR_NETWORK",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a different network configuration: NEXT_PUBLIC_SOROBAN_RPC_URL",
+      "status": "passed"
+    },
+    {
+      "name": "explicit private Testnet configuration rejects a different network configuration: NEXT_PUBLIC_SOROBAN_RPC_URL",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary requires a Privy session even with the historical auth switch off",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects another database or Privy application before touching data",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary permits own pending-profile reading while writes are paused, without requiring on-chain approval",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects PUT from a foreign or missing Origin: https://foreign.example.test",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects PUT from a foreign or missing Origin: ",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects mismatched owner/binding 0",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects mismatched owner/binding 1",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects mismatched owner/binding 2",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects mismatched owner/binding 3",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change email",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change userId",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change wallet",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change walletId",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change status",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary never lets profile editing change id",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 0",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 1",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 2",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 3",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 4",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 5",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary rejects malformed profile body 6",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary updates permitted fields only under the resolved ID and verified email, without changing pending status",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary returns no profile for an unregistered participant and never creates one via PUT",
+      "status": "passed"
+    },
+    {
+      "name": "private doctor profile boundary reports a review conflict when the guarded profile update is rejected",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation starts reading a submitted attempt immediately after a page load",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation keeps the same attempt after an RPC failure and stops only after its receipt",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation reconciles a lost confirmation response without preparing or signing another attempt",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation leaves an unsigned request for an explicit user action",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation shows a failed chain receipt as failed and never as success",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation rejects another operation returned by the status endpoint",
+      "status": "passed"
+    },
+    {
+      "name": "Recovery of a durable private operation stops polling and ignores responses after leaving the screen",
+      "status": "passed"
+    },
+    {
+      "name": "Changed eligibility while a saved receipt is pending keeps 'consent' pending until the same attempt receives confirmation",
+      "status": "passed"
+    },
+    {
+      "name": "Changed eligibility while a saved receipt is pending replaces the pending 'consent' explanation with a real failed receipt",
+      "status": "passed"
+    },
+    {
+      "name": "Changed eligibility while a saved receipt is pending preserves eligibility errors in state cancelled",
+      "status": "passed"
+    },
+    {
+      "name": "chain reads uses the exact persistent consent key; distinguishes absence from RPC or wrong-key results",
+      "status": "passed"
+    },
+    {
+      "name": "persistent owner operations booking start, participants and wallet IDs must match exact accredited snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "persistent owner operations cancellation blocks rebroadcast of an uncertain mint; expired attempts also remain saved",
+      "status": "passed"
+    },
+    {
+      "name": "persistent owner operations mint confirmation preserves a competing signed cancellation for authority receipt reconciliation",
+      "status": "passed"
+    },
+    {
+      "name": "persistent owner operations wrong authenticated user or changed wallet cannot confirm another account operation",
+      "status": "passed"
+    },
+    {
+      "name": "persistent owner operations another pending action owns the wallet sequence and blocks a new preparation",
+      "status": "passed"
+    },
+    {
+      "name": "public API shape and retired routes client cannot submit XDR, hashes, contract IDs or another wallet as operation parameters",
+      "status": "passed"
+    },
+    {
+      "name": "public API shape and retired routes old clinical and wallet write routes remain retired, independent of private-write flag",
+      "status": "passed"
+    },
+    {
+      "name": "actual private-document retrieval patient and issuer can read revoked history, without exposing encryption envelope or blinding",
+      "status": "passed"
+    },
+    {
+      "name": "actual private-document retrieval administrator or unrelated authenticated wallet cannot read clinical data",
+      "status": "passed"
+    },
+    {
+      "name": "actual private-document retrieval patient cannot read an unsigned draft; issuer review does not assert an on-chain record",
+      "status": "passed"
+    },
+    {
+      "name": "actual private-document retrieval wrong public commitment or altered ciphertext never returns the private document",
+      "status": "passed"
+    },
+    {
+      "name": "Stellar owner signing UI boundary refuses another user wallet",
+      "status": "passed"
+    },
+    {
+      "name": "Stellar owner signing UI boundary never signs a cancelled operation again",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent allows consent only after attendance, doctor start and receipt",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent attendance alone grants no consent",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent doctor start without patient attendance grants no consent",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent does not treat a submitted booking as attested",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent does not offer consent after a booking expires",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent blocks consent immediately when cancellation has been requested",
+      "status": "passed"
+    },
+    {
+      "name": "Separate attendance and one-use consent does not reuse consumed consent",
+      "status": "passed"
+    },
+    {
+      "name": "Private recipe status and login destination never calls a prepared document Registered",
+      "status": "passed"
+    },
+    {
+      "name": "Private recipe status and login destination keeps revocation visible even after expiry",
+      "status": "passed"
+    },
+    {
+      "name": "Private recipe status and login destination distinguishes Registered from Active",
+      "status": "passed"
+    },
+    {
+      "name": "Private recipe status and login destination routes each approved role to its own portal",
+      "status": "passed"
+    },
+    {
+      "name": "Private recipe status and login destination never uses an arbitrary return destination",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .json suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .png suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .svg suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .ico suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .jpg suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .webp suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "retired modules cannot return through the write kill switch does not treat a forbidden API with .woff2 suffix as a public asset",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP a Privy rejection leaves an unsigned request and open dialog; only an explicit retry can confirm",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP losing the confirmation response and remounting recovers the same hash without another signature",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP two confirmation clicks in one render submit only one prepared owner signature",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP a server replay already submitted never invokes Privy or posts another signature",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP a server replay already confirmed never invokes Privy or posts another signature",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP closing the review dialog before confirmation neither prepares nor signs",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP a cancellation reported while mint signing is pending cannot become a client-side issuance success",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP if the server confirms mint after a competing cancellation, the client displays that receipt and does not rewrite it as cancelled",
+      "status": "passed"
+    },
+    {
+      "name": "active private signing components with controlled Privy and HTTP a substituted operation in the confirmation response is never shown as success and recovery queries only the original ID",
+      "status": "passed"
+    },
+    {
+      "name": "Portal Stellar session initialization does not refresh Privy when the verified wallet is already linked",
+      "status": "passed"
+    },
+    {
+      "name": "Portal Stellar session initialization shares simultaneous mounts and refreshes a newly created wallet once",
+      "status": "passed"
+    },
+    {
+      "name": "Privy owner signing boundary rejects changed intent walletId",
+      "status": "passed"
+    },
+    {
+      "name": "Privy owner signing boundary rejects a wallet removed from the owner account",
+      "status": "passed"
+    },
+    {
+      "name": "Privy owner signing boundary rejects another wallet signature",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association reuses one existing wallet on every login",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association does not create on GET-style lookup",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association blocks ambiguous legacy identities",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association creates at most once with simultaneous requests",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association never retries uncertain provider creation",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association recovers a lost response from the linked wallet",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association blocks removal and replacement of a saved wallet",
+      "status": "passed"
+    },
+    {
+      "name": "persistent Stellar wallet association blocks extra Stellar wallets even with a saved binding without replacing or recreating it",
+      "status": "passed"
+    },
+    {
+      "name": "paridad de esquema entre migrate.mjs y /api/admin/migrate mantiene idéntica la protección de participantes y cancelación reconciliada",
+      "status": "passed"
+    }
+  ],
+  "limitations": [
+    "Automated tests use controlled dependencies; they do not prove authenticated foreign-user requests on the deployment.",
+    "Main browser scenario was executed before the presentation-only correction; its commit is recorded separately."
+  ]
+}
