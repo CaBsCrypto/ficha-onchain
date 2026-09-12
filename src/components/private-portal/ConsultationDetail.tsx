@@ -86,7 +86,18 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
       <OperationNotice operation={operation} />
       {!operation && data.operations?.slice(0, 3).map(op => <OperationNotice key={op.id} operation={op} />)}
       {role === 'doctor' && !data.prescription && <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-900">Preparar receta privada</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">Preparar receta privada</h2>
+          <button type="button" disabled={unavailable || !mintReady || !!(document.medication.trim() && document.dosage.trim() && document.instructions.trim())}
+            onClick={() => setDocument(value => ({
+              medication: value.medication.trim() ? value.medication : `Producto ficticio DEMO-${id}`,
+              dosage: value.dosage.trim() ? value.dosage : 'Indicación sintética para validación técnica; no administrar.',
+              instructions: value.instructions.trim() ? value.instructions : `Consulta de prueba #${id}. Documento sintético de demostración, sin uso clínico.`,
+            }))}
+            className="rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-40">
+            Rellenar datos de prueba
+          </button>
+        </div>
         <p className="text-sm text-slate-600">Destinatario: <strong>{appointment.patient_name || appointment.patient_email}</strong>. Vigencia de prueba: 30 días.</p>
         <p className="text-xs text-slate-500">Utiliza exclusivamente medicamentos y datos sintéticos para esta demostración.</p>
         <fieldset disabled={unavailable || !mintReady} className="space-y-3 disabled:opacity-50">
