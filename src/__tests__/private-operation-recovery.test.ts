@@ -89,6 +89,9 @@ describe('Monotonic UI state and reviewer-visible errors', () => {
 });
 
 const changedEligibility = [
+  { action: 'mint', errorCode: 'consent_required' },
+  { action: 'mint', errorCode: 'booking_not_ready' },
+  { action: 'mint', errorCode: 'prescription_not_ready' },
   { action: 'consent', errorCode: 'consent_already_active' },
   { action: 'activate', errorCode: 'prescription_not_activatable' },
 ] satisfies Pick<PrivateOperation, 'action' | 'errorCode'>[];
