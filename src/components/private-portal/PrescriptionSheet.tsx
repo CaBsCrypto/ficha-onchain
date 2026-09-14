@@ -50,5 +50,3 @@ export function PrescriptionSheet({ document, prescription }: { document: Prescr
     <footer><p>Vencimiento: {localDate(prescription.expiresAt)} · Hora de Chile</p><p><strong>Datos sintéticos · Sin uso clínico</strong> · Stellar Testnet</p><p className="rx-copy-note">El estado corresponde al momento de generar esta copia.</p></footer>
   </article></>;
 }
-
-

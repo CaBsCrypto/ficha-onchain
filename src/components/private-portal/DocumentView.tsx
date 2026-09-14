@@ -65,8 +65,3 @@ export function DocumentView({ id, prescription, onAvailable }: { id: string; pr
       </dialog>, document.body))}
   </>;
 }
-
-
-
-
-
