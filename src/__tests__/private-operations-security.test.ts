@@ -165,6 +165,25 @@ function database(f:ReturnType<typeof saved>) {
 }
 
 describe('persistent owner operations',()=>{
+  it.each(['mint','activate','revoke'] as const)('rejects patient preparation of %s before chain preparation or persistence',async(action)=>{
+    const d=database(saved(action));
+    const connect=mocks.connection.getMockImplementation()!;
+    mocks.connection.mockImplementation(async()=>{
+      const client=await connect();
+      const query=client.query;
+      client.query=async(sql:string,values:any[]=[])=>{
+        if(sql.startsWith('SELECT * FROM private_operations WHERE source_wallet'))return {rows:[],rowCount:0};
+        return query(sql,values);
+      };
+      return client;
+    });
+    await expect(preparePrivateOperation(actors.patient,action,{prescriptionId})).rejects.toMatchObject({message:'forbidden',status:403});
+    expect(d.events).toContain('ROLLBACK');expect(d.events).not.toContain('COMMIT');
+    expect(d.events.some(sql=>sql.startsWith('INSERT INTO private_operations'))).toBe(false);
+    expect(d.chain.prepare).not.toHaveBeenCalled();expect(d.chain.submit).not.toHaveBeenCalled();
+    expect(d.chain.verifyDeployment).not.toHaveBeenCalled();
+  });
+
   it('persists signed hash and commits before transmission; replay never creates another envelope or nested connection',async()=>{
     const f=saved(),d=database(f);
     const first=await confirmPrivateOperation(f.actor,operationId,f.signature);
