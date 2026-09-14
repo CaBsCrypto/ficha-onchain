@@ -154,8 +154,8 @@ export async function readPrivateDocument(actor:AuthedUser,id:string) {
       JOIN prescription_booking_requests b ON b.appointment_id=p.appointment_id WHERE p.id=$1 AND p.contract_id=$2
       AND ((p.state='confirmed' AND p.patient_wallet=$3 AND b.patient_requested_by=$4) OR (p.doctor_wallet=$3 AND b.doctor_user_id=$4))`,[id,RX_PRIVATE,wallet.address,actor.userId])).rows[0];
     if(!row)throw new PrivateFlowError('private_prescription_unavailable',404);
-    const chain=createPrivateChain();await chain.verifyDeployment();
-    if(row.state==='confirmed')await prescriptionView(row,{},chain);
+    const chain=createPrivateChain();
+    await Promise.all([chain.verifyDeployment(), row.state==='confirmed' ? prescriptionView(row,{},chain) : Promise.resolve()]);
     const plain=decryptPrescription(row.ciphertext,encryptionKey(),storageContext(row.id));
     if(prescriptionCommitment(plain)!==row.commitment||plain.patient!==row.patient_wallet||plain.doctor!==row.doctor_wallet||plain.issuanceId!==row.issuance_id||plain.expiresAt!==Number(row.expires_at)||plain.contractId!==RX_PRIVATE||plain.network!=='testnet')throw new PrivateFlowError('private_prescription_unavailable',503);
     return {id:row.id,rxId:row.state==='confirmed'?String(row.rx_id):null,document:plain.document};

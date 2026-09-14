@@ -17,10 +17,11 @@ export const jsonBody = (body: unknown): RequestInit => ({ method: 'POST', heade
 export function usePortalData<T>(path: string | null, interval = 3000) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
+  const [resultPath, setResultPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
-  useEffect(() => { setData(null); setLoading(true); }, [path]);
+  useEffect(() => { setData(null); setError(''); setResultPath(null); setLoading(true); }, [path]);
   useEffect(() => {
     if (!path) { setLoading(false); return; }
     const controller = new AbortController();
@@ -29,14 +30,14 @@ export function usePortalData<T>(path: string | null, interval = 3000) {
     async function poll() {
       try {
         const next = await portalApi<T>(path!, { signal: controller.signal });
-        if (alive) { setData(next); setError(''); }
+        if (alive) { setData(next); setResultPath(path); setError(''); }
       } catch (failure) { if (alive) setError(failure instanceof Error ? failure.message : 'No se pudo consultar.'); }
       finally { if (alive) { setLoading(false); if (interval > 0) timer = setTimeout(() => void poll(), interval); } }
     }
     void poll();
     return () => { alive = false; controller.abort(); clearTimeout(timer); };
   }, [path, revision, interval]);
-  return { data, error, loading, refresh };
+  return { data: path && resultPath === path ? data : null, error, loading: !!path && (loading || resultPath !== path && !error), refresh };
 }
 export function localDate(timestamp?: number | null) {
   return timestamp ? new Date(timestamp * 1000).toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'Pendiente';
