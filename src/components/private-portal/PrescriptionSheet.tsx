@@ -40,7 +40,7 @@ export function PrescriptionSheet({ document, prescription }: { document: Prescr
         <div><dt>Paciente</dt><dd>{prescription.patientName}</dd></div>
         <div><dt>Médico emisor</dt><dd>{prescription.doctorName}</dd></div>
       </dl>
-      
+
       <dl className="rx-treatment">
         <div className="rx-medication"><dt>Medicamento de prueba</dt><dd>{document.medication}</dd></div>
         <div className="rx-dose"><dt>Dosis e indicación</dt><dd>{document.dosage}</dd></div>
