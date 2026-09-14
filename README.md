@@ -16,6 +16,8 @@ TrustLeaf connects doctor and patient portals to **two smart contracts on Stella
 
 ## Current status
 
+**Week 3 preparation:** Week 2 has been delivered according to the project owner. The historical preview evidence below remains a separate cutoff. A new main-domain recording, transaction timestamp map and final QA are being prepared in the [Week 3 package](./docs/sow-delivery/week3-review/README.md). Week 3 is not yet validated or delivered; see its [current checks and outstanding work](./docs/sow-delivery/week3-review/VALIDATION.md).
+
 - Three distinct test accounts have confirmed owner-signing probes with relayer-paid Testnet receipts: administrator, doctor and patient.
 - Administrative doctor authorization is confirmed in `DoctorRegistryPrivate`. The same request moved from pending to confirmed with one transaction hash, and the doctor saw the current authorization in the deployed portal.
 - The isolated preview completed two independent consultations. The patient confirmed attendance and granted consent separately; the doctor issued and activated both prescriptions, then revoked `#6` while preserving its history.
