@@ -1,6 +1,7 @@
 import { localDate } from './client';
 import { prescriptionLabel } from './state';
-import type { PrescriptionDocument, PrivatePrescription } from './types';
+import type { PrescriptionDocument, PrivatePrescription, PrescriptionVerification as Verification } from './types';
+import { PrescriptionVerification } from './PrescriptionVerification';
 
 /** Shared, scoped presentation for the portal and browser printing. */
 export const prescriptionStyles = `
@@ -22,11 +23,17 @@ export const prescriptionStyles = `
 .tl-rx .rx-dose{border-top:1px solid #dbeaf3;padding-top:12px;margin-top:14px}.tl-rx .rx-dose dd{font-size:15px}
 .tl-rx .rx-instructions{padding-top:20px;margin-top:22px;border-top:1px solid #e2e8f0}.tl-rx .rx-instructions dt{font-size:13px;color:#0f172a}.tl-rx .rx-instructions dd{line-height:1.75}
 .tl-rx footer{border-top:1px solid #e2e8f0;padding:14px 28px;font-size:11px;color:#64748b}.tl-rx footer strong{color:#475569;font-weight:600}.tl-rx .rx-copy-note{display:none}
+.tl-rx .rx-verification{margin-top:24px;padding-top:18px;border-top:1px solid #e2e8f0;break-inside:avoid;font-size:12px}
+.tl-rx .rx-verification h5{margin:0 0 12px;font-size:14px;color:#0f172a}.tl-rx .rx-verification-grid{display:grid;grid-template-columns:minmax(0,1fr) 144px;gap:16px}
+.tl-rx .rx-verification dl>div{margin-bottom:8px}.tl-rx .rx-verification dd{margin-top:0}.tl-rx .rx-verification a{color:#0369a1;text-decoration:underline}.tl-rx .rx-hash{display:block;word-break:break-all;font-size:10px;line-height:1.5}
+.tl-rx .rx-verification figure{margin:0;text-align:center}.tl-rx .rx-verification img{display:block;max-width:100%;height:auto}.tl-rx .rx-verification figcaption,.tl-rx .rx-verification-note{font-size:11px;color:#64748b}
+@media(max-width:480px){.tl-rx .rx-verification-grid{grid-template-columns:1fr}.tl-rx .rx-verification figure{width:144px}}
 @media(max-width:480px){.tl-rx header,.tl-rx .rx-body{padding:20px}.tl-rx footer{padding:14px 20px}.tl-rx .rx-people{grid-template-columns:1fr;gap:12px}.tl-rx h4{font-size:24px}}
 @media print{@page{size:A4;margin:15mm}.tl-rx{font-size:11pt;overflow:visible}.tl-rx header,.tl-rx .rx-body,.tl-rx footer{padding-left:0;padding-right:0}.tl-rx .rx-people{grid-template-columns:1fr 1fr}.tl-rx dt{break-after:avoid}.tl-rx dd,.tl-rx p{orphans:3;widows:3}.tl-rx header,.tl-rx .rx-people{break-inside:avoid}.tl-rx .rx-treatment{box-decoration-break:clone;-webkit-box-decoration-break:clone}.tl-rx .rx-copy-note{display:block}}
 `;
 
-export function PrescriptionSheet({ document, prescription }: { document: PrescriptionDocument; prescription: PrivatePrescription }) {
+export function PrescriptionSheet({ document, prescription: listed, verification, onQrReady }: { document: PrescriptionDocument; prescription: PrivatePrescription; verification?: Verification; onQrReady?: (ready: boolean) => void }) {
+  const prescription = verification ? { ...listed, rxId: verification.rxId, status: verification.status, expiresAt: verification.expiresAt, expired: verification.expired } : listed;
   const inactive = prescription.status === 'Revoked' || prescription.status === 'Blocked' || prescription.expired;
   const statusClass = inactive ? 'rx-inactive' : prescription.rxId != null && prescription.status === 'Active' ? 'rx-active' : '';
   return <><style>{prescriptionStyles}</style><article aria-label="Documento de receta privada" className="tl-rx">
@@ -46,6 +53,7 @@ export function PrescriptionSheet({ document, prescription }: { document: Prescr
         <div className="rx-dose"><dt>Dosis e indicación</dt><dd>{document.dosage}</dd></div>
       </dl>
       <dl className="rx-instructions"><dt>Instrucciones</dt><dd>{document.instructions || 'Sin instrucciones adicionales'}</dd></dl>
+      {verification && <PrescriptionVerification verification={verification} onQrReady={onQrReady} />}
     </div>
     <footer><p>Vencimiento: {localDate(prescription.expiresAt)} · Hora de Chile</p><p><strong>Datos sintéticos · Sin uso clínico</strong> · Stellar Testnet</p><p className="rx-copy-note">El estado corresponde al momento de generar esta copia.</p></footer>
   </article></>;
