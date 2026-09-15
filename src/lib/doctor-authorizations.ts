@@ -26,7 +26,7 @@ export async function verifiedWallet(sql: Sql, userId: string, email: string) {
   const user = await p.getUser(userId);
   const actualEmail = (user.email?.address ?? user.google?.email)?.toLowerCase();
   if (actualEmail !== email.toLowerCase()) throw new DoctorAuthorizationError('identity_changed', 403);
-  return resolveStellarWallet(sql, { getUser: id => p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId);
+  return resolveStellarWallet(sql, { getUser: id => id === userId ? Promise.resolve(user) : p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId);
 }
 export async function resolveDoctor(sql: Sql, doctorId: number) {
   const [doctor] = await sql`SELECT id,name,email,specialty,status FROM doctors WHERE id=${doctorId}`;

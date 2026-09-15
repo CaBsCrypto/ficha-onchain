@@ -150,14 +150,21 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
 export async function readPrivateDocument(actor:AuthedUser,id:string) {
   const wallet=await privateActorWallet(actor),client=await getDbConnection();
   try {
-    const row=(await client.query(`SELECT p.*,b.doctor_user_id,b.patient_requested_by FROM private_prescriptions p
+    const row=(await client.query(`SELECT p.*,b.doctor_user_id,b.patient_requested_by,
+      (SELECT o.transaction_hash FROM private_operations o WHERE o.prescription_id=p.id
+        AND o.action='revoke' AND o.state='confirmed' ORDER BY o.created_at DESC LIMIT 1) AS revocation_hash FROM private_prescriptions p
       JOIN prescription_booking_requests b ON b.appointment_id=p.appointment_id WHERE p.id=$1 AND p.contract_id=$2
       AND ((p.state='confirmed' AND p.patient_wallet=$3 AND b.patient_requested_by=$4) OR (p.doctor_wallet=$3 AND b.doctor_user_id=$4))`,[id,RX_PRIVATE,wallet.address,actor.userId])).rows[0];
     if(!row)throw new PrivateFlowError('private_prescription_unavailable',404);
-    const chain=createPrivateChain();await chain.verifyDeployment();
-    if(row.state==='confirmed')await prescriptionView(row,{},chain);
+    const chain=createPrivateChain();
+    const [,view]=await Promise.all([chain.verifyDeployment(), prescriptionView(row,{},chain)]);
     const plain=decryptPrescription(row.ciphertext,encryptionKey(),storageContext(row.id));
     if(prescriptionCommitment(plain)!==row.commitment||plain.patient!==row.patient_wallet||plain.doctor!==row.doctor_wallet||plain.issuanceId!==row.issuance_id||plain.expiresAt!==Number(row.expires_at)||plain.contractId!==RX_PRIVATE||plain.network!=='testnet')throw new PrivateFlowError('private_prescription_unavailable',503);
-    return {id:row.id,rxId:row.state==='confirmed'?String(row.rx_id):null,document:plain.document};
+    const validHash=(value:unknown)=>typeof value==='string'&&/^[a-f0-9]{64}$/i.test(value)?value.toLowerCase():null;
+    return {id:row.id,rxId:row.state==='confirmed'?String(row.rx_id):null,document:plain.document,
+      verification:{network:'testnet',contract:RX_PRIVATE,rxId:row.state==='confirmed'?String(row.rx_id):null,
+        status:view.status,expiresAt:view.expiresAt,expired:view.expired,checkedAt:new Date().toISOString(),
+        issuanceHash:row.state==='confirmed'?validHash(row.transaction_hash):null,
+        revocationHash:view.status==='Revoked'?validHash(row.revocation_hash):null}};
   }finally{client.release();}
 }

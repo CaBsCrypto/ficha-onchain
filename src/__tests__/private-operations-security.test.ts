@@ -314,7 +314,8 @@ describe('actual private-document retrieval',()=>{
     const f=documentFixture();
     for(const actor of [actors.patient,actors.doctor]) {
       const result=await readPrivateDocument(actor,prescriptionId);
-      expect(result).toEqual({id:prescriptionId,rxId:'9',document:f.payload.document});
+      expect(result).toMatchObject({id:prescriptionId,rxId:'9',document:f.payload.document,
+        verification:{network:'testnet',contract:RX_PRIVATE,rxId:'9',status:'Revoked',issuanceHash:null,revocationHash:null}});
       expect(JSON.stringify(result)).not.toContain(f.payload.blinding);expect(JSON.stringify(result)).not.toContain('dossier:v1');
     }
   });
@@ -323,11 +324,23 @@ describe('actual private-document retrieval',()=>{
     await expect(readPrivateDocument({userId:'did:privy:admin',email:'admin@example.test'},prescriptionId)).rejects.toThrow('private_prescription_unavailable');
     expect(f.chain.prescription).not.toHaveBeenCalled();
   });
+  it('returns the same confirmed public receipts to patient and issuer, ignoring invalid hashes',async()=>{
+    const f=documentFixture();
+    f.row.transaction_hash='ab'.repeat(32);f.row.revocation_hash='cd'.repeat(32);
+    for(const actor of [actors.patient,actors.doctor]) {
+      const {verification}=await readPrivateDocument(actor,prescriptionId);
+      expect(verification).toMatchObject({issuanceHash:f.row.transaction_hash,revocationHash:f.row.revocation_hash,status:'Revoked'});
+      expect(Number.isFinite(Date.parse(verification.checkedAt))).toBe(true);
+    }
+    f.row.transaction_hash='javascript:bad';f.row.revocation_hash='not-a-hash';
+    expect((await readPrivateDocument(actors.patient,prescriptionId)).verification).toMatchObject({issuanceHash:null,revocationHash:null});
+  });
   it('patient cannot read an unsigned draft; issuer review does not assert an on-chain record',async()=>{
     const f=documentFixture('prepared');
     await expect(readPrivateDocument(actors.patient,prescriptionId)).rejects.toThrow('private_prescription_unavailable');
     const result=await readPrivateDocument(actors.doctor,prescriptionId);
     expect(result.document).toEqual(f.payload.document);expect(result.rxId).toBeNull();expect(f.chain.prescription).not.toHaveBeenCalled();
+    expect(result.verification).toMatchObject({status:'Pending',rxId:null,issuanceHash:null,revocationHash:null});
   });
   it('wrong public commitment or altered ciphertext never returns the private document',async()=>{
     const f=documentFixture();f.chain.prescription.mockResolvedValueOnce({id:'9',patient:f.row.patient_wallet,doctor:f.row.doctor_wallet,

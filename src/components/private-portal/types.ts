@@ -29,3 +29,8 @@ export interface ConsultationState {
   prescription?: PrivatePrescription | null; operations: PrivateOperation[];
 }
 export interface PrescriptionDocument { medication: string; dosage: string; instructions: string }
+export interface PrescriptionVerification {
+  network: 'testnet'; contract: string; rxId: string | null;
+  status: PrivatePrescription['status']; expiresAt: number; expired: boolean; checkedAt: string;
+  issuanceHash: string | null; revocationHash: string | null;
+}

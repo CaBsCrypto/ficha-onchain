@@ -1,23 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { DocumentView } from './DocumentView';
 import { localDate, usePortalData } from './client';
 import { prescriptionLabel } from './state';
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation } from './Operation';
-import type { PortalRole, PrescriptionDocument, PrivatePrescription } from './types';
-
-export function DocumentView({ id, onAvailable }: { id: string; onAvailable?: (available: boolean) => void }) {
-  const [open, setOpen] = useState(false);
-  const { data, error, loading, refresh } = usePortalData<{ document: PrescriptionDocument }>(open ? `/api/private-prescriptions/${encodeURIComponent(id)}/document` : null, 0);
-  useEffect(() => { onAvailable?.(open && !!data && !error && !loading); }, [open, data, error, loading, onAvailable]);
-  return <div>
-    <button onClick={() => setOpen(value => !value)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{open ? 'Cerrar documento' : 'Abrir documento privado'}</button>
-    {open && <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
-      {loading && <p role="status" className="text-sm text-slate-500">Comprobando tu acceso…</p>}
-      {error && <p role="alert" className="text-sm text-rose-700">{error} <button onClick={refresh} className="underline">Reintentar</button></p>}
-      {data && !error && <dl className="space-y-3 text-sm">{[['Medicamento de prueba', data.document.medication], ['Dosis e indicación', data.document.dosage], ['Instrucciones', data.document.instructions]].map(([label, value]) => <div key={label}><dt className="font-semibold text-slate-800">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-slate-600">{value || 'Sin instrucciones adicionales'}</dd></div>)}</dl>}
-    </div>}
-  </div>;
-}
+import type { PortalRole, PrivatePrescription } from './types';
 
 export function PrescriptionCard({ prescription, role, onChange, unavailable = false }: { prescription: PrivatePrescription; role: PortalRole; onChange: () => void; unavailable?: boolean }) {
   const [documentReady, setDocumentReady] = useState(false);
@@ -30,12 +17,12 @@ export function PrescriptionCard({ prescription, role, onChange, unavailable = f
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `Receta #${prescription.rxId}` : 'Documento preparado'}</h3><span className={`rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription)}</span></div>
     <p className="text-sm text-slate-600">Médico: <strong>{prescription.doctorName}</strong><br />Paciente: <strong>{prescription.patientName}</strong></p>
     <p className="text-xs text-slate-500">Vence: {localDate(prescription.expiresAt)} · Hora de Chile</p>
-    {(role === 'doctor' || prescription.rxId != null) && <DocumentView id={prescription.id} />}
+    {(role === 'doctor' || prescription.rxId != null) && <DocumentView id={prescription.id} prescription={prescription} />}
     <ReceiptLink hash={prescription.transactionHash} />
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
     <OperationNotice operation={operation ?? prescription.operation} />
     {role === 'doctor' && <div className="flex flex-wrap gap-3">
-      {prescription.rxId == null && <ConfirmationButton label="Revisar y continuar emisión" title="Emitir la receta preparada" disabled={busy || pending || unavailable || prescription.expired} confirmDisabled={!documentReady} onConfirm={() => act('mint')}><p>Emitirás el documento guardado para <strong>{prescription.patientName}</strong>. Abre y revisa su contenido para habilitar la confirmación.</p><DocumentView id={prescription.id} onAvailable={setDocumentReady} /></ConfirmationButton>}
+      {prescription.rxId == null && <ConfirmationButton label="Revisar y continuar emisión" title="Emitir la receta preparada" disabled={busy || pending || unavailable || prescription.expired} confirmDisabled={!documentReady} onConfirm={() => act('mint')}><p>Emitirás el documento guardado para <strong>{prescription.patientName}</strong>. Abre y revisa su contenido para habilitar la confirmación.</p><DocumentView id={prescription.id} prescription={prescription} onAvailable={setDocumentReady} /></ConfirmationButton>}
       {prescription.rxId != null && prescription.status === 'Registered' && !prescription.expired && <ConfirmationButton label="Activar receta" title="Activar esta receta" disabled={busy || pending || unavailable} onConfirm={() => act('activate')}><p>Activarás la receta #{prescription.rxId} para <strong>{prescription.patientName}</strong>. Este cambio requiere tu firma y quedará confirmado mediante su propio recibo.</p></ConfirmationButton>}
       {prescription.rxId != null && ['Registered', 'Active'].includes(prescription.status) && <ConfirmationButton danger label="Revocar receta" title="Revocar esta receta" disabled={busy || pending || unavailable} onConfirm={() => act('revoke')}><p>Revocarás la receta #{prescription.rxId} para <strong>{prescription.patientName}</strong>. La receta y su historial se conservarán.</p></ConfirmationButton>}
     </div>}
