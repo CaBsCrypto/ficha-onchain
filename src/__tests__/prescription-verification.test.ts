@@ -10,11 +10,10 @@ describe('public prescription verification presentation',()=>{
     expect(receiptUrl(sample.issuanceHash)).toBe(`https://stellar.expert/explorer/testnet/tx/${sample.issuanceHash}`);
     expect(receiptUrl('https://another.example')).toBeNull();expect(receiptUrl(null)).toBeNull();
   });
-  it('prints full issuance and revocation hashes and a dated status',()=>{
+  it('omits the technical summary from the document',()=>{
     const html=renderToStaticMarkup(createElement(PrescriptionVerification,{verification:sample}));
-    expect(html).toContain(sample.issuanceHash);expect(html).toContain(sample.revocationHash);
-    expect(html).toContain('America/Santiago');expect(html).toContain('Revocada');
-    expect(html).toContain('no publica el contenido privado');
+    expect(html).not.toContain('<dl>');expect(html).not.toContain('Fecha de consulta');
+    expect(html).not.toContain(sample.revocationHash);expect(html).not.toContain('PrescriptionPrivate v2');
   });
   it('does not invent a receipt for prepared documents or malformed hashes',()=>{
     const prepared=renderToStaticMarkup(createElement(PrescriptionVerification,{verification:{...sample,rxId:null,status:'Pending',issuanceHash:null,revocationHash:null}}));
