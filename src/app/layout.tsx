@@ -4,8 +4,6 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppPrivyProvider } from "@/providers/PrivyProvider";
-import { Suspense } from 'react';
-import { AccessProbe } from '@/components/private-portal/AccessProbe';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,7 +58,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-canvas text-ink">
         <AppPrivyProvider>
-          {(process.env.VERCEL_ENV === 'preview' || ['test', 'preview', 'local'].includes(process.env.TRUSTLEAF_ENV ?? '')) && <Suspense fallback={null}><AccessProbe /></Suspense>}
           <LanguageProvider>{children}</LanguageProvider>
         </AppPrivyProvider>
         <Toaster richColors position="bottom-center" />
