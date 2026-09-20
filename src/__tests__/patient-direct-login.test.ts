@@ -40,8 +40,10 @@ it('consumes the URL intent once and restores focus after cancellation',async()=
   mock.ready=true;await render();expect(mock.login).toHaveBeenCalledOnce();
   expect(window.location.search).toBe('?lang=pt');expect(window.location.hash).toBe('#how');
   mock.isOpen=true;await render();expect(box.firstElementChild?.hasAttribute('inert')).toBe(true);
+  await act(async()=>mock.callbacks.onError('exited_auth_flow'));
   mock.isOpen=false;await render();await render();
   expect(mock.login).toHaveBeenCalledOnce();expect(mock.replace).not.toHaveBeenCalled();
+  expect(box.querySelector('[role=alert]')).toBeNull();
   expect(box.firstElementChild?.hasAttribute('inert')).toBe(false);
   expect(document.activeElement).toBe(button('Iniciar sesión'));
   await click('Iniciar sesión');expect(mock.login).toHaveBeenCalledTimes(2);

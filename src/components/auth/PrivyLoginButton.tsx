@@ -28,7 +28,11 @@ export function PrivyLoginButton() {
       requested.current = false;
       router.replace('/patient');
     },
-    onError: () => { requested.current = false; setBusy(false); setError(true); },
+    onError: (code) => {
+      requested.current = false;
+      setBusy(false);
+      setError(code !== 'exited_auth_flow');
+    },
   });
   function enter() {
     if (!ready || requested.current) return;
