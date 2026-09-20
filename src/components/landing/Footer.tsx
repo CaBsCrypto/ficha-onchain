@@ -19,6 +19,7 @@ export function Footer() {
     if (l.includes("veri")) return "/verify";
     if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login/doctor";
     if (l.includes("pacient") || l.includes("patient")) return "/login/patient";
+    if (l.includes("priva")) return "#waitlist";
     return "#";
   };
 

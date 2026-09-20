@@ -1,95 +1,57 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useLanguage } from "@/hooks/useLanguage";
+import { useId, useRef, useState, type FormEvent } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
+import { normalizeWaitlistEmail, WAITLIST_EMAIL_MAX_LENGTH } from '@/lib/waitlist';
+import { waitlistCopy } from '@/lib/waitlist-copy';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type Status = 'idle' | 'invalid' | 'submitting' | 'done' | 'unavailable' | 'limited';
 
-/**
- * Shared waitlist email form — used by both the on-page section and the
- * navbar modal so the input, button, and submit logic never drift apart.
- * Colors assume a dark blue→purple gradient background.
- */
-export function WaitlistForm() {
-  const { t } = useLanguage();
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "error" | "submitting" | "done">(
-    "idle",
-  );
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (status === "submitting") return;
-    if (!EMAIL_RE.test(email)) {
-      setStatus("error");
-      return;
-    }
-    setStatus("submitting");
+/** Shared by the section and modal; one in-flight submission per form. */
+export function WaitlistForm({ compact = false }: { compact?: boolean }) {
+  const { t, lang } = useLanguage();
+  const copy = waitlistCopy[lang];
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<Status>('idle');
+  const inFlight = useRef(false);
+  const id = useId();
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (inFlight.current) return;
+    const normalized = normalizeWaitlistEmail(email);
+    if (!normalized) { setStatus('invalid'); return; }
+    inFlight.current = true; setStatus('submitting');
     try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      const response = await fetch('/api/waitlist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized }), cache: 'no-store',
       });
-      if (!res.ok) throw new Error("request failed");
-      setStatus("done");
-      setEmail("");
-    } catch {
-      // Network / server error — surface the same inline error as invalid input.
-      setStatus("error");
-    }
+      if (response.status === 429) { setStatus('limited'); return; }
+      if (response.status === 400) { setStatus('invalid'); return; }
+      if (!response.ok || (await response.json()).success !== true) throw new Error('unavailable');
+      setStatus('done'); setEmail('');
+    } catch { setStatus('unavailable'); }
+    finally { inFlight.current = false; }
   }
-
-  if (status === "done") {
-    return (
-      <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-mint/15 px-5 py-3 text-sm font-medium text-mint">
-        <svg
-          viewBox="0 0 24 24"
-          className="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-        {t.waitlist.success}
-      </p>
-    );
-  }
-
-  return (
-    <>
-      <form
-        onSubmit={onSubmit}
-        className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row"
-        noValidate
-      >
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (status === "error") setStatus("idle");
-          }}
-          placeholder={t.waitlist.placeholder}
-          aria-label={t.waitlist.placeholder}
-          aria-invalid={status === "error"}
-          className="h-14 flex-1 rounded-full border border-white/20 bg-white/10 px-6 text-white placeholder-white/50 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
-        />
-        <button
-          type="submit"
-          disabled={status === "submitting"}
-          className="inline-flex h-14 items-center justify-center rounded-full bg-white px-8 text-base font-medium text-[#4c1d95] transition-all duration-200 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 disabled:opacity-70"
-        >
-          {status === "submitting" ? "…" : t.waitlist.cta}
+  const error = status === 'invalid' ? t.waitlist.invalid : status === 'limited' ? copy.limited : status === 'unavailable' ? copy.unavailable : null;
+  return <div className="mt-6">
+    {status === 'done' ? <p role="status" className="rounded-xl bg-emerald-500/15 p-4 text-sm text-emerald-200">{copy.success}</p> :
+      <form onSubmit={onSubmit} noValidate aria-busy={status === 'submitting'} className={compact ? 'space-y-3' : 'mx-auto flex max-w-xl flex-col gap-3 sm:flex-row'}>
+        <label className="sr-only" htmlFor={id}>{copy.email}</label>
+        <input id={id} type="email" autoComplete="email" maxLength={WAITLIST_EMAIL_MAX_LENGTH} value={email}
+          disabled={status === 'submitting'}
+          onChange={event => { setEmail(event.target.value); if (status !== 'submitting') setStatus('idle'); }}
+          placeholder={t.waitlist.placeholder} aria-invalid={status === 'invalid'} aria-describedby={`${id}-notice${error ? ` ${id}-error` : ''}`}
+          className="min-w-0 w-full flex-1 rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-sm text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-sky-300" />
+        <button type="submit" disabled={status === 'submitting'} className="shrink-0 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-sky-900 hover:bg-sky-50 disabled:opacity-60">
+          {status === 'submitting' ? copy.sending : status === 'unavailable' || status === 'limited' ? copy.retry : t.waitlist.cta}
         </button>
-      </form>
-
-      {status === "error" && (
-        <p className="mt-3 text-sm text-rose-300">{t.waitlist.invalid}</p>
-      )}
-    </>
-  );
+      </form>}
+    {error && <p id={`${id}-error`} role="alert" className="mt-3 text-sm text-rose-200">{error}</p>}
+    <p id={`${id}-notice`} className="mt-4 text-xs leading-relaxed text-white/75">{copy.interest}</p>
+    <details className="mt-3 text-left text-xs leading-relaxed text-white/75">
+      <summary className="cursor-pointer underline underline-offset-4">{copy.privacyTitle}</summary>
+      <p className="mt-2">{copy.privacy}</p>
+    </details>
+  </div>;
 }
