@@ -65,6 +65,7 @@ export function DisponibilidadTab() {
   const dirty = savedBlocks !== null && fingerprint(blocks) !== fingerprint(savedBlocks);
   const [savingGrid, setSavingGrid] = useState(false);
   const [gridError, setGridError] = useState('');
+  const [draftError, setDraftError] = useState('');
   const [gridSaved, setGridSaved] = useState(false);
 
   // New-block draft
@@ -106,9 +107,9 @@ export function DisponibilidadTab() {
   function addBlock() {
     if (savingGrid) return;
     setGridSaved(false);
-    setGridError('');
+    setDraftError('');
     if (draftEnd <= draftStart) {
-      setGridError('La hora de término debe ser posterior a la de inicio');
+      setDraftError('La hora de término debe ser posterior a la de inicio');
       return;
     }
     // Reject a block that overlaps an existing one on the same day, so the
@@ -122,7 +123,7 @@ export function DisponibilidadTab() {
         b.start_time < draftEnd,
     );
     if (clash) {
-      setGridError(`Ese horario se cruza con un bloque que ya tienes el ${WEEKDAYS[draftWeekday]}`);
+      setDraftError(`Ese horario se cruza con un bloque que ya tienes el ${WEEKDAYS[draftWeekday]}`);
       return;
     }
     setBlocks((prev) => [
@@ -220,7 +221,7 @@ export function DisponibilidadTab() {
                 <FormField label="Día">
                   <select
                     value={draftWeekday}
-                    onChange={(e) => setDraftWeekday(Number(e.target.value))}
+                    onChange={(e) => { setDraftWeekday(Number(e.target.value)); setDraftError(''); }}
                     className={selectCls}
                   >
                     {DISPLAY_ORDER.map((wd) => (
@@ -232,7 +233,7 @@ export function DisponibilidadTab() {
                   <input
                     type="time"
                     value={draftStart}
-                    onChange={(e) => setDraftStart(e.target.value)}
+                    onChange={(e) => { setDraftStart(e.target.value); setDraftError(''); }}
                     className={inputCls}
                   />
                 </FormField>
@@ -240,7 +241,7 @@ export function DisponibilidadTab() {
                   <input
                     type="time"
                     value={draftEnd}
-                    onChange={(e) => setDraftEnd(e.target.value)}
+                    onChange={(e) => { setDraftEnd(e.target.value); setDraftError(''); }}
                     className={inputCls}
                   />
                 </FormField>
@@ -309,6 +310,7 @@ export function DisponibilidadTab() {
               )}
             </div>
 
+            {draftError && <div role="alert" className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{draftError}</div>}
             {gridError && (
               <div role="alert" className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{gridError}</div>
             )}
