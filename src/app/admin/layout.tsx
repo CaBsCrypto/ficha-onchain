@@ -68,7 +68,7 @@ function LoginScreen() {
       <p className="mb-4 text-sm text-white/60">
         Ingresa con tu cuenta. Solo los administradores autorizados pueden entrar al panel.
       </p>
-      <Link href="/login?role=admin" className={`${primaryBtn} block text-center`} style={primaryBtnStyle}>
+      <Link href="/login/admin" className={`${primaryBtn} block text-center`} style={primaryBtnStyle}>
         Entrar con mi cuenta
       </Link>
     </Gate>
@@ -216,7 +216,7 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
 
   async function changeAccount() {
     setLeaving(true);
-    try { await logout(); router.replace('/login?role=admin'); }
+    try { await logout(); router.replace('/login/admin'); }
     catch (failure) { setLeaving(false); setError(accessFailure(failure)); setPhase('error'); }
   }
   if (leaving || phase === 'checking') return <Loading />;

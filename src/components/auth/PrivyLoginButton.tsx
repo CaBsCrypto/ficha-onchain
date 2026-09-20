@@ -1,14 +1,16 @@
 'use client';
+import Link from 'next/link';
 import { usePrivyAuth } from '@/lib/privy';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTrackUser } from '@/hooks/useTrackUser';
 
 export function PrivyLoginButton() {
-  const { ready, authenticated, user, login, logout } = usePrivyAuth();
+  const { ready, authenticated, user, logout } = usePrivyAuth();
   useTrackUser(); // track on any page where this button renders
   const { lang } = useLanguage();
 
   const labels = {
+    pt: { signIn: 'Entrar', connected: 'Conectado', signOut: 'Sair' },
     en: { signIn: 'Sign in', connected: 'Connected', signOut: 'Sign out' },
     es: { signIn: 'Iniciar sesión', connected: 'Conectado', signOut: 'Salir' },
   }[lang] ?? { signIn: 'Sign in', connected: 'Connected', signOut: 'Sign out' };
@@ -34,11 +36,11 @@ export function PrivyLoginButton() {
   }
 
   return (
-    <button
-      onClick={login}
+    <Link
+      href="/login/patient"
       className="text-sm px-4 py-2 rounded-lg bg-sky-500 text-white hover:bg-sky-600 transition-colors font-medium"
     >
       {labels.signIn}
-    </button>
+    </Link>
   );
 }

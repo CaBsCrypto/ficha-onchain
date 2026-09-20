@@ -3,7 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminLayout from '@/app/admin/layout';
-import LoginPage from '@/app/login/page';
+import RoleLogin from '@/components/auth/RoleLogin';
+const LoginPage = () => createElement(RoleLogin, { activeRole: mock.role as 'admin' | 'patient' | 'doctor' });
 import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 
 const mock = vi.hoisted(() => ({
@@ -57,7 +58,7 @@ describe('Administrator access recovery', () => {
   it('offers reauthentication on 401 while preserving the admin destination', async () => {
     mock.fetch.mockResolvedValue(reply(401, { error: 'unauthorized' }));
     await render(AdminLayout); await click('Volver a ingresar con Privy');
-    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).toHaveBeenCalledWith('/login?role=admin');
+    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).toHaveBeenCalledWith('/login/admin');
     expect(container.textContent).not.toContain('Protected portal');
   });
   it('reserves access denied for 403', async () => {
@@ -89,7 +90,7 @@ describe('Administrator access recovery', () => {
     await render(AdminLayout); mock.authenticated = false; mock.user = null; await render(AdminLayout);
     await act(async () => { old.resolve(reply(200, { admin: true, email: 'admin@example.test' })); });
     expect(container.textContent).not.toContain('Protected portal');
-    expect(container.querySelector('a[href="/login?role=admin"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/login/admin"]')).not.toBeNull();
   });
 });
 

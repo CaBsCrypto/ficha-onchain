@@ -437,7 +437,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
 
   useEffect(() => {
-    if (ready && !authenticated) router.replace('/login?role=doctor');
+    if (ready && !authenticated) router.replace('/login/doctor');
   }, [ready, authenticated, router]);
 
   if (!ready || !authenticated) {

@@ -38,10 +38,10 @@ export function AudienceSection() {
             </div>
             <div className="mt-8 pt-6 border-t border-clinical/10">
               <Link
-                href="/login?role=doctor"
+                href="/login/doctor"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-clinical-600 hover:text-clinical-700"
               >
-                {lang === "es" ? "Ingresar al portal médico" : "Enter doctor portal"} →
+                {lang === "pt" ? "Entrar no portal médico" : lang === "es" ? "Ingresar al portal médico" : "Enter doctor portal"} →
               </Link>
             </div>
           </div>
@@ -56,10 +56,10 @@ export function AudienceSection() {
             </div>
             <div className="mt-8 pt-6 border-t border-mint/10">
               <Link
-                href="/login?role=patient"
+                href="/login/patient"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-mint-700 hover:text-mint-800"
               >
-                {lang === "es" ? "Ingresar al portal del paciente" : "Enter patient portal"} →
+                {lang === "pt" ? "Entrar no portal do paciente" : lang === "es" ? "Ingresar al portal del paciente" : "Enter patient portal"} →
               </Link>
             </div>
           </div>

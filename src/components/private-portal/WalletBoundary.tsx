@@ -44,7 +44,7 @@ function VerifiedWalletBoundary({ children, role }: { children: React.ReactNode;
   }, [revision, leaving]);
   async function changeAccount() {
     setLeaving(true); setWallet(null);
-    try { await logout(); router.replace(`/login?role=${role}`); }
+    try { await logout(); router.replace(`/login/${role}`); }
     catch (failure) { setLeaving(false); setError(accessFailure(failure)); }
   }
   if (!wallet || leaving) return <div className="mx-auto my-16 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

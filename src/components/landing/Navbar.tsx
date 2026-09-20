@@ -9,7 +9,7 @@ import type { Language } from "@/types";
 
 function LangSwitch() {
   const { lang, setLang } = useLanguage();
-  const options: Language[] = ["en", "es"];
+  const options: Language[] = ["en", "es", "pt"];
   return (
     <div className="flex items-center rounded-full border border-slate-200 bg-white/60 p-0.5 text-xs font-medium">
       {options.map((opt) => (
@@ -96,16 +96,16 @@ export function Navbar() {
             {/* Direct Actor Portals */}
             <div className="hidden sm:flex items-center gap-2">
               <Link
-                href="/login?role=patient"
+                href="/login/patient"
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-emerald-700"
               >
-                {lang === "es" ? "Paciente" : "Patient"}
+                {lang === "pt" ? "Paciente" : lang === "es" ? "Paciente" : "Patient"}
               </Link>
               <Link
-                href="/login?role=doctor"
+                href="/login/doctor"
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-sky-700"
               >
-                {lang === "es" ? "Médico" : "Doctor"}
+                {lang === "pt" ? "Médico" : lang === "es" ? "Médico" : "Doctor"}
               </Link>
             </div>
 
@@ -147,18 +147,18 @@ export function Navbar() {
           <div className="border-t border-slate-100 bg-white/95 backdrop-blur-sm px-4 py-4 space-y-2">
             <div className="grid grid-cols-2 gap-2 pb-3 border-b border-slate-100">
               <Link
-                href="/login?role=patient"
+                href="/login/patient"
                 onClick={() => setMobileOpen(false)}
                 className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-2.5 text-center text-xs font-semibold text-emerald-800"
               >
-                {lang === "es" ? "Portal Paciente" : "Patient Portal"}
+                {lang === "pt" ? "Portal do paciente" : lang === "es" ? "Portal Paciente" : "Patient Portal"}
               </Link>
               <Link
-                href="/login?role=doctor"
+                href="/login/doctor"
                 onClick={() => setMobileOpen(false)}
                 className="rounded-xl border border-sky-200 bg-sky-50/50 p-2.5 text-center text-xs font-semibold text-sky-800"
               >
-                {lang === "es" ? "Portal Médico" : "Doctor Portal"}
+                {lang === "pt" ? "Portal médico" : lang === "es" ? "Portal Médico" : "Doctor Portal"}
               </Link>
             </div>
             {links.map((link) => (
@@ -172,13 +172,6 @@ export function Navbar() {
               </a>
             ))}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <Link
-                href="/login?role=admin"
-                onClick={() => setMobileOpen(false)}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800"
-              >
-                {lang === "es" ? "Administración" : "Admin"}
-              </Link>
               <LangSwitch />
             </div>
           </div>

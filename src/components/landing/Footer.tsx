@@ -12,14 +12,13 @@ export function Footer() {
   const hrefFor = (label: string) => {
     const l = label.toLowerCase();
     if (l.includes("problem") || l.includes("problema")) return "#problem";
-    if (l.includes("solut") || l.includes("soluci")) return "#solution";
+    if (l.includes("solut") || l.includes("soluci") || l.includes("soluç")) return "#solution";
     if (l.includes("how") || l.includes("cómo") || l.includes("como")) return "#how";
     if (l.includes("roadmap")) return "#roadmap";
     if (l.includes("tract") || l.includes("tracc")) return "/traction";
     if (l.includes("veri")) return "/verify";
-    if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login?role=doctor";
-    if (l.includes("pacient") || l.includes("patient")) return "/login?role=patient";
-    if (l.includes("admin")) return "/login?role=admin";
+    if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login/doctor";
+    if (l.includes("pacient") || l.includes("patient")) return "/login/patient";
     return "#";
   };
 
