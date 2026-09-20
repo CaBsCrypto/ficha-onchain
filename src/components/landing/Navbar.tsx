@@ -122,7 +122,9 @@ export function Navbar() {
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/80 text-slate-600 transition-colors hover:bg-white md:hidden"
-              aria-label="Menú"
+              aria-label={lang === 'es' ? 'Menú' : 'Menu'}
+              aria-expanded={mobileOpen}
+              aria-controls="public-mobile-navigation"
             >
               {mobileOpen ? (
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -139,6 +141,8 @@ export function Navbar() {
 
         {/* Mobile dropdown menu */}
         <div
+          id="public-mobile-navigation"
+          hidden={!mobileOpen}
           className={cn(
             "overflow-hidden transition-all duration-300 md:hidden",
             mobileOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
