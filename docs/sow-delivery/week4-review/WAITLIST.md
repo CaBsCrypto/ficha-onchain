@@ -29,8 +29,6 @@ Comprobación de lectura del 19 de septiembre de 2026 (Chile): ambas bases tiene
 
 El aviso desplegable explica almacenamiento, finalidad, acceso restringido y separación de la información clínica. No hay un contador público estimado ni una lista pública de correos. Antes de una campaña de captación amplia se debe definir un canal de contacto de privacidad y una política de conservación; este cierre no declara cumplimiento legal certificado.
 
-## Pendientes de publicación
-
 ## Validación local realizada
 
 19 de septiembre de 2026, build local servido con la base dev `ep-lingering-water` y habilitación sólo en ese proceso:
