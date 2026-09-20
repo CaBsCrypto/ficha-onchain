@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-09-20T03:46:18.031Z",
+  "environment": "main-testnet",
+  "receipts": [
+    {
+      "hash": "d0629666fada0834cd6c917ec6ba397f8fbe78f6db2d11f6914e203c80fcbd89",
+      "method": "authorize_doctor",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "source": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+      "feePayer": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "ledger": 4731261,
+      "createdAt": "1789679892",
+      "feeCharged": "57092",
+      "signatureVerified": true,
+      "exactArgumentsVerified": true,
+      "savedEnvelopeMatches": true
+    },
+    {
+      "hash": "cc9e08929adb5f23b97c416f909f7fe1fb5fdf5c960644d39e5cdde3dfdd37b9",
+      "method": "attest_booking",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "source": "GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO",
+      "feePayer": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "ledger": 4731331,
+      "createdAt": "1789680242",
+      "feeCharged": "59628",
+      "signatureVerified": true,
+      "exactArgumentsVerified": true,
+      "savedEnvelopeMatches": true
+    },
+    {
+      "hash": "e8239a5202d8824f594088a132960d0b9ca720b024a6d3de02293dbad5c3eaad",
+      "method": "authorize_prescriber",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "source": "GDUIUM2OR4LCV4Y6R3ZQRWMC3FZR4QRYWHQ4MKZISQ56K3ZNSGVWBMO5",
+      "feePayer": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "ledger": 4731350,
+      "createdAt": "1789680337",
+      "feeCharged": "44385",
+      "signatureVerified": true,
+      "exactArgumentsVerified": true,
+      "savedEnvelopeMatches": true
+    },
+    {
+      "hash": "d474000d257b59c44ad11f64bd22fc1ea94fb94100fc4e27ec1e4b463f75e001",
+      "method": "mint_prescription",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "source": "GD5ORX6R4UVDNL4NWGQ7BFEK5626RYC3BGA3OTO7PA6LVKXDOOBEFSIS",
+      "feePayer": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "ledger": 4731363,
+      "createdAt": "1789680402",
+      "feeCharged": "159174",
+      "signatureVerified": true,
+      "exactArgumentsVerified": true,
+      "savedEnvelopeMatches": true
+    },
+    {
+      "hash": "ad71954aca2fd3d018379a067d788f60df88413cebf485bbec988f476e392401",
+      "method": "revoke",
+      "contract": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "source": "GD5ORX6R4UVDNL4NWGQ7BFEK5626RYC3BGA3OTO7PA6LVKXDOOBEFSIS",
+      "feePayer": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+      "status": "SUCCESS",
+      "ledger": 4731383,
+      "createdAt": "1789680502",
+      "feeCharged": "7429",
+      "signatureVerified": true,
+      "exactArgumentsVerified": true,
+      "savedEnvelopeMatches": true
+    }
+  ],
+  "prescriptions": [
+    {
+      "rxId": "12",
+      "recordId": "9dd584cc-b2b5-47aa-9b14-a43af528cef5",
+      "appointmentId": 7,
+      "status": "Revoked",
+      "bookingConsumed": true,
+      "consentAbsent": true,
+      "documentCommitmentRecomputed": true,
+      "consultationCompleted": false,
+      "storageLedger": 4770478
+    }
+  ],
+  "checks": [
+    "one_prescription_12",
+    "three_confirmed_user_operations_no_activate",
+    "one_consumed_booking",
+    "one_authorization",
+    "unique_hashes"
+  ],
+  "status": "passed",
+  "limitations": [
+    "Point-in-time audit; no new transactions or database mutations.",
+    "Decryption only in memory to verify commitment; no document content, envelopes, tokens or secrets exported.",
+    "Access-control browser tests are separate."
+  ]
+}

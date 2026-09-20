@@ -23,6 +23,21 @@ it('uses the Santiago date across UTC midnight and the daylight-saving change',(
 const button=(text:string)=>[...box.querySelectorAll('button')].find(b=>b.textContent?.includes(text))!;
 async function click(text:string){await act(async()=>button(text).click());}
 async function change(el:HTMLInputElement|HTMLSelectElement,value:string){await act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value')!.set!.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));});}
+it('clears a rejected draft when corrected without hiding a save failure',async()=>{
+  mock.fetch.mockImplementation(async(_url:string,init?:RequestInit)=>init?.method==='PUT'
+    ? Response.json({error:'No se pudo guardar la disponibilidad'},{status:503})
+    : Response.json({data:[]}));
+  await act(async()=>root.render(createElement(DisponibilidadTab)));
+  const times=box.querySelectorAll<HTMLInputElement>('input[type=time]');
+  await change(times[0],'18:20');await click('Agregar bloque');
+  expect(box.textContent).toContain('La hora de término debe ser posterior');
+  await change(times[1],'20:00');
+  expect(box.textContent).not.toContain('La hora de término debe ser posterior');
+  await click('Agregar bloque');await click('Guardar disponibilidad');
+  expect(box.textContent).toContain('No se pudo guardar la disponibilidad');
+  await change(times[1],'21:00');
+  expect(box.textContent).toContain('No se pudo guardar la disponibilidad');
+});
 it('only saves added blocks and requires confirmation to clear a saved agenda',async()=>{
   let stored:any[]=[];
   mock.fetch.mockImplementation(async(_url:string,init?:RequestInit)=>{if(init?.method==='PUT')stored=JSON.parse(String(init.body)).blocks;return Response.json({data:stored});});
