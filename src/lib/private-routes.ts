@@ -1,6 +1,6 @@
 // Retired routes stay retired independently of the private write switch.
 const pages=new Set(['/','/login', '/login/patient', '/login/doctor', '/login/admin','/doctor','/patient','/admin','/admin/doctors','/legal']);
-const api=new Set(['/api/privy/stellar-wallet','/api/doctor-status','/api/doctors','/api/appointments',
+const api=new Set(['/api/waitlist','/api/privy/stellar-wallet','/api/doctor-status','/api/doctors','/api/appointments',
   '/api/prescription-bookings','/api/doctor/profile','/api/doctor/availability','/api/doctor/slots',
   '/api/admin/whoami','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate',
   '/api/private-prescriptions','/api/private-operations','/api/doctor/onboarding','/api/admin/doctor-onboarding']);
