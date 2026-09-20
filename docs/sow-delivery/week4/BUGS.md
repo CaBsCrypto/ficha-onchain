@@ -27,10 +27,10 @@ Los tiempos corresponden al video original; si se edita, conservará el mapeo pr
 
 | ID | Tiempo / origen | Observado | Clasificación / acción | Estado |
 |---|---|---|---|---|
-| W-10 | 00:40, 03:40 | Pantallas `/login?role=…` en inglés ("Sign In", "Back to Home", "Enter confirmation code") con el conmutador EN/ES visible; el hero del landing aparece en inglés al volver (08:45) | P2 / auditar y coherencia idiomática de accesos y persistencia del idioma en rutas públicas; #125 aporta `/login/doctor` y ES/EN/PT — verificar allí | Pendiente verificación en preview |
-| W-11 | pestañas 00:35–06:55 | Título de pestaña "Receta privada…" vigente también en `/login` y `/admin/doctors` | P3 / título de documento por ruta | Pendiente |
-| W-12 | 04:20 | Carga de "Mis consultas" con una línea de texto gris suelto, sin estructura | P3 / esqueleto o indicador consistente | Pendiente |
-| W-13 | 07:50 | Insignia "Registrada · pendiente de activación" cortada en ancho reducido | P3 / ajuste de flujo del texto (envolver o acortar) | Pendiente |
+| W-10 | 00:40, 03:40 | El modal de Privy ("Enter confirmation code") aparece en inglés aunque la app esté en español | P3 / límite del proveedor: `@privy-io/react-auth` 3.40 no expone `locale` ni traducciones en `appearance`. El video se grabó con el conmutador en EN, por lo que el resto de pantallas bilingües no era un fallo | Descartado como bug de producto; registrar en material de grabación |
+| W-11 | pestañas 00:35–06:55 | Título de pestaña "Receta privada…" vigente también en `/login` y `/admin/doctors` | P3 / título por superficie | Corregido en esta PR (`PageTitle` + efectos en accesos, médico, paciente, administración); comprobar en preview |
+| W-12 | 04:20 | Carga de "Mis consultas" con una línea de texto gris suelto, sin estructura | P3 / esqueleto o indicador consistente | Corregido en esta PR (esqueleto con dos bloques `animate-pulse` y prueba); comprobar en preview |
+| W-13 | 07:50 | Insignia "Registrada · pendiente de activación" cortada en ancho reducido | P3 / ajuste de flujo del texto (envolver o acortar) | Corregido en esta PR (`max-w-full whitespace-normal` en la insignia de `Prescriptions.tsx`); comprobar en preview |
 
 ## Heredados del inventario del video sin cambio de producto
 
