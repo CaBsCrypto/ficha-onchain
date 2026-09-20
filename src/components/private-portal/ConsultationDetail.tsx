@@ -83,8 +83,8 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         </>}
       </div>
       {operationError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{operationError}</p>}
-      <OperationNotice operation={operation} />
-      {!operation && data.operations?.slice(0, 3).map(op => <OperationNotice key={op.id} operation={op} />)}
+      {operation?.id !== data.prescription?.operation?.id && <OperationNotice operation={operation} />}
+      {!operation && data.operations?.filter(op => op.id !== data.prescription?.operation?.id).slice(0, 3).map(op => <OperationNotice key={op.id} operation={op} />)}
       {role === 'doctor' && !data.prescription && <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-slate-900">Preparar receta privada</h2>
