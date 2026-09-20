@@ -47,6 +47,14 @@ Corrección en #125, commit `5476de4`: esperar `ready`, sesión autenticada e id
 
 Regresión: cuatro casos fallaron antes del cambio; después pasan. #125: 572 pruebas, TypeScript y build aprobados. #126 integrado: 595 pruebas aprobadas. Pendiente: validación autenticada del preview actualizado; las pruebas con Privy simulado no acreditan el OTP real.
 
+### QA-12 · Acceso paciente desde la landing
+
+20 septiembre, revisión posterior al video. P2 / mejora de experiencia: eliminar el segundo paso entre «Iniciar sesión» y Privy. #125 (`3227ea5`, `3dbc817`, `18ce58a`), integrada en #126 (`d7ffae7`). El botón abre el popup nativo, con landing desenfocada e inerte. La intención de las rutas antiguas se consume una vez. La cancelación devuelve el foco; una sesión existente no redirige por visitar la landing. El cierre del paciente vuelve al inicio, con error recuperable si falla. Se conservan las barreras de identidad, wallet y autorización.
+
+Pruebas: 580 casos de aplicación en #125; 603 en #126. TypeScript aprobado en ambas; build local de #125 aprobado y build de la primera integración #126 (`6d7826a`) aprobado. El build de la última integración se comprueba en CI/Vercel. Se probaron doble clic, intención única, cancelación/reapertura, retorno de foco, fallo del proveedor, sesión existente y carrera/error de logout con proveedor simulado.
+
+Navegador real en preview `3dbc817`: apertura directa y blur verificados; Escape devuelve el foco; ruta `/login/patient?lang=pt` termina en landing portuguesa y consume la intención; móvil 390 × 844 sin desbordamiento, popup legible y un solo enlace al médico en el pie. Se observó que Privy emite `exited_auth_flow` al cancelar: `18ce58a` evita mostrarlo como fallo, con regresión automatizada. Pendiente: confirmar esa corrección en el último preview, ingreso con OTP nuevo de paciente y cierre desde su sesión real. No se considera el proveedor simulado evidencia de OTP. Main no se modifica.
+
 ## Auditoría independiente de #12
 
 `rx12-chain-audit.json` registra cinco transacciones distintas, todas SUCCESS, verificadas contra Stellar Testnet y los registros persistidos: autorización, acreditación, consentimiento, emisión y revocación. Se comprobaron métodos, contratos, argumentos, firmas, pagador y coincidencia del hash guardado. El compromiso del documento se recalculó en memoria sin exportar contenido.
