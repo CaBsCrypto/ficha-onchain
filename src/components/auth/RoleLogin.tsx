@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
@@ -153,6 +153,17 @@ export default function RoleLogin({ activeRole }: { activeRole: RoleKey }) {
 
   const [changingAccount, setChangingAccount] = useState(false);
   const [accessError, setAccessError] = useState(false);
+  const redirected = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    if (!authenticated) { redirected.current = null; return; }
+    if (!user?.id || changingAccount || accessError) return;
+    const entry = `${user.id}:${destination}`;
+    if (redirected.current === entry) return;
+    redirected.current = entry;
+    // Navigation never grants access: each destination retains its own guards.
+    router.replace(destination);
+  }, [ready, authenticated, user?.id, changingAccount, accessError, destination, router]);
   async function changeAccount() {
     setChangingAccount(true); setAccessError(false);
     try { await logout(); }
@@ -272,7 +283,7 @@ export default function RoleLogin({ activeRole }: { activeRole: RoleKey }) {
 
                 {/* Primary Action Button */}
                 <button
-                  disabled={!ready || changingAccount}
+                  disabled={!ready || changingAccount || (authenticated && !accessError)}
                   onClick={() => authenticated ? router.replace(destination) : login()}
                   className={cn(
                     'group relative flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-lg transition-all duration-200 disabled:opacity-50',
@@ -281,7 +292,9 @@ export default function RoleLogin({ activeRole }: { activeRole: RoleKey }) {
                 >
                   {authenticated ? (
                     <>
-                      <span>{lang === 'pt' ? 'Continuar com esta conta' : lang === 'es' ? 'Continuar con esta cuenta' : 'Continue with this account'}</span>
+                      <span role="status">{accessError
+                        ? (lang === 'pt' ? 'Continuar com esta conta' : lang === 'es' ? 'Continuar con esta cuenta' : 'Continue with this account')
+                        : (lang === 'pt' ? 'Abrindo seu portal…' : lang === 'es' ? 'Abriendo tu portal…' : 'Opening your portal…')}</span>
                     </>
                   ) : ready ? (
                     <>
