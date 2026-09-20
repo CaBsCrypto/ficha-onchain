@@ -303,6 +303,14 @@ export default function RoleLogin({ activeRole }: { activeRole: RoleKey }) {
                 </button>}
               </div>
 
+              {activeRole === 'patient' && (
+                <p className="mt-5 text-center">
+                  <Link href={`/login/doctor?lang=${lang}`} className="text-xs text-slate-500 underline-offset-4 hover:text-sky-700 hover:underline">
+                    {lang === 'pt' ? 'É médico? Acesse aqui' : lang === 'es' ? '¿Eres médico? Ingresa aquí' : 'Are you a doctor? Sign in here'}
+                  </Link>
+                </p>
+              )}
+
               {/* Security & Gas Sponsorship Pill */}
               <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                 <div className="flex items-start gap-2.5">
