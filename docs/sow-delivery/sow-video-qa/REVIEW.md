@@ -39,6 +39,14 @@ Prioridad P0: seguridad/integridad; P1: bloqueo o brecha del entregable; P2: con
 
 Los estados awaiting_signature → submitted → confirmed observados no constituyen por sí mismos un fallo. Las capturas de carga del documento tampoco acreditan cinco segundos de demora.
 
+### QA-11 · Ingreso automático solicitado durante la revisión
+
+20 septiembre, acceso por ruta: después de confirmar Privy se exigía otro clic en «Continuar con esta cuenta». El usuario solicita abrir directamente el portal elegido. Clasificación: P2, mejora de flujo reproducida en componente (fuera del video original).
+
+Corrección en #125, commit `5476de4`: esperar `ready`, sesión autenticada e identidad; reemplazar la ruta una sola vez por cuenta/destino. Se mantienen los controles del portal, cambio de cuenta y error de cierre de sesión. No se conceden permisos desde login. Integrado en #126 como `0f0fe9f`.
+
+Regresión: cuatro casos fallaron antes del cambio; después pasan. #125: 572 pruebas, TypeScript y build aprobados. #126 integrado: 595 pruebas aprobadas. Pendiente: validación autenticada del preview actualizado; las pruebas con Privy simulado no acreditan el OTP real.
+
 ## Auditoría independiente de #12
 
 `rx12-chain-audit.json` registra cinco transacciones distintas, todas SUCCESS, verificadas contra Stellar Testnet y los registros persistidos: autorización, acreditación, consentimiento, emisión y revocación. Se comprobaron métodos, contratos, argumentos, firmas, pagador y coincidencia del hash guardado. El compromiso del documento se recalculó en memoria sin exportar contenido.
