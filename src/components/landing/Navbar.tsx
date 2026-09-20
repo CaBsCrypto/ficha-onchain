@@ -91,24 +91,8 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Right side: Actor shortcuts + Privy + Lang */}
+          {/* Primary patient access and language selection */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Direct Actor Portals */}
-            <div className="hidden sm:flex items-center gap-2">
-              <Link
-                href="/login/patient"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-emerald-700"
-              >
-                {lang === "pt" ? "Paciente" : lang === "es" ? "Paciente" : "Patient"}
-              </Link>
-              <Link
-                href="/login/doctor"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-sky-700"
-              >
-                {lang === "pt" ? "Médico" : lang === "es" ? "Médico" : "Doctor"}
-              </Link>
-            </div>
-
             {/* Privy Login button */}
             <PrivyLoginButton />
 
@@ -149,22 +133,6 @@ export function Navbar() {
           )}
         >
           <div className="border-t border-slate-100 bg-white/95 backdrop-blur-sm px-4 py-4 space-y-2">
-            <div className="grid grid-cols-2 gap-2 pb-3 border-b border-slate-100">
-              <Link
-                href="/login/patient"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-2.5 text-center text-xs font-semibold text-emerald-800"
-              >
-                {lang === "pt" ? "Portal do paciente" : lang === "es" ? "Portal Paciente" : "Patient Portal"}
-              </Link>
-              <Link
-                href="/login/doctor"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-xl border border-sky-200 bg-sky-50/50 p-2.5 text-center text-xs font-semibold text-sky-800"
-              >
-                {lang === "pt" ? "Portal médico" : lang === "es" ? "Portal Médico" : "Doctor Portal"}
-              </Link>
-            </div>
             {links.map((link) => (
               <a
                 key={link.href}
