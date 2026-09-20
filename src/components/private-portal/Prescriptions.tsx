@@ -14,7 +14,7 @@ export function PrescriptionCard({ prescription, role, onChange, unavailable = f
     await run(action, { prescriptionId: prescription.id }); onChange();
   }
   return <article className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `Receta #${prescription.rxId}` : 'Documento preparado'}</h3><span className={`rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription)}</span></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `Receta #${prescription.rxId}` : 'Documento preparado'}</h3><span className={`max-w-full whitespace-normal rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription)}</span></div>
     <p className="text-sm text-slate-600">Médico: <strong>{prescription.doctorName}</strong><br />Paciente: <strong>{prescription.patientName}</strong></p>
     <p className="text-xs text-slate-500">Vence: {localDate(prescription.expiresAt)} · Hora de Chile</p>
     {(role === 'doctor' || prescription.rxId != null) && <DocumentView id={prescription.id} prescription={prescription} />}

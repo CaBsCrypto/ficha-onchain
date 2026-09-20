@@ -14,6 +14,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const { ready, authenticated, user, logout } = usePrivy();
   const router = useRouter();
   useEffect(() => { if (ready && !authenticated) router.replace('/login?role=patient'); }, [ready, authenticated, router]);
+  useEffect(() => { document.title = 'TrustLeaf — Portal del paciente'; }, []);
   if (!ready || !authenticated) return <p role="status" className="p-8 text-center text-sm text-slate-500">Verificando acceso…</p>;
   return <WalletBoundary key={user?.id}><div className="min-h-screen bg-[#f8fafc]">
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur-sm"><div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">

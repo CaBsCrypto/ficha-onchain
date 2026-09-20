@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
 import { rolePath } from '@/components/private-portal/state';
 import { useLanguage } from '@/hooks/useLanguage';
+import { PageTitle } from '@/components/PageTitle';
 import { cn } from '@/lib/utils';
 import type { Language } from '@/types';
 import { privyEmail } from '@/lib/auth/privy-email';
@@ -168,6 +169,7 @@ function LoginContent() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50">
+      <PageTitle title={lang === 'es' ? 'Acceso a TrustLeaf' : 'TrustLeaf sign in'} />
       {/* Dynamic Background Glow */}
       <div
         className={cn(

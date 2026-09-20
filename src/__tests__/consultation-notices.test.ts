@@ -3,9 +3,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ConsultationDetail } from '@/components/private-portal/ConsultationDetail';
-const state = vi.hoisted(() => ({ data: null as any, operation: null as any }));
+const state = vi.hoisted(() => ({ data: null as any, operation: null as any, loading: false }));
 vi.mock('@/components/private-portal/client', () => ({
-  usePortalData: () => ({ data: state.data, refresh: vi.fn() }),
+  usePortalData: () => ({ data: state.data, loading: state.loading, refresh: vi.fn() }),
   localDate: () => 'synthetic date', jsonBody: vi.fn(), portalApi: vi.fn(),
 }));
 vi.mock('@/components/private-portal/Operation', () => ({
@@ -22,6 +22,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   box = document.createElement('div'); document.body.append(box); root = createRoot(box);
   state.operation = { id: 'mint', action: 'mint', state: 'confirmed' };
+  state.loading = false;
   state.data = { appointment: { date:'2026-09-17', status:'in_progress' }, consent:{status:'consumed'},
     operations:[state.operation], prescription:{ rxId:'12', operation:state.operation } };
 });
@@ -40,4 +41,11 @@ it('preserves distinct consent notices and deduplicates the fallback list', asyn
   await render();
   expect(box.querySelectorAll('[data-operation="mint"]')).toHaveLength(1);
   expect(box.querySelectorAll('[data-operation="consent"]')).toHaveLength(1);
+});
+it('shows a structured skeleton while the consultation loads', async () => {
+  state.loading = true; state.data = null;
+  await render();
+  const status = box.querySelector('[role="status"]');
+  expect(status).not.toBeNull();
+  expect(status?.querySelectorAll('.animate-pulse').length).toBeGreaterThanOrEqual(2);
 });
