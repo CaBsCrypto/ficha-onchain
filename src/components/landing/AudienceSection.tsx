@@ -36,14 +36,6 @@ export function AudienceSection() {
               </span>
               <CheckList points={t.audience.doctors.points} tone="clinical" />
             </div>
-            <div className="mt-8 pt-6 border-t border-clinical/10">
-              <Link
-                href="/login/doctor"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-clinical-600 hover:text-clinical-700"
-              >
-                {lang === "pt" ? "Entrar no portal médico" : lang === "es" ? "Ingresar al portal médico" : "Enter doctor portal"} →
-              </Link>
-            </div>
           </div>
         </Reveal>
         <Reveal delay={0.1}>

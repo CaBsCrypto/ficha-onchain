@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
@@ -13,13 +13,22 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, user, logout } = usePrivy();
   const router = useRouter();
-  useEffect(() => { if (ready && !authenticated) router.replace('/login/patient'); }, [ready, authenticated, router]);
+  const signingOut = useRef(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  useEffect(() => { if (ready && !authenticated) router.replace(signingOut.current ? '/' : '/login/patient'); }, [ready, authenticated, router]);
+  async function signOut() {
+    if (signingOut.current) return;
+    signingOut.current = true; setLogoutBusy(true); setLogoutError(false);
+    try { await logout(); router.replace('/'); }
+    catch { signingOut.current = false; setLogoutBusy(false); setLogoutError(true); }
+  }
   if (!ready || !authenticated) return <p role="status" className="p-8 text-center text-sm text-slate-500">Verificando acceso…</p>;
   return <WalletBoundary key={user?.id}><div className="min-h-screen bg-[#f8fafc]">
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur-sm"><div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
       <Link href="/" className="flex items-center gap-2 font-semibold"><span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-xs font-bold text-white">T</span><span className="text-slate-900">Trust<span className="text-sky-500">Leaf</span></span></Link>
       <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Paciente · Stellar Testnet</span>
-      <div className="flex min-w-0 items-center gap-3"><span className="hidden max-w-52 truncate text-xs text-slate-500 sm:block">{privyEmail(user)}</span><button onClick={() => void logout()} className="rounded-xl px-3 py-2 text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600">Cerrar sesión</button></div>
+      <div className="flex min-w-0 flex-wrap items-center gap-3"><span className="hidden max-w-52 truncate text-xs text-slate-500 sm:block">{privyEmail(user)}</span><button disabled={logoutBusy} onClick={() => void signOut()} className="rounded-xl px-3 py-2 text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">{logoutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>{logoutError && <p role="alert" className="text-sm text-rose-700">No pudimos cerrar la sesión. Vuelve a intentarlo.</p>}</div>
     </div></header>
     <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8"><aside className="hidden w-56 shrink-0 md:block"><div className="sticky top-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><p className="border-b border-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Mi portal</p><Suspense><Navigation /></Suspense></div></aside><main className="min-w-0 flex-1 pb-24 md:pb-6">{children}</main></div>
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white md:hidden"><Suspense><Navigation mobile /></Suspense></div>
