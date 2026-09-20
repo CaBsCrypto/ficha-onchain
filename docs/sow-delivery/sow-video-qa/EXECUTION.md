@@ -29,6 +29,7 @@ No se incluyen secretos en este registro. No se han generado recetas ni firmas n
 | #125 / 9a915e4 | Navegador: paciente → PT → enlace discreto médico | Ruta de médico con lang=pt y textos portugueses; sin selector conjunto de roles ni enlace admin |
 | #126 / aea906b | Aplicación completa tras integrar #125 | 592 pruebas, 54 archivos aprobados |
 | #126 / aea906b | TypeScript y build local | Aprobados |
+| #127 / 95f3d23 | Ejecución final local antes de pasar a listo, 20 de septiembre | 567 pruebas en 51 archivos aprobadas; TypeScript sin errores tras regenerar tipos de `.next` (referencia obsoleta a `login/[role]` ya retirada); build de producción local aprobado. Sin cambios de código respecto de 915fc02 más que documentación |
 
 No se repitieron contratos privados por un merge que sólo cambió navegación pública. Se repetirán todas las suites sobre la candidata integrada final después de las fusiones secuenciales.
 
