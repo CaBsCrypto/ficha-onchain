@@ -67,7 +67,7 @@ export function Navbar() {
           scrolled ? "glass shadow-sm" : "bg-white/80 backdrop-blur-md border-b border-slate-100",
         )}
       >
-        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
+        <nav className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:min-h-16 sm:px-6">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-clinical text-white shadow-sm shadow-clinical/30">

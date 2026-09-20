@@ -7,10 +7,11 @@ import { AudienceSection } from "@/components/landing/AudienceSection";
 import { RoadmapSection } from "@/components/landing/RoadmapSection";
 import { WaitlistSection } from "@/components/landing/WaitlistSection";
 import { Footer } from "@/components/landing/Footer";
+import { LandingBackdrop } from "@/components/landing/LandingBackdrop";
 
 export default function Home() {
   return (
-    <>
+    <LandingBackdrop>
       <Navbar />
       <main className="flex-1">
         <HeroSection />
@@ -22,7 +23,7 @@ export default function Home() {
         <WaitlistSection />
       </main>
       <Footer />
-    </>
+    </LandingBackdrop>
   );
 }
 
