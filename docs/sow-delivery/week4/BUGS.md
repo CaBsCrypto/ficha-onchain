@@ -36,6 +36,23 @@ Los tiempos corresponden al video original; si se edita, conservará el mapeo pr
 
 QA-06 (narración confunde firma del propietario con el relayer y sugiere pérdida de acceso tras revocar — corregir al editar), QA-07 (explicación de espera de wallet — guion), QA-08 (encuadre/zoom — grabación). QA-10 (recibo de consentimiento tras recarga) se comprueba en la revisión autenticada de preview.
 
+## Exposición en la propia grabación (higiene de datos personales, no bug de plataforma)
+
+W-01 y W-02 incumben a quien graba, no a TrustLeaf. Validación: al editar, pixelar los intervalos indicados y revisar fotograma a fotograma el corte final; en grabaciones futuras, ventana de invitado o perfil de navegador limpio (el selector de Google no debe mostrar cuentas personales). El material original queda sólo en disco local.
+
+## Barrido automático en producción (Playwright headless, 20 septiembre)
+
+44 combinaciones (14 rutas × {390, 1280}px × {es, en, pt} sobre `trustleaf-demo.vercel.app`), con captura de errores de consola, códigos HTTP y desbordamiento horizontal. Resultados:
+
+| ID | Observado | Clasificación / acción | Estado |
+|---|---|---|---|
+| W-14 | El pie del landing enlaza `/verify` ("Verificar") y `/traction` ("Trabaja con nosotros"), que el middleware responde con 410 en producción (`module_outside_current_delivery`): el público vería una página muerta | P1 / el pie ya no resuelve a ninguna ruta retirada; prueba unitaria sobre la resolución de enlaces | Corregido en esta PR; confirmar en preview |
+| W-15 | `POST /api/waitlist` responde 410 en producción | Informativo / la rama #126 ya blanquea la ruta en el middleware; quedará disponible al fusionar y activar `TRUSTLEAF_WAITLIST_ENABLED` | Bloqueado en el merge de #126 |
+| — | Cero desbordes horizontales en las 44 capturas; cero errores propios de consola (sólo 410 conocidos); el `Reveal` del landing se revela completo al scrollear también con movimiento reducido | — | Sano |
+
+Nota: el barrido inicial contra el preview de #126 apuntó a la pared de inicio de sesión de Vercel (protección de despliegues activada); los previews se validan con sesión de navegador humana, no con este barrido.
+
+
 ## Criterios
 
 Ningún elemento de esta lista se declara cerrado sin: prueba automatizada cuando aplique, verificación en preview y, para W-01/W-02, revisión del corte final editado.
