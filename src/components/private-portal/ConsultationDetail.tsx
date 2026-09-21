@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { canAuthorizeIssuance } from './state';
 import { jsonBody, localDate, portalApi, usePortalData } from './client';
+import { appointmentDate } from './client';
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation } from './Operation';
 import { PrescriptionCard } from './Prescriptions';
 import type { ConsultationState, PortalRole, PrescriptionDocument, PrivatePrescription } from './types';
@@ -49,8 +50,8 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">Consulta de prueba #{id}</h1>
         <p className="mt-2 text-sm text-slate-600">Médico: <strong>{appointment.doctor_name || appointment.doctor_email}</strong><br />Paciente: <strong>{appointment.patient_name || appointment.patient_email}</strong></p>
-        <p className="mt-2 text-sm text-slate-500">{appointment.date.slice(0, 10)} · {appointment.time_slot} · Hora de Chile</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <p className="mt-2 text-sm text-slate-500">{role === 'patient' ? appointmentDate(appointment.date) : appointment.date.slice(0, 10)} · {appointment.time_slot} · Hora de Chile</p>
+        <div data-patient-progress className="mt-4 grid gap-3 sm:grid-cols-3">
           <Status title="Asistencia del paciente" value={attended ? 'Confirmada' : 'Pendiente'} />
           <Status title="Inicio por el médico" value={appointment.started_at ? 'Consulta iniciada' : 'Pendiente'} />
           <Status title="Reserva Stellar" value={data.booking ? bookingLabels[data.booking.state] ?? 'Verificando estado' : 'Esperando asistencia e inicio'} />

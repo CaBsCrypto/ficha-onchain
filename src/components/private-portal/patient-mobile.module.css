@@ -42,6 +42,11 @@
   .portal [data-patient-booking] > div:first-child { align-items: flex-start; }
   .portal [data-patient-booking] button[aria-pressed=true] { color: white; background: #0369a1; border-color: #0369a1; }
   .portal [data-patient-detail] > div { border-radius: 18px; box-shadow: none; }
+  .portal [data-patient-progress] { display: block; border-top: 1px solid #e2e8f0; }
+  .portal [data-patient-progress] > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; border-radius: 0; background: transparent; }
+  .portal [data-patient-progress] p { margin: 0; font-size: 14px; }
+  .portal [data-patient-progress] p:last-child { text-align: right; }
+  .portal [data-prescription-status=Revoked], .portal [data-prescription-status=Blocked] { color: #9f1239; background: #fff1f2; }
   .portal [data-patient-actions] { display: grid; grid-template-columns: 1fr; }
   .portal [data-patient-actions] > button { min-height: 48px; }
   .portal [data-patient-account-actions] { margin-top: 20px; padding: 20px; border: 1px solid #dce8ef; border-radius: 18px; background: white; }
