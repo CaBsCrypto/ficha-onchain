@@ -45,3 +45,11 @@ El aviso desplegable explica almacenamiento, finalidad, acceso restringido y sep
 - Verificar duplicado, lectura pública rechazada y control administrativo.
 - CI/Vercel y revisión del preview antes de habilitar main.
 - Registrar commit desplegado y resultado de comprobación pública en el checklist final.
+
+## Panel administrativo de sólo lectura (21 de septiembre)
+
+`/admin/waitlist` reutiliza `GET /api/waitlist` y el control Privy/ADMIN_EMAILS del panel. Sólo esta ruta se incorpora al filtro de páginas; los módulos retirados siguen bloqueados. El panel muestra correo, fecha de Chile y rol cuando existe, permite búsqueda local y actualización manual. No permite exportar, eliminar ni enviar campañas.
+
+La carga distingue lista vacía de fallo. Una respuesta 401/403 elimina las filas anteriores; al desmontar la pantalla se cancela la petición y se ignoran sus respuestas tardías. Los errores del proveedor no se imprimen en el panel. El cambio de identidad conserva el desmontaje del layout administrativo existente.
+
+Evidencia previa de preview: dos envíos sintéticos con diferencias de mayúsculas produjeron una sola fila, comprobada por lectura independiente. La protección de Vercel frente a una petición anónima no se cuenta como un rechazo de la aplicación. Permanecen pendientes la revisión autenticada de este panel nuevo y su publicación.
