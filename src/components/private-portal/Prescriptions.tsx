@@ -34,6 +34,10 @@ export function PrivatePrescriptions({ role }: { role: PortalRole }) {
   const [filter, setFilter] = useState('all');
   const prescriptions = data?.prescriptions ?? [];
   const shown = prescriptions.filter(rx => filter === 'all' || (filter === 'expired' ? rx.expired && !['Revoked', 'Blocked'].includes(rx.status) : rx.status === filter && (filter === 'Revoked' || !rx.expired) && rx.rxId != null));
+  if (role === 'patient') {
+    const active = (rx: PrivatePrescription) => rx.status === 'Active' && !rx.expired && rx.rxId != null;
+    shown.sort((a, b) => Number(active(b)) - Number(active(a)));
+  }
   return <section className="space-y-5">
     <div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">Estados verificados en Stellar Testnet. El documento clínico permanece cifrado.</p></div>
     <label data-patient-filter className="block text-sm text-slate-600">Estado<select value={filter} onChange={e => setFilter(e.target.value)} className="ml-3 rounded-xl border border-slate-200 bg-white px-3 py-2"><option value="all">Todas</option><option value="Registered">Registradas</option><option value="Active">Activas</option><option value="Revoked">Revocadas</option><option value="expired">Vencidas</option></select></label>
