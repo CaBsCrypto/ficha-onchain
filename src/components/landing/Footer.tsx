@@ -11,12 +11,11 @@ export function footerHrefFor(label: string) {
   const l = label.toLowerCase();
   const href =
     l.includes("problem") || l.includes("problema") ? "#problem" :
-    l.includes("solut") || l.includes("soluci") ? "#solution" :
+    l.includes("solut") || l.includes("soluci") || l.includes("soluç") ? "#solution" :
     l.includes("how") || l.includes("cómo") || l.includes("como") ? "#how" :
     l.includes("roadmap") ? "#roadmap" :
-    l.includes("médic") || l.includes("medic") || l.includes("doctor") || l.includes("médico") ? "/login?role=doctor" :
-    l.includes("pacient") || l.includes("patient") || l.includes("paciente") ? "/login?role=patient" :
-    l.includes("admin") ? "/login?role=admin" : "#";
+    l.includes("médic") || l.includes("medic") || l.includes("doctor") ? "/login/doctor" :
+    l.includes("pacient") || l.includes("patient") ? "/login/patient" : "#";
   return RETIRED_PATHS.some(p => href.startsWith(p)) ? '#' : href;
 }
 

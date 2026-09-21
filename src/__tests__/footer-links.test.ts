@@ -13,13 +13,13 @@ describe('footer link resolution', () => {
   });
 
   it.each(['Problema', 'Problem'])('%s anchors to the problem section', (label) => expect(footerHrefFor(label)).toBe('#problem'));
-  it.each(['Solución', 'Solution'])('%s anchors to the solution section', (label) => expect(footerHrefFor(label)).toBe('#solution'));
+  it.each(['Solución', 'Solution', 'Solução'])('%s anchors to the solution section', (label) => expect(footerHrefFor(label)).toBe('#solution'));
   it.each(['Cómo funciona', 'How it works'])('%s anchors to the how section', (label) => expect(footerHrefFor(label)).toBe('#how'));
 
-  it('routes each role to its login entry', () => {
-    expect(footerHrefFor('Médicos')).toBe('/login?role=doctor');
-    expect(footerHrefFor('Pacientes')).toBe('/login?role=patient');
-    expect(footerHrefFor('Admin')).toBe('/login?role=admin');
+  it('preserves current public access routes without exposing administration', () => {
+    expect(footerHrefFor('Médicos')).toBe('/login/doctor');
+    expect(footerHrefFor('Pacientes')).toBe('/login/patient');
+    expect(footerHrefFor('Admin')).toBe('#');
   });
 
   it('never emits a path retired with 410 in production', () => {

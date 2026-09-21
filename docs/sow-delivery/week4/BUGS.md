@@ -16,12 +16,12 @@ Los tiempos corresponden al video original; si se edita, conservará el mapeo pr
 
 | ID | Tiempo / origen | Observado | Clasificación / acción | Estado |
 |---|---|---|---|---|
-| W-04 | 04:00 | El selector de médico del paciente muestra opciones indistinguibles ("Médico de prueba TrustLeaf · Medicina general · Demo" repetido) | P2 / diferenciar etiquetas de los médicos demo (ya observado en ensayo D3 de semana 3) | Pendiente |
+| W-04 | 04:00 | El selector de médico del paciente muestra opciones indistinguibles ("Médico de prueba TrustLeaf · Medicina general · Demo" repetido) | P2 / diferenciar etiquetas de los médicos demo (ya observado en ensayo D3 de semana 3) | Corregido en 7b56daa: perfil público distingue duplicados, sin correos; regresión automatizada. Revisión integrada pendiente |
 | W-05 | 06:55 | Dos avisos idénticos "Emisión de receta · Enviada" apilados en la consulta del médico | P2 / duplicado de avisos | Corregido en #127 (`95e2341`, en main); comprobar en preview |
 | W-06 | 03:05 | Error "La hora de término debe ser posterior a la de inicio" persiste con valores ya válidos | P2 / error de agenda obsoleto | Corregido en #127; comprobar en preview |
 | W-07 | 08:25–08:39 | "Finalizar consulta" disponible pero nunca accionado: consulta 7 quedó sin finalizar | P2 / cerrar la consulta en la grabación complementaria; no tocar el historial existente (criterio QA-05) | Pendiente (grabación) |
-| W-08 | 07:20–08:19 | Receta revocada sin paso de activación ("Activar receta" visible junto a "Revocar receta") | P1 / brecha del guion: el tramo complementario debe mostrar activación antes de revocar (QA-04) | Pendiente (grabación) |
-| W-09 | 08:45 | QR bajo el documento revocado rotulado sólo "Recibo de emisión" | P3 / copy: aclarar que certifica la emisión, no el estado vigente | Pendiente |
+| W-08 | 07:20–08:19 | Receta revocada sin paso de activación ("Activar receta" visible junto a "Revocar receta") | P1 / brecha del guion: el tramo complementario debe mostrar activación, lectura del paciente y finalización como otra ejecución; la revocación ya pertenece al video original (QA-04) | Pendiente (grabación) |
+| W-09 | 08:45 | QR bajo el documento revocado rotulado sólo "Recibo de emisión" | P3 / copy: aclarar que enlaza al recibo de emisión, no certifica el PDF ni consulta el estado vigente | Pendiente |
 
 ## Visuales / i18n
 
@@ -56,3 +56,10 @@ Nota: el barrido inicial contra el preview de #126 apuntó a la pared de inicio 
 ## Criterios
 
 Ningún elemento de esta lista se declara cerrado sin: prueba automatizada cuando aplique, verificación en preview y, para W-01/W-02, revisión del corte final editado.
+
+## Revisión autónoma del 21 de septiembre
+
+- La resolución de enlaces de esta rama no reconocía Solução y conservaba accesos antiguos y resolución pública de Admin. Dos regresiones fallaron antes del arreglo; se corrigen el ancla PT y las rutas públicas sin administración. Validar la navegación renderizada al integrar.
+- Preservar en la integración el único enlace discreto de médico de #125, su idioma y el aviso/ancla de privacidad de #126. No reemplazar el footer integrado por la versión antigua de esta rama.
+- #125 ya fusionada; administrador autorizado y paciente rechazado observados en el panel de waitlist de #126. La petición anónima del preview aún no se ha observado en la aplicación.
+- No se usó el escritorio ni se realizaron emisiones en esta revisión. Las observaciones de navegador de la candidata integrada siguen pendientes.
