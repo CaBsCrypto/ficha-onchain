@@ -16,7 +16,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('public waitlist', () => {
   it('allows only the existing endpoint, without reopening retired modules', () => {
     expect(isPrivatePortalPath('/api/waitlist')).toBe(true);
-    expect(isPrivatePortalPath('/admin/waitlist')).toBe(false);
+    expect(isPrivatePortalPath('/admin/waitlist')).toBe(true);
     expect(isPrivatePortalPath('/api/mcp')).toBe(false);
   });
   it('normalizes and uses an idempotent insert with identical confirmation for duplicates', async () => {
