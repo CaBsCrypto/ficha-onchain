@@ -1,0 +1,48 @@
+.portal { --patient-accent: #0369a1; }
+.mobileOnly { display: none; }
+@media (max-width: 767px) {
+  .mobileOnly { display: block; }
+  .portal { background: #f5f8fb; color: #163047; font-size: 16px; line-height: 1.5; }
+  .portal [data-patient-desktop] { display: none; }
+  .portal header > div { flex-wrap: nowrap; min-height: 64px; gap: 8px; padding: 8px 16px; }
+  .portal [data-patient-account-link] { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border-radius: 14px; background: #edf7fc; color: #075985; font-size: 14px; font-weight: 600; }
+  .portal main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .portal main h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.035em; font-weight: 700; }
+  .portal main h2 { font-size: 18px; line-height: 1.35; }
+  .portal main h3 { font-size: 18px; }
+  .portal main :global(.text-sm) { font-size: 16px; line-height: 1.55; }
+  .portal main :global(.text-xs) { font-size: 13px; line-height: 1.5; }
+  .portal main p { overflow-wrap: anywhere; }
+  .portal main button, .portal main input, .portal main select, .portal main summary { min-height: 44px; }
+  .portal main input, .portal main select, .portal main textarea { font-size: 16px; max-width: 100%; }
+  .portal main button { line-height: 1.4; }
+  .portal main a { min-height: 44px; display: inline-flex; align-items: center; }
+  .portal :is(a, button, input, select, summary):focus-visible { outline: 3px solid #0284c7; outline-offset: 3px; }
+  .portal [data-patient-navigation] { padding-bottom: env(safe-area-inset-bottom); background: #fff; box-shadow: 0 -4px 24px #16304708; }
+  .portal [data-patient-navigation] nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 8px 12px; }
+  .portal [data-patient-navigation] a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 56px; padding: 6px 2px; font-size: 12px; line-height: 18px; color: #52677a; border-radius: 14px; }
+  .portal [data-patient-navigation] a[aria-current=page] { color: #0369a1; background: #e8f5fc; box-shadow: none; }
+  .portal [data-patient-home] { display: grid; gap: 20px; }
+  .portal [data-patient-home] > p { color: #52677a; }
+  .portal [data-patient-home-card] { display: flex; align-items: center; gap: 16px; padding: 22px 18px; border: 1px solid #dce8ef; border-radius: 20px; background: white; box-shadow: 0 3px 12px #16304704; }
+  .portal [data-patient-home-card] > span:first-child { display: grid; flex-shrink: 0; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: #edf8fe; color: #0284c7; }
+  .portal [data-patient-home-card] p { margin-top: 5px; font-size: 14px; color: #52677a; }
+  .portal [data-patient-home-card] > span:last-child { margin-left: auto; color: #0284c7; }
+  .portal [data-patient-primary] { width: 100%; background: #0369a1; border-color: #0369a1; padding: 13px 16px; border-radius: 14px; color: white; }
+  .portal [data-patient-list-card] { display: block; padding: 20px; border-radius: 20px; border-color: #dce8ef; box-shadow: 0 2px 8px #16304704; }
+  .portal [data-patient-list-card] > button { margin-top: 16px; width: 100%; background: #f0f8fc; border-color: #d7ebf6; }
+  .portal [data-patient-document] > button { width: 100%; padding: 12px 16px; background: #edf8fe; border-color: #c7e4f4; color: #075985; }
+  .portal [data-patient-list-card] [data-patient-name] { font-size: 17px; line-height: 1.4; }
+  .portal [data-patient-status] { display: inline-block; padding: 4px 10px; border-radius: 8px; color: #334155; background: #f1f5f9; }
+  .portal [data-patient-status=scheduled], .portal [data-patient-status=in_progress] { color: #075985; background: #e0f2fe; }
+  .portal [data-patient-status=cancelled], .portal [data-patient-status=cancel_requested] { color: #9f1239; background: #fff1f2; }
+  .portal [data-patient-filter] { display: grid; gap: 8px; }
+  .portal [data-patient-filter] select { margin: 0; width: 100%; padding: 12px; }
+  .portal [data-patient-booking] { padding: 18px; border-color: #c7e4f4; border-radius: 20px; }
+  .portal [data-patient-booking] > div:first-child { align-items: flex-start; }
+  .portal [data-patient-booking] button[aria-pressed=true] { color: white; background: #0369a1; border-color: #0369a1; }
+  .portal [data-patient-detail] > div { border-radius: 18px; box-shadow: none; }
+  .portal [data-patient-actions] { display: grid; grid-template-columns: 1fr; }
+  .portal [data-patient-actions] > button { min-height: 48px; }
+  .portal [data-patient-account-actions] { margin-top: 20px; padding: 20px; border: 1px solid #dce8ef; border-radius: 18px; background: white; }
+}
