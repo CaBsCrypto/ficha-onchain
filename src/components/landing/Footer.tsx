@@ -3,7 +3,7 @@
 import { useLanguage } from "@/hooks/useLanguage";
 
 export function Footer() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const cols = t.footer.columns;
   const year = 2026;
 
@@ -12,14 +12,13 @@ export function Footer() {
   const hrefFor = (label: string) => {
     const l = label.toLowerCase();
     if (l.includes("problem") || l.includes("problema")) return "#problem";
-    if (l.includes("solut") || l.includes("soluci")) return "#solution";
+    if (l.includes("solut") || l.includes("soluci") || l.includes("soluç")) return "#solution";
     if (l.includes("how") || l.includes("cómo") || l.includes("como")) return "#how";
     if (l.includes("roadmap")) return "#roadmap";
     if (l.includes("tract") || l.includes("tracc")) return "/traction";
     if (l.includes("veri")) return "/verify";
-    if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login?role=doctor";
-    if (l.includes("pacient") || l.includes("patient")) return "/login?role=patient";
-    if (l.includes("admin")) return "/login?role=admin";
+    if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login/doctor";
+    if (l.includes("pacient") || l.includes("patient")) return "/login/patient";
     return "#";
   };
 
@@ -63,6 +62,9 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-6 text-sm text-muted sm:flex-row">
           <p>© {year} TrustLeaf. {t.footer.rights}</p>
+          <a href={`/login/doctor?lang=${lang}`} className="text-xs text-muted underline-offset-4 hover:text-clinical hover:underline">
+            {lang === 'pt' ? 'Acesso para médicos' : lang === 'es' ? 'Acceso para médicos' : 'Doctor access'}
+          </a>
           <p className="text-xs">Santiago · Chile 🇨🇱</p>
         </div>
       </div>

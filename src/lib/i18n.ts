@@ -1,10 +1,11 @@
+import { publicPortuguese } from './i18n-pt';
 import type { Language } from "@/types";
 
 /**
  * Lightweight i18n dictionary for the landing page (EN / ES).
  * Kept as a single typed object — no runtime deps. Swap for next-intl later.
  */
-export const translations = {
+const baseTranslations = {
   en: {
     nav: {
       problem: "Problem",
@@ -570,5 +571,8 @@ export const translations = {
     },
   },
 } as const;
+
+// Legacy pages outside the public-language scope retain Spanish.
+export const translations = { ...baseTranslations, pt: { ...baseTranslations.es, ...publicPortuguese } };
 
 export type Translation = (typeof translations)[Language];

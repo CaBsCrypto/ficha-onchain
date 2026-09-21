@@ -2,7 +2,7 @@
  * Shared TypeScript types for TrustLeaf
  */
 
-export type Language = "en" | "es";
+export type Language = "en" | "es" | "pt";
 
 /** Actor role for the D2 portals (doctor / patient). */
 export type Role = "doctor" | "patient";
