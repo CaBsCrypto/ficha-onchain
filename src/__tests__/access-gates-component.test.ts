@@ -3,7 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminLayout from '@/app/admin/layout';
-import LoginPage from '@/app/login/page';
+import RoleLogin from '@/components/auth/RoleLogin';
+const LoginPage = () => createElement(RoleLogin, { activeRole: mock.role as 'admin' | 'patient' | 'doctor' });
 import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 
 const mock = vi.hoisted(() => ({
@@ -57,7 +58,7 @@ describe('Administrator access recovery', () => {
   it('offers reauthentication on 401 while preserving the admin destination', async () => {
     mock.fetch.mockResolvedValue(reply(401, { error: 'unauthorized' }));
     await render(AdminLayout); await click('Volver a ingresar con Privy');
-    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).toHaveBeenCalledWith('/login?role=admin');
+    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).toHaveBeenCalledWith('/login/admin');
     expect(container.textContent).not.toContain('Protected portal');
   });
   it('reserves access denied for 403', async () => {
@@ -89,27 +90,37 @@ describe('Administrator access recovery', () => {
     await render(AdminLayout); mock.authenticated = false; mock.user = null; await render(AdminLayout);
     await act(async () => { old.resolve(reply(200, { admin: true, email: 'admin@example.test' })); });
     expect(container.textContent).not.toContain('Protected portal');
-    expect(container.querySelector('a[href="/login?role=admin"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/login/admin"]')).not.toBeNull();
   });
 });
 
-describe('Explicit account selection', () => {
-  it('shows the current account instead of automatically sending it to another role', async () => {
-    await render(LoginPage);
+describe('Automatic authenticated entry', () => {
+  it.each(['patient', 'doctor', 'admin'])('opens the %s portal once after Privy resolves', async role => {
+    mock.role = role; mock.ready = false;
+    await render(LoginPage); expect(mock.replace).not.toHaveBeenCalled();
+    mock.ready = true; mock.authenticated = false; mock.user = null;
+    await render(LoginPage); expect(mock.replace).not.toHaveBeenCalled();
+    mock.authenticated = true; await render(LoginPage);
     expect(mock.replace).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('admin@example.test');
-    expect(container.textContent).toContain('no cambia tu cuenta ni concede permisos');
-    mock.role = 'patient'; await render(LoginPage);
-    expect(mock.replace).not.toHaveBeenCalled();
-    await click('Continuar con esta cuenta'); expect(mock.replace).toHaveBeenCalledWith('/patient');
+    mock.user = user(role); await render(LoginPage); await render(LoginPage);
+    expect(mock.replace).toHaveBeenCalledOnce();
+    expect(mock.replace).toHaveBeenCalledWith(role === 'admin' ? '/admin/doctors' : `/${role}`);
   });
   it('signs out explicitly and retains the selected role for the next login', async () => {
     mock.role = 'doctor'; await render(LoginPage); await click('Cambiar de cuenta');
-    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).not.toHaveBeenCalled();
+    expect(mock.logout).toHaveBeenCalledOnce(); expect(mock.replace).toHaveBeenCalledOnce();
     mock.authenticated = false; mock.user = null; await render(LoginPage); await click('Continuar con Privy');
     expect(mock.login).toHaveBeenCalledOnce();
     mock.authenticated = true; mock.user = user('doctor'); await render(LoginPage);
-    await click('Continuar con esta cuenta'); expect(mock.replace).toHaveBeenCalledWith('/doctor');
+    expect(mock.replace).toHaveBeenLastCalledWith('/doctor');
+    expect(mock.replace).toHaveBeenCalledTimes(2);
+  });
+  it('does not redirect again after a failed change of account', async () => {
+    await render(LoginPage); mock.replace.mockClear();
+    mock.logout.mockRejectedValueOnce(new Error('offline'));
+    await click('Cambiar de cuenta'); await render(LoginPage);
+    expect(mock.replace).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('No pudimos cerrar la sesión');
   });
 });
 

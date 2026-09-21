@@ -74,7 +74,7 @@ export function WaitlistForm() {
             if (status === "error") setStatus("idle");
           }}
           placeholder={t.waitlist.placeholder}
-          aria-label="Email"
+          aria-label={t.waitlist.placeholder}
           aria-invalid={status === "error"}
           className="h-14 flex-1 rounded-full border border-white/20 bg-white/10 px-6 text-white placeholder-white/50 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
         />

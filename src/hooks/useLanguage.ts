@@ -37,14 +37,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   // Priority: ?lang= query param > localStorage.
   useEffect(() => {
     const fromQuery = new URLSearchParams(window.location.search).get("lang");
-    if (fromQuery === "en" || fromQuery === "es") {
+    if (fromQuery === "en" || fromQuery === "es" || fromQuery === "pt") {
       setLangState(fromQuery);
       setResolved(true);
       return;
     }
     let stored: Language | null = null;
     try { stored = window.localStorage.getItem(STORAGE_KEY) as Language | null; } catch { /* Storage can be unavailable. */ }
-    if (stored === "en" || stored === "es") {
+    if (stored === "en" || stored === "es" || stored === "pt") {
       setLangState(stored);
     }
     setResolved(true);
@@ -52,13 +52,21 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!resolved) return;
-    document.documentElement.lang = lang;
+    document.documentElement.lang = lang === "pt" ? "pt-BR" : lang;
     try { window.localStorage.setItem(STORAGE_KEY, lang); } catch { /* Keep the in-memory preference. */ }
   }, [lang, resolved]);
 
-  const setLang = useCallback((next: Language) => setLangState(next), []);
+  const setLang = useCallback((next: Language) => {
+    setLangState(next);
+    // An initial language link must not undo an explicit choice on reload.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('lang')) {
+      url.searchParams.set('lang', next);
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, []);
   const toggle = useCallback(
-    () => setLangState((prev) => (prev === "en" ? "es" : "en")),
+    () => setLangState((prev) => (prev === "en" ? "es" : prev === "es" ? "pt" : "en")),
     [],
   );
 

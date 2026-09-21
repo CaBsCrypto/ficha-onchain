@@ -136,7 +136,7 @@ export function WaitlistModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={lang === 'pt' ? 'Fechar' : lang === 'es' ? 'Cerrar' : 'Close'}
           className="absolute right-4 top-4 z-10 grid h-8 w-8 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -192,7 +192,7 @@ export function WaitlistModal({
             ) : (
               <>
                 <p className="mb-4 text-sm font-medium text-white/60">
-                  {lang === "es" ? "Ingresa tu correo para reservar tu lugar" : "Enter your email to reserve your spot"}
+                  {lang === "pt" ? "Digite seu e-mail para entrar na lista" : lang === "es" ? "Ingresa tu correo para reservar tu lugar" : "Enter your email to reserve your spot"}
                 </p>
                 <form onSubmit={onSubmit} className="space-y-3" noValidate>
                   <input
@@ -200,7 +200,7 @@ export function WaitlistModal({
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); }}
                     placeholder={t.waitlist.placeholder}
-                    aria-label="Email"
+                    aria-label={lang === 'pt' ? 'E-mail' : lang === 'es' ? 'Correo electrónico' : 'Email'}
                     aria-invalid={status === "error"}
                     className="w-full rounded-xl border px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-all focus:ring-2 focus:ring-sky-500/50"
                     style={{
@@ -225,7 +225,7 @@ export function WaitlistModal({
                 </form>
 
                 <p className="mt-5 text-xs text-white/25 text-center">
-                  {lang === "es" ? "Sin spam. Te contactaremos cuando abramos." : "No spam. We'll reach out when we launch."}
+                  {lang === "pt" ? "Sem spam. Entraremos em contato quando lançarmos." : lang === "es" ? "Sin spam. Te contactaremos cuando abramos." : "No spam. We'll reach out when we launch."}
                 </p>
               </>
             )}

@@ -20,7 +20,7 @@ export function footerHrefFor(label: string) {
 }
 
 export function Footer() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const cols = t.footer.columns;
   const year = 2026;
 
@@ -64,6 +64,9 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-6 text-sm text-muted sm:flex-row">
           <p>© {year} TrustLeaf. {t.footer.rights}</p>
+          <a href={`/login/doctor?lang=${lang}`} className="text-xs text-muted underline-offset-4 hover:text-clinical hover:underline">
+            {lang === 'pt' ? 'Acesso para médicos' : lang === 'es' ? 'Acceso para médicos' : 'Doctor access'}
+          </a>
           <p className="text-xs">Santiago · Chile 🇨🇱</p>
         </div>
       </div>
