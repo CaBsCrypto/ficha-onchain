@@ -7,12 +7,13 @@ describe('footer link resolution', () => {
   it.each([
     ['Verify', '#'], ['Verificar', '#'], ['Verificação', '#'],
     ['Trabaja con nosotros', '#'], ['Careers', '#'],
-    ['Privacidad', '#'], ['Términos', '#'], ['Seguridad', '#'],
+    ['Términos', '#'], ['Seguridad', '#'],
   ])('%s never resolves to a live navigation target', (label, expected) => {
     expect(footerHrefFor(label)).toBe(expected);
   });
 
   it.each(['Problema', 'Problem'])('%s anchors to the problem section', (label) => expect(footerHrefFor(label)).toBe('#problem'));
+  it.each(['Privacidad', 'Privacy', 'Privacidade'])('%s preserves the waitlist privacy notice', (label) => expect(footerHrefFor(label)).toBe('#waitlist'));
   it.each(['Solución', 'Solution', 'Solução'])('%s anchors to the solution section', (label) => expect(footerHrefFor(label)).toBe('#solution'));
   it.each(['Cómo funciona', 'How it works'])('%s anchors to the how section', (label) => expect(footerHrefFor(label)).toBe('#how'));
 

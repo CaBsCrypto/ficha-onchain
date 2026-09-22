@@ -15,7 +15,8 @@ export function footerHrefFor(label: string) {
     l.includes("how") || l.includes("cómo") || l.includes("como") ? "#how" :
     l.includes("roadmap") ? "#roadmap" :
     l.includes("médic") || l.includes("medic") || l.includes("doctor") ? "/login/doctor" :
-    l.includes("pacient") || l.includes("patient") ? "/login/patient" : "#";
+    l.includes("pacient") || l.includes("patient") ? "/login/patient" :
+    l.includes("priva") ? "#waitlist" : "#";
   return RETIRED_PATHS.some(p => href.startsWith(p)) ? '#' : href;
 }
 

@@ -1,71 +1,44 @@
-/**
- * POST /api/waitlist — join the launch waitlist.
- * ---------------------------------------------------------------------------
- * Persists signups to Neon Postgres (Vercel Storage). The DATABASE_URL env
- * var is injected automatically by Vercel when a Neon database is linked to
- * the project (Storage → Connect Database).
- *
- * The table is created on first request if it doesn't exist (idempotent).
- *
- * Body (JSON): { email: string, role?: "doctor" | "patient" }
- * Responses:
- *   200 { success: true, alreadyRegistered?: true }
- *   400 { error }   — malformed / missing email
- *   500 { error }   — database error
- */
-import { getDb } from "@/lib/db";
-import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/admin";
+/** Waitlist interest only; never creates an account, sends mail or writes to Stellar. */
+import { getDb } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { requirePrivyAdmin } from '@/lib/auth/admin';
+import { checkWaitlistRateLimit } from '@/lib/auth/rate-limit';
+import { normalizeWaitlistEmail, readWaitlistBody } from '@/lib/waitlist';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_EMAIL_LEN = 254;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+const headers = { 'Cache-Control': 'no-store' };
+const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers });
 
 export async function POST(request: Request) {
-  let body: { email?: unknown; role?: unknown };
+  // Enable only after verifying the environment's database and existing schema.
+  if (process.env.TRUSTLEAF_WAITLIST_ENABLED !== 'true') return reply({ error: 'waitlist_unavailable' }, 503);
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return reply({ error: 'invalid_json' }, 415);
+  let body: unknown;
+  try { body = await readWaitlistBody(request); }
+  catch (error) { return reply({ error: error instanceof Error && error.message === 'body_too_large' ? 'body_too_large' : 'invalid_json' }, error instanceof Error && error.message === 'body_too_large' ? 413 : 400); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ error: 'invalid_email' }, 400);
+  const value = body as { email?: unknown; role?: unknown };
+  const email = normalizeWaitlistEmail(value.email);
+  if (!email) return reply({ error: 'invalid_email' }, 400);
+  const role = value.role === 'doctor' || value.role === 'patient' ? value.role : null;
   try {
-    body = (await request.json()) as { email?: unknown; role?: unknown };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const email = String(body.email ?? "").trim().toLowerCase();
-  if (!email || email.length > MAX_EMAIL_LEN || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
-  }
-
-  const role =
-    body.role === "doctor" || body.role === "patient" ? body.role : null;
-
-  try {
+    if (!await checkWaitlistRateLimit()) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { ...headers, 'Retry-After': '60' } });
     const sql = getDb();
-
-    await sql`
-      INSERT INTO waitlist (email, role)
-      VALUES (${email}, ${role})
-      ON CONFLICT (email) DO NOTHING
-    `;
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[waitlist] db error:", err);
-    return NextResponse.json({ error: "Could not save your signup" }, { status: 500 });
+    await sql`INSERT INTO waitlist (email, role) VALUES (${email}, ${role}) ON CONFLICT (email) DO NOTHING`;
+    // Identical response avoids disclosing whether an address was already registered.
+    return reply({ success: true });
+  } catch {
+    return reply({ error: 'waitlist_unavailable' }, 503);
   }
 }
 
 export async function GET(request: Request) {
-  // Simple admin endpoint — list all signups.
-  const auth = await requireAdmin(request);
-  if ("error" in auth) return auth.error;
-
+  const auth = await requirePrivyAdmin(request);
+  if ('error' in auth) { auth.error.headers.set('Cache-Control', 'no-store'); return auth.error; }
   try {
     const sql = getDb();
     const rows = await sql`SELECT email, role, created_at FROM waitlist ORDER BY created_at DESC`;
-    return NextResponse.json({ count: rows.length, signups: rows });
-  } catch (err) {
-    console.error("[waitlist] db error:", err);
-    return NextResponse.json({ error: "Could not fetch signups" }, { status: 500 });
-  }
+    return reply({ count: rows.length, signups: rows });
+  } catch { return reply({ error: 'waitlist_unavailable' }, 503); }
 }
