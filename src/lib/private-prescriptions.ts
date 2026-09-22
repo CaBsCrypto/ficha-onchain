@@ -103,21 +103,32 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number) {
 }
 export async function listPrivatePrescriptions(actor:AuthedUser,role:string) {
   const wallet=await privateActorWallet(actor),client=await getDbConnection();
+  let rows:PrivateRow[];
   try {
     const column=role==='doctor'?'doctor_wallet':'patient_wallet';
     const identity=role==='doctor'?'doctor_user_id':'patient_requested_by';
-    const rows=(await client.query(`SELECT p.*,a.patient_name,d.name AS doctor_name,
+    rows=(await client.query(`SELECT p.*,a.patient_name,d.name AS doctor_name,
       (SELECT jsonb_build_object('id',o.id,'action',o.action,'state',o.state,'source_wallet',o.source_wallet,
         'expires_at',o.expires_at,'signing_hash',o.signing_hash,'transaction_hash',o.transaction_hash,'error_code',o.error_code)
         FROM private_operations o WHERE o.prescription_id=p.id AND o.actor_user_id=$2 ORDER BY o.created_at DESC LIMIT 1) AS operation FROM private_prescriptions p
       JOIN prescription_booking_requests b ON b.appointment_id=p.appointment_id JOIN appointments a ON a.id=p.appointment_id
       JOIN doctors d ON LOWER(d.email)=LOWER(a.doctor_email) WHERE p.${column}=$1 AND b.${identity}=$2 AND p.contract_id=$3
       ${role==='patient'?"AND p.state='confirmed'":''} ORDER BY p.created_at DESC`,[wallet.address,actor.userId,RX_PRIVATE])).rows;
-    const chain=createPrivateChain();await chain.verifyDeployment();
-    const prescriptions=[];
-    for(const row of rows)prescriptions.push(await prescriptionView(row,row,chain));
-    return {prescriptions};
   }finally{client.release();}
+  const chain=createPrivateChain();await chain.verifyDeployment();
+  const prescriptions:Awaited<ReturnType<typeof prescriptionView>>[]=new Array(rows.length);
+  let next=0;
+  let failed=false;
+  // Bound RPC pressure while retaining database order and all-or-nothing validation.
+  async function readNext() {
+    while(!failed && next<rows.length) {
+      const index=next++;
+      try {prescriptions[index]=await prescriptionView(rows[index],rows[index],chain);}
+      catch(error) {failed=true;throw error;}
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(4,rows.length)},readNext));
+  return {prescriptions};
 }
 export async function preparePrescription(actor:AuthedUser,appointmentId:number,document:unknown) {
   assertPrivateWrites();const wallet=await privateActorWallet(actor);
