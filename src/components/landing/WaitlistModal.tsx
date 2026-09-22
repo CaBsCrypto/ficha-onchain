@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { WaitlistForm } from "./WaitlistForm";
 
 function ShieldIcon() {
   return (
@@ -36,24 +36,6 @@ function ShieldIcon() {
   );
 }
 
-function AvatarStack() {
-  const colors = ["#0ea5e9", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"];
-  const letters = ["A", "D", "M", "P", "C"];
-  return (
-    <div className="flex items-center -space-x-2">
-      {colors.map((c, i) => (
-        <div
-          key={i}
-          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#1a1040] text-[10px] font-bold text-white"
-          style={{ background: c, zIndex: colors.length - i }}
-        >
-          {letters[i]}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function WaitlistModal({
   open,
   onClose,
@@ -62,40 +44,29 @@ export function WaitlistModal({
   onClose: () => void;
 }) {
   const { t, lang } = useLanguage();
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "error" | "submitting" | "done">("idle");
-
+  const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === 'Tab') {
+        const items = [...(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), summary, a[href]') ?? [])];
+        const first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      previous?.focus();
     };
   }, [open, onClose]);
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (status === "submitting") return;
-    if (!EMAIL_RE.test(email)) { setStatus("error"); return; }
-    setStatus("submitting");
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) throw new Error("failed");
-      setStatus("done");
-      setEmail("");
-    } catch {
-      setStatus("error");
-    }
-  }
 
   if (!open) return null;
 
@@ -109,7 +80,8 @@ export function WaitlistModal({
       aria-label={t.waitlist.title}
     >
       <div
-        className="relative w-full max-w-2xl overflow-hidden rounded-3xl shadow-2xl"
+        ref={dialog}
+        className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl shadow-2xl"
         style={{
           background: "linear-gradient(135deg, #04111f 0%, #062440 50%, #041929 100%)",
           border: "1px solid rgba(14,165,233,0.18)",
@@ -162,13 +134,7 @@ export function WaitlistModal({
               {t.waitlist.subtitle}
             </p>
 
-            {/* Social proof */}
-            <div className="mt-6 flex items-center gap-3">
-              <AvatarStack />
-              <p className="text-xs text-white/35">
-                {t.waitlist.socialProof.replace("{count}", "147")}
-              </p>
-            </div>
+
           </div>
 
           {/* Divider */}
@@ -180,55 +146,7 @@ export function WaitlistModal({
 
           {/* Right — form */}
           <div className="flex flex-col justify-center px-8 py-10 sm:py-12">
-            {status === "done" ? (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30">
-                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                </div>
-                <p className="text-sm font-medium text-emerald-300">{t.waitlist.success}</p>
-              </div>
-            ) : (
-              <>
-                <p className="mb-4 text-sm font-medium text-white/60">
-                  {lang === "pt" ? "Digite seu e-mail para entrar na lista" : lang === "es" ? "Ingresa tu correo para reservar tu lugar" : "Enter your email to reserve your spot"}
-                </p>
-                <form onSubmit={onSubmit} className="space-y-3" noValidate>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); }}
-                    placeholder={t.waitlist.placeholder}
-                    aria-label={lang === 'pt' ? 'E-mail' : lang === 'es' ? 'Correo electrónico' : 'Email'}
-                    aria-invalid={status === "error"}
-                    className="w-full rounded-xl border px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-all focus:ring-2 focus:ring-sky-500/50"
-                    style={{
-                      background: "rgba(14,165,233,0.06)",
-                      borderColor: status === "error" ? "rgba(239,68,68,0.5)" : "rgba(14,165,233,0.2)",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={status === "submitting"}
-                    className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"
-                    style={{
-                      background: "linear-gradient(135deg, #0284c7, #0ea5e9)",
-                      boxShadow: "0 0 28px rgba(14,165,233,0.35)",
-                    }}
-                  >
-                    {status === "submitting" ? "…" : t.waitlist.cta}
-                  </button>
-                  {status === "error" && (
-                    <p className="text-center text-xs text-rose-400">{t.waitlist.invalid}</p>
-                  )}
-                </form>
-
-                <p className="mt-5 text-xs text-white/25 text-center">
-                  {lang === "pt" ? "Sem spam. Entraremos em contato quando lançarmos." : lang === "es" ? "Sin spam. Te contactaremos cuando abramos." : "No spam. We'll reach out when we launch."}
-                </p>
-              </>
-            )}
+            <WaitlistForm compact />
           </div>
         </div>
       </div>

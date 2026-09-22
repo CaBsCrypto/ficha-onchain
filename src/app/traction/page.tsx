@@ -23,7 +23,6 @@ export default function TractionPage() {
       value: METRICS.stellarTx.toLocaleString(),
       href: STELLAR_EXPLORER_URL,
     },
-    { label: page.metrics.waitlist, value: METRICS.waitlist.toLocaleString() },
   ];
 
   return (
