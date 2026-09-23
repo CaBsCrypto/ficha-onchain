@@ -7,7 +7,7 @@ import { WaitlistForm } from "./WaitlistForm";
 
 function ShieldIcon() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-12 w-12" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-8 w-8" aria-hidden>
       <path
         d="M24 4L8 10v14c0 10 7 18.4 16 21 9-2.6 16-11 16-21V10L24 4z"
         fill="url(#shieldGrad)"
@@ -81,7 +81,7 @@ export function WaitlistModal({
     >
       <div
         ref={dialog}
-        className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl shadow-2xl shadow-slate-900/15"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[480px] flex-col overflow-hidden rounded-3xl shadow-2xl shadow-slate-900/15"
         style={{
           background: "linear-gradient(135deg, #f0f9ff 0%, #ffffff 65%, #f8fafc 100%)",
           border: "1px solid rgba(14,165,233,0.18)",
@@ -109,47 +109,25 @@ export function WaitlistModal({
           type="button"
           onClick={onClose}
           aria-label={lang === 'pt' ? 'Fechar' : lang === 'es' ? 'Cerrar' : 'Close'}
-          className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full text-slate-500 transition-colors hover:bg-sky-100 hover:text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600"
+          className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/95 text-slate-500 transition-colors hover:bg-sky-100 hover:text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         </button>
 
-        {/* Two-column layout */}
-        <div className="relative grid sm:grid-cols-[1fr_1.15fr]">
-
-          {/* Left — identity */}
-          <div className="flex flex-col justify-center px-8 py-10 sm:py-12">
-            <div className="mb-5">
-              <ShieldIcon />
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
+        <div className="relative overflow-y-auto overscroll-contain px-6 pb-6 pt-6 sm:px-8 sm:pb-8">
+          <div className="pr-12">
+            <ShieldIcon />
+            <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-sky-700">
               {t.waitlist.kicker}
             </p>
             <h2 className="mt-2 text-2xl font-semibold leading-snug tracking-tight text-ink">
               {t.waitlist.title}
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              {t.waitlist.subtitle}
-            </p>
-
-
           </div>
-
-          {/* Divider */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-6 left-[calc(50%-0.5px)] hidden w-px sm:block"
-            style={{ background: "linear-gradient(to bottom, transparent, rgba(14,165,233,0.2), transparent)" }}
-          />
-
-          {/* Right — form */}
-          <div className="flex flex-col justify-center px-8 py-10 sm:py-12">
-            <WaitlistForm compact tone="light" />
-          </div>
+          <p className="mt-4 text-sm leading-relaxed text-slate-600">
+            {t.waitlist.subtitle}
+          </p>
+          <WaitlistForm compact tone="light" />
         </div>
-      </div>
-    </div>
-  );
-}

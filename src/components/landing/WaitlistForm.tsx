@@ -43,8 +43,8 @@ export function WaitlistForm({ compact = false, tone = 'dark' }: { compact?: boo
           disabled={status === 'submitting'}
           onChange={event => { setEmail(event.target.value); if (status !== 'submitting') setStatus('idle'); }}
           placeholder={t.waitlist.placeholder} aria-invalid={status === 'invalid'} aria-describedby={`${id}-notice${error ? ` ${id}-error` : ''}`}
-          className={`min-w-0 w-full flex-1 rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 ${light ? 'border-slate-300 bg-white text-slate-900 placeholder-slate-500' : 'border-white/25 bg-white/10 text-white placeholder-white/60'}`} />
-        <button type="submit" disabled={status === 'submitting'} className={`shrink-0 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 ${light ? 'bg-clinical text-white hover:bg-sky-600' : 'bg-white text-sky-900 hover:bg-sky-50'}`}>
+          className={`min-h-11 min-w-0 w-full flex-1 rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 ${light ? 'border-slate-300 bg-white text-slate-900 placeholder-slate-500' : 'border-white/25 bg-white/10 text-white placeholder-white/60'}`} />
+        <button type="submit" disabled={status === 'submitting'} className={`${compact ? 'w-full min-h-11' : ''} shrink-0 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 ${light ? 'bg-clinical text-white hover:bg-sky-600' : 'bg-white text-sky-900 hover:bg-sky-50'}`}>
           {status === 'submitting' ? copy.sending : status === 'unavailable' || status === 'limited' ? copy.retry : t.waitlist.cta}
         </button>
       </form>}
