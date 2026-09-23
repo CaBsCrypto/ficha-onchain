@@ -2,26 +2,28 @@
 
 import { useLanguage } from "@/hooks/useLanguage";
 
+// Most footer links are still placeholders; resolve the ones that have a
+// real destination today. Keyed by label text (EN + ES + PT). Retired
+// modules (/verify, /traction, mock portals) answer 410 in production and
+// must never be linked from public surfaces.
+const RETIRED_PATHS = ['/verify', '/traction', '/mcp', '/licenses', '/ficha', '/dispensary', '/sandbox'];
+export function footerHrefFor(label: string) {
+  const l = label.toLowerCase();
+  const href =
+    l.includes("problem") || l.includes("problema") ? "#problem" :
+    l.includes("solut") || l.includes("soluci") || l.includes("soluç") ? "#solution" :
+    l.includes("how") || l.includes("cómo") || l.includes("como") ? "#how" :
+    l.includes("roadmap") ? "#roadmap" :
+    l.includes("médic") || l.includes("medic") || l.includes("doctor") ? "/login/doctor" :
+    l.includes("pacient") || l.includes("patient") ? "/login/patient" :
+    l.includes("priva") ? "#waitlist" : "#";
+  return RETIRED_PATHS.some(p => href.startsWith(p)) ? '#' : href;
+}
+
 export function Footer() {
   const { t, lang } = useLanguage();
   const cols = t.footer.columns;
   const year = 2026;
-
-  // Most footer links are still placeholders; resolve the ones that have a
-  // real destination today. Keyed by label text (EN + ES).
-  const hrefFor = (label: string) => {
-    const l = label.toLowerCase();
-    if (l.includes("problem") || l.includes("problema")) return "#problem";
-    if (l.includes("solut") || l.includes("soluci") || l.includes("soluç")) return "#solution";
-    if (l.includes("how") || l.includes("cómo") || l.includes("como")) return "#how";
-    if (l.includes("roadmap")) return "#roadmap";
-    if (l.includes("tract") || l.includes("tracc")) return "/traction";
-    if (l.includes("veri")) return "/verify";
-    if (l.includes("médic") || l.includes("medic") || l.includes("doctor")) return "/login/doctor";
-    if (l.includes("pacient") || l.includes("patient")) return "/login/patient";
-    if (l.includes("priva")) return "#waitlist";
-    return "#";
-  };
 
   return (
     <footer className="border-t border-slate-200 bg-white">
@@ -49,7 +51,7 @@ export function Footer() {
                 {col.links.map((link) => (
                   <li key={link}>
                     <a
-                      href={hrefFor(link)}
+                      href={footerHrefFor(link)}
                       className="text-sm text-muted transition-colors hover:text-clinical"
                     >
                       {link}

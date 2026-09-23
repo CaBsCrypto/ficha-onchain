@@ -13,6 +13,7 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, user, logout } = usePrivy();
   const router = useRouter();
+  useEffect(() => { document.title = 'TrustLeaf — Portal del paciente'; }, []);
   const signingOut = useRef(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState(false);

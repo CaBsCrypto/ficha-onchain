@@ -227,6 +227,7 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, user } = usePrivy();
+  useEffect(() => { document.title = 'TrustLeaf — Administración'; }, []);
   if (!ready) return <Loading />;
   if (!authenticated || !user) return <LoginScreen />;
   // Remount synchronously on identity changes, before an old response can expose the panel.
