@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { PatientIcon } from './PatientIcon';
+import styles from './patient-mobile.module.css';
 import { usePrivy } from '@privy-io/react-auth';
 import { privyEmail } from '@/lib/auth/privy-email';
 import { usePortalWallet } from './WalletBoundary';
@@ -17,7 +19,16 @@ export function PortalIdentity({ role }: { role: PortalRole }) {
 }
 export function PortalHome({ role }: { role: PortalRole }) {
   const base = role === 'doctor' ? '/doctor' : '/patient';
-  return <div className="space-y-5">
+  return <>
+    {role === 'patient' && <section className={styles.mobileOnly}>
+      <div data-patient-home>
+        <div><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-700">Tu portal · Testnet</p><h1>Tu espacio de atención</h1><p className="mt-3 text-base text-slate-600">Tus consultas y recetas, en un solo lugar.</p></div>
+        <Link href="/patient?tab=consultas" data-patient-home-card><span><PatientIcon name="consultas" /></span><div><h2>Mis consultas</h2><p>Reserva un horario y revisa tu atención.</p></div><span aria-hidden="true">→</span></Link>
+        <Link href="/patient?tab=recetas" data-patient-home-card><span><PatientIcon name="recetas" /></span><div><h2>Mis recetas</h2><p>Abre tus documentos y consulta su estado.</p></div><span aria-hidden="true">→</span></Link>
+        <p className="text-xs leading-5">Datos sintéticos · Sin uso clínico · Stellar Testnet</p>
+      </div>
+    </section>}
+    <div data-patient-desktop={role === 'patient' ? '' : undefined} className="space-y-5">
     <PortalIdentity role={role} />
     <div className="grid gap-4 sm:grid-cols-2">
       <Link href={`${base}?tab=consultas`} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-sky-300"><h2 className="font-semibold text-slate-800">Mis consultas</h2><p className="mt-2 text-sm text-slate-500">{role === 'doctor' ? 'Inicia la consulta y prepara la receta para el paciente correcto.' : 'Reserva, confirma tu asistencia y autoriza por separado una emisión.'}</p></Link>
@@ -25,5 +36,5 @@ export function PortalHome({ role }: { role: PortalRole }) {
     </div>
     {role === 'doctor' && <Link href="/doctor?tab=disponibilidad" className="inline-block rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-700">Configurar mi disponibilidad</Link>}
     <p className="text-xs text-slate-500">Entorno de prueba con datos sintéticos. Tus confirmaciones se firman con Privy y TrustLeaf cubre las comisiones.</p>
-  </div>;
+  </div></>;
 }

@@ -6,17 +6,17 @@ import { PrivyLoginButton } from '@/components/auth/PrivyLoginButton';
 import { LandingBackdrop } from '@/components/landing/LandingBackdrop';
 import PatientLayout from '@/app/patient/layout';
 const mock = vi.hoisted(() => ({ ready:true, authenticated:false, isOpen:false, user:null as any,
-  login:vi.fn(), logout:vi.fn(), replace:vi.fn(), callbacks:null as any }));
+  login:vi.fn(), logout:vi.fn(), replace:vi.fn(), tab:"", callbacks:null as any }));
 vi.mock('@privy-io/react-auth', () => ({usePrivy:()=>mock, useModalStatus:()=>({isOpen:mock.isOpen}),
   useLogin:(callbacks:any)=>{mock.callbacks=callbacks;return {login:mock.login};}}));
-vi.mock('next/navigation', () => ({useRouter:()=>({replace:mock.replace}),useSearchParams:()=>new URLSearchParams()}));
+vi.mock('next/navigation', () => ({useRouter:()=>({replace:mock.replace}),useSearchParams:()=>new URLSearchParams(mock.tab ? `tab=${mock.tab}` : "")}));
 vi.mock('next/link', () => ({default:(props:any)=>createElement('a',props)}));
 vi.mock('@/hooks/useTrackUser', () => ({useTrackUser:()=>{}}));
 vi.mock('@/hooks/useLanguage', () => ({useLanguage:()=>({lang:'es'})}));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({WalletBoundary:({children}:any)=>children}));
 let root:Root, box:HTMLDivElement;
 beforeEach(()=>{
-  vi.clearAllMocks();mock.ready=true;mock.authenticated=false;mock.isOpen=false;mock.user=null;
+  vi.clearAllMocks();mock.ready=true;mock.authenticated=false;mock.isOpen=false;mock.user=null;mock.tab="";
   mock.logout.mockResolvedValue(undefined);mock.login.mockImplementation(()=>{});
   window.history.replaceState(null,'','/');
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -78,4 +78,23 @@ it('keeps the portal after logout failure and allows retry',async()=>{
 it('routes an expired portal session to the patient entry',async()=>{
   await render(true);expect(mock.replace).toHaveBeenCalledWith('/login/patient');
   expect(box.textContent).not.toContain('Protected content');
+});
+
+it('offers logout in the mobile account and recovers from failure without redirecting',async()=>{
+  mock.authenticated=true;mock.tab='perfil';mock.logout.mockRejectedValueOnce(new Error('offline'));
+  await render(true);
+  const account=box.querySelector('[data-patient-account-actions]')!;
+  const logout=account.querySelector('button')!;
+  await act(async()=>logout.click());
+  expect(account.textContent).toContain('No pudimos cerrar la sesión');
+  expect(mock.replace).not.toHaveBeenCalled();
+  await act(async()=>logout.click());
+  expect(mock.replace).toHaveBeenCalledWith('/');
+});
+it('keeps mobile account actions out of the consultation screen',async()=>{
+  mock.authenticated=true;mock.tab='consultas';await render(true);
+  expect(box.querySelector('[data-patient-account-actions]')).toBeNull();
+  const navigation=box.querySelector('[data-patient-navigation]')!;
+  expect(navigation.querySelector('[aria-current="page"]')?.textContent).toBe('Consultas');
+  expect(navigation.querySelectorAll('a')).toHaveLength(4);
 });

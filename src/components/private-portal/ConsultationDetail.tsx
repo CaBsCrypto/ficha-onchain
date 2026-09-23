@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { canAuthorizeIssuance } from './state';
 import { jsonBody, localDate, portalApi, usePortalData } from './client';
+import { appointmentDate } from './client';
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation } from './Operation';
 import { PrescriptionCard } from './Prescriptions';
 import type { ConsultationState, PortalRole, PrescriptionDocument, PrivatePrescription } from './types';
@@ -46,15 +47,15 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
   const inProgress = appointment?.status === 'in_progress';
   const mintReady = !!data && inProgress && !!attended && data.booking?.state === 'confirmed' &&
     !data.booking.cancellation_requested_at && Number(data.booking.valid_until) * 1000 > Date.now() && data.consent.status === 'active' && Number(data.consent.validUntil ?? 0) * 1000 > Date.now();
-  return <section className="space-y-5">
+  return <section data-patient-detail={role === "patient" ? "" : undefined} className="space-y-5">
     <button onClick={onBack} disabled={busy || saving} className="text-sm font-semibold text-sky-700 hover:underline">← Volver a mis consultas</button>
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error} <button onClick={refresh} className="font-semibold underline">Actualizar estado</button></div>}
     {data && appointment && <>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">Consulta de prueba #{id}</h1>
         <p className="mt-2 text-sm text-slate-600">Médico: <strong>{appointment.doctor_name || appointment.doctor_email}</strong><br />Paciente: <strong>{appointment.patient_name || appointment.patient_email}</strong></p>
-        <p className="mt-2 text-sm text-slate-500">{appointment.date.slice(0, 10)} · {appointment.time_slot} · Hora de Chile</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <p className="mt-2 text-sm text-slate-500">{role === 'patient' ? appointmentDate(appointment.date) : appointment.date.slice(0, 10)} · {appointment.time_slot} · Hora de Chile</p>
+        <div data-patient-progress className="mt-4 grid gap-3 sm:grid-cols-3">
           <Status title="Asistencia del paciente" value={attended ? 'Confirmada' : 'Pendiente'} />
           <Status title="Inicio por el médico" value={appointment.started_at ? 'Consulta iniciada' : 'Pendiente'} />
           <Status title="Reserva Stellar" value={data.booking ? bookingLabels[data.booking.state] ?? 'Verificando estado' : 'Esperando asistencia e inicio'} />
@@ -65,7 +66,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         {appointment.status === 'cancel_requested' && <p role="status" className="mt-3 text-sm font-semibold text-amber-700">Cancelación solicitada. Esperamos la confirmación antes de mostrar la reserva como cancelada.</p>}
         {appointment.status === 'completed' && <p className="mt-3 font-semibold text-slate-600">Consulta finalizada</p>}
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div data-patient-actions={role === "patient" ? "" : undefined} className="flex flex-wrap gap-3">
         {role === 'patient' && !attended && ['scheduled', 'in_progress'].includes(appointment.status) && <button disabled={unavailable} onClick={() => void appointmentAction('attend')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Confirmar mi asistencia</button>}
         {role === 'doctor' && appointment.status === 'scheduled' && <button disabled={unavailable} onClick={() => void appointmentAction('start')} className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Iniciar consulta</button>}
         {['scheduled', 'in_progress'].includes(appointment.status) && data.consent.status !== 'consumed' && <button disabled={unavailable || data.booking?.state === 'cancel_requested'} onClick={() => void appointmentAction('cancel')} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-40">Solicitar cancelación</button>}

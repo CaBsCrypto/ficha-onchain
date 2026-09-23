@@ -13,11 +13,12 @@ export function PrescriptionCard({ prescription, role, onChange, unavailable = f
   async function act(action: 'activate' | 'revoke' | 'mint') {
     await run(action, { prescriptionId: prescription.id }); onChange();
   }
-  return <article className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `Receta #${prescription.rxId}` : 'Documento preparado'}</h3><span className={`max-w-full whitespace-normal rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription)}</span></div>
-    <p className="text-sm text-slate-600">Médico: <strong>{prescription.doctorName}</strong><br />Paciente: <strong>{prescription.patientName}</strong></p>
+  return <article data-patient-list-card={role === "patient" ? "" : undefined} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `Receta #${prescription.rxId}` : 'Documento preparado'}</h3><span data-prescription-status={prescription.status} className={`max-w-full whitespace-normal rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription)}</span></div>
+    <p className="text-sm text-slate-600">Médico: <strong>{prescription.doctorName}</strong><span data-patient-desktop={role === "patient" ? "" : undefined}><br />Paciente: <strong>{prescription.patientName}</strong></span></p>
+
     <p className="text-xs text-slate-500">Vence: {localDate(prescription.expiresAt)} · Hora de Chile</p>
-    {(role === 'doctor' || prescription.rxId != null) && <DocumentView id={prescription.id} prescription={prescription} />}
+    {(role === 'doctor' || prescription.rxId != null) && <div data-patient-document><DocumentView id={prescription.id} prescription={prescription} /></div>}
     <ReceiptLink hash={prescription.transactionHash} />
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
     <OperationNotice operation={operation ?? prescription.operation} />
@@ -34,9 +35,13 @@ export function PrivatePrescriptions({ role }: { role: PortalRole }) {
   const [filter, setFilter] = useState('all');
   const prescriptions = data?.prescriptions ?? [];
   const shown = prescriptions.filter(rx => filter === 'all' || (filter === 'expired' ? rx.expired && !['Revoked', 'Blocked'].includes(rx.status) : rx.status === filter && (filter === 'Revoked' || !rx.expired) && rx.rxId != null));
+  if (role === 'patient') {
+    const active = (rx: PrivatePrescription) => rx.status === 'Active' && !rx.expired && rx.rxId != null;
+    shown.sort((a, b) => Number(active(b)) - Number(active(a)));
+  }
   return <section className="space-y-5">
     <div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">Estados verificados en Stellar Testnet. El documento clínico permanece cifrado.</p></div>
-    <label className="block text-sm text-slate-600">Estado<select value={filter} onChange={e => setFilter(e.target.value)} className="ml-3 rounded-xl border border-slate-200 bg-white px-3 py-2"><option value="all">Todas</option><option value="Registered">Registradas</option><option value="Active">Activas</option><option value="Revoked">Revocadas</option><option value="expired">Vencidas</option></select></label>
+    <label data-patient-filter className="block text-sm text-slate-600">Estado<select value={filter} onChange={e => setFilter(e.target.value)} className="ml-3 rounded-xl border border-slate-200 bg-white px-3 py-2"><option value="all">Todas</option><option value="Registered">Registradas</option><option value="Active">Activas</option><option value="Revoked">Revocadas</option><option value="expired">Vencidas</option></select></label>
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error} <button onClick={refresh} className="font-semibold underline">Actualizar</button></div>}
     {loading && <p role="status" className="text-sm text-slate-500">Consultando recetas…</p>}
     {!loading && !error && shown.length === 0 && <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No hay recetas en este estado.</p>}

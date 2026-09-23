@@ -46,3 +46,8 @@ export function santiagoToday() {
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
 }
+
+/** Calendar dates are already in Santiago; UTC prevents shifting their calendar day. */
+export function appointmentDate(date: string) {
+  return new Intl.DateTimeFormat('es-CL', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date.slice(0, 10) + 'T12:00:00Z'));
+}

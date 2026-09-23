@@ -4,7 +4,7 @@ import {createRoot,Root} from 'react-dom/client';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {PrivateConsultations} from '@/components/private-portal/Consultations';
 import {DisponibilidadTab} from '@/components/doctor/DisponibilidadTab';
-import {santiagoToday} from '@/components/private-portal/client';
+import {appointmentDate,santiagoToday} from '@/components/private-portal/client';
 const mock=vi.hoisted(()=>({fetch:vi.fn()}));
 vi.mock('@/lib/auth/authed-fetch',()=>({authedFetch:mock.fetch}));
 vi.mock('@/hooks/usePrivyEmail',()=>({usePrivyEmail:()=> 'doctor@example.test'}));
@@ -93,4 +93,20 @@ it('ignores a slow response for the previous doctor and offers retry after failu
   await act(async()=>finish(Response.json({data:{date:'2026-09-14',slots:[{time:'09:00',available:true}]}})));
   expect(box.textContent).not.toContain('09:00');expect(button('Confirmar reserva').disabled).toBe(true);
   expect(button('Reintentar')).toBeDefined();
+});
+
+it('keeps a single booking entry and exposes the complete selected doctor',async()=>{
+  mock.fetch.mockImplementation(async(url:string)=>Response.json(url==='/api/doctors'?{doctors:[{id:7,name:'Médica de prueba con nombre completo',specialty:'Medicina general'}]}:url.startsWith('/api/doctor/slots')?{data:{date:null,slots:[]}}:{appointments:[]}));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await click('Reservar consulta');
+  expect([...box.querySelectorAll('button')].some(b=>b.textContent==='Reservar consulta')).toBe(false);
+  await change(box.querySelector('select')!,'7');
+  expect(box.querySelector('[data-selected-doctor]')?.textContent).toBe('Médica de prueba con nombre completo · Medicina general');
+  await click('Cerrar');
+  expect([...box.querySelectorAll('button')].some(b=>b.textContent==='Reservar consulta')).toBe(true);
+  expect(mock.fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+});
+it('formats calendar dates with year without moving the Santiago day',()=>{
+  expect(appointmentDate('2026-09-06')).toBe('6 de septiembre de 2026');
+  expect(appointmentDate('2026-09-09T00:00:00.000Z')).toBe('9 de septiembre de 2026');
 });
