@@ -131,3 +131,7 @@ export function WaitlistModal({
           </p>
           <WaitlistForm compact tone="light" />
         </div>
+      </div>
+    </div>
+  );
+}
