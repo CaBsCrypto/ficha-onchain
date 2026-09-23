@@ -440,6 +440,8 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     if (ready && !authenticated) router.replace('/login/doctor');
   }, [ready, authenticated, router]);
 
+  useEffect(() => { document.title = 'TrustLeaf — Portal del médico'; }, []);
+
   if (!ready || !authenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f8fafc]">

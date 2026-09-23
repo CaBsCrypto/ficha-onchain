@@ -6,6 +6,14 @@ import type { PortalRole, PrivateAppointment } from './types';
 
 function BookingForm({ onSaved, onClose }: { onSaved: (id: number) => void; onClose: () => void }) {
   const doctors = usePortalData<{ doctors: { id: number; name: string; specialty: string | null }[] }>('/api/doctors', 0);
+  const doctorLabels = (doctors.data?.doctors ?? []).map(doctor => ({
+    doctor, label: `${doctor.name}${doctor.specialty ? ` · ${doctor.specialty}` : ''}`,
+  }));
+  const labelCounts = new Map<string, number>();
+  for (const { label } of doctorLabels) {
+    const key = label.trim().toLocaleLowerCase('es');
+    labelCounts.set(key, (labelCounts.get(key) ?? 0) + 1);
+  }
   const [doctorId, setDoctorId] = useState('');
   const selectedDoctor = doctors.data?.doctors.find(doctor => String(doctor.id) === doctorId);
   const [date, setDate] = useState(santiagoToday());
@@ -42,7 +50,7 @@ function BookingForm({ onSaved, onClose }: { onSaved: (id: number) => void; onCl
   return <form data-patient-booking onSubmit={reserve} className="space-y-4 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-900">Reservar consulta de prueba</h2><button type="button" onClick={onClose} disabled={busy} className="text-sm text-slate-500 underline">Cerrar</button></div>
     <p className="text-sm text-slate-500">Tu cuenta será el paciente de esta reserva. Fechas y horas de Chile.</p>
-    <label className="block text-sm text-slate-600">Médico<select required value={doctorId} onChange={e => { clearSlots(); setDoctorId(e.target.value); const today = santiagoToday(); setDate(today); setQuery({date:today,next:true,revision:0}); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5"><option value="">Selecciona un médico autorizado</option>{doctors.data?.doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.name}{doctor.specialty ? ` · ${doctor.specialty}` : ''}</option>)}</select></label>
+    <label className="block text-sm text-slate-600">Médico<select required value={doctorId} onChange={e => { clearSlots(); setDoctorId(e.target.value); const today = santiagoToday(); setDate(today); setQuery({date:today,next:true,revision:0}); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5"><option value="">Selecciona un médico autorizado</option>{doctorLabels.map(({ doctor, label }) => <option key={doctor.id} value={doctor.id}>{label}{(labelCounts.get(label.trim().toLocaleLowerCase('es')) ?? 0) > 1 ? ` · Perfil #${doctor.id}` : ''}</option>)}</select></label>
     {selectedDoctor && <p data-selected-doctor className="text-sm text-slate-600"><strong>{selectedDoctor.name}</strong>{selectedDoctor.specialty && <span> · {selectedDoctor.specialty}</span>}</p>}
     {doctors.error && <p role="alert" className="text-sm text-rose-700">{doctors.error} <button type="button" onClick={doctors.refresh} className="underline">Reintentar</button></p>}
     <label className="block text-sm text-slate-600">Fecha<input type="date" min={santiagoToday()} required value={date} onChange={e => { clearSlots(); setDate(e.target.value); setQuery({date:e.target.value,next:false,revision:0}); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5" /></label>

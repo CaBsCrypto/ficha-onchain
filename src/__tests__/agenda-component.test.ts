@@ -21,6 +21,22 @@ it('uses the Santiago date across UTC midnight and the daylight-saving change',(
   } finally {vi.useRealTimers();}
 });
 const button=(text:string)=>[...box.querySelectorAll('button')].find(b=>b.textContent?.includes(text))!;
+it('distinguishes identical doctor labels without revealing their emails',async()=>{
+  mock.fetch.mockImplementation(async(url:string)=>Response.json(url==='/api/doctors'?{doctors:[
+    {id:7,name:'Médico Demo',specialty:'General',email:'one@example.test'},
+    {id:9,name:'Médico Demo',specialty:'General',email:'two@example.test'},
+    {id:10,name:'Otra médica',specialty:'General'},
+  ]}:{appointments:[]}));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await click('Reservar consulta');
+  const options=[...box.querySelectorAll('option')].slice(1);
+  expect(new Set(options.map(o=>o.textContent)).size).toBe(3);
+  expect(options[0].textContent).toContain('Perfil #7');
+  expect(options[1].textContent).toContain('Perfil #9');
+  expect(options[2].textContent).toBe('Otra médica · General');
+  expect(box.textContent).not.toContain('@example.test');
+  expect(options.map(o=>o.value)).toEqual(['7','9','10']);
+});
 async function click(text:string){await act(async()=>button(text).click());}
 async function change(el:HTMLInputElement|HTMLSelectElement,value:string){await act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value')!.set!.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));});}
 it('clears a rejected draft when corrected without hiding a save failure',async()=>{

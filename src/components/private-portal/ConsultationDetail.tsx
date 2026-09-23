@@ -35,7 +35,11 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
       await run('mint', { prescriptionId: saved.prescription.id });
     } finally { lock.current = false; setSaving(false); refresh(); }
   }
-  if (loading && !data) return <p role="status" className="text-sm text-slate-500">Consultando la reserva y sus permisos…</p>;
+  if (loading && !data) return <section role="status" className="space-y-4">
+    <div className="h-24 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" aria-hidden />
+    <div className="h-44 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" aria-hidden />
+    <p className="text-sm text-slate-500">Consultando la reserva y sus permisos…</p>
+  </section>;
   const appointment = data?.appointment;
   const attended = appointment?.attended_at ?? appointment?.attendance_at;
   const pending = busy || saving || operation?.state === 'submitted' || !!data?.operations?.some(op => op.state === 'submitted');

@@ -113,6 +113,7 @@ function Loading() {
 
 // ── Sidebar nav ───────────────────────────────────────────────────────────────
 const NAV = [
+  { href: "/admin/waitlist", label: "Registro de interés", icon: "M4 4h16v16H4zM7 8h10M7 12h10M7 16h6" },
   { href: "/admin/doctors", label: "Médicos",    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M12 12c1.1.5 2 1.7 2 3M12 12c-1.1.5-2 1.7-2 3m2-3v5" },
 ];
 
@@ -226,6 +227,7 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, user } = usePrivy();
+  useEffect(() => { document.title = 'TrustLeaf — Administración'; }, []);
   if (!ready) return <Loading />;
   if (!authenticated || !user) return <LoginScreen />;
   // Remount synchronously on identity changes, before an old response can expose the panel.

@@ -37,6 +37,21 @@ export interface RateResult {
   used: number;
 }
 
+/** Public waitlist: shared database quota, independent of IP headers and instances.
+ * org_id=0 / env=waitlist is reserved for this non-MCP bucket (no organization FK).
+ * Fail closed on a database error; never expose connection strings or email values.
+ */
+export async function checkWaitlistRateLimit(): Promise<boolean> {
+  const sql = getDb();
+  const [row] = await sql<{ count: number }>`
+    INSERT INTO api_rate_limits (org_id, env, bucket, window_start, count)
+    VALUES (0, 'waitlist', 'public', date_trunc('minute', NOW()), 1)
+    ON CONFLICT (org_id, env, bucket, window_start)
+    DO UPDATE SET count = api_rate_limits.count + 1
+    RETURNING count`;
+  return Boolean(row && row.count <= 30);
+}
+
 export async function checkRateLimit(
   ctx: ApiContext,
   toolName: string,
