@@ -1,63 +1,42 @@
 "use client";
 
-import Link from "next/link";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "./SectionHeading";
 
-function CheckList({ points, tone }: { points: readonly string[]; tone: "clinical" | "mint" }) {
-  const dot = tone === "clinical" ? "text-clinical" : "text-mint";
-  return (
-    <ul className="mt-6 space-y-4">
-      {points.map((p) => (
-        <li key={p} className="flex items-start gap-3">
-          <svg viewBox="0 0 24 24" className={`mt-0.5 h-5 w-5 shrink-0 ${dot}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-          <span className="text-base leading-relaxed text-slate-700">{p}</span>
-        </li>
-      ))}
-    </ul>
-  );
+function Benefits({ points }: { points: readonly string[] }) {
+  return <ul className="mt-5 space-y-3 text-base leading-relaxed text-slate-600">
+    {points.map(point => <li key={point}>{point}</li>)}
+  </ul>;
 }
 
 export function AudienceSection() {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
+  const { patients, doctors } = t.audience;
   return (
-    <section className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
-      <SectionHeading kicker={t.audience.kicker} title={t.audience.title} />
-
-      <div className="mt-14 grid gap-6 md:grid-cols-2">
+    <section id="for-you" className="mx-auto max-w-6xl px-6 py-16 sm:py-24 lg:py-32">
+      <SectionHeading kicker={t.audience.kicker} title={t.audience.title} subtitle={t.audience.subtitle} />
+      <div className="mt-12 grid gap-6 md:grid-cols-[1.3fr_1fr]">
         <Reveal>
-          <div className="flex h-full flex-col justify-between rounded-3xl border border-clinical/15 bg-gradient-to-br from-clinical-50/70 to-white p-8 shadow-sm">
-            <div>
-              <span className="inline-flex rounded-xl bg-clinical/10 px-3 py-1 text-sm font-semibold text-clinical-600">
-                {t.audience.doctors.title}
-              </span>
-              <CheckList points={t.audience.doctors.points} tone="clinical" />
+          <article className="h-full rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold text-sky-700">{patients.title}</p>
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{patients.headline}</h3>
+            <Benefits points={patients.points} />
+            <div className="mt-7 border-t border-sky-200/70 pt-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{patients.futureLabel}</p>
+              <h4 className="mt-2 text-lg font-semibold text-ink">{patients.futureTitle}</h4>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{patients.futureDescription}</p>
             </div>
-          </div>
+          </article>
         </Reveal>
         <Reveal delay={0.1}>
-          <div className="flex h-full flex-col justify-between rounded-3xl border border-mint/15 bg-gradient-to-br from-mint-50/70 to-white p-8 shadow-sm">
-            <div>
-              <span className="inline-flex rounded-xl bg-mint/10 px-3 py-1 text-sm font-semibold text-mint">
-                {t.audience.patients.title}
-              </span>
-              <CheckList points={t.audience.patients.points} tone="mint" />
-            </div>
-            <div className="mt-8 pt-6 border-t border-mint/10">
-              <Link
-                href="/login/patient"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-mint-700 hover:text-mint-800"
-              >
-                {lang === "pt" ? "Entrar no portal do paciente" : lang === "es" ? "Ingresar al portal del paciente" : "Enter patient portal"} →
-              </Link>
-            </div>
-          </div>
+          <article className="h-full rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+            <p className="text-sm font-semibold text-slate-600">{doctors.title}</p>
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-ink">{doctors.headline}</h3>
+            <Benefits points={doctors.points} />
+          </article>
         </Reveal>
       </div>
     </section>
   );
 }
-

@@ -104,25 +104,30 @@ const baseTranslations = {
       ]
     },
     audience: {
-      "kicker": "What we are building toward",
-      "title": "Better continuity for patients and doctors",
-      "doctors": {
-        "title": "For doctors",
-        "points": [
-          "Bring relevant health information together, with patient authorization.",
-          "Reduce time spent reconstructing fragmented histories.",
-          "Today: try the prescription flow with synthetic data."
-        ]
-      },
+      "kicker": "Our vision · Patients first",
+      "title": "Your health has a story. Make it yours.",
+      "subtitle": "We are building a space to help you understand and follow your health, with continuity and control.",
       "patients": {
-        "title": "For patients",
+        "title": "For you",
+        "headline": "Your story, with you.",
         "points": [
-          "Keep your health history with you across care providers.",
-          "Make informed choices about who can access your information.",
-          "Today: authorize issuance and read your private demo prescriptions."
+          "Your health information, together and accessible.",
+          "Control over whom you share it with."
+        ],
+        "futureLabel": "Part of our vision",
+        "futureTitle": "A map to track your pain",
+        "futureDescription": "Record where it hurts and follow how it changes over time. A future capability, not yet available in this demo."
+      },
+      "doctors": {
+        "title": "For those who care for you",
+        "headline": "More context to support you.",
+        "points": [
+          "Better understand your progress between visits.",
+          "Consult the information you choose to share."
         ]
       }
     },
+
     legal: {
       kicker: "Legal & Compliance",
       title: "Prescribe with legal backing",
@@ -423,25 +428,30 @@ const baseTranslations = {
       ]
     },
     audience: {
-      "kicker": "Hacia dónde vamos",
-      "title": "Más continuidad para pacientes y médicos",
-      "doctors": {
-        "title": "Para médicos",
-        "points": [
-          "Reunir información relevante con autorización del paciente.",
-          "Reducir el tiempo dedicado a reconstruir historiales fragmentados.",
-          "Hoy: probar el flujo de recetas con datos sintéticos."
-        ]
-      },
+      "kicker": "Nuestra visión · El paciente primero",
+      "title": "Tu salud tiene una historia. Hazla tuya.",
+      "subtitle": "Construimos un espacio para que puedas comprender y seguir tu salud, con continuidad y bajo tu control.",
       "patients": {
-        "title": "Para pacientes",
+        "title": "Para ti",
+        "headline": "Tu historia, contigo.",
         "points": [
-          "Llevar tu historial contigo entre distintos centros de atención.",
-          "Decidir quién puede acceder a tu información.",
-          "Hoy: autorizar la emisión y leer tus recetas privadas de demostración."
+          "Tu información de salud reunida y accesible.",
+          "Control sobre con quién la compartes."
+        ],
+        "futureLabel": "En nuestra visión",
+        "futureTitle": "Un mapa para seguir tu dolor",
+        "futureDescription": "Registrar dónde duele y observar cómo cambia con el tiempo. Una capacidad futura, aún no disponible en esta demo."
+      },
+      "doctors": {
+        "title": "Para quienes te cuidan",
+        "headline": "Más contexto para acompañarte.",
+        "points": [
+          "Comprender mejor tu evolución entre consultas.",
+          "Consultar la información que decidas compartir."
         ]
       }
     },
+
     legal: {
       kicker: "Legal & Compliance",
       title: "Prescribe con respaldo legal",

@@ -62,25 +62,30 @@ export const publicPortuguese = {
     ]
   },
   audience: {
-    "kicker": "Aonde queremos chegar",
-    "title": "Mais continuidade para pacientes e médicos",
-    "doctors": {
-      "title": "Para médicos",
-      "points": [
-        "Reunir informações relevantes com autorização do paciente.",
-        "Reduzir o tempo gasto reconstruindo históricos fragmentados.",
-        "Hoje: testar o fluxo de receitas com dados sintéticos."
-      ]
-    },
+    "kicker": "Nossa visão · O paciente em primeiro lugar",
+    "title": "Sua saúde tem uma história. Faça dela sua.",
+    "subtitle": "Estamos construindo um espaço para você compreender e acompanhar sua saúde, com continuidade e sob seu controle.",
     "patients": {
-      "title": "Para pacientes",
+      "title": "Para você",
+      "headline": "Sua história, com você.",
       "points": [
-        "Levar seu histórico entre diferentes serviços de saúde.",
-        "Decidir quem pode acessar suas informações.",
-        "Hoje: autorizar a emissão e ler suas receitas privadas de demonstração."
+        "Suas informações de saúde reunidas e acessíveis.",
+        "Controle sobre com quem você as compartilha."
+      ],
+      "futureLabel": "Na nossa visão",
+      "futureTitle": "Um mapa para acompanhar sua dor",
+      "futureDescription": "Registrar onde dói e observar como a dor muda ao longo do tempo. Uma capacidade futura, ainda não disponível nesta demo."
+    },
+    "doctors": {
+      "title": "Para quem cuida de você",
+      "headline": "Mais contexto para acompanhar você.",
+      "points": [
+        "Compreender melhor sua evolução entre consultas.",
+        "Consultar as informações que você decidir compartilhar."
       ]
     }
   },
+
   roadmap: {
     "kicker": "Roadmap",
     "title": "De receitas a um histórico conectado",
