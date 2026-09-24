@@ -8,7 +8,7 @@ const request = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: request }));
 vi.mock('@/components/private-portal/DocumentView', () => ({ DocumentView: () => null }));
 vi.mock('@/components/private-portal/Operation', () => ({
-  ConfirmationButton: () => null, OperationNotice: () => null, ReceiptLink: () => null,
+  ConfirmationButton: ({ label, disabled }: { label: string; disabled: boolean }) => createElement('button', { disabled }, label), OperationNotice: () => null, ReceiptLink: () => null,
   usePrivateOperation: () => ({ run: vi.fn(), busy: false, operation: null, error: '' }),
 }));
 let root: Root, box: HTMLDivElement;
@@ -17,7 +17,7 @@ const rx = (id: string, status: PrivatePrescription['status'], expired = false):
 });
 const rows = [rx('1', 'Revoked', true), rx('2', 'Active', true), rx('3', 'Registered'), rx('4', 'Active'), rx('5', 'Active'), rx('6', 'Blocked', true)];
 beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; request.mockReset(); box = document.createElement('div'); document.body.append(box); root = createRoot(box); });
-afterEach(async () => { await act(async () => root.unmount()); box.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); box.remove(); vi.useRealTimers(); });
 const titles = () => [...box.querySelectorAll('article h3')].map(node => node.textContent);
 async function render(role: 'doctor' | 'patient' = 'patient') { await act(async () => root.render(createElement(PrivatePrescriptions, { role }))); }
 async function filter(value: string) { await act(async () => { const select = box.querySelector('select')!; select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); }); }
@@ -48,4 +48,26 @@ it('discards late results from the previous role while the next request fails', 
   expect(signal.aborted).toBe(true);
   await act(async () => finish(Response.json({ prescriptions: rows })));
   expect(titles()).toEqual([]); expect(box.querySelector('[role="alert"]')).not.toBeNull();
+});
+
+it('labels retained data after a failed refresh and restores verification only after a successful retry', async () => {
+  vi.useFakeTimers();
+  request.mockResolvedValueOnce(Response.json({ prescriptions: [rx('4', 'Active')] }))
+    .mockResolvedValueOnce(Response.json({ error: 'private_service_unavailable' }, { status: 503 }));
+  await render('doctor');
+  expect(box.textContent).toContain('Estados verificados en Stellar Testnet');
+  await act(async () => vi.advanceTimersByTimeAsync(3000));
+  expect(titles()).toEqual(['Receta #4']);
+  expect(box.textContent).toContain('Datos de la última consulta correcta');
+  expect(box.textContent).not.toContain('Estados verificados en Stellar Testnet');
+  expect([...box.querySelectorAll('button')].find(button => button.textContent === 'Revocar receta')?.disabled).toBe(true);
+  let finish!: (response: Response) => void;
+  request.mockReturnValueOnce(new Promise<Response>(resolve => { finish = resolve; }));
+  await act(async () => box.querySelector<HTMLButtonElement>('[role="alert"] button')!.click());
+  expect(box.textContent).toContain('Datos de la última consulta correcta');
+  await act(async () => finish(Response.json({ prescriptions: [rx('4', 'Revoked')] })));
+  expect(box.querySelector('[role="alert"]')).toBeNull();
+  expect(box.textContent).toContain('Estados verificados en Stellar Testnet');
+  expect(box.textContent).not.toContain('Datos de la última consulta correcta');
+  expect(box.querySelector('[data-prescription-status="Revoked"]')).not.toBeNull();
 });
