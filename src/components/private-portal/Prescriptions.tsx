@@ -40,7 +40,7 @@ export function PrivatePrescriptions({ role }: { role: PortalRole }) {
     shown.sort((a, b) => Number(active(b)) - Number(active(a)));
   }
   return <section className="space-y-5">
-    <div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">Estados verificados en Stellar Testnet. El documento clínico permanece cifrado.</p></div>
+    <div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">{error ? (data ? 'Datos de la última consulta correcta. No se pudo verificar el estado actual en Stellar Testnet.' : 'No se pudo verificar el estado de las recetas en Stellar Testnet.') : data ? 'Estados verificados en Stellar Testnet.' : 'Consultando estados en Stellar Testnet.'} El documento clínico permanece cifrado.</p></div>
     <label data-patient-filter className="block text-sm text-slate-600">Estado<select value={filter} onChange={e => setFilter(e.target.value)} className="ml-3 rounded-xl border border-slate-200 bg-white px-3 py-2"><option value="all">Todas</option><option value="Registered">Registradas</option><option value="Active">Activas</option><option value="Revoked">Revocadas</option><option value="expired">Vencidas</option></select></label>
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error} <button onClick={refresh} className="font-semibold underline">Actualizar</button></div>}
     {loading && <p role="status" className="text-sm text-slate-500">Consultando recetas…</p>}
