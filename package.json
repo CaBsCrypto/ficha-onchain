@@ -12,7 +12,7 @@
     "smoke:sandbox": "node scripts/smoke-sandbox-isolation.mjs",
     "test:phases": "node scripts/phases/run.mjs",
     "test": "vitest run",
-    "test:private": "node --test scripts/worker-doctor-authorizations.test.mjs scripts/worker-prescription-bookings.test.mjs scripts/worker-private-portal.test.mjs scripts/lib/private-doctor-dossier.test.mjs scripts/lib/private-prescription.test.mjs scripts/lib/read-private-prescription.test.mjs",
+    "test:private": "node --test scripts/hosted-worker.test.mjs scripts/worker-doctor-authorizations.test.mjs scripts/worker-prescription-bookings.test.mjs scripts/worker-private-portal.test.mjs scripts/lib/private-doctor-dossier.test.mjs scripts/lib/private-prescription.test.mjs scripts/lib/read-private-prescription.test.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

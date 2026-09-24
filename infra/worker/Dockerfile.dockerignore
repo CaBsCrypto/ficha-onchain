@@ -1,0 +1,16 @@
+# Allowlist: never send local secrets, evidence or the working tree to Docker.
+**
+!infra/
+!infra/worker/
+!infra/worker/Dockerfile
+!infra/worker/package.json
+!infra/worker/package-lock.json
+!scripts/
+!scripts/worker-private-portal.mjs
+!scripts/worker-doctor-authorizations.mjs
+!scripts/worker-prescription-bookings.mjs
+!scripts/lib/
+!scripts/lib/private-worker-runtime.mjs
+!scripts/lib/private-worker-session.mjs
+!scripts/lib/private-registry.mjs
+!scripts/lib/private-doctor-dossier.mjs

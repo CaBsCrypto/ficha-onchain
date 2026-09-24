@@ -7,8 +7,8 @@ import { PRIVATE_PRESCRIPTION_ID, PRIVY_APP_ID, workerConfiguration } from './li
 
 function environment(patch={}) {
   const authority=Keypair.random().publicKey();
-  return {TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech',
-    DATABASE_URL:'postgresql://synthetic:synthetic@ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech/test',
+  return {TRUSTLEAF_ENV:'local',TRUSTLEAF_DB_HOST:'ep-lingering-water-ahzh89z5.c-3.us-east-1.aws.neon.tech',
+    DATABASE_URL:'postgresql://synthetic:synthetic@ep-lingering-water-ahzh89z5.c-3.us-east-1.aws.neon.tech/test',
     PRIVY_APP_ID,DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:PRIVATE_REGISTRY_ID,PRESCRIPTION_PRIVATE_CONTRACT_ID:PRIVATE_PRESCRIPTION_ID,
     DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:authority,BOOKING_AUTHORITY_PUBLIC_KEY:authority,STELLAR_CONFIG_DIR:'synthetic',
     DOCTOR_REGISTRY_ADMIN_ALIAS:'synthetic',PRIVY_APP_SECRET:'synthetic',RELAYER_SECRET:'synthetic',TRUSTLEAF_DATA_KEY:'synthetic',...patch};
@@ -26,7 +26,7 @@ test('runtime fails closed for absent switch and wrong environment/database/cont
 
 test('preview/test accepts only exact isolated host and never known production',()=>{
   for(const env of ['preview','test']) {
-    const host='ep-synthetic-isolated-pooler.c-3.us-east-1.aws.neon.tech';
+    const host='ep-synthetic-isolated.c-3.us-east-1.aws.neon.tech';
     assert.equal(workerConfiguration(environment({TRUSTLEAF_ENV:env,TRUSTLEAF_DB_HOST:host,DATABASE_URL:`postgresql://synthetic:synthetic@${host}/test`})).host,host);
     const production='ep-rapid-shadow-ahq94785-pooler.c-3.us-east-1.aws.neon.tech';
     assert.throws(()=>workerConfiguration(environment({TRUSTLEAF_ENV:env,TRUSTLEAF_DB_HOST:production,DATABASE_URL:`postgresql://synthetic:synthetic@${production}/test`})));

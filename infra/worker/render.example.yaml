@@ -1,0 +1,45 @@
+# Template only. No deployment or secret values are included.
+services:
+  - type: worker
+    name: trustleaf-testnet-worker
+    runtime: docker
+    dockerfilePath: ./infra/worker/Dockerfile
+    dockerContext: .
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    envVars:
+      - key: TRUSTLEAF_PRIVATE_WRITES_ENABLED
+        value: "false"
+      - key: TRUSTLEAF_ENV
+        value: test
+      - key: STELLAR_NETWORK
+        value: testnet
+      - key: TRUSTLEAF_SIGNER_MODE
+        value: secret-file
+      - key: TRUSTLEAF_AUTHORITY_SECRET_FILE
+        value: /etc/secrets/authority-testnet
+      - key: DATABASE_URL
+        sync: false
+      - key: TRUSTLEAF_DB_HOST
+        sync: false
+      - key: TRUSTLEAF_AUTHORITY_DATABASE_HOST
+        sync: false
+      - key: TRUSTLEAF_AUTHORITY_DATABASE_NAME
+        sync: false
+      - key: DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY
+        sync: false
+      - key: BOOKING_AUTHORITY_PUBLIC_KEY
+        sync: false
+      - key: DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID
+        sync: false
+      - key: PRESCRIPTION_PRIVATE_CONTRACT_ID
+        sync: false
+      - key: PRIVY_APP_ID
+        sync: false
+      - key: PRIVY_APP_SECRET
+        sync: false
+      - key: TRUSTLEAF_DATA_KEY
+        sync: false
+      - key: RELAYER_SECRET
+        sync: false
