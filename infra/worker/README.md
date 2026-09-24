@@ -26,6 +26,7 @@ Default command is `--watch`; `--once` performs one queue cycle. Both require va
 | `DATABASE_URL` | TLS Neon **direct** URL, never the `-pooler` endpoint. This dedicated session holds the advisory lock. |
 | `TRUSTLEAF_DB_HOST` | Exact hostname of that URL. |
 | `TRUSTLEAF_AUTHORITY_DATABASE_HOST` | The single approved database host bound operationally to this authority. Must match the URL. |
+| `TRUSTLEAF_AUTHORITY_DATABASE_NAME` | Exact logical database name on that host; must match the URL path. |
 | `TRUSTLEAF_ENV` | Existing guard: `test` for hosted Testnet demo, `preview` for an isolated preview; `local` is restricted to the existing dev host. This is not a Mainnet deployment mode. |
 | `STELLAR_NETWORK` | Exactly `testnet`. RPC and signing passphrase remain pinned to Stellar Testnet. |
 | `TRUSTLEAF_SIGNER_MODE` | `secret-file` for hosting. Default `local` retains the CLI secure-store alias. |
@@ -66,7 +67,7 @@ During hosting stage configure alerts for unexpected process exit, prolonged loc
 
 `npm run test:private` includes new synthetic-key signer and lock lifecycle tests plus existing uncertain-RPC/envelope-reuse and writes-disabled regressions. They do not exercise live Privy or create Stellar transactions.
 
-The `hosted-worker` workflow additionally uses an ephemeral loopback PostgreSQL service to demonstrate real session exclusion, loss and takeover, builds the Docker image, checks CLI/runtime/non-root permissions and payload, runs synthetic signer tests inside it, and checks safe startup rejection without credentials. The local Docker engine was unavailable during initial preparation; **container and PostgreSQL acceptance requires the workflow to pass**, not merely the unit tests.
+The `hosted-worker` workflow additionally uses an ephemeral loopback PostgreSQL service to demonstrate real session exclusion, loss and takeover, builds the Docker image, checks CLI/runtime/non-root permissions and payload, runs synthetic signer and real SIGTERM tests inside it, and checks safe startup rejection without credentials. The local Docker engine was unavailable during initial preparation; **container and PostgreSQL acceptance requires the workflow to pass**, not merely the unit tests.
 
 The minimal dependency lock preserves existing SDK/Privy versions. Its audit currently reports 7 inherited findings (5 moderate, 2 high), including transitive TOML, stream-json and uuid advisories. The worker does not call Stellar TOML discovery or Solana JSON-RPC, but this does not constitute a completed reachability audit. Do not run `npm audit fix --force`: suggested SDK/Privy changes cross compatibility boundaries. Review and disposition these findings before real hosting; this PR does not claim a vulnerability-free image.
 

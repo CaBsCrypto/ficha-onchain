@@ -18,7 +18,9 @@ export function workerConfiguration(env) {
   const signerMode = env.TRUSTLEAF_SIGNER_MODE ?? 'local';
   if (!['local', 'secret-file'].includes(signerMode)) throw Error('worker_signer_mode_invalid');
   if (signerMode === 'secret-file' && (env.STELLAR_NETWORK !== 'testnet' ||
-      env.TRUSTLEAF_AUTHORITY_DATABASE_HOST !== host || !env.TRUSTLEAF_AUTHORITY_SECRET_FILE)) throw Error('hosted_signer_configuration_required');
+      env.TRUSTLEAF_AUTHORITY_DATABASE_HOST !== host ||
+      !env.TRUSTLEAF_AUTHORITY_DATABASE_NAME || decodeURIComponent(url.pathname.slice(1)) !== env.TRUSTLEAF_AUTHORITY_DATABASE_NAME ||
+      !env.TRUSTLEAF_AUTHORITY_SECRET_FILE)) throw Error('hosted_signer_configuration_required');
   const localDev = /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(host);
   if (env.TRUSTLEAF_ENV === 'local' ? !localDev : localDev || /^ep-rapid-shadow-ahq94785(?:-pooler)?\./.test(host)) throw Error('isolated_test_database_required');
   if (env.PRIVY_APP_ID !== PRIVY_APP_ID || env.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID !== PRIVATE_REGISTRY_ID ||

@@ -25,6 +25,8 @@ services:
         sync: false
       - key: TRUSTLEAF_AUTHORITY_DATABASE_HOST
         sync: false
+      - key: TRUSTLEAF_AUTHORITY_DATABASE_NAME
+        sync: false
       - key: DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY
         sync: false
       - key: BOOKING_AUTHORITY_PUBLIC_KEY

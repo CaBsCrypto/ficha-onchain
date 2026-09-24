@@ -15,7 +15,7 @@ import { sessionGuard, guardedChain, waitForAuthorityLock, pause } from './lib/p
 const authority = Keypair.random();
 const host = 'ep-synthetic.c-3.us-east-1.aws.neon.tech';
 const env = () => ({ TRUSTLEAF_ENV:'test', DATABASE_URL:`postgresql://fake:fake@${host}/test`, TRUSTLEAF_DB_HOST:host,
-  TRUSTLEAF_AUTHORITY_DATABASE_HOST:host, TRUSTLEAF_SIGNER_MODE:'secret-file', STELLAR_NETWORK:'testnet',
+  TRUSTLEAF_AUTHORITY_DATABASE_HOST:host, TRUSTLEAF_AUTHORITY_DATABASE_NAME:'test', TRUSTLEAF_SIGNER_MODE:'secret-file', STELLAR_NETWORK:'testnet',
   TRUSTLEAF_AUTHORITY_SECRET_FILE:'/synthetic/key', STELLAR_CONFIG_DIR:'/tmp/worker', PRIVY_APP_ID,
   DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID:PRIVATE_REGISTRY_ID, PRESCRIPTION_PRIVATE_CONTRACT_ID:PRIVATE_PRESCRIPTION_ID,
   DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:authority.publicKey(), BOOKING_AUTHORITY_PUBLIC_KEY:authority.publicKey(),
@@ -24,6 +24,7 @@ const env = () => ({ TRUSTLEAF_ENV:'test', DATABASE_URL:`postgresql://fake:fake@
 test('hosted mode rejects pooled DB, mismatched authority host, network and missing key configuration', () => {
   assert.equal(workerConfiguration(env()).writesEnabled, false);
   for (const patch of [{STELLAR_NETWORK:'public'}, {TRUSTLEAF_AUTHORITY_DATABASE_HOST:'other.neon.tech'},
+    {TRUSTLEAF_AUTHORITY_DATABASE_NAME:'other'}, {TRUSTLEAF_AUTHORITY_DATABASE_NAME:''},
     {TRUSTLEAF_AUTHORITY_SECRET_FILE:''}, {TRUSTLEAF_SIGNER_MODE:'unknown'},
     {DATABASE_URL:`postgresql://fake:fake@ep-synthetic-pooler.c-3.us-east-1.aws.neon.tech/test`,TRUSTLEAF_DB_HOST:'ep-synthetic-pooler.c-3.us-east-1.aws.neon.tech'}]) {
     assert.throws(() => workerConfiguration({...env(),...patch}));
