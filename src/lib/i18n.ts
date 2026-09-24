@@ -307,10 +307,6 @@ const baseTranslations = {
             {
               "label": "How it works",
               "href": "#how"
-            },
-            {
-              "label": "Roadmap",
-              "href": "#roadmap"
             }
           ]
         },
@@ -631,10 +627,6 @@ const baseTranslations = {
             {
               "label": "Cómo funciona",
               "href": "#how"
-            },
-            {
-              "label": "Roadmap",
-              "href": "#roadmap"
             }
           ]
         },

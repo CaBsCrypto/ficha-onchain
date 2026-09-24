@@ -141,10 +141,6 @@ export const publicPortuguese = {
           {
             "label": "Como funciona",
             "href": "#how"
-          },
-          {
-            "label": "Roadmap",
-            "href": "#roadmap"
           }
         ]
       },

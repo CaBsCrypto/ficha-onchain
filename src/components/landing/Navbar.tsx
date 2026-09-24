@@ -48,7 +48,7 @@ export function Navbar() {
     { href: "#problem", label: t.nav.problem },
     { href: "#solution", label: t.nav.solution },
     { href: "#how", label: t.nav.how },
-    { href: "#roadmap", label: t.nav.roadmap },
+
   ];
 
   return (

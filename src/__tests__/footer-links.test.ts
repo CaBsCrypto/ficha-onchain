@@ -18,7 +18,7 @@ describe('published footer navigation', () => {
     element.innerHTML = renderToStaticMarkup(createElement(Footer));
     const links = [...element.querySelectorAll('a')];
     expect(links.map(link => link.getAttribute('href'))).toEqual([
-      '#problem', '#solution', '#how', '#roadmap', '#waitlist', '#waitlist', `/login/doctor?lang=${lang}`,
+      '#problem', '#solution', '#how', '#waitlist', '#waitlist', `/login/doctor?lang=${lang}`,
     ]);
     expect(links.every(link => Boolean(link.textContent?.trim()))).toBe(true);
     expect(element.querySelectorAll('h4')).toHaveLength(2);
