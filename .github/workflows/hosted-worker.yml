@@ -1,0 +1,51 @@
+name: hosted-worker
+on:
+  pull_request:
+    paths: ['infra/worker/**', 'scripts/worker-*.mjs', 'scripts/hosted-worker*', 'scripts/lib/private-worker*', '.github/workflows/hosted-worker.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.8
+        env:
+          POSTGRES_USER: worker_test
+          POSTGRES_PASSWORD: worker_test
+          POSTGRES_DB: worker_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix infra/worker --ignore-scripts
+      - name: Isolated lifecycle and actual PostgreSQL locks
+        env:
+          TRUSTLEAF_TEST_POSTGRES: local-ci
+        run: node --test scripts/hosted-worker.test.mjs scripts/hosted-worker-postgres.test.mjs
+      - name: Build without credentials
+        run: docker build --platform linux/amd64 -f infra/worker/Dockerfile -t trustleaf-worker:test .
+      - name: Runtime, non-root and payload smoke checks
+        run: |
+          docker run --rm --entrypoint sh trustleaf-worker:test -c 'test "$(id -u)" != 0 && node --version && stellar --version && test ! -e /app/.env.local && test ! -e /app/.trustleaf-local && test ! -e /app/docs && test ! -e /app/src && test ! -e /app/node_modules/pg'
+          docker run --rm --entrypoint node -v "$PWD/scripts/hosted-worker.test.mjs:/app/scripts/hosted-worker.test.mjs:ro" trustleaf-worker:test --test scripts/hosted-worker.test.mjs
+          set +e
+          docker run --rm trustleaf-worker:test --once > /tmp/worker-log 2>&1
+          result=$?
+          set -e
+          test "$result" = 1
+          grep -q 'configuration or reconciliation required' /tmp/worker-log
+          test "$(wc -l < /tmp/worker-log)" -eq 1
+          docker history --no-trunc trustleaf-worker:test > /tmp/image-history
+          test -z "$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' trustleaf-worker:test | grep -E '^(RELAYER_SECRET|PRIVY_APP_SECRET|TRUSTLEAF_DATA_KEY|DATABASE_URL)=')"
