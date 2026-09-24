@@ -29,12 +29,6 @@ export function RoadmapSection() {
                 <p className="mt-2 text-base leading-relaxed text-muted">
                   {phase.desc}
                 </p>
-                <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-clinical to-mint"
-                    style={{ width: `${[70, 25, 8, 4][i] ?? 5}%` }}
-                  />
-                </div>
               </div>
             </Reveal>
           ))}

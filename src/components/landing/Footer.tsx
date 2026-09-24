@@ -2,24 +2,6 @@
 
 import { useLanguage } from "@/hooks/useLanguage";
 
-// Most footer links are still placeholders; resolve the ones that have a
-// real destination today. Keyed by label text (EN + ES + PT). Retired
-// modules (/verify, /traction, mock portals) answer 410 in production and
-// must never be linked from public surfaces.
-const RETIRED_PATHS = ['/verify', '/traction', '/mcp', '/licenses', '/ficha', '/dispensary', '/sandbox'];
-export function footerHrefFor(label: string) {
-  const l = label.toLowerCase();
-  const href =
-    l.includes("problem") || l.includes("problema") ? "#problem" :
-    l.includes("solut") || l.includes("soluci") || l.includes("soluç") ? "#solution" :
-    l.includes("how") || l.includes("cómo") || l.includes("como") ? "#how" :
-    l.includes("roadmap") ? "#roadmap" :
-    l.includes("médic") || l.includes("medic") || l.includes("doctor") ? "/login/doctor" :
-    l.includes("pacient") || l.includes("patient") ? "/login/patient" :
-    l.includes("priva") ? "#waitlist" : "#";
-  return RETIRED_PATHS.some(p => href.startsWith(p)) ? '#' : href;
-}
-
 export function Footer() {
   const { t, lang } = useLanguage();
   const cols = t.footer.columns;
@@ -28,7 +10,7 @@ export function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-white">
       <div className="mx-auto max-w-6xl px-6 py-14">
-        <div className="grid gap-8 grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid gap-8 grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr]">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-clinical text-white">
@@ -44,17 +26,17 @@ export function Footer() {
             </p>
           </div>
 
-          {[cols.product, cols.company, cols.legal].map((col) => (
+          {[cols.product, cols.legal].map((col) => (
             <div key={col.title}>
               <h4 className="text-sm font-semibold text-ink">{col.title}</h4>
               <ul className="mt-4 space-y-3">
                 {col.links.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <a
-                      href={footerHrefFor(link)}
-                      className="text-sm text-muted transition-colors hover:text-clinical"
+                      href={link.href}
+                      className="text-sm text-muted transition-colors hover:text-clinical focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-clinical"
                     >
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}
