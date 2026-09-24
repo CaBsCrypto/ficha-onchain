@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hostname } from 'node:os';
-import { StrKey } from '@stellar/stellar-sdk';
+import { Keypair, Networks, StrKey, TransactionBuilder } from '@stellar/stellar-sdk';
 import { PRIVATE_REGISTRY_ID } from './private-registry.mjs';
 
 export const PRIVY_APP_ID = 'cmrix722m03d30clewd1fuffq';
@@ -14,15 +14,39 @@ export function workerConfiguration(env) {
   const url = new URL(env.DATABASE_URL), host = url.hostname;
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || host !== env.TRUSTLEAF_DB_HOST ||
       !/^[a-z0-9.-]+\.neon\.tech$/.test(host)) throw Error('database_host_mismatch');
+  if (host.includes('-pooler.')) throw Error('worker_requires_direct_database');
+  const signerMode = env.TRUSTLEAF_SIGNER_MODE ?? 'local';
+  if (!['local', 'secret-file'].includes(signerMode)) throw Error('worker_signer_mode_invalid');
+  if (signerMode === 'secret-file' && (env.STELLAR_NETWORK !== 'testnet' ||
+      env.TRUSTLEAF_AUTHORITY_DATABASE_HOST !== host || !env.TRUSTLEAF_AUTHORITY_SECRET_FILE)) throw Error('hosted_signer_configuration_required');
   const localDev = /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(host);
   if (env.TRUSTLEAF_ENV === 'local' ? !localDev : localDev || /^ep-rapid-shadow-ahq94785(?:-pooler)?\./.test(host)) throw Error('isolated_test_database_required');
   if (env.PRIVY_APP_ID !== PRIVY_APP_ID || env.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID !== PRIVATE_REGISTRY_ID ||
       env.PRESCRIPTION_PRIVATE_CONTRACT_ID !== PRIVATE_PRESCRIPTION_ID ||
       !StrKey.isValidEd25519PublicKey(env.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY ?? '') ||
       env.BOOKING_AUTHORITY_PUBLIC_KEY !== env.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY || !env.STELLAR_CONFIG_DIR ||
-      !env.DOCTOR_REGISTRY_ADMIN_ALIAS || !env.PRIVY_APP_SECRET || !env.RELAYER_SECRET || !env.TRUSTLEAF_DATA_KEY) throw Error('worker_configuration_required');
-  return { environment: env.TRUSTLEAF_ENV, host, authority: env.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY,
+      (signerMode === 'local' && !env.DOCTOR_REGISTRY_ADMIN_ALIAS) || !env.PRIVY_APP_SECRET || !env.RELAYER_SECRET || !env.TRUSTLEAF_DATA_KEY) throw Error('worker_configuration_required');
+  return { environment: env.TRUSTLEAF_ENV, host, authority: env.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY, signerMode,
     writesEnabled: env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'true' };
+}
+
+/** Mounted only at runtime. Does not write a CLI key file or log provider errors. */
+export async function secretFileSigner({ path, authority, network }) {
+  if (network !== 'testnet' || !path) throw Error('hosted_signer_configuration_required');
+  let key;
+  try { key = Keypair.fromSecret((await readFile(path, 'utf8')).trim()); }
+  catch { throw Error('authority_secret_unavailable'); }
+  if (key.publicKey() !== authority) throw Error('authority_secret_mismatch');
+  return async xdr => {
+    let tx;
+    try { tx = TransactionBuilder.fromXDR(xdr, Networks.TESTNET); }
+    catch { throw Error('authority_envelope_invalid'); }
+    if (tx.innerTransaction || tx.source !== authority || tx.operations.length !== 1 ||
+        tx.operations[0].type !== 'invokeHostFunction' || tx.signatures.length !== 0) throw Error('authority_envelope_invalid');
+    // Chain adapters validate exact contract/method/arguments before calling this signer.
+    tx.sign(key);
+    return tx.toXDR();
+  };
 }
 
 export function secureStoreSigner({ alias, configDir }) {
