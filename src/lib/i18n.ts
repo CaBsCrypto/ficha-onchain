@@ -63,60 +63,71 @@ const baseTranslations = {
       ],
     },
     solution: {
-      kicker: "The solution",
-      title: "One health record, owned by you",
-      subtitle:
-        "Your medical history lives on Stellar Soroban — complete, portable and verifiable. You decide who sees it, and you never lose it.",
-      steps: [
-        { title: "Doctors add to it", desc: "Each visit, prescription and result is signed on-chain and added to your record." },
-        { title: "It lives with you", desc: "Your full history stays in your pocket — it follows you everywhere, fee-free." },
-        { title: "You grant access", desc: "Any doctor sees your verified history in seconds — only with your authorization." },
-      ],
+      "kicker": "Our vision",
+      "title": "One health record, owned by you",
+      "subtitle": "We are building a connected health history with private access and verifiable records. Today, we start with prescriptions on Stellar Testnet.",
+      "steps": [
+        {
+          "title": "Connected care",
+          "desc": "Our goal: bring visits, prescriptions and results together."
+        },
+        {
+          "title": "A history that follows you",
+          "desc": "We envision continuity of care across providers and places."
+        },
+        {
+          "title": "Access under your control",
+          "desc": "Patient authorization is at the heart of that vision."
+        }
+      ]
     },
     how: {
-      kicker: "How it works",
-      title: "Your records, wherever care happens",
-      subtitle: "No crypto knowledge required — for you or your doctors.",
-      steps: [
+      "kicker": "Today · Stellar Testnet demo",
+      "title": "A private prescription, a verifiable record",
+      "subtitle": "Synthetic data · No clinical use. Sign in with Privy; TrustLeaf covers Testnet transaction fees.",
+      "steps": [
         {
-          step: "01",
-          title: "Your record is built",
-          desc: "Doctors sign each visit and prescription with a biometric Passkey. It's added to your history on Soroban — tamper-proof, forever.",
+          "step": "01",
+          "title": "The patient authorizes",
+          "desc": "The patient grants permission for prescription issuance, separately from confirming attendance."
         },
         {
-          step: "02",
-          title: "It stays with you",
-          desc: "No crypto needed. Your complete record lives in your wallet, delivered fee-free by a relayer that sponsors every transaction.",
+          "step": "02",
+          "title": "The doctor issues",
+          "desc": "An authorized doctor signs the issuance and activation. Each confirmed transaction has a receipt."
         },
         {
-          step: "03",
-          title: "You share on your terms",
-          desc: "Grant any doctor or pharmacy instant access with a scan. They see a verified history; you stay in control the whole time.",
-        },
-      ],
+          "step": "03",
+          "title": "Read privately, verify the record",
+          "desc": "The patient and issuing doctor open the private document. Transaction receipts can be checked on Stellar Expert."
+        }
+      ]
     },
     audience: {
-      kicker: "For everyone in the loop",
-      title: "Your record. Everyone on the same page.",
-      doctors: {
-        title: "For Doctors",
-        points: [
-          "See a patient's complete, verified history in seconds — with their consent.",
-          "Sign visits and prescriptions with a biometric Passkey — no seed phrases.",
-          "Add to a permanent, auditable record tied to your medical license.",
-          "No more chasing faxes or piecing together fragmented charts.",
+      "kicker": "Our vision · Patients first",
+      "title": "Your health has a story. Make it yours.",
+      "subtitle": "We are building a space to help you understand and follow your health, with continuity and control.",
+      "patients": {
+        "title": "For you",
+        "headline": "Your story, with you.",
+        "points": [
+          "Your health information, together and accessible.",
+          "Control over whom you share it with."
         ],
+        "futureLabel": "Part of our vision",
+        "futureTitle": "A map to track your pain",
+        "futureDescription": "Record where it hurts and follow how it changes over time. A future capability, not yet available in this demo."
       },
-      patients: {
-        title: "For Patients",
-        points: [
-          "Own your complete medical history — it travels with you, for life.",
-          "Switch doctors, cities or countries; your record arrives before you do.",
-          "Grant and revoke access in a tap — no one sees your history without you.",
-          "No wallet setup, no crypto jargon, no fees, no friction.",
-        ],
-      },
+      "doctors": {
+        "title": "For those who care for you",
+        "headline": "More context to support you.",
+        "points": [
+          "Better understand your progress between visits.",
+          "Consult the information you choose to share."
+        ]
+      }
     },
+
     legal: {
       kicker: "Legal & Compliance",
       title: "Prescribe with legal backing",
@@ -180,34 +191,34 @@ const baseTranslations = {
       },
     },
     roadmap: {
-      kicker: "Roadmap",
-      title: "From verified prescriptions to your full health record",
-      phases: [
+      "kicker": "Roadmap",
+      "title": "From prescriptions to a connected health history",
+      "phases": [
         {
-          phase: "Phase 0",
-          title: "Verifiable prescriptions",
-          desc: "Tamper-proof, patient-owned prescriptions issued by licensed doctors.",
-          status: "In progress",
+          "phase": "Today",
+          "title": "Verifiable prescriptions",
+          "desc": "Issuance, activation and revocation with private documents and receipts on Stellar Testnet.",
+          "status": "Demo"
         },
         {
-          phase: "Phase 1",
-          title: "Your clinical record",
-          desc: "Your complete FHIR-based medical history — patient-owned and portable.",
-          status: "Next",
+          "phase": "Next stages",
+          "title": "Your clinical record",
+          "desc": "Explore a portable health history based on FHIR. Scope and validation remain to be defined.",
+          "status": "Proposed"
         },
         {
-          phase: "Phase 2",
-          title: "AI Health Agent",
-          desc: "A private assistant that reasons over your verified record.",
-          status: "Planned",
+          "phase": "Future vision",
+          "title": "AI health assistant",
+          "desc": "Explore a private assistant grounded in authorized health information.",
+          "status": "Exploration"
         },
         {
-          phase: "Phase 3",
-          title: "Ecosystem & Integrations",
-          desc: "Clinics, pharmacies, labs and insurers plug into your record.",
-          status: "Planned",
-        },
-      ],
+          "phase": "Future vision",
+          "title": "Connected ecosystem",
+          "desc": "Explore integrations with clinics, pharmacies and laboratories.",
+          "status": "Exploration"
+        }
+      ]
     },
     waitlist: {
       kicker: "Early access",
@@ -278,14 +289,45 @@ const baseTranslations = {
       back: "Back to home",
     },
     footer: {
-      tagline: "Built on Stellar Soroban",
-      built: "Built on Stellar Soroban",
-      rights: "All rights reserved.",
-      columns: {
-        product: { title: "Product", links: ["Problem", "Solution", "How it works", "Roadmap", "Verify"] },
-        company: { title: "Company", links: ["About", "Contact", "Careers"] },
-        legal: { title: "Legal", links: ["Privacy", "Terms", "Security"] },
-      },
+      "tagline": "Built on Stellar Soroban",
+      "built": "Built on Stellar Soroban",
+      "rights": "All rights reserved.",
+      "columns": {
+        "product": {
+          "title": "Explore",
+          "links": [
+            {
+              "label": "Problem",
+              "href": "#problem"
+            },
+            {
+              "label": "Our vision",
+              "href": "#solution"
+            },
+            {
+              "label": "How it works",
+              "href": "#how"
+            },
+            {
+              "label": "Roadmap",
+              "href": "#roadmap"
+            }
+          ]
+        },
+        "legal": {
+          "title": "Stay connected",
+          "links": [
+            {
+              "label": "Join the waitlist",
+              "href": "#waitlist"
+            },
+            {
+              "label": "Waitlist privacy notice",
+              "href": "#waitlist"
+            }
+          ]
+        }
+      }
     },
   },
   es: {
@@ -345,60 +387,71 @@ const baseTranslations = {
       ],
     },
     solution: {
-      kicker: "La solución",
-      title: "Una sola ficha clínica, tuya",
-      subtitle:
-        "Tu historial médico vive en Stellar Soroban — completo, portable y verificable. Tú decides quién lo ve, y nunca lo pierdes.",
-      steps: [
-        { title: "Los médicos la nutren", desc: "Cada consulta, receta y resultado se firma on-chain y se suma a tu ficha." },
-        { title: "Vive contigo", desc: "Tu historial completo va en tu bolsillo — te sigue a todas partes, sin comisiones." },
-        { title: "Tú das el acceso", desc: "Cualquier médico ve tu historial verificado en segundos — solo con tu autorización." },
-      ],
+      "kicker": "Nuestra visión",
+      "title": "Una sola ficha clínica, tuya",
+      "subtitle": "Construimos un historial conectado, con acceso privado y registros verificables. Hoy empezamos por las recetas en Stellar Testnet.",
+      "steps": [
+        {
+          "title": "Atención conectada",
+          "desc": "Buscamos reunir consultas, recetas y resultados en una misma historia."
+        },
+        {
+          "title": "Un historial que te acompaña",
+          "desc": "Aspiramos a dar continuidad a tu atención entre médicos y lugares."
+        },
+        {
+          "title": "Acceso bajo tu control",
+          "desc": "La autorización del paciente está en el centro de esa visión."
+        }
+      ]
     },
     how: {
-      kicker: "Cómo funciona",
-      title: "Tu ficha, donde sea que te atiendan",
-      subtitle: "No se requiere conocimiento de cripto — ni para ti ni para tus médicos.",
-      steps: [
+      "kicker": "Hoy · Demo en Stellar Testnet",
+      "title": "Una receta privada, un registro verificable",
+      "subtitle": "Datos sintéticos · Sin uso clínico. Ingresas con Privy; TrustLeaf cubre las comisiones de Testnet.",
+      "steps": [
         {
-          step: "01",
-          title: "Tu ficha se construye",
-          desc: "Los médicos firman cada consulta y receta con un Passkey biométrico. Se suma a tu historial en Soroban — inalterable, para siempre.",
+          "step": "01",
+          "title": "El paciente autoriza",
+          "desc": "El paciente concede permiso para emitir la receta, por separado de la confirmación de asistencia."
         },
         {
-          step: "02",
-          title: "Se queda contigo",
-          desc: "Sin cripto. Tu ficha completa vive en tu billetera, entregada sin comisiones por un relayer que patrocina cada transacción.",
+          "step": "02",
+          "title": "El médico emite",
+          "desc": "Un médico autorizado firma la emisión y la activación. Cada transacción confirmada tiene su recibo."
         },
         {
-          step: "03",
-          title: "Compartes en tus términos",
-          desc: "Das acceso instantáneo a cualquier médico o farmacia con un escaneo. Ven un historial verificado; tú mantienes el control todo el tiempo.",
-        },
-      ],
+          "step": "03",
+          "title": "Lectura privada y registro verificable",
+          "desc": "El paciente y el médico emisor abren el documento privado. Los recibos se pueden contrastar en Stellar Expert."
+        }
+      ]
     },
     audience: {
-      kicker: "Para todos en el proceso",
-      title: "Tu ficha. Todos en la misma página.",
-      doctors: {
-        title: "Para Médicos",
-        points: [
-          "Ve el historial completo y verificado del paciente en segundos — con su consentimiento.",
-          "Firma consultas y recetas con un Passkey biométrico — sin frases semilla.",
-          "Suma a un registro permanente y auditable ligado a tu licencia médica.",
-          "Se acabó perseguir faxes o reconstruir fichas fragmentadas.",
+      "kicker": "Nuestra visión · El paciente primero",
+      "title": "Tu salud tiene una historia. Hazla tuya.",
+      "subtitle": "Construimos un espacio para que puedas comprender y seguir tu salud, con continuidad y bajo tu control.",
+      "patients": {
+        "title": "Para ti",
+        "headline": "Tu historia, contigo.",
+        "points": [
+          "Tu información de salud reunida y accesible.",
+          "Control sobre con quién la compartes."
         ],
+        "futureLabel": "En nuestra visión",
+        "futureTitle": "Un mapa para seguir tu dolor",
+        "futureDescription": "Registrar dónde duele y observar cómo cambia con el tiempo. Una capacidad futura, aún no disponible en esta demo."
       },
-      patients: {
-        title: "Para Pacientes",
-        points: [
-          "Eres dueño de tu historial médico completo — te acompaña de por vida.",
-          "Cambia de médico, ciudad o país; tu ficha llega antes que tú.",
-          "Das y revocas acceso con un toque — nadie ve tu historial sin ti.",
-          "Sin configurar billeteras, sin jerga cripto, sin comisiones, sin fricción.",
-        ],
-      },
+      "doctors": {
+        "title": "Para quienes te cuidan",
+        "headline": "Más contexto para acompañarte.",
+        "points": [
+          "Comprender mejor tu evolución entre consultas.",
+          "Consultar la información que decidas compartir."
+        ]
+      }
     },
+
     legal: {
       kicker: "Legal & Compliance",
       title: "Prescribe con respaldo legal",
@@ -462,34 +515,34 @@ const baseTranslations = {
       },
     },
     roadmap: {
-      kicker: "Roadmap",
-      title: "De recetas verificadas a tu historial completo",
-      phases: [
+      "kicker": "Roadmap",
+      "title": "De recetas a un historial conectado",
+      "phases": [
         {
-          phase: "Fase 0",
-          title: "Recetas verificables",
-          desc: "Recetas inalterables y soulbound, propiedad del paciente, emitidas por médicos habilitados.",
-          status: "En curso",
+          "phase": "Hoy",
+          "title": "Recetas verificables",
+          "desc": "Emisión, activación y revocación con documentos privados y recibos en Stellar Testnet.",
+          "status": "Demo"
         },
         {
-          phase: "Fase 1",
-          title: "Tu ficha clínica",
-          desc: "Tu historial médico completo basado en FHIR — propiedad tuya y portable.",
-          status: "Siguiente",
+          "phase": "Próximas etapas",
+          "title": "Tu ficha clínica",
+          "desc": "Explorar un historial portable basado en FHIR. Alcance y validación por definir.",
+          "status": "Propuesta"
         },
         {
-          phase: "Fase 2",
-          title: "Agente de Salud IA",
-          desc: "Un asistente privado que razona sobre tu historial verificado.",
-          status: "Planeado",
+          "phase": "Visión futura",
+          "title": "Asistente de salud con IA",
+          "desc": "Explorar un asistente privado basado en información de salud autorizada.",
+          "status": "Exploración"
         },
         {
-          phase: "Fase 3",
-          title: "Ecosistema e Integraciones",
-          desc: "Clínicas, farmacias, laboratorios y aseguradoras se conectan a tu ficha.",
-          status: "Planeado",
-        },
-      ],
+          "phase": "Visión futura",
+          "title": "Ecosistema conectado",
+          "desc": "Explorar integraciones con clínicas, farmacias y laboratorios.",
+          "status": "Exploración"
+        }
+      ]
     },
     waitlist: {
       kicker: "Acceso anticipado",
@@ -560,14 +613,45 @@ const baseTranslations = {
       back: "Volver al inicio",
     },
     footer: {
-      tagline: "Construido sobre Stellar Soroban",
-      built: "Construido sobre Stellar Soroban",
-      rights: "Todos los derechos reservados.",
-      columns: {
-        product: { title: "Producto", links: ["Problema", "Solución", "Cómo funciona", "Roadmap", "Verificar"] },
-        company: { title: "Empresa", links: ["Nosotros", "Contacto", "Trabaja con nosotros"] },
-        legal: { title: "Legal", links: ["Privacidad", "Términos", "Seguridad"] },
-      },
+      "tagline": "Construido sobre Stellar Soroban",
+      "built": "Construido sobre Stellar Soroban",
+      "rights": "Todos los derechos reservados.",
+      "columns": {
+        "product": {
+          "title": "Explorar",
+          "links": [
+            {
+              "label": "Problema",
+              "href": "#problem"
+            },
+            {
+              "label": "Nuestra visión",
+              "href": "#solution"
+            },
+            {
+              "label": "Cómo funciona",
+              "href": "#how"
+            },
+            {
+              "label": "Roadmap",
+              "href": "#roadmap"
+            }
+          ]
+        },
+        "legal": {
+          "title": "Sigamos en contacto",
+          "links": [
+            {
+              "label": "Lista de interés",
+              "href": "#waitlist"
+            },
+            {
+              "label": "Privacidad del registro de interés",
+              "href": "#waitlist"
+            }
+          ]
+        }
+      }
     },
   },
 } as const;

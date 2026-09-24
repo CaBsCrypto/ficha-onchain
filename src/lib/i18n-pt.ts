@@ -21,45 +21,100 @@ export const publicPortuguese = {
     ],
   },
   solution: {
-    kicker: 'A solução', title: 'Um prontuário, sob seu controle',
-    subtitle: 'Seu histórico médico na Stellar Soroban — completo, portátil e verificável. Você decide quem pode acessá-lo.',
-    steps: [
-      { title: 'Os médicos contribuem', desc: 'Cada consulta, receita e resultado é assinado na blockchain e adicionado ao seu prontuário.' },
-      { title: 'Ele acompanha você', desc: 'Seu histórico completo no seu bolso — onde quer que esteja, sem taxas.' },
-      { title: 'Você autoriza o acesso', desc: 'Um médico pode consultar seu histórico verificado em segundos — somente com sua autorização.' },
-    ],
+    "kicker": "Nossa visão",
+    "title": "Um prontuário, sob seu controle",
+    "subtitle": "Estamos construindo um histórico conectado, com acesso privado e registros verificáveis. Hoje, começamos pelas receitas na Stellar Testnet.",
+    "steps": [
+      {
+        "title": "Atendimento conectado",
+        "desc": "Queremos reunir consultas, receitas e resultados em um mesmo histórico."
+      },
+      {
+        "title": "Um histórico que acompanha você",
+        "desc": "Buscamos continuidade no atendimento entre profissionais e lugares."
+      },
+      {
+        "title": "Acesso sob seu controle",
+        "desc": "A autorização do paciente está no centro dessa visão."
+      }
+    ]
   },
   how: {
-    kicker: 'Como funciona', title: 'Seu prontuário, onde você for atendido', subtitle: 'Sem precisar entender de cripto — para você e seus médicos.',
-    steps: [
-      { step: '01', title: 'Seu prontuário é construído', desc: 'Os médicos assinam cada consulta e receita com uma passkey biométrica. O registro é adicionado ao seu histórico na Soroban.' },
-      { step: '02', title: 'Ele fica com você', desc: 'Sem precisar de cripto. Seu prontuário fica na sua carteira, sem taxas, com um relayer que patrocina cada transação.' },
-      { step: '03', title: 'Você compartilha nos seus termos', desc: 'Autorize o acesso de médicos ou farmácias com uma leitura. Eles consultam um histórico verificável; você mantém o controle.' },
-    ],
+    "kicker": "Hoje · Demo na Stellar Testnet",
+    "title": "Uma receita privada, um registro verificável",
+    "subtitle": "Dados sintéticos · Sem uso clínico. Entre com Privy; a TrustLeaf cobre as taxas da Testnet.",
+    "steps": [
+      {
+        "step": "01",
+        "title": "O paciente autoriza",
+        "desc": "O paciente autoriza a emissão da receita, separadamente da confirmação de presença."
+      },
+      {
+        "step": "02",
+        "title": "O médico emite",
+        "desc": "Um médico autorizado assina a emissão e a ativação. Cada transação confirmada tem seu comprovante."
+      },
+      {
+        "step": "03",
+        "title": "Leitura privada e registro verificável",
+        "desc": "O paciente e o médico emissor abrem o documento privado. Os comprovantes podem ser consultados no Stellar Expert."
+      }
+    ]
   },
   audience: {
-    kicker: 'Para todos os envolvidos', title: 'Seu prontuário. Todos na mesma página.',
-    doctors: { title: 'Para médicos', points: [
-      'Consulte o histórico completo e verificado do paciente — com seu consentimento.',
-      'Assine consultas e receitas com uma passkey biométrica — sem frases de recuperação.',
-      'Contribua para um registro permanente e auditável vinculado ao seu registro profissional.',
-      'Chega de buscar documentos e reconstruir prontuários fragmentados.',
-    ] },
-    patients: { title: 'Para pacientes', points: [
-      'Tenha controle sobre seu histórico médico completo — ele acompanha você.',
-      'Troque de médico, cidade ou país; seu prontuário vai junto.',
-      'Conceda e revogue o acesso — ninguém consulta seu histórico sem você.',
-      'Sem configurar carteiras, sem jargão cripto e sem taxas.',
-    ] },
+    "kicker": "Nossa visão · O paciente em primeiro lugar",
+    "title": "Sua saúde tem uma história. Faça dela sua.",
+    "subtitle": "Estamos construindo um espaço para você compreender e acompanhar sua saúde, com continuidade e sob seu controle.",
+    "patients": {
+      "title": "Para você",
+      "headline": "Sua história, com você.",
+      "points": [
+        "Suas informações de saúde reunidas e acessíveis.",
+        "Controle sobre com quem você as compartilha."
+      ],
+      "futureLabel": "Na nossa visão",
+      "futureTitle": "Um mapa para acompanhar sua dor",
+      "futureDescription": "Registrar onde dói e observar como a dor muda ao longo do tempo. Uma capacidade futura, ainda não disponível nesta demo."
+    },
+    "doctors": {
+      "title": "Para quem cuida de você",
+      "headline": "Mais contexto para acompanhar você.",
+      "points": [
+        "Compreender melhor sua evolução entre consultas.",
+        "Consultar as informações que você decidir compartilhar."
+      ]
+    }
   },
+
   roadmap: {
-    kicker: 'Roadmap', title: 'De receitas verificáveis ao seu histórico completo',
-    phases: [
-      { phase: 'Fase 0', title: 'Receitas verificáveis', desc: 'Receitas vinculadas ao paciente, emitidas por médicos autorizados e registradas na blockchain.', status: 'Em andamento' },
-      { phase: 'Fase 1', title: 'Seu prontuário', desc: 'Seu histórico médico completo baseado em FHIR — portátil e sob seu controle.', status: 'A seguir' },
-      { phase: 'Fase 2', title: 'Agente de saúde com IA', desc: 'Um assistente privado que utiliza seu histórico verificado.', status: 'Planejado' },
-      { phase: 'Fase 3', title: 'Ecossistema e integrações', desc: 'Clínicas, farmácias, laboratórios e seguradoras conectados ao seu prontuário.', status: 'Planejado' },
-    ],
+    "kicker": "Roadmap",
+    "title": "De receitas a um histórico conectado",
+    "phases": [
+      {
+        "phase": "Hoje",
+        "title": "Receitas verificáveis",
+        "desc": "Emissão, ativação e revogação com documentos privados e comprovantes na Stellar Testnet.",
+        "status": "Demo"
+      },
+      {
+        "phase": "Próximas etapas",
+        "title": "Seu prontuário",
+        "desc": "Explorar um histórico portátil baseado em FHIR. Escopo e validação ainda serão definidos.",
+        "status": "Proposta"
+      },
+      {
+        "phase": "Visão futura",
+        "title": "Assistente de saúde com IA",
+        "desc": "Explorar um assistente privado baseado em informações de saúde autorizadas.",
+        "status": "Exploração"
+      },
+      {
+        "phase": "Visão futura",
+        "title": "Ecossistema conectado",
+        "desc": "Explorar integrações com clínicas, farmácias e laboratórios.",
+        "status": "Exploração"
+      }
+    ]
   },
   waitlist: {
     kicker: 'Acesso antecipado', title: 'Assuma o controle da sua saúde',
@@ -68,11 +123,44 @@ export const publicPortuguese = {
     invalid: 'Digite um endereço de e-mail válido.', socialProof: 'Junte-se a {count} médicos e pacientes na lista.',
   },
   footer: {
-    tagline: 'Construído na Stellar Soroban', built: 'Construído na Stellar Soroban', rights: 'Todos os direitos reservados.',
-    columns: {
-      product: { title: 'Produto', links: ['Problema', 'Solução', 'Como funciona', 'Roadmap', 'Verificar'] },
-      company: { title: 'Empresa', links: ['Sobre', 'Contato', 'Trabalhe conosco'] },
-      legal: { title: 'Jurídico', links: ['Privacidade', 'Termos', 'Segurança'] },
-    },
+    "tagline": "Construído na Stellar Soroban",
+    "built": "Construído na Stellar Soroban",
+    "rights": "Todos os direitos reservados.",
+    "columns": {
+      "product": {
+        "title": "Explorar",
+        "links": [
+          {
+            "label": "Problema",
+            "href": "#problem"
+          },
+          {
+            "label": "Nossa visão",
+            "href": "#solution"
+          },
+          {
+            "label": "Como funciona",
+            "href": "#how"
+          },
+          {
+            "label": "Roadmap",
+            "href": "#roadmap"
+          }
+        ]
+      },
+      "legal": {
+        "title": "Vamos manter contato",
+        "links": [
+          {
+            "label": "Lista de interesse",
+            "href": "#waitlist"
+          },
+          {
+            "label": "Privacidade do registro de interesse",
+            "href": "#waitlist"
+          }
+        ]
+      }
+    }
   },
 } as const;
