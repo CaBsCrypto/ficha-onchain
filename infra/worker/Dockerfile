@@ -13,7 +13,7 @@ COPY infra/worker/package.json infra/worker/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 FROM node:22.22.0-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=cli /usr/local/bin/stellar /usr/local/bin/stellar
