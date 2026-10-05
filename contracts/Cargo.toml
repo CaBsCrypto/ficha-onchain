@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "doctor-registry-private",
     "prescription-private",
+    "clinical-history-private",
 ]
 
 # Release profile is centralized here so every contract WASM is built with the

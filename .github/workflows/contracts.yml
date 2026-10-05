@@ -74,7 +74,7 @@ jobs:
 
       - name: Build contracts with Stellar CLI
         run: |
-          for p in doctor-registry-private prescription-private; do
+          for p in doctor-registry-private prescription-private clinical-history-private; do
             stellar contract build --locked --package "$p" --out-dir dist
           done
           sha256sum dist/*.wasm > dist/SHA256SUMS
