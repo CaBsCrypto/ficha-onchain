@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { BASE_FEE, Keypair, Networks, StrKey, TransactionBuilder, scValToNative } from '@stellar/stellar-sdk';
+import { BASE_FEE, Keypair, Networks, StrKey, TransactionBuilder, scValToNative, xdr } from '@stellar/stellar-sdk';
 
 const unavailable = () => new Error('clinical_transaction_unavailable');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -13,11 +13,21 @@ export function createClinicalTransactionRunner({ network, source, server, store
   assertExclusive, verifyOperation, writesEnabled = false }) {
   if (network !== 'testnet' || !StrKey.isValidEd25519PublicKey(source) ||
       typeof assertExclusive !== 'function' || typeof verifyOperation !== 'function') throw unavailable();
-  function matchesOperation(tx, operation) {
+  function matchesOperation(tx, operation, restorationData) {
     const actual = tx.toEnvelope().v1().tx().operations()[0];
     if (!actual || Boolean(actual.sourceAccount()) !== Boolean(operation.sourceAccount()) ||
         (actual.sourceAccount() && !actual.sourceAccount().toXDR().equals(operation.sourceAccount().toXDR()))) return false;
-    if (actual.body().switch().name !== 'invokeHostFunction' || operation.body().switch().name !== 'invokeHostFunction') return false;
+    if (operation.body().switch().name === 'restoreFootprint') {
+      if (!restorationData || !actual.body().toXDR().equals(operation.body().toXDR())) return false;
+      const ext = tx.toEnvelope().v1().tx().ext();
+      if (ext.switch() !== 1) return false;
+      const data = ext.sorobanData();
+      return data.resources().footprint().toXDR().equals(restorationData.resources().footprint().toXDR()) &&
+        data.resources().diskReadBytes() > 0 && data.resources().writeBytes() > 0 &&
+        BigInt(data.resourceFee().toString()) >= 0n && BigInt(data.resourceFee().toString()) <= 10_000_000n &&
+        BigInt(tx.fee) <= 10_000_000n + BigInt(BASE_FEE);
+    }
+    if (restorationData || actual.body().switch().name !== 'invokeHostFunction' || operation.body().switch().name !== 'invokeHostFunction') return false;
     const invoked = actual.body().invokeHostFunctionOp(), expected = operation.body().invokeHostFunctionOp().hostFunction();
     if (!invoked.hostFunction().toXDR().equals(expected.toXDR())) return false;
     for (const authorization of invoked.auth()) {
@@ -33,23 +43,26 @@ export function createClinicalTransactionRunner({ network, source, server, store
     }
     return true;
   }
-  function verifyEnvelope(saved, operation) {
+  function verifyEnvelope(saved, operation, restorationData) {
     const tx = TransactionBuilder.fromXDR(saved.xdr, Networks.TESTNET);
     if (tx.innerTransaction || tx.source !== source || tx.operations.length !== 1 ||
         !tx.operations[0].type || tx.hash().toString('hex') !== saved.hash ||
-        !matchesOperation(tx, operation) ||
+        !matchesOperation(tx, operation, restorationData) ||
         !tx.signatures.some(s => Keypair.fromPublicKey(source).verify(tx.hash(), s.signature()))) throw unavailable();
     return tx;
   }
   return {
-    async run({ id, operation, resubmitSaved = false }) {
+    async run({ id, operation, restorationData, resubmitSaved = false }) {
       let phase = 'configuration';
       try {
         if (typeof id !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(id)) throw unavailable();
+        // Snapshot the maintenance footprint before asynchronous provider IO.
+        if (restorationData) restorationData = xdr.SorobanTransactionData.fromXDR(restorationData.toXDR());
         if ((await server.getNetwork()).passphrase !== Networks.TESTNET) throw unavailable();
-        await verifyOperation(operation);
+        await verifyOperation(operation, restorationData);
         await assertExclusive();
-        const intent = digest(Buffer.concat([Buffer.from('clinical-testnet-v1:' + source), operation.body().toXDR()]));
+        const intent = digest(Buffer.concat([Buffer.from('clinical-testnet-v1:' + source), operation.body().toXDR(),
+          ...(restorationData ? [restorationData.toXDR()] : [])]));
         phase = 'load_attempt';
         let saved = await store.load(id);
         if (saved && (saved.intent !== intent || saved.source !== source)) throw unavailable();
@@ -57,18 +70,19 @@ export function createClinicalTransactionRunner({ network, source, server, store
           if (!writesEnabled) return { status: 'writes_paused' };
           if (store.reserve) await store.reserve(id, { intent, source });
           phase = 'prepare';
-          const unsigned = new TransactionBuilder(await server.getAccount(source), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
-            .addOperation(operation).setTimeout(180).build();
+          const builder = new TransactionBuilder(await server.getAccount(source), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET });
+          if (restorationData) builder.setSorobanData(restorationData);
+          const unsigned = builder.addOperation(operation).setTimeout(180).build();
           const prepared = await server.prepareTransaction(unsigned);
           // Preparation cannot redirect the caller's operation or change source.
           if (prepared.source !== source || prepared.operations.length !== 1 ||
-              !matchesOperation(prepared, operation)) throw unavailable();
+              !matchesOperation(prepared, operation, restorationData)) throw unavailable();
           await assertExclusive();
           phase = 'sign';
           const signed = TransactionBuilder.fromXDR(await sign(prepared.toXDR()), Networks.TESTNET);
           if (!signed.hash().equals(prepared.hash())) throw unavailable();
           saved = { intent, source, hash: signed.hash().toString('hex'), xdr: signed.toXDR() };
-          verifyEnvelope(saved, operation);
+          verifyEnvelope(saved, operation, restorationData);
           await assertExclusive();
           phase = 'persist';
           await store.save(id, saved);
@@ -77,7 +91,7 @@ export function createClinicalTransactionRunner({ network, source, server, store
           phase = 'submit';
           await server.sendTransaction(signed);
         }
-        const tx = verifyEnvelope(saved, operation);
+        const tx = verifyEnvelope(saved, operation, restorationData);
         await assertExclusive();
         phase = 'reconcile';
         const receipt = await server.getTransaction(saved.hash);

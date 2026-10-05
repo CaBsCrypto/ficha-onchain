@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Account, Contract, Keypair, Networks, nativeToScVal, StrKey, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
+import { Account, Address, Contract, Keypair, Networks, nativeToScVal, Operation, SorobanDataBuilder, StrKey, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 import { createClinicalTransactionRunner } from './clinical-chain-write.mjs';
 
 function fixture() {
@@ -29,6 +29,57 @@ test('exact signature and envelope are saved before send; retries only reconcile
   const f = fixture(); const runner = f.run();
   assert.equal((await runner.run({ id: 'append', operation: f.operation })).status, 'SUCCESS');
   assert.equal((await runner.run({ id: 'append', operation: f.operation })).status, 'SUCCESS');
+  assert.equal(f.counts.signatures, 1); assert.equal(f.counts.submissions, 1);
+});
+
+function restorationFixture() {
+  const f = fixture();
+  const contractId = StrKey.encodeContract(Buffer.alloc(32, 1));
+  const key = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+    contract: new Address(contractId).toScAddress(), key: xdr.ScVal.scvLedgerKeyContractInstance(),
+    durability: xdr.ContractDataDurability.persistent(),
+  }));
+  const data = new SorobanDataBuilder().setReadWrite([key]).setResources(0, 1000, 1000).setResourceFee('1000').build();
+  const operation = Operation.restoreFootprint({});
+  f.configuration.verifyOperation = async (op, value) => {
+    assert.ok(op.body().toXDR().equals(operation.body().toXDR()));
+    assert.ok(value.toXDR().equals(data.toXDR()));
+  };
+  return { ...f, operation, data };
+}
+
+test('restoration lost reply and restart reconcile one saved footprint and one signature', async () => {
+  const f = restorationFixture(); f.state.lostReply = true;
+  await assert.rejects(() => f.run().run({ id: 'restore', operation: f.operation, restorationData: f.data }));
+  assert.equal(f.jobs.size, 1);
+  f.state.lostReply = false;
+  assert.equal((await f.run().run({ id: 'restore', operation: f.operation, restorationData: f.data })).status, 'SUCCESS');
+  assert.equal(f.counts.signatures, 1); assert.equal(f.counts.submissions, 1);
+});
+
+test('restoration preparation cannot redirect footprint or exceed the resource-fee cap', async () => {
+  for (const change of [data => data.resources().footprint().readWrite([]),
+    data => data.resourceFee(xdr.Int64.fromString('10000001'))]) {
+    const f = restorationFixture();
+    f.configuration.server.prepareTransaction = async tx => {
+      const envelope = tx.toEnvelope(); change(envelope.v1().tx().ext().sorobanData());
+      return TransactionBuilder.fromXDR(envelope.toXDR('base64'), Networks.TESTNET);
+    };
+    await assert.rejects(() => f.run().run({ id: 'restore', operation: f.operation, restorationData: f.data }));
+    assert.equal(f.counts.signatures, 0); assert.equal(f.counts.submissions, 0);
+  }
+});
+
+test('paused restoration never signs or submits and rejects an absent or changed persisted plan', async () => {
+  const f = restorationFixture();
+  assert.equal((await f.run({ writesEnabled: false }).run({ id: 'restore', operation: f.operation, restorationData: f.data })).status, 'writes_paused');
+  assert.equal(f.counts.signatures, 0); assert.equal(f.counts.submissions, 0);
+  await assert.rejects(() => f.run().run({ id: 'restore', operation: f.operation }));
+  await f.run().run({ id: 'restore', operation: f.operation, restorationData: f.data });
+  const changed = xdr.SorobanTransactionData.fromXDR(f.data.toXDR());
+  changed.resourceFee(xdr.Int64.fromString('1001'));
+  f.configuration.verifyOperation = async () => {};
+  await assert.rejects(() => f.run().run({ id: 'restore', operation: f.operation, restorationData: changed }));
   assert.equal(f.counts.signatures, 1); assert.equal(f.counts.submissions, 1);
 });
 test('lost RPC reply and restart reuse the same persisted attempt without another signature', async () => {
