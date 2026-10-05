@@ -14,7 +14,7 @@ import { PRIVATE_REGISTRY_ID } from './lib/private-registry.mjs';
 
 const local = '.trustleaf-local/sow2-clinical';
 const evidence = 'docs/evidence/sow2-week1-2026-10-05';
-const wasmFile = 'contracts/target/wasm32v1-none/release/clinical_history_private.wasm';
+const wasmFile = 'contracts/dist-deployed/clinical_history_private.wasm';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const server = new rpc.Server('https://soroban-testnet.stellar.org');
 

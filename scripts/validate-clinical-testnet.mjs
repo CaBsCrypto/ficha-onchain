@@ -52,7 +52,7 @@ async function main() {
   url.hostname = url.hostname.replace('-pooler.', '.'); // session locks require direct Neon
   const deployment = JSON.parse(fs.readFileSync(output + '/deployment.json', 'utf8'));
   if (deployment.network !== 'testnet' || deployment.registryId !== PRIVATE_REGISTRY_ID ||
-      deployment.wasmHash !== createHash('sha256').update(fs.readFileSync('contracts/target/wasm32v1-none/release/clinical_history_private.wasm')).digest('hex')) throw Error('clinical_demo_configuration_invalid');
+      deployment.wasmHash !== createHash('sha256').update(fs.readFileSync('contracts/dist-deployed/clinical_history_private.wasm')).digest('hex')) throw Error('clinical_demo_configuration_invalid');
   const secrets = clinicalLocalSecrets(local, { backup: mode === '--run' });
   const patient = Keypair.fromSecret(secrets.patient), deployer = Keypair.fromSecret(secrets.deployer);
   const found = spawnSync('stellar', ['keys', 'address', doctorAlias, '--config-dir', configDir], { encoding: 'utf8', windowsHide: true });

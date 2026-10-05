@@ -12,6 +12,7 @@ Comandos:
 - node scripts/deploy-clinical-testnet.mjs --audit
 - node --env-file=.env.local scripts/validate-clinical-testnet.mjs --readback
 - node --env-file=.env.local scripts/clinical-lock-smoke.mjs
+- node --env-file=.env.local scripts/restore-clinical-testnet.mjs --inspect
 
 readback requiere una demostración terminada. No crea, firma, transmite ni restaura. Los getters simulados no prolongan TTL real.
 
@@ -37,10 +38,16 @@ Paciente/deployer son sintéticos nuevos y médico una identidad sintética ya a
 
 Las operaciones reales extienden TTL de las claves alcanzadas. Simulaciones no lo persisten. Un estado archivado bloquea; no se interpreta como ausencia para recrear permisos. Restauración/mantenimiento exige footprints exactos, simulación, persistencia de sobre/hash y recibo auditado. No se acredita restauración real en esta entrega.
 
+`restore-clinical-testnet.mjs --inspect` revisa únicamente las claves conocidas de la demostración; no firma, transmite ni modifica Neon. Al 5 de octubre, las 16 claves estaban disponibles. No se ha forzado su expiración.
+
+`--restore` requiere `TRUSTLEAF_CLINICAL_TESTNET_WRITES=true`, host Neon dev y bloqueo directo por wallet. Conserva el plan en el journal local y el sobre firmado en Neon antes de transmitir. Si no hay claves faltantes ni intento previo, termina como `not_required`, sin transacción. Una respuesta incierta conserva el mismo intento; no borrar el journal. Tras SUCCESS se comprueban despliegue, revocación y los compromisos históricos. Los pendientes/errores no se describen como restaurados.
+
 ## Validación
 
 npm test; npm run test:private; npx tsc --noEmit; npm run build.
 
-Contratos: cargo test --locked --manifest-path contracts/Cargo.toml --workspace y stellar contract build --manifest-path contracts/clinical-history-private/Cargo.toml.
+Contratos: `cargo test --locked --manifest-path contracts/Cargo.toml --workspace` y `stellar contract build --locked --manifest-path contracts/clinical-history-private/Cargo.toml --out-dir contracts/dist-deployed`.
+
+El despliegue y readback usan el WASM optimizado de `contracts/dist-deployed`, no el archivo intermedio de Cargo. Rust 1.96.0 y Stellar CLI 27.0.0 están fijados. CI Windows reproduce y compara el SHA desplegado; Linux genera otro hash. No se afirma reproducibilidad entre sistemas operativos.
 
 Comparar hash WASM/manifiesto. CI no despliega ni escribe en Neon/Testnet. Resultados locales, SQL real y recibos reales permanecen distinguidos en VALIDACION-2026-10-05.md.
