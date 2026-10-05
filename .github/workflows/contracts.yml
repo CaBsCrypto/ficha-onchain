@@ -19,6 +19,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  deployed-wasm:
+    name: reproduce deployed clinical WASM
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: contracts
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          targets: wasm32v1-none
+      - name: Install pinned Stellar CLI
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'stellar-cli.tar.gz'
+          Invoke-WebRequest 'https://github.com/stellar/stellar-cli/releases/download/v27.0.0/stellar-cli-27.0.0-x86_64-pc-windows-msvc.tar.gz' -OutFile $archive
+          tar -xzf $archive -C $env:RUNNER_TEMP
+          $env:RUNNER_TEMP | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Build and compare to Testnet manifest
+        run: |
+          stellar --version
+          stellar contract build --locked --package clinical-history-private --out-dir dist-deployed
+          if ($LASTEXITCODE -ne 0) { throw 'Clinical build failed' }
+          $manifest = Get-Content ../docs/evidence/sow2-week1-2026-10-05/deployment.json -Raw | ConvertFrom-Json
+          $artifact = Get-Item dist-deployed/clinical_history_private.wasm
+          $hash = (Get-FileHash $artifact.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne $manifest.wasmHash -or $artifact.Length -ne $manifest.wasmBytes) { throw 'WASM does not match deployed Testnet evidence' }
+          Write-Output "Verified deployed WASM: $hash"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployed-clinical-wasm
+          path: contracts/dist-deployed/
+          retention-days: 30
+          if-no-files-found: error
+
   test:
     name: cargo test (Soroban contracts)
     runs-on: ubuntu-latest
