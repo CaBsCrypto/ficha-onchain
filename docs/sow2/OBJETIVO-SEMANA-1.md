@@ -10,7 +10,7 @@ El paciente debe poder decidir qué médico puede leer o agregar información. L
 
 1. **Contrato clínico probado y desplegado en Testnet.** Registrar autorizaciones, revocaciones y nuevas versiones sin publicar contenido médico. Reutilizar el registro de médicos existente y conservar los contratos del SOW 1. El nuevo contrato no tendrá una función de actualización de código.
 2. **Permisos de lectura y escritura independientes.** Sólo el paciente concede o retira acceso a su historia. Cada aporte o corrección médica exige autorización médica y permiso del paciente vigentes. Nadie sobrescribe silenciosamente los registros de otro autor.
-3. **Almacenamiento privado y cifrado comprobable.** Mantener Neon para los registros; definir y configurar el almacenamiento de PDF e imágenes, sus límites y el manejo de claves. Verificar el contenido antes de entregarlo a una persona autorizada.
+3. **Almacenamiento privado y cifrado comprobable.** Guardar registros y archivos cifrados en Neon. Admitir PDF, PNG y JPEG de hasta 3 MB por archivo original, con las claves fuera de la base de datos. Verificar el contenido antes de entregarlo a una persona autorizada.
 4. **Pruebas y evidencia de funcionamiento.** Documentar resultados por commit, arquitectura, riesgos y límites, junto con el identificador del contrato, el hash del WASM y los recibos de las operaciones reales de Testnet.
 
 ## Demostración técnica mínima
