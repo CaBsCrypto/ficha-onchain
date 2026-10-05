@@ -5,10 +5,12 @@ Rama: codex/sow2-clinical-foundation. Contrato desplegado y demostración técni
 ## Resultados
 
 - Aplicación: 634 pruebas en 61 suites aprobadas.
-- Servicios privados: 98 pruebas aprobadas.
+- Servicios privados: 109 pruebas aprobadas localmente, incluidas recuperación y selección acotada del footprint.
 - Contratos: 25 pruebas (14 clínicas, 4 registro médico y 7 recetas).
 - TypeScript y build aprobados. Formato Rust normalizado; recompilación con el mismo WASM.
 - WASM: 15.533 bytes; 29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0.
+
+La PR es [#135](https://github.com/CaBsCrypto/ficha-onchain/pull/135). `7d9dbda` aprobó aplicación/build, contratos, WASM y Vercel. El job Windows de [ese run](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37353683760) reprodujo el hash exacto desplegado. Las modificaciones posteriores del comando operativo y sus tests necesitan checks del candidato actualizado; no se dan por aprobadas con el run anterior.
 
 ## Evidencia real
 
@@ -30,6 +32,7 @@ Firmas exactas, permisos independientes, correcciones ajenas, revisiones antigua
 
 - CI del commit y revisión de PR.
 - Restauración real de footprint archivado: pruebas locales acreditan rechazo seguro, no restauración real.
+- Recuperación: herramienta `restore-clinical-testnet.mjs` preparada y probada de forma aislada; inspección real de 16 claves conocidas, ninguna faltante. La ejecución con escrituras fue rechazada por revisión automática y está pendiente de autorización específica. No se generó recibo de restauración.
 - Integración clínica con pantallas/Privy corresponde a semanas siguientes; el harness usa challenges Ed25519 reales.
 - Custodia portable y alojamiento permanente no entregados. Neon dev está configurado y probado mediante herramientas locales.
 

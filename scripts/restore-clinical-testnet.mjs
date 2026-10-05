@@ -2,6 +2,8 @@
  * signs or writes. --restore requires the isolated write flag and preserves
  * the selected footprint before signing, so restart never selects a new intent. */
 import fs from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import WebSocket from 'ws';
@@ -12,6 +14,7 @@ import { clinicalAttemptStore } from './lib/clinical-attempt-store.mjs';
 import { acquireClinicalSourceLocks } from './lib/clinical-source-lock.mjs';
 import { clinicalLocalSecrets } from './lib/clinical-local-secrets.mjs';
 import { createClinicalChainReader } from './lib/clinical-chain-read.mjs';
+import { validateClinicalContext } from './lib/clinical-crypto.mjs';
 
 const local = '.trustleaf-local/sow2-clinical';
 const evidence = 'docs/evidence/sow2-week1-2026-10-05';
@@ -24,7 +27,14 @@ function save(file, value) {
   finally { fs.closeSync(fd); }
   fs.renameSync(file + '.tmp', file);
 }
-function knownKeys(deployment, state) {
+export function knownClinicalRestorationKeys(deployment, state) {
+  const names = ['create_history', 'grant', 'append_pdf', 'correct_pdf', 'append_image', 'revoke'];
+  if (deployment?.network !== 'testnet' || !/^[a-f0-9]{64}$/.test(deployment.wasmHash) ||
+      state?.network !== 'testnet' || state.contractId !== deployment.contractId || state.completed !== true ||
+      !state.operations || !state.records || Object.keys(state.operations).length !== names.length ||
+      names.some(name => !/^[a-f0-9]{64}$/.test(state.operations[name])) ||
+      new Set(Object.values(state.operations)).size !== names.length ||
+      Object.keys(state.records).sort().join(',') !== 'append_image,append_pdf,correct_pdf') throw fail();
   const address = new Address(deployment.contractId).toScAddress();
   const bytes = v => { if (!/^[a-f0-9]{64}$/.test(v)) throw fail(); return nativeToScVal(Buffer.from(v, 'hex')); };
   const wallet = v => new Address(v).toScVal();
@@ -36,12 +46,17 @@ function knownKeys(deployment, state) {
     xdr.LedgerKey.contractCode(new xdr.LedgerKeyContractCode({ hash: Buffer.from(deployment.wasmHash, 'hex') })),
     variant('History', bytes(state.historyId)), variant('Patient', wallet(state.patient)),
     variant('Grant', bytes(state.historyId), wallet(state.doctor))];
-  for (const record of Object.values(state.records)) {
-    const c = record.context;
-    if (c.contractId !== deployment.contractId || c.historyId !== state.historyId || c.patient !== state.patient) throw fail();
+  for (const [name, record] of Object.entries(state.records)) {
+    const c = validateClinicalContext(record.context);
+    if (c.contractId !== deployment.contractId || c.historyId !== state.historyId || c.patient !== state.patient ||
+        c.author !== state.doctor || c.version !== (name === 'correct_pdf' ? 2 : 1) ||
+        !/^[a-f0-9]{64}$/.test(record.commitment)) throw fail();
     keys.push(variant('Entry', bytes(c.historyId), bytes(c.entryId)),
       variant('Version', bytes(c.historyId), bytes(c.entryId), nativeToScVal(c.version, { type: 'u32' })));
   }
+  if (state.records.correct_pdf.context.entryId !== state.records.append_pdf.context.entryId ||
+      state.records.correct_pdf.context.previousCommitment !== state.records.append_pdf.commitment ||
+      state.records.append_image.context.entryId === state.records.append_pdf.context.entryId) throw fail();
   for (const [name, id] of Object.entries(state.operations)) {
     const actor = name.startsWith('append_') || name === 'correct_pdf' ? state.doctor : state.patient;
     keys.push(variant('Operation', wallet(actor), bytes(id)));
@@ -58,7 +73,7 @@ async function main() {
   const state = JSON.parse(fs.readFileSync(local + '/demonstration.json', 'utf8'));
   if (deployment.network !== 'testnet' || state.network !== 'testnet' || !state.completed ||
       state.contractId !== deployment.contractId || (await server.getNetwork()).passphrase !== Networks.TESTNET) throw fail();
-  const keys = knownKeys(deployment, state);
+  const keys = knownClinicalRestorationKeys(deployment, state);
   const observed = await server.getLedgerEntries(...keys);
   const actual = new Map(observed.entries.map(row => [row.key.toXDR('base64'), row]));
   if ([...actual.keys()].some(k => !keys.some(key => key.toXDR('base64') === k))) throw fail();
@@ -130,4 +145,6 @@ async function main() {
     if (locks) await locks.release(); if (client) client.release(); await pool.end();
   }
 }
-main().catch(() => { console.error('clinical_restoration_unavailable'); process.exitCode = 1; });
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(() => { console.error('clinical_restoration_unavailable'); process.exitCode = 1; });
+}
