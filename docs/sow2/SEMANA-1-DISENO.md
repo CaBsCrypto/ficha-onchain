@@ -2,7 +2,7 @@
 
 Este documento convierte las decisiones sobre la historia clínica privada en un plan de implementación y pruebas. El objetivo de la primera semana es construir una base verificable para los portales del paciente y del médico: permisos, versiones e integridad. La interfaz completa corresponde a las semanas siguientes.
 
-Estado al 5 de octubre de 2026: contrato implementado y desplegado en Testnet; almacenamiento cifrado en Neon dev y demostración técnica real comprobados. CI y revisión de la PR siguen pendientes. Ver VALIDACION-2026-10-05.md para evidencia y límites.
+Estado al 5 de octubre de 2026: contrato implementado y desplegado en Testnet; almacenamiento cifrado en Neon dev y demostración técnica real comprobados. CI aprobado para `db9bc2f`; revisión de PR pendiente. Ver VALIDACION-2026-10-05.md para evidencia y límites.
 
 ## Decisiones acordadas
 

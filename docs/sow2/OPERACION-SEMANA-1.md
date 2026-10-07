@@ -16,6 +16,24 @@ Comandos:
 
 readback requiere una demostración terminada. No crea, firma, transmite ni restaura. Los getters simulados no prolongan TTL real.
 
+`readback` actualiza el archivo público local `docs/evidence/sow2-week1-2026-10-05/readback.json` con la fecha de la nueva comprobación. `node scripts/present-clinical-evidence.mjs` presenta ese informe guardado, sin red, sin secretos y sin nuevas escrituras. Ver INFORME-SEMANA-1.md y GRABACION-SEMANA-1.md. Si una consulta falla, no usar un informe anterior para afirmar disponibilidad vigente.
+
+### Ejecuciones independientes
+
+Añadir `--run-id <UUID v4 en minúsculas>` selecciona un journal y keyring DPAPI propios en `.trustleaf-local/sow2-clinical/runs/<UUID>` y evidencia pública en `docs/evidence/sow2-week1-runs/<UUID>`. Sin selector se conserva el recorrido original. No borrar journals ni cambiar de UUID para eludir un intento pendiente.
+
+La ejecución nueva es `ed9cf324-b9f1-400c-aae8-3323a66407ad`. Para auditarla sin operaciones nuevas:
+
+```powershell
+node scripts/check-clinical-recording.mjs --run-id ed9cf324-b9f1-400c-aae8-3323a66407ad
+node scripts/build-clinical-report.mjs --run-id ed9cf324-b9f1-400c-aae8-3323a66407ad
+node scripts/serve-clinical-report.mjs --run-id ed9cf324-b9f1-400c-aae8-3323a66407ad
+```
+
+El visor sirve sólo HTML en `127.0.0.1:3014`, sin Neon, secretos, APIs ni firmas. Reiniciarlo tras regenerar el HTML. El readback utiliza challenges técnicos locales para comprobar el control de la wallet; no los transmite a Stellar.
+
+Un nuevo `--run` exige autorización médica con al menos 900 segundos restantes, saldo disponible, red y Neon dev exactos, código desplegado correcto y exclusividad por wallet. Un intento firmado se reconcilia usando el mismo sobre. Un `prepared` sin sobre permanece bloqueado para revisión manual; cerca del vencimiento el harness detiene la ejecución y no sustituye intentos. La autorización usada vencía el 7 de octubre a las 05:10:40 UTC; estos recibos históricos no autorizan otra ejecución ni una renovación administrativa.
+
 ## Migración y escrituras
 
 TRUSTLEAF_CLINICAL_MIGRATION=true habilita exclusivamente scripts/migrate.mjs --step=clinical-history-v1 en Neon dev. La migración general omite clínica. El mecanismo administrativo conserva autenticación y exige el mismo flag/host para las tablas nuevas.

@@ -1,6 +1,6 @@
 # Semana 1 · Evidencia técnica
 
-Rama: codex/sow2-clinical-foundation. Contrato desplegado y demostración técnica comprobada; CI y revisión pendientes. Sin fusión a main.
+Rama: codex/sow2-clinical-foundation. Contrato desplegado y demostración técnica comprobada; CI aprobado para `db9bc2f`; revisión de PR pendiente. Sin fusión a main.
 
 ## Resultados
 
@@ -10,7 +10,7 @@ Rama: codex/sow2-clinical-foundation. Contrato desplegado y demostración técni
 - TypeScript y build aprobados. Formato Rust normalizado; recompilación con el mismo WASM.
 - WASM: 15.533 bytes; 29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0.
 
-La PR es [#135](https://github.com/CaBsCrypto/ficha-onchain/pull/135). `7d9dbda` aprobó aplicación/build, contratos, WASM y Vercel. El job Windows de [ese run](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37353683760) reprodujo el hash exacto desplegado. Las modificaciones posteriores del comando operativo y sus tests necesitan checks del candidato actualizado; no se dan por aprobadas con el run anterior.
+La PR es [#135](https://github.com/CaBsCrypto/ficha-onchain/pull/135), en borrador y sin fusionar. CI/Vercel aprobados para `db9bc2f3eebb5c827321636d1e2275b540aee7be`: [aplicación, TypeScript y build](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37354464405) y [contratos, WASM y reproducción Windows](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37354464333). Las cifras completas corresponden a ese commit. Se repitieron hoy las 14 pruebas clínicas; no se atribuye una suite completa nueva a esta documentación.
 
 ## Evidencia real
 
@@ -30,7 +30,7 @@ Firmas exactas, permisos independientes, correcciones ajenas, revisiones antigua
 
 ## Pendientes y límites
 
-- CI del commit y revisión de PR.
+- Revisión de PR y grabación; CI de db9bc2f aprobado.
 - Restauración real de footprint archivado: pruebas locales acreditan rechazo seguro, no restauración real.
 - Recuperación: herramienta `restore-clinical-testnet.mjs` preparada y probada de forma aislada; inspección real de 16 claves conocidas, ninguna faltante. La ejecución con escrituras fue rechazada por revisión automática y está pendiente de autorización específica. No se generó recibo de restauración.
 - Integración clínica con pantallas/Privy corresponde a semanas siguientes; el harness usa challenges Ed25519 reales.

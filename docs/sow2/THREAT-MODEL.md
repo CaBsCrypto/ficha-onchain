@@ -55,10 +55,6 @@ El contrato clínico archivado y las rutas antiguas no acreditan el nuevo modelo
 
 Los antiguos scripts `validate-private-flow-testnet` y `validate-private-registry-testnet` realizan escrituras y firmas. No son un preflight de sólo lectura y no deben ejecutarse para comprobar simplemente configuración o disponibilidad. El migrador general también ejecuta todas sus etapas y debe revisarse antes de aplicarlo; no protege por sí solo el host de destino.
 
-## Condiciones pendientes para declarar completada la semana
+## Estado acreditado y pendientes
 
-- Convertir cada control anterior en pruebas del nuevo flujo y registrar resultados del commit entregado.
-- Acreditar SQL real de Neon, guardado/lectura de PDF e imagen cifrados y recuperación de claves. Un adaptador en memoria no demuestra infraestructura alojada.
-- Revisar el contrato sin upgrade y sus límites operativos antes de desplegar. Un interruptor en el servidor puede detener la aplicación, pero no impide invocaciones directas al contrato público.
-- Separar evidencia técnica con claves sintéticas de la validación real de Privy. No atribuir una prueba de servicio al recorrido de navegador.
-- No presentar este modelo como auditoría externa, certificación de seguridad, cumplimiento normativo ni garantía de ausencia de fallos.
+Contrato, permisos, cifrado, SQL real y coordinación de journals están acreditados en la matriz de aceptación. CI/Vercel aprobados para db9bc2f. Quedan revisión de PR, grabación y restauración real de estado archivado. Privy clínico, recuperación portable y alojamiento permanente no se presentan como entregados. No se acredita certificación ni auditoría externa.

@@ -36,8 +36,10 @@ La plataforma gestiona el descifrado para usuarios autorizados. Revocar acceso n
 
 ## Estado y siguiente paso
 
-**Estado al 5 de octubre de 2026:** contrato clínico desplegado; demostración técnica con seis recibos reales y almacenamiento cifrado persistente en Neon dev comprobados. Pruebas y build aprobados localmente; CI y revisión pendientes. Ver [registro de validación](VALIDACION-2026-10-05.md).
+**Estado al 5 de octubre de 2026:** contrato clínico desplegado; demostración técnica con seis recibos reales y almacenamiento cifrado persistente en Neon dev comprobados. Pruebas y build aprobados localmente; CI aprobado para `db9bc2f`; revisión de PR pendiente. Ver [registro de validación](VALIDACION-2026-10-05.md).
 
-El siguiente paso es fijar el commit y acreditar CI de la PR. La integración con pantallas y Privy corresponde a semanas siguientes.
+**Actualización del 7 de octubre:** se completó otra ejecución sintética, preservando la anterior. El [informe de semana 1](INFORME-SEMANA-1.md) reúne los seis recibos nuevos, la auditoría de los tres contratos, lectura posterior, pruebas actuales y el visor local. Las pantallas clínicas de la semana 2, la revisión de PR y la grabación continúan separadas.
+
+El siguiente paso es revisar INFORME-SEMANA-1.md y grabar según GRABACION-SEMANA-1.md. La integración con pantallas y Privy corresponde a semanas siguientes.
 
 Ver el [diseño técnico y la matriz de pruebas](SEMANA-1-DISENO.md).

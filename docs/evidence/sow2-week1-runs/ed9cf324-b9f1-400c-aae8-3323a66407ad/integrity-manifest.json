@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "network": "testnet",
+  "generatedAt": "2026-10-07T04:51:54.704Z",
+  "sourceCommit": "2565f972401e145740c24211ce09a329e3050c52",
+  "state": "passed",
+  "liveVerification": false,
+  "files": [
+    {
+      "file": "docs/evidence/sow2-week1-2026-10-05/deployment.json",
+      "bytes": 1717,
+      "sha256": "0ac7138f3588aa32b4af75805dc6bcf98aea1ff281540b1835ecc2109fe383a8"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/previous-readback.json",
+      "bytes": 3205,
+      "sha256": "b659572e486afa3b81c2095b25921b0f9e21b539e841db9753a169b7d4c9cf25"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/demonstration.json",
+      "bytes": 3486,
+      "sha256": "ab72fa949949e5ec6172c279dda9f78d7380ad72f8bddb4bd1a47107bbbb4cfc"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/readback.json",
+      "bytes": 6350,
+      "sha256": "428979a537ec58f8b30f5ee0ce3c65730f1cd4638473a68ddbdd663a0fffa263"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/contracts-audit.json",
+      "bytes": 4091,
+      "sha256": "865f01f3bf794ed89479272023b6f64a01038ca0f10a631690cb0eb9ac80abe8"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/funding-audit.json",
+      "bytes": 936,
+      "sha256": "7b01910af1b5f30ed359fe29fb0da4c8119310e73d65ce35c4d283c50842116a"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/restoration-inspection.json",
+      "bytes": 251,
+      "sha256": "39aecf25e3901a3ecf11c6bc5aa11a2e653c4c3d9cd752d3d1852a065daa1c95"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/validation.json",
+      "bytes": 884,
+      "sha256": "8fdfd2798133508851eafc30171500038616562fdb502dbda58073c7e4465f86"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/ui-review.json",
+      "bytes": 1262,
+      "sha256": "415ef953f5407a494e653aac274f370764c65d8969394cee78b7736ecf0a4c24"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/index.html",
+      "bytes": 19695,
+      "sha256": "c9119433808b0bb8fe3abebe07cf68fa492efe53953f53ff58325379001e2b7b"
+    },
+    {
+      "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/report.md",
+      "bytes": 6155,
+      "sha256": "f275206a01dc8468a1e99c2f96d1d7f8ef7e53f699809e328609d5a3dfe7b42f"
+    }
+  ],
+  "limits": [
+    "Does not verify authenticity of source evidence",
+    "No medical files or secrets",
+    "Manifest does not hash itself",
+    "Archived-state restoration not demonstrated"
+  ]
+}

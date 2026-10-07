@@ -9,7 +9,7 @@ const RUN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/;
-const INPUTS = ['demonstration.json', 'readback.json', 'contracts-audit.json', 'funding-audit.json', 'restoration-inspection.json', 'validation.json', 'preparation.json'];
+const INPUTS = ['demonstration.json', 'readback.json', 'contracts-audit.json', 'funding-audit.json', 'restoration-inspection.json', 'validation.json', 'ui-review.json', 'preparation.json'];
 const STEPS = [
   ['create_history', 'Crear historial', 'Paciente', 'Firma del propietario'],
   ['grant', 'Conceder lectura y agregado', 'Paciente', 'Ser propietario del historial'],

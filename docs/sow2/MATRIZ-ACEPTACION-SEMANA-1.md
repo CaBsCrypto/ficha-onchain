@@ -1,6 +1,8 @@
 # Semana 1 · Matriz de aceptación
 
-Esta matriz separa pruebas aisladas de operaciones reales. La PR es [#135](https://github.com/CaBsCrypto/ficha-onchain/pull/135); no está fusionada. `7d9dbda` aprobó todos sus checks, incluida la reproducción del WASM desplegado. Los cambios posteriores del comando y sus regresiones requieren checks actualizados.
+Esta matriz separa pruebas aisladas de operaciones reales. La PR es [#135](https://github.com/CaBsCrypto/ficha-onchain/pull/135); no está fusionada. `db9bc2f` aprobó todos sus checks, incluida la reproducción Windows del WASM. Revisión pendiente.
+
+**Actualización del 7 de octubre:** una ejecución independiente `ed9cf324-b9f1-400c-aae8-3323a66407ad` acreditó seis operaciones clínicas, tres versiones cifradas y lectura desde otro proceso, con cero intentos pendientes. Se auditaron por lectura los tres contratos y, aparte, la financiación Testnet. Las herramientas `2565f97` aprobaron 151 pruebas privadas; aplicación 634, contratos 25 (14 clínicos incluidos), TypeScript y build también pasaron en esta preparación. CI/Vercel del nuevo HEAD se registran por separado. Ver [informe actual](INFORME-SEMANA-1.md) y [evidencia nueva](../evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/report.md). Las cifras de la tabla original corresponden a `db9bc2f`.
 
 | Requisito | Evidencia inspeccionada | Resultado |
 | --- | --- | --- |
@@ -16,8 +18,8 @@ Esta matriz separa pruebas aisladas de operaciones reales. La PR es [#135](https
 | Fallos recuperables, sin confirmaciones falsas ni datos anteriores | Tests de storage/RPC, cambio de identidad, sesión vencida, respuestas tardías; journal persiste antes de enviar y reconcilia el mismo sobre | Comprobado con fallos simulados; no se atribuyen fallos reales a Privy. |
 | Exclusividad frente al flujo de recetas | Lock por origen; reserva de journal clínico y guardia en preparación de recetas; tests y dos conexiones directas Neon | Comprobado; un intento reservado sin sobre exige revisión, no se descarta automáticamente. |
 | Demostración técnica mínima | Seis recibos de `demonstration.json` y segunda ejecución de lectura `readback.json` | Comprobado con cuentas sintéticas; sin interfaz clínica ni integración Privy nueva. |
-| Pruebas/build/CI por commit | 634 app, 109 privadas y 25 contratos locales; aplicación y build del código de producto aprobados; nuevas regresiones privadas ejecutadas | CI actualizado pendiente. Último candidato con todos los checks aprobados: `7d9dbda`. |
-| WASM reproducible | CLI 27.0.0 y Rust 1.96.0 fijados; SHA desplegado `29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0` | Compilación limpia local y [CI Windows](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37353683760) reproducen ese SHA. Linux produce otro hash; no se afirma reproducibilidad entre sistemas ni equivalencia semántica sólo por comparar la interfaz. |
+| Pruebas/build/CI por commit | 634 app, 109 privadas y 25 contratos locales; aplicación y build del código de producto aprobados; nuevas regresiones privadas ejecutadas | CI/Vercel aprobados para `db9bc2f`. |
+| WASM reproducible | CLI 27.0.0 y Rust 1.96.0 fijados; SHA desplegado `29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0` | Compilación limpia local y [CI Windows](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37354464333) reproducen ese SHA. Linux produce otro hash; no se afirma reproducibilidad entre sistemas ni equivalencia semántica sólo por comparar la interfaz. |
 | Preservación del trabajo anterior | Rama desde main; documentos pendientes excluidos de commits y respaldo local registrado | Conservado; sin fusión ni configuración clínica de main. |
 
 ## Comprobación operativa adicional pendiente
