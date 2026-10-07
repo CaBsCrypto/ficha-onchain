@@ -13,6 +13,7 @@ const steps = [
   ['Reglas del contrato: pruebas aisladas', 'cargo', ['test', '--locked', '--manifest-path', 'contracts/Cargo.toml', '-p', 'clinical-history-private']],
   ['Lectura real de archivos, permisos y seis recibos', process.execPath, ['--env-file=.env.local', 'scripts/validate-clinical-testnet.mjs', '--readback', ...runArgs]],
   ['Inspección del estado disponible, sin restaurar', process.execPath, ['--env-file=.env.local', 'scripts/restore-clinical-testnet.mjs', '--inspect', ...runArgs]],
+  ...(selection.runId ? [['Recibo adicional de financiación Testnet', process.execPath, ['scripts/audit-clinical-funding.mjs', ...runArgs]]] : []),
   ['Resumen de la evidencia recién leída', process.execPath, ['scripts/present-clinical-evidence.mjs', ...runArgs]],
 ];
 console.log('SOW 2 · Semana 1 · Auditoría de ejecución existente');

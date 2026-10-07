@@ -1,6 +1,6 @@
 // Presentation of public evidence only. Never reads .env, keys, Neon, or Stellar.
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, realpathSync, lstatSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, realpathSync, lstatSync, existsSync } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -9,7 +9,7 @@ const RUN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/;
-const INPUTS = ['demonstration.json', 'readback.json', 'contracts-audit.json', 'validation.json', 'preparation.json'];
+const INPUTS = ['demonstration.json', 'readback.json', 'contracts-audit.json', 'funding-audit.json', 'restoration-inspection.json', 'validation.json', 'preparation.json'];
 const STEPS = [
   ['create_history', 'Crear historial', 'Paciente', 'Firma del propietario'],
   ['grant', 'Conceder lectura y agregado', 'Paciente', 'Ser propietario del historial'],
@@ -77,7 +77,8 @@ export function loadReportEvidence(runId, root = REPO_ROOT) {
     }
   };
   read('deployment', join(root, 'docs/evidence/sow2-week1-2026-10-05/deployment.json'), 'base');
-  read('original', join(root, 'docs/evidence/sow2-week1-2026-10-05/readback.json'), 'previous');
+  const previousSnapshot = join(directory, 'previous-readback.json');
+  read('original', existsSync(previousSnapshot) ? previousSnapshot : join(root, 'docs/evidence/sow2-week1-2026-10-05/readback.json'), 'previous');
   for (const name of INPUTS) read(name.replace('.json', ''), join(directory, name), 'new');
   return { evidence, files, issues, directory };
 }
@@ -131,7 +132,14 @@ export function createReportModel(runId, { evidence, issues = [] }, generatedAt 
   const receiptsComplete = receipts.every(tx => tx.state === 'passed') && uniqueReceipts === 6 &&
     report?.confirmedAttemptCount === 6 && report?.pendingAttemptCount === 0 && Object.keys(report.transactions ?? {}).length === 6;
   if (report && !receiptsComplete) invalid.push({ name: 'clinical-receipts', state: 'failed' });
-  const readbackVerified = Boolean(readback && receiptsComplete && readback.readbackAfterProcessRestart === true &&
+  const exactAudits = Array.isArray(readback?.auditedReceipts) && readback.auditedReceipts.length === 6 &&
+    new Set(readback.auditedReceipts.map(row => row.name)).size === 6 && receipts.every(tx => {
+      const row = readback.auditedReceipts.find(item => item.name === tx.key);
+      const method = tx.key === 'create_history' ? 'create_history' : ['grant','revoke'].includes(tx.key) ? 'set_permissions' : 'append_version';
+      return row?.contractId === d?.contractId && row.method === method && row.source === tx.source && row.transactionHash === tx.hash &&
+        row.ledger === tx.ledger && row.status === 'SUCCESS' && row.signatureVerified === true && row.argumentsVerified === true && row.envelopeVerified === true;
+    });
+  const readbackVerified = Boolean(readback && receiptsComplete && exactAudits && readback.readbackAfterProcessRestart === true &&
     readback.files?.pdfVersions === 2 && readback.files?.pngVersions === 1 && readback.files?.maximumOriginalBytes === 3_000_000 &&
     CLINICAL_CHECKS.every(([key]) => readback.checks?.[key] === true));
   const checks = CLINICAL_CHECKS.map(([key, label]) => ({ label, state: result(report?.checks?.[key]) }));
@@ -174,9 +182,13 @@ export function createReportModel(runId, { evidence, issues = [] }, generatedAt 
     RUN_PATTERN.test(previous.runId ?? '') && previous.runId !== runId && previous.contractId === d?.contractId && safeDate(previous.observedAt);
   const executionBlocked = audit?.clinicalExecution?.ready === false;
   const fundingHash = hash(report?.funding?.transactionHash);
+  const fundingAudit = evidence['funding-audit'];
+  const fundingVerified = !fundingHash || (fundingAudit?.schemaVersion === 1 && fundingAudit.runId === runId && fundingAudit.network === 'testnet' &&
+    fundingAudit.readOnly === true && fundingAudit.transactionHash === fundingHash && fundingAudit.patient === patient && fundingAudit.status === 'verified' &&
+    fundingAudit.envelopeHashVerified === true && fundingAudit.destinationVerified === true && fundingAudit.operationsVerified === 1 && fundingAudit.clinicalOperation === false);
   const funding = fundingHash ? { hash: fundingHash, explorer: txLink(fundingHash), provider: 'Stellar Testnet Friendbot' } : null;
   const complete = readbackVerified && cards.every(card => card.state === 'passed') && tests.every(test => test.passed > 0) &&
-    testChecks.every(check => check.state === 'passed') && invalid.length === 0;
+    testChecks.every(check => check.state === 'passed') && fundingVerified && invalid.length === 0;
   return { runId, generatedAt: safeDate(generatedAt), state: invalid.length || checks.some(check => check.state === 'failed') || cards.some(card => card.state === 'failed') ? 'failed' : complete ? 'passed' : 'pending',
     sourceCommit: commit(v?.sourceCommit ?? v?.productCommit ?? v?.commit) ?? commit(audit?.sourceCommit),
     deployment: deploymentValid ? { contractId: d.contractId, registryId: d.registryId, wasmHash: d.wasmHash,

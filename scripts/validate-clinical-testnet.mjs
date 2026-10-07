@@ -20,7 +20,7 @@ import { PRIVATE_REGISTRY_ID } from './lib/private-registry.mjs';
 import { secureStoreSigner, acquireSignerLock } from './lib/private-worker-runtime.mjs';
 import { clinicalRunConfiguration } from './lib/clinical-run-config.mjs';
 import { syntheticClinicalPdf, syntheticClinicalImage } from './lib/clinical-fixtures.mjs';
-import { requireClinicalDoctorWindow, requireClinicalRunAvailable } from './lib/clinical-demo-policy.mjs';
+import { requireClinicalDoctorWindow, requireClinicalRunAvailable, requireClinicalBalance } from './lib/clinical-demo-policy.mjs';
 import { auditClinicalRunReceipts } from './lib/clinical-receipt-audit.mjs';
 
 const server = new rpc.Server('https://soroban-testnet.stellar.org');
@@ -80,8 +80,7 @@ async function main() {
     const balanceResponse = await fetch('https://horizon-testnet.stellar.org/accounts/' + doctor, { signal: AbortSignal.timeout(20_000) });
     if (!balanceResponse.ok) throw Error('clinical_doctor_not_ready');
     const accountDetails = await balanceResponse.json();
-    const nativeBalance = accountDetails.balances?.find(balance => balance.asset_type === 'native');
-    if (accountDetails.account_id !== doctor || !nativeBalance || Number(nativeBalance.balance) < 5) throw Error('clinical_doctor_not_ready');
+    requireClinicalBalance(accountDetails, doctor);
   }
   const secrets = clinicalLocalSecrets(local, { create: mode === '--run' && !selection.legacy, backup: mode === '--run' });
   const patient = Keypair.fromSecret(secrets.patient);
@@ -126,6 +125,9 @@ async function main() {
         state.funding = { transactionHash: receipt.hash, source: 'Stellar Testnet Friendbot', explorer: 'https://stellar.expert/explorer/testnet/tx/' + receipt.hash }; save();
         await server.getAccount(patient.publicKey());
       }
+      const patientResponse = await fetch('https://horizon-testnet.stellar.org/accounts/' + patient.publicKey(), { signal: AbortSignal.timeout(20_000) });
+      if (!patientResponse.ok) throw Error('clinical_account_not_ready');
+      requireClinicalBalance(await patientResponse.json(), patient.publicKey());
     }
     const operationId = name => {
       if (!state.operations[name]) { state.operations[name] = randomBytes(32).toString('hex'); save(); }
@@ -277,7 +279,7 @@ async function main() {
 main().catch(error => {
   const allowed = ['clinical_writes_paused','clinical_source_busy','clinical_transaction_pending','clinical_transaction_unavailable',
     'clinical_demo_configuration_invalid','clinical_demo_schema_missing','clinical_demo_use_readback','clinical_attempt_unavailable',
-    'clinical_receipt_mismatch','clinical_demo_record_conflict','clinical_doctor_not_ready','clinical_testnet_funding_uncertain'];
+    'clinical_receipt_mismatch','clinical_demo_record_conflict','clinical_doctor_not_ready','clinical_account_not_ready','clinical_testnet_funding_uncertain'];
   console.error(JSON.stringify({ error: allowed.includes(error?.message) ? error.message : 'clinical_demonstration_unavailable',
     phase: ['configuration','load_attempt','prepare','sign','persist','submit','reconcile'].includes(error?.phase) ? error.phase : 'setup' }));
   process.exitCode = 1;

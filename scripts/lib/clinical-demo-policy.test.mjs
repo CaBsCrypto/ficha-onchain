@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { requireClinicalDoctorWindow, requireClinicalRunAvailable } from './clinical-demo-policy.mjs';
+import { requireClinicalDoctorWindow, requireClinicalRunAvailable, requireClinicalBalance } from './clinical-demo-policy.mjs';
 import { syntheticClinicalPdf, syntheticClinicalImage } from './clinical-fixtures.mjs';
 import { inflateSync } from 'node:zlib';
 test('expired, revoked, unknown and short-lived authorizations stop new execution', () => {
@@ -14,6 +14,12 @@ test('unresolved foreign and unsigned attempts block a new run; only own signed 
   assert.throws(() => requireClinicalRunAvailable('a',[{run_id:'a',state:'prepared'}],[]));
   assert.throws(() => requireClinicalRunAvailable('a',[],[{}]));
   assert.doesNotThrow(() => requireClinicalRunAvailable('a',[{run_id:'a',state:'submitted'}],[]));
+});
+test('wrong account, malformed balances and insufficient funds stop preparation', () => {
+  for (const balance of ['NaN', 'Infinity', '-1', '4.9999999', undefined])
+    assert.throws(() => requireClinicalBalance({account_id:'doctor',balances:[{asset_type:'native',balance}]},'doctor'));
+  assert.throws(() => requireClinicalBalance({account_id:'other',balances:[{asset_type:'native',balance:'1000'}]},'doctor'));
+  assert.doesNotThrow(() => requireClinicalBalance({account_id:'doctor',balances:[{asset_type:'native',balance:'5.0000000'}]},'doctor'));
 });
 test('PDF fixtures have valid object offsets and preserve original/corrected distinct bytes', () => {
   const first=syntheticClinicalPdf(1),second=syntheticClinicalPdf(2);

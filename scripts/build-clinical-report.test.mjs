@@ -29,7 +29,9 @@ function fixture() {
     wasmHash: WASM, observedAt: DATE, transactions, confirmedAttemptCount: 6, pendingAttemptCount: 0,
     files: { pdfVersions: 2, pngVersions: 1, maximumOriginalBytes: 3_000_000 },
     checks: { patientIntegrityAndPreviousVersion: true, authorizedDoctorRead: true, revocationDeniesSubsequentReadAndAppend: true, alteredCiphertextRejected: true } };
-  const readback = { ...demonstration, readbackAfterProcessRestart: true };
+  const readback = { ...demonstration, readbackAfterProcessRestart: true, auditedReceipts: Object.entries(transactions).map(([name,tx]) => ({name,...tx,
+    contractId:CLINICAL, method:name==='create_history'?'create_history':['grant','revoke'].includes(name)?'set_permissions':'append_version',
+    signatureVerified:true,argumentsVerified:true,envelopeVerified:true})) };
   const audit = { schemaVersion: 1, runId: RUN, network: 'testnet', syntheticOnly: true, readOnly: true, newTransactions: 0,
     observedAt: DATE, sourceCommit: 'c'.repeat(40), contracts: ['DoctorRegistryPrivate', 'PrescriptionPrivate', 'ClinicalHistoryPrivate'].map((name, i) => ({
       name, contractId: [REGISTRY, RX, CLINICAL][i], expectedWasmHash: WASM, observedWasmHash: WASM,
@@ -85,6 +87,14 @@ test('false checks, duplicate hashes, incorrect actor, and pending attempts neve
     data => { data.evidence.readback.pendingAttemptCount = 1; },
   ];
   for (const change of changes) { const data = fixture(); change(data); assert.equal(createReportModel(RUN, data, DATE).state, 'failed'); }
+});
+test('missing or substituted exact invocation audits cannot approve an otherwise successful readback', () => {
+  for (const change of [data => { delete data.evidence.readback.auditedReceipts; },
+    data => { data.evidence.readback.auditedReceipts[0].contractId=REGISTRY; },
+    data => { data.evidence.readback.auditedReceipts[2].argumentsVerified=false; }]) {
+    const data=fixture(); change(data); const model=createReportModel(RUN,data,DATE);
+    assert.notEqual(model.state,'passed'); assert.equal(model.encryptedVersions,null);
+  }
 });
 
 test('expired doctor records a blocked preparation and failed registry condition', () => {
