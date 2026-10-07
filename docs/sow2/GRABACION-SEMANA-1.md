@@ -33,12 +33,17 @@ La autorización del médico usada en la ejecución vencía el **7 de octubre a 
 | Tres contratos | Tarjetas de registro médico, recetas e historia clínica | Un único contrato clínico nuevo. Los dos existentes se consultaron, sin recetas nuevas ni cambios de contrato. |
 | Pruebas aisladas | Salida de las 14 pruebas clínicas y registro de validación | Las 14 están incluidas en las 25 contractuales; las pruebas no son transacciones. Aplicación, privadas, TypeScript y build tienen sus propios resultados. |
 | Ejecución nueva | Tabla de seis pasos y sus actores | Paciente crea y concede; médico agrega y corrige; paciente revoca. Lectura y agregado son permisos independientes. |
+| Paso 5: imagen | Enlace «Ver almacenamiento y límites» y bloque celeste de archivos | Neon aloja los archivos cifrados; Stellar registra permisos y comprobantes. PDF, PNG y JPEG tienen un límite de 3 MB originales. El procesamiento de esta prueba se ejecuta con herramientas locales. |
 | Recibos reales | Enlaces del recorrido a Stellar Expert | Se verificaron método, contrato, firmante, argumentos, sobre y resultado. Los hashes corresponden a esta ejecución. |
 | Privacidad y persistencia | Resultado de lectura posterior y comprobaciones | Tres versiones cifradas recuperadas; integridad correcta; médico rechazado después de revocar; cero intentos pendientes en esta ejecución. |
 | Evidencia separada | Primera prueba, despliegue y Friendbot | Dos ejecuciones clínicas distintas. La financiación nueva es una operación adicional; los dos recibos de despliegue son anteriores. |
 | Límites | Pendientes del informe | Sin restauración real acreditada, certificación de seguridad ni veracidad clínica. Pantallas y Privy corresponden a las semanas siguientes. |
 
 El registro de receta existente #2 se consultó como **Registrada y vencida**, no como activa. No se abre contenido privado de recetas ni se modifica su estado.
+
+En el paso 5 puedes narrar: «La imagen se guarda cifrada en Neon. Stellar registra quién la agregó, sus permisos y el comprobante de integridad. El archivo sólo se entrega tras comprobar el acceso autorizado, y el límite es de 3 MB».
+
+El límite es **3.000.000 bytes por archivo original**, antes del cifrado. La clave de servicio está fuera de Neon, protegida localmente con DPAPI en esta demostración. La carga desde el portal y la compresión automática siguen pendientes de una etapa posterior; no se muestran como funciones terminadas.
 
 Si conviene mostrar sólo la prueba del contrato:
 

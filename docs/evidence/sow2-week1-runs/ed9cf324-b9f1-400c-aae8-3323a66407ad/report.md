@@ -2,7 +2,7 @@
 
 **Estado:** Comprobado. **Ejecución:** `ed9cf324-b9f1-400c-aae8-3323a66407ad`.
 
-Informe generado: 07-10-2026, 1:51:54 a. m. (Chile); 2026-10-07T04:51:54.704Z. Es evidencia guardada; no una consulta en vivo.
+Informe generado: 07-10-2026, 2:17:00 a. m. (Chile); 2026-10-07T05:17:00.411Z. Es evidencia guardada; no una consulta en vivo.
 
 Commit de referencia de la evidencia: `2565f972401e145740c24211ce09a329e3050c52`.
 
@@ -46,6 +46,17 @@ Lectura posterior registrada: 07-10-2026, 1:44:00 a. m. (Chile); 2026-10-07T04:4
 - Contenido cifrado alterado rechazado: **Comprobado**.
 - Lectura posterior desde otro proceso: **Comprobado**.
 - Cero intentos clínicos pendientes: **Comprobado**.
+
+### Paso 5 · Almacenamiento y tamaño de archivos
+
+- **Dónde se guardan:** En la base PostgreSQL alojada en Neon, dentro de la rama dev aislada de esta prueba. El archivo queda cifrado, sin un enlace público de descarga.
+- **Cómo se protegen:** Cifrado AES-256-GCM con una clave por versión. La clave de servicio permanece fuera de Neon, protegida localmente con DPAPI en esta demostración.
+- **Quién puede leer:** El servicio técnico comprueba identidad, permiso de lectura vigente, autorización médica cuando corresponde e integridad antes de entregar el archivo. Retirar permisos bloquea nuevos accesos; no borra copias ya descargadas.
+- **Formatos y tamaño:** PDF, PNG y JPEG: hasta 3 MB (3.000.000 bytes) por archivo original, antes de cifrar. El contenido cifrado ocupa más espacio. La carga desde el portal y la compresión automática quedan para una etapa posterior.
+
+**Para narrar:** «La imagen se guarda cifrada en Neon. Stellar registra quién la agregó, sus permisos y el comprobante de integridad. El archivo sólo se entrega tras comprobar el acceso autorizado, y el límite es de 3 MB.»
+
+Neon aloja la base; las herramientas locales de TrustLeaf realizan el cifrado y las comprobaciones de esta prueba. El informe sólo muestra evidencia guardada.
 
 ### Operación adicional de preparación
 

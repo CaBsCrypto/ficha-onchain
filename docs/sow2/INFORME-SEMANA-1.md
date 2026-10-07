@@ -33,6 +33,14 @@ El contrato clínico no tiene método de actualización. WASM SHA-256: `29e5510e
 
 Sólo el paciente concede o retira permisos. El médico necesita autorización vigente en el registro y el permiso correspondiente. Una corrección conserva versiones anteriores y sólo puede realizarla su autor. Revocar no elimina copias descargadas. Integridad no acredita veracidad clínica.
 
+### Guía para explicar el paso 5
+
+Los PDF e imágenes se guardan cifrados en la base PostgreSQL alojada en **Neon dev**, sin un enlace público de descarga. Las herramientas locales de TrustLeaf realizan el cifrado y comprueban identidad, permisos, autorización médica cuando corresponde e integridad antes de entregar contenido. El visor local sólo presenta los resultados guardados.
+
+Se admiten **PDF, PNG y JPEG de hasta 3 MB (3.000.000 bytes) originales por archivo**, antes de cifrar; el sobre cifrado ocupa más espacio. La clave de servicio permanece fuera de Neon, protegida con DPAPI en esta demostración. La carga desde el portal y la compresión automática pertenecen a una etapa posterior.
+
+Para el video: «La imagen se guarda cifrada en Neon. Stellar registra quién la agregó, sus permisos y el comprobante de integridad. El archivo sólo se entrega tras comprobar el acceso autorizado, y el límite es de 3 MB».
+
 ## Resultados
 
 | Evidencia | Resultado | Naturaleza |
