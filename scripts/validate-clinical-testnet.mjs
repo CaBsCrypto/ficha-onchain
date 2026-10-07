@@ -18,10 +18,11 @@ import { sealClinicalVersion, openClinicalVersion } from './lib/clinical-crypto.
 import { readClinicalVersion } from './lib/clinical-read.mjs';
 import { PRIVATE_REGISTRY_ID } from './lib/private-registry.mjs';
 import { secureStoreSigner, acquireSignerLock } from './lib/private-worker-runtime.mjs';
+import { clinicalRunConfiguration } from './lib/clinical-run-config.mjs';
+import { syntheticClinicalPdf, syntheticClinicalImage } from './lib/clinical-fixtures.mjs';
+import { requireClinicalDoctorWindow, requireClinicalRunAvailable } from './lib/clinical-demo-policy.mjs';
+import { auditClinicalRunReceipts } from './lib/clinical-receipt-audit.mjs';
 
-const local = '.trustleaf-local/sow2-clinical';
-const file = local + '/demonstration.json';
-const output = 'docs/evidence/sow2-week1-2026-10-05';
 const server = new rpc.Server('https://soroban-testnet.stellar.org');
 const doctorAlias = 'trustleaf-testnet-doctor-1-20260907';
 const configDir = 'C:/Users/MGC/.config/stellar';
@@ -32,8 +33,6 @@ const u32 = value => nativeToScVal(value, { type: 'u32' });
 const u64 = value => nativeToScVal(BigInt(value), { type: 'u64' });
 const struct = value => xdr.ScVal.scvMap(Object.entries(value).sort(([a], [b]) => a < b ? -1 : 1)
   .map(([key, val]) => new xdr.ScMapEntry({ key: nativeToScVal(key, { type: 'symbol' }), val })));
-const pdf = version => Buffer.from('%PDF-1.7\n% SYNTHETIC CLINICAL FIXTURE ' + version + '\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
-const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aPqkAAAAASUVORK5CYII=', 'base64');
 function saveJson(target, value) {
   fs.mkdirSync(target.slice(0, target.lastIndexOf('/')), { recursive: true });
   const handle = fs.openSync(target + '.tmp', 'w', 0o600);
@@ -43,30 +42,22 @@ function saveJson(target, value) {
 }
 
 async function main() {
-  const mode = process.argv[2];
-  if (!['--run', '--readback'].includes(mode) || process.argv.length !== 3 || process.env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet') throw Error('clinical_demo_configuration_invalid');
+  const selection = clinicalRunConfiguration(process.argv.slice(2), { allowedModes: ['--run', '--readback'] });
+  const { mode, local, evidence: output, demonstrationFile: file } = selection;
+  if (process.env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet') throw Error('clinical_demo_configuration_invalid');
   if (mode === '--run' && process.env.TRUSTLEAF_CLINICAL_TESTNET_WRITES !== 'true') throw Error('clinical_writes_paused');
   const url = new URL(process.env.DATABASE_URL ?? '');
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.searchParams.get('sslmode') !== 'require' ||
       !/^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(url.hostname)) throw Error('clinical_demo_configuration_invalid');
   url.hostname = url.hostname.replace('-pooler.', '.'); // session locks require direct Neon
-  const deployment = JSON.parse(fs.readFileSync(output + '/deployment.json', 'utf8'));
+  const deployment = JSON.parse(fs.readFileSync(selection.deploymentFile, 'utf8'));
   if (deployment.network !== 'testnet' || deployment.registryId !== PRIVATE_REGISTRY_ID ||
       deployment.wasmHash !== createHash('sha256').update(fs.readFileSync('contracts/dist-deployed/clinical_history_private.wasm')).digest('hex')) throw Error('clinical_demo_configuration_invalid');
-  const secrets = clinicalLocalSecrets(local, { backup: mode === '--run' });
-  const patient = Keypair.fromSecret(secrets.patient), deployer = Keypair.fromSecret(secrets.deployer);
+  const deployer = Keypair.fromSecret(clinicalLocalSecrets(selection.sharedLocal).deployer);
   const found = spawnSync('stellar', ['keys', 'address', doctorAlias, '--config-dir', configDir], { encoding: 'utf8', windowsHide: true });
   const doctor = found.stdout.trim();
   if (found.status !== 0 || !StrKey.isValidEd25519PublicKey(doctor)) throw Error('clinical_demo_signer_unavailable');
   const doctorSign = secureStoreSigner({ alias: doctorAlias, configDir });
-  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {
-    schemaVersion: 1, runId: randomUUID(), network: 'testnet', contractId: deployment.contractId,
-    patient: patient.publicKey(), doctor, operations: {}, records: {}, transactions: {}, checks: {},
-  };
-  if (state.network !== 'testnet' || state.contractId !== deployment.contractId || state.patient !== patient.publicKey() || state.doctor !== doctor) throw Error('clinical_demo_configuration_invalid');
-  if (mode === '--readback' && (!fs.existsSync(file) || !state.completed)) throw Error('clinical_demo_incomplete');
-  if (mode === '--run' && state.completed) throw Error('clinical_demo_use_readback');
-  const save = () => saveJson(file, state);
   const reader = createClinicalChainReader({ network: 'testnet', contractId: deployment.contractId,
     registryId: deployment.registryId, wasmHash: deployment.wasmHash, readerAddress: deployer.publicKey() });
   await reader.verifyDeployment();
@@ -77,6 +68,34 @@ async function main() {
     if (!rpc.Api.isSimulationSuccess(result) || rpc.Api.isSimulationRestore(result) || !result.result) throw Error('clinical_demo_read_failed');
     return scValToNative(result.result.retval);
   }
+  if ((await server.getNetwork()).passphrase !== Networks.TESTNET) throw Error('clinical_demo_configuration_invalid');
+  const previousState = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+  if (mode === '--run' && previousState?.completed) throw Error('clinical_demo_use_readback');
+  if (mode === '--readback' && !previousState?.completed) throw Error('clinical_demo_incomplete');
+  if (mode === '--run') {
+    const authorization = await read('get_authorization', [address(doctor)], PRIVATE_REGISTRY_ID);
+    requireClinicalDoctorWindow(await read('is_authorized', [address(doctor)], PRIVATE_REGISTRY_ID), authorization);
+    const doctorAccount = await server.getAccount(doctor);
+    if (!doctorAccount) throw Error('clinical_doctor_not_ready');
+    const balanceResponse = await fetch('https://horizon-testnet.stellar.org/accounts/' + doctor, { signal: AbortSignal.timeout(20_000) });
+    if (!balanceResponse.ok) throw Error('clinical_doctor_not_ready');
+    const accountDetails = await balanceResponse.json();
+    const nativeBalance = accountDetails.balances?.find(balance => balance.asset_type === 'native');
+    if (accountDetails.account_id !== doctor || !nativeBalance || Number(nativeBalance.balance) < 5) throw Error('clinical_doctor_not_ready');
+  }
+  const secrets = clinicalLocalSecrets(local, { create: mode === '--run' && !selection.legacy, backup: mode === '--run' });
+  const patient = Keypair.fromSecret(secrets.patient);
+  const state = previousState ?? {
+    schemaVersion: 1, runId: selection.runId ?? randomUUID(), network: 'testnet', contractId: deployment.contractId,
+    patient: patient.publicKey(), doctor, operations: {}, records: {}, transactions: {}, checks: {},
+  };
+  if (state.network !== 'testnet' || state.contractId !== deployment.contractId || state.patient !== patient.publicKey() || state.doctor !== doctor ||
+      (selection.runId && state.runId !== selection.runId)) throw Error('clinical_demo_configuration_invalid');
+  const save = () => saveJson(file, state);
+  const pdf = selection.legacy
+    ? version => Buffer.from('%PDF-1.7\n% SYNTHETIC CLINICAL FIXTURE ' + version + '\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n')
+    : syntheticClinicalPdf;
+  const image = selection.legacy ? Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aPqkAAAAASUVORK5CYII=', 'base64') : syntheticClinicalImage();
   neonConfig.webSocketConstructor = WebSocket;
   const pool = new Pool({ connectionString: url.href, connectionTimeoutMillis: 15_000 });
   let client, locks, signerRelease, stopped = false;
@@ -91,11 +110,20 @@ async function main() {
       locks = await acquireClinicalSourceLocks(client, [patient.publicKey(), doctor]);
       signerRelease = await acquireSignerLock(configDir, doctor);
       if (!signerRelease) throw Error('clinical_source_busy');
-      await locks.assertHeld(); save();
+      await locks.assertHeld();
+      const busy = await client.query(`SELECT run_id,state FROM clinical_transaction_attempts WHERE source_wallet=ANY($1::text[]) AND state IN ('prepared','submitted')`, [[patient.publicKey(), doctor]]);
+      const other = await client.query("SELECT id FROM private_operations WHERE source_wallet=ANY($1::text[]) AND state IN ('awaiting_signature','submitted')", [[patient.publicKey(), doctor]]);
+      requireClinicalRunAvailable(state.runId, busy.rows, other.rows);
+      save();
       let funded = false; try { await server.getAccount(patient.publicKey()); funded = true; } catch { /* only explicit --run may fund */ }
       if (!funded) {
+        if (state.fundingRequested) throw Error('clinical_testnet_funding_uncertain');
+        state.fundingRequested = true; save();
         const funding = await fetch('https://friendbot.stellar.org/?addr=' + patient.publicKey(), { signal: AbortSignal.timeout(20_000) });
         if (!funding.ok) throw Error('clinical_testnet_funding_failed');
+        const receipt = await funding.json();
+        if (!/^[a-f0-9]{64}$/.test(receipt.hash ?? '')) throw Error('clinical_testnet_funding_failed');
+        state.funding = { transactionHash: receipt.hash, source: 'Stellar Testnet Friendbot', explorer: 'https://stellar.expert/explorer/testnet/tx/' + receipt.hash }; save();
         await server.getAccount(patient.publicKey());
       }
     }
@@ -109,7 +137,10 @@ async function main() {
         assertExclusive: async () => { if (stopped) throw Error('clinical_stopped'); await locks.assertHeld(); },
         verifyOperation: async candidate => { await reader.verifyDeployment(); if (!candidate.body().toXDR().equals(operation.body().toXDR())) throw Error('clinical_operation_invalid'); },
         sign: async envelope => {
-          if (actor === doctor) return doctorSign(envelope);
+          if (actor === doctor) {
+            if (await read('is_authorized', [address(doctor)], PRIVATE_REGISTRY_ID) !== true) throw Error('clinical_doctor_not_ready');
+            return doctorSign(envelope);
+          }
           if (actor !== patient.publicKey()) throw Error('clinical_actor_invalid');
           const tx = TransactionBuilder.fromXDR(envelope, Networks.TESTNET); tx.sign(patient); return tx.toXDR();
         },
@@ -220,13 +251,9 @@ async function main() {
     assert.deepEqual((await privateRead('append_image', 'patient')).content, image);
     const grantNow = await reader.readAccess({ deployment: reader.deployment, historyId: state.historyId, reader: doctor });
     assert.equal(grantNow.canRead, false); assert.equal(grantNow.grantRevision, 2);
-    const rows = await client.query('SELECT state,transaction_hash,signed_xdr FROM clinical_transaction_attempts WHERE run_id=$1', [state.runId]);
+    const rows = await client.query('SELECT run_id,operation_name,source_wallet,state,transaction_hash,signed_xdr FROM clinical_transaction_attempts WHERE run_id=$1', [state.runId]);
     assert.equal(rows.rows.length, 6); assert.equal(rows.rows.every(row => row.state === 'confirmed'), true);
-    for (const row of rows.rows) {
-      const receipt = await server.getTransaction(row.transaction_hash);
-      assert.equal(receipt.status, 'SUCCESS');
-      assert.equal(receipt.envelopeXdr.toXDR().equals(TransactionBuilder.fromXDR(row.signed_xdr, Networks.TESTNET).toEnvelope().toXDR()), true);
-    }
+    const auditedReceipts = await auditClinicalRunReceipts({ deployment, state, attempts: rows.rows, server });
     const duplicates = await client.query('SELECT count(*) AS count FROM clinical_private_versions WHERE contract_id=$1 AND history_id=$2', [deployment.contractId, state.historyId]);
     assert.equal(Number(duplicates.rows[0].count), 3);
     if (mode === '--readback') await client.query('ROLLBACK');
@@ -235,6 +262,7 @@ async function main() {
       identityEvidence: 'real Ed25519 technical challenges; no Privy/browser login', database: 'isolated Neon dev, direct connection',
       files: { pdfVersions: 2, pngVersions: 1, maximumOriginalBytes: 3000000 }, checks: state.checks,
       transactions: state.transactions, confirmedAttemptCount: 6, pendingAttemptCount: 0,
+      funding: state.funding ?? null, auditedReceipts,
       readbackAfterProcessRestart: mode === '--readback', observedAt: new Date().toISOString() };
     saveJson(output + (mode === '--readback' ? '/readback.json' : '/demonstration.json'), report);
     console.log(JSON.stringify({ mode, syntheticOnly: true, actualTestnetReceipts: 6,
@@ -249,7 +277,7 @@ async function main() {
 main().catch(error => {
   const allowed = ['clinical_writes_paused','clinical_source_busy','clinical_transaction_pending','clinical_transaction_unavailable',
     'clinical_demo_configuration_invalid','clinical_demo_schema_missing','clinical_demo_use_readback','clinical_attempt_unavailable',
-    'clinical_receipt_mismatch','clinical_demo_record_conflict'];
+    'clinical_receipt_mismatch','clinical_demo_record_conflict','clinical_doctor_not_ready','clinical_testnet_funding_uncertain'];
   console.error(JSON.stringify({ error: allowed.includes(error?.message) ? error.message : 'clinical_demonstration_unavailable',
     phase: ['configuration','load_attempt','prepare','sign','persist','submit','reconcile'].includes(error?.phase) ? error.phase : 'setup' }));
   process.exitCode = 1;

@@ -15,10 +15,8 @@ import { acquireClinicalSourceLocks } from './lib/clinical-source-lock.mjs';
 import { clinicalLocalSecrets } from './lib/clinical-local-secrets.mjs';
 import { createClinicalChainReader } from './lib/clinical-chain-read.mjs';
 import { validateClinicalContext } from './lib/clinical-crypto.mjs';
+import { clinicalRunConfiguration } from './lib/clinical-run-config.mjs';
 
-const local = '.trustleaf-local/sow2-clinical';
-const evidence = 'docs/evidence/sow2-week1-2026-10-05';
-const journalFile = local + '/restoration.json';
 const server = new rpc.Server('https://soroban-testnet.stellar.org');
 const fail = () => new Error('clinical_restoration_unavailable');
 function save(file, value) {
@@ -64,21 +62,22 @@ export function knownClinicalRestorationKeys(deployment, state) {
   return [...new Map(keys.map(k => [k.toXDR('base64'), k])).values()];
 }
 async function main() {
-  const mode = process.argv[2];
-  if (!['--inspect', '--restore'].includes(mode) || process.argv.length !== 3 ||
-      process.env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet') throw fail();
+  const configuration = clinicalRunConfiguration(process.argv.slice(2), { allowedModes: ['--inspect', '--restore'] });
+  const { mode, evidence, restorationFile: journalFile, sharedLocal } = configuration;
+  if (process.env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet') throw fail();
   const writes = mode === '--restore';
   if (writes && process.env.TRUSTLEAF_CLINICAL_TESTNET_WRITES !== 'true') throw fail();
-  const deployment = JSON.parse(fs.readFileSync(evidence + '/deployment.json', 'utf8'));
-  const state = JSON.parse(fs.readFileSync(local + '/demonstration.json', 'utf8'));
+  const deployment = JSON.parse(fs.readFileSync(configuration.deploymentFile, 'utf8'));
+  const state = JSON.parse(fs.readFileSync(configuration.demonstrationFile, 'utf8'));
   if (deployment.network !== 'testnet' || state.network !== 'testnet' || !state.completed ||
-      state.contractId !== deployment.contractId || (await server.getNetwork()).passphrase !== Networks.TESTNET) throw fail();
+      state.contractId !== deployment.contractId || (configuration.runId !== null && state.runId !== configuration.runId) ||
+      (await server.getNetwork()).passphrase !== Networks.TESTNET) throw fail();
   const keys = knownClinicalRestorationKeys(deployment, state);
   const observed = await server.getLedgerEntries(...keys);
   const actual = new Map(observed.entries.map(row => [row.key.toXDR('base64'), row]));
   if ([...actual.keys()].some(k => !keys.some(key => key.toXDR('base64') === k))) throw fail();
   const missing = keys.filter(k => !actual.has(k.toXDR('base64')));
-  const summary = { observedAt: new Date().toISOString(), network: 'testnet', contractId: deployment.contractId,
+  const summary = { observedAt: new Date().toISOString(), network: 'testnet', contractId: deployment.contractId, runId: state.runId,
     readOnly: !writes, knownKeys: keys.length, missingKeys: missing.length, latestLedger: observed.latestLedger };
   if (!writes) { console.log(JSON.stringify(summary)); return; }
   const existing = fs.existsSync(journalFile) ? JSON.parse(fs.readFileSync(journalFile, 'utf8')) : null;
@@ -94,7 +93,7 @@ async function main() {
   let client, locks, stopped = false;
   const stop = () => { stopped = true; }; process.once('SIGTERM', stop); process.once('SIGINT', stop);
   try {
-    const signer = Keypair.fromSecret(clinicalLocalSecrets(local).deployer);
+    const signer = Keypair.fromSecret(clinicalLocalSecrets(sharedLocal).deployer);
     if (signer.publicKey() !== deployment.deployer) throw fail();
     client = await pool.connect(); locks = await acquireClinicalSourceLocks(client, [signer.publicKey()]);
     const account = await server.getAccount(signer.publicKey());
@@ -108,11 +107,12 @@ async function main() {
       const plan = buildClinicalRestoration({ deployment, sourceAccount: await server.getAccount(signer.publicKey()),
         preamble: { minResourceFee: sim.minResourceFee, transactionData: sim.transactionData } });
       if (!plan.transaction.toEnvelope().v1().tx().ext().sorobanData().resources().footprint().toXDR().equals(placeholder.resources().footprint().toXDR())) throw fail();
-      journal = { network: 'testnet', contractId: deployment.contractId, source: signer.publicKey(), runId: randomUUID(),
+      journal = { network: 'testnet', contractId: deployment.contractId, source: signer.publicKey(), runId: randomUUID(), executionRunId: state.runId,
         data: plan.transaction.toEnvelope().v1().tx().ext().sorobanData().toXDR('base64') };
       await locks.assertHeld(); if (stopped) throw fail(); save(journalFile, journal);
     }
-    if (journal.network !== 'testnet' || journal.contractId !== deployment.contractId || journal.source !== signer.publicKey()) throw fail();
+    if (journal.network !== 'testnet' || journal.contractId !== deployment.contractId || journal.source !== signer.publicKey() ||
+        (configuration.runId !== null && journal.executionRunId !== configuration.runId)) throw fail();
     const data = xdr.SorobanTransactionData.fromXDR(journal.data, 'base64');
     if (data.resources().footprint().readWrite().some(key => !keys.some(known => known.toXDR().equals(key.toXDR())))) throw fail();
     buildClinicalRestoration({ deployment, sourceAccount: await server.getAccount(signer.publicKey()),
