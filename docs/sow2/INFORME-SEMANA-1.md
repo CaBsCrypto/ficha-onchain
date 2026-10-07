@@ -42,7 +42,7 @@ Sólo el paciente concede o retira permisos. El médico necesita autorización v
 | Auditoría de tres contratos, 7 de octubre, 01:40:39 de Chile (04:40:39 UTC) | Tres códigos, interfaces y configuraciones comprobados; receta existente leída sin cambios | Lectura real de Testnet |
 | Ejecución nueva, 01:42:49 de Chile (04:42:49 UTC) | Seis recibos `SUCCESS`, tres versiones cifradas y cero intentos pendientes | Neon dev y Testnet reales, datos sintéticos |
 | Lectura posterior, 01:44:00 de Chile (04:44:00 UTC) | Firma, sobre y argumentos de los seis recibos auditados; versiones recuperadas; médico rechazado después de revocar | Proceso nuevo, Neon dev y Testnet reales |
-| CI/Vercel del nuevo commit y revisión de #135 | Pendientes de acreditar sobre el commit final | No se sustituyen con los checks anteriores |
+| CI/Vercel de `e72024f` | Aplicación, TypeScript, build, contratos, build WASM, reproducción Windows y Vercel aprobados | [CI](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37573515671), [contratos/WASM](https://github.com/CaBsCrypto/ficha-onchain/actions/runs/37573515539), [Vercel](https://vercel.com/cabscryptocontacto-6028s-projects/trustleaf-demo/HkXTAtHAFrW91zkwZxKjKJxarUu3) |
 
 Las 14 pruebas clínicas están incluidas en las 25 contractuales; no son una cifra adicional. Las seis operaciones del recorrido son distintas de las dos transacciones de despliegue. Leer o verificar datos no añade otra transacción.
 
@@ -92,7 +92,7 @@ Datos sintéticos, ejecución nueva **`ed9cf324-b9f1-400c-aae8-3323a66407ad`**:
 
 1. Abrir la [página local con tres tarjetas](http://127.0.0.1:3014/). Es un informe estático de evidencia pública, sin secretos, botones de firma ni consulta en vivo.
 2. Abrir el contrato y los seis recibos nuevos en Stellar Expert; contrastarlos con los manifiestos públicos y el [manifiesto de integridad del informe](../evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/integrity-manifest.json).
-3. Revisar los resultados por commit y la [matriz de aceptación](MATRIZ-ACEPTACION-SEMANA-1.md), que distingue pruebas aisladas de evidencia real. Los checks del candidato final se incorporarán cuando terminen.
+3. Revisar los resultados por commit y la [matriz de aceptación](MATRIZ-ACEPTACION-SEMANA-1.md), que distingue pruebas aisladas de evidencia real. Los enlaces anteriores acreditan `e72024f`; el HEAD de la PR, incluidas actualizaciones documentales posteriores, se comprueba en sus [checks](https://github.com/CaBsCrypto/ficha-onchain/pull/135/checks).
 4. Seguir el [recorrido de grabación](GRABACION-SEMANA-1.md). El video revisará esta ejecución nueva ya realizada, sin fingir que las transacciones ocurren durante la consulta ni que el portal clínico está terminado.
 
 En el equipo configurado:
@@ -108,7 +108,7 @@ El generador crea la página, el informe de la ejecución y su manifiesto a part
 
 | Punto | Estado y siguiente paso |
 | --- | --- |
-| CI/Vercel de la entrega final, revisión de PR y video | Pendientes de consolidar y acreditar; la PR sigue en borrador. Registrar los tiempos del video definitivo. |
+| Revisión de PR y video | Pendientes; CI/Vercel de `e72024f` aprobados. La PR sigue en borrador. Registrar los tiempos del video definitivo. |
 | Restauración real de estado archivado | No acreditada. Las entradas siguen disponibles; ni la inspección ni las pruebas simuladas demuestran una restauración real. |
 | Pantallas clínicas y firmas mediante Privy | Trabajo de las semanas siguientes. El recorrido actual utiliza scripts y firmas técnicas sintéticas. |
 | Recetas existentes y archivos previos del paciente | Vinculación y presentación pendientes; ver [plan de aportes y adjuntos](PLAN-APORTES-Y-ADJUNTOS.md). La compresión automática todavía no está implementada. |
