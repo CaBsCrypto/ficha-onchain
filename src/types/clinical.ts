@@ -32,5 +32,6 @@ export interface ClinicalExpected {
   historyId: string; patient: string; operationId: string;
   entryId?: string; author?: string; commitment?: string; previousCommitment?: string | null;
   expectedVersion?: number; expectedGrantRevision?: number;
-  doctor?: string; canRead?: boolean; canAppend?: boolean; expectedRevision?: number;
+  /** Server-only target selection; it is not a Soroban argument. */
+  doctorId?: number; doctor?: string; canRead?: boolean; canAppend?: boolean; expectedRevision?: number;
 }

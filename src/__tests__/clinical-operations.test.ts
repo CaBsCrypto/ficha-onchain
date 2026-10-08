@@ -175,6 +175,68 @@ describe('clinical operation preparation and private idempotency', () => {
     const other = fixture(true); m.chain.doctorAuthorized.mockResolvedValue(false);
     await expect(prepareClinicalOperation(user, actor, { ...input, canRead: false, canAppend: true })).rejects.toThrow('doctor_not_authorized'); expect(other.state.row).toBeNull();
   });
+  it.each(['inactive', 'wallet-changed'])('rejects a medical target %s changed after preparing positive permissions', async condition => {
+    const f = fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
+    m.doctor.mockResolvedValue({ address: condition === 'wallet-changed' ? payer.publicKey() : doctor.publicKey(), doctor: { status: condition === 'inactive' ? 'revoked' : 'active' } });
+    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('doctor_not_authorized');
+    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(f.state.row!.state).toBe('awaiting_signature');
+  });
+  it('does not replace the original selected doctor behind an existing request UUID', async () => {
+    const f = fixture(true); const input: ClinicalPrepareRequest = { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 };
+    await prepareClinicalOperation(user, actor, input); const saved = clone(f.state.row);
+    await expect(prepareClinicalOperation(user, actor, { ...input, doctorId: 2 })).rejects.toThrow('clinical_request_conflict');
+    expect(f.state.row).toEqual(saved); expect(m.doctor).toHaveBeenCalledTimes(1); expect(m.chain.prepare).toHaveBeenCalledTimes(1);
+  });
+  it.each(['wallet_binding_ambiguous', 'doctor_not_found'])('does not sign a positive grant when re-resolving its original target fails with %s', async failure => {
+    const f = fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: true, expectedRevision: 0 });
+    m.doctor.mockRejectedValue(Error(failure));
+    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow(failure);
+    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.state.row!.state).toBe('awaiting_signature');
+  });
+  it('requires a persisted original target for a legacy unsigned positive grant', async () => {
+    const f = fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: true, expectedRevision: 0 });
+    expect(f.state.row!.expected.doctorId).toBe(1); delete f.state.row!.expected.doctorId;
+    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('clinical_saved_intent_invalid');
+    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('allows full withdrawal without requiring a still-active physician target', async () => {
+    const f = fixture(true); m.chain.grant.mockResolvedValue({ canRead: true, canAppend: true, revision: 3 });
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: false, expectedRevision: 3 });
+    m.doctor.mockRejectedValue(Error('isolated_doctor_no_longer_bound')); m.chain.doctorAuthorized.mockResolvedValue(false);
+    const result = await signClinicalOperation(user, actor, ID, 'isolated-credential');
+    expect(result.operation.state).toBe('submitted'); expect(f.state.row!.expected).toMatchObject({ doctorId: 1, canRead: false, canAppend: false });
+    expect(m.doctor).toHaveBeenCalledTimes(1); expect(m.sign).toHaveBeenCalledOnce();
+  });
+  it('rechecks registry authorization before granting access with an unchanged active app target', async () => {
+    fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: true, expectedRevision: 0 });
+    m.chain.doctorAuthorized.mockResolvedValue(false);
+    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('doctor_not_authorized');
+    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.doctor).toHaveBeenLastCalledWith(expect.anything(), 1);
+  });
+  it.each(['inactive', 'wallet-changed'])('retains the exact uncertain grant when its target becomes %s', async condition => {
+    const f = fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
+    await signClinicalOperation(user, actor, ID, 'isolated-credential'); const saved = clone(f.state.row);
+    m.doctor.mockResolvedValue({ address: condition === 'wallet-changed' ? payer.publicKey() : doctor.publicKey(), doctor: { status: condition === 'inactive' ? 'revoked' : 'active' } });
+    m.sign.mockClear(); m.chain.submit.mockClear();
+    const result = await reconcileClinicalOperation(actor, ID, true);
+    expect(result.operation).toMatchObject({ state: 'submitted', errorCode: 'clinical_retry_unavailable', transactionHash: saved.transaction_hash });
+    expect(f.state.row).toEqual(saved); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('allows exact successful receipt reconciliation of a legacy grant without another target lookup or signature', async () => {
+    const f = fixture(true);
+    await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
+    await signClinicalOperation(user, actor, ID, 'isolated-credential'); delete f.state.row!.expected.doctorId; f.state.receipt = 'SUCCESS';
+    m.doctor.mockRejectedValue(Error('isolated_target_unavailable')); m.doctor.mockClear(); m.sign.mockClear(); m.chain.submit.mockClear();
+    expect((await reconcileClinicalOperation(actor, ID)).operation.state).toBe('confirmed');
+    expect(m.doctor).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
   it('releases and rolls back when deployment or storage preparation fails', async () => {
     const f = fixture(); m.chain.verifyDeployment.mockRejectedValue(Error('isolated_deployment_error'));
     await expect(prepareClinicalOperation(user, actor, createInput)).rejects.toThrow('isolated_deployment_error');
@@ -275,6 +337,24 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
     await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('private_writes_paused');
     expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('submitted');
     expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it.each(['missing', 'rotated'])('audits an exact successful saved receipt when the current relayer is %s', async condition => {
+    const f = fixture(); f.seed(); f.state.receipt = 'SUCCESS';
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false'); vi.stubEnv('RELAYER_SECRET', condition === 'missing' ? '' : doctor.secret());
+    const result = await reconcileClinicalOperation(actor, ID);
+    expect(result.operation.state).toBe('confirmed'); expect(result.operation.transactionHash).toBe(f.state.row!.transaction_hash);
+    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it.each(['missing', 'rotated'])('does not retransmit an uncertain saved envelope when the current relayer is %s', async condition => {
+    const f = fixture(); const saved = clone(f.seed()); vi.stubEnv('RELAYER_SECRET', condition === 'missing' ? '' : doctor.secret());
+    const result = await reconcileClinicalOperation(actor, ID, true);
+    expect(result.operation.state).toBe('submitted'); expect(f.state.row).toEqual(saved);
+    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('still rejects a different successful envelope after relayer rotation', async () => {
+    const f = fixture(); f.seed(); f.state.receipt = 'SUCCESS'; f.state.wrongReceipt = true; vi.stubEnv('RELAYER_SECRET', doctor.secret());
+    await expect(reconcileClinicalOperation(actor, ID)).rejects.toThrow('clinical_receipt_mismatch');
+    expect(f.state.row!.state).toBe('submitted'); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('expired uncertain attempts retain the exact hash and never submit again', async () => {
     const f = fixture(); f.seed(); f.state.row!.expires_at = Math.floor(Date.now()/1000)-1;

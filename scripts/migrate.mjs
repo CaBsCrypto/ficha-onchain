@@ -812,9 +812,9 @@ step("clinical-web-v1", async () => {
     CHECK (jsonb_typeof(expected)='object' AND expected ?& ARRAY['historyId','patient','operationId']),
     CHECK ((expected->>'historyId' ~ '^[a-f0-9]{64}$' AND expected->>'patient' ~ '^G[A-Z2-7]{55}$'
       AND expected->>'operationId' ~ '^[a-f0-9]{64}$') IS TRUE),
-    CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
-      'expectedVersion','expectedGrantRevision','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb),
-    CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+    CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb),
+    CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
         AND expected->>'patient'=source_wallet)
       OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
         AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
@@ -824,11 +824,44 @@ step("clinical-web-v1", async () => {
         AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
           OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
       OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
-        AND (expected - ARRAY['historyId','patient','operationId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
         AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
         AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
         AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE)
   )`;
+  await sql`DO $$ DECLARE old_check RECORD; BEGIN
+    -- Replace only the former unnamed expected-key/action checks. A server
+    -- doctorId is optional for legacy receipt reads, required by signing gates.
+    FOR old_check IN SELECT conname FROM pg_constraint
+      WHERE conrelid='clinical_web_operations'::regclass AND contype='c'
+        AND conname NOT IN ('clinical_web_expected_keys','clinical_web_expected_action')
+        AND pg_get_constraintdef(oid) LIKE '%expected - ARRAY[%'
+    LOOP
+      EXECUTE format('ALTER TABLE clinical_web_operations DROP CONSTRAINT %I', old_check.conname);
+    END LOOP;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_keys') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb);
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_action') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet)
+      OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
+        AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
+        AND expected->>'entryId' ~ '^[a-f0-9]{64}$' AND expected->>'author'=source_wallet
+        AND expected->>'commitment' ~ '^[a-f0-9]{64}$' AND jsonb_typeof(expected->'expectedVersion')='number'
+        AND (expected->>'expectedVersion')::bigint BETWEEN 0 AND 4294967295
+        AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
+          OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
+      OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
+        AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
+        AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE);
+    END IF;
+  END $$`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_web_operations_one_live_source
     ON clinical_web_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`;
   await sql`CREATE INDEX IF NOT EXISTS clinical_web_operations_actor

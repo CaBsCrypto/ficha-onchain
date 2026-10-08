@@ -119,6 +119,20 @@ describe('clinical web persistence: immutable operation intents', () => {
     const db = client([], [historyRow()], [operationRow({ action: 'set_permissions', method: 'set_permissions', expected: e })]);
     expect((await clinicalWebStore(db, scope).insertOperation(data)).expected).toEqual(e);
   });
+  it('persists the immutable target doctor ID while preserving legacy permission row reads', async () => {
+    const e = { ...expected, doctorId: 17, doctor: PATIENT, canRead: true, canAppend: false, expectedRevision: 0 };
+    const data = insert({ action: 'set_permissions', method: 'set_permissions', expected: e });
+    const db = client([], [historyRow()], [operationRow({ action: 'set_permissions', method: 'set_permissions', expected: e })]);
+    expect((await clinicalWebStore(db, scope).insertOperation(data)).expected).toEqual(e);
+    const { doctorId: _doctorId, ...legacy } = e;
+    const existing = client([operationRow({ action: 'set_permissions', method: 'set_permissions', expected: legacy })]);
+    expect((await clinicalWebStore(existing, scope).getOperation(ID, USER))?.expected).toEqual(legacy);
+  });
+  it.each([null, 0, -1, 1.5, '17', 2_147_483_648])('rejects an invalid target doctor ID %s before querying', async doctorId => {
+    const db = client(); const e = { ...expected, doctorId, doctor: PATIENT, canRead: true, canAppend: false, expectedRevision: 0 };
+    await expect(clinicalWebStore(db, scope).insertOperation(insert({ action: 'set_permissions', method: 'set_permissions', expected: e } as Partial<ClinicalOperationInsert>))).rejects.toThrow('clinical_storage_invalid');
+    expect(db.query).not.toHaveBeenCalled();
+  });
   it('does not replace a competing live wallet request when insert conflicts', async () => {
     await expect(clinicalWebStore(client([], [], [], []), scope).insertOperation(insert())).rejects.toThrow('clinical_operation_conflict');
   });
