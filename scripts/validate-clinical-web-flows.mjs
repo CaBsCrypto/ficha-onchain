@@ -73,7 +73,7 @@ async function run() {
   const actualSuites = (parsed.testResults ?? []).map(suite => suite.name?.replaceAll('\\', '/')).sort();
   const allRequestedSuitesPresent = JSON.stringify(actualSuites) === JSON.stringify(expectedSuites);
   const appPassed = app.exitCode === 0 && parsed.success === true && cases.length > 0 && cases.every(test => test.status === 'passed') && integrationPassed && allRequestedSuitesPresent;
-  const services = await execute(process.execPath, ['--test', ...privateFiles]);
+  const services = await execute(process.execPath, ['--test', '--test-reporter=tap', ...privateFiles]);
   const total = Number(services.stdout.match(/^# tests (\d+)\r?$/m)?.[1]);
   const passed = Number(services.stdout.match(/^# pass (\d+)\r?$/m)?.[1]);
   const failed = Number(services.stdout.match(/^# fail (\d+)\r?$/m)?.[1]);
