@@ -6,6 +6,7 @@ import type { ClinicalOperation, ClinicalSnapshot, ClinicalVersion } from '@/typ
 import { ClinicalClientError, ClinicalOperationController, clinicalApi, readClinicalDownload, readClinicalFile, useClinicalSnapshot, validateClinicalFile, verifiedClinicalOperation } from '@/components/private-portal/clinical-client';
 import { ClinicalEntryForm } from '@/components/private-portal/ClinicalEntryForm';
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
+import { ClinicalPermissions } from '@/components/private-portal/ClinicalPermissions';
 
 const deps = vi.hoisted(() => ({ fetch: vi.fn(), userId: 'did:privy:patient1' }));
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: deps.fetch }));
@@ -196,5 +197,103 @@ describe('review, focus and object URL lifecycle', () => {
     await act(async () => open.click()); await act(async () => root.unmount()); roots = roots.filter(item => item.root !== root); host.remove();
     await act(async () => late.resolve({ ok: true, headers: new Headers({ 'content-type': 'application/pdf' }), blob: async () => new Blob(['private late content'], { type: 'application/pdf' }) }));
     expect(signal.aborted).toBe(true); expect(createUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('prepared history attempt focus', () => {
+  const scroll = vi.fn();
+  let originalScroll: PropertyDescriptor | undefined;
+  const withPermissions = () => createElement(ClinicalHistory, { renderPermissions: props => createElement(ClinicalPermissions, props) });
+  const shared = (): ClinicalSnapshot => ({ ...snapshot([version()]), grants: [{ doctorId: 1, doctorName: 'Médico sintético', address: 'G' + 'B'.repeat(55), authorized: true, canRead: true, canAppend: false, revision: 1 }] });
+  const getButton = (host: HTMLElement, text: string) => [...host.querySelectorAll('button')].find(button => button.textContent === text)!;
+  function mockPreparation(saved: ReturnType<typeof deferred<unknown>>) {
+    let requestId = '';
+    deps.fetch.mockImplementation((path, init) => {
+      if (path === '/api/private-clinical-history') return Promise.resolve(response(shared()));
+      requestId = JSON.parse(init.body).requestId;
+      return saved.promise;
+    });
+    return () => requestId;
+  }
+  async function reviewPermission(host: HTMLElement) {
+    const checkbox = host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1];
+    await act(async () => checkbox.click());
+    const review = getButton(host, 'Revisar cambio de permisos'); review.focus();
+    await act(async () => review.click());
+    return review;
+  }
+  beforeEach(() => {
+    originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+  });
+  afterEach(() => {
+    if (originalScroll) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScroll);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  });
+  it('brings a successfully prepared permission change into view without signing, and returns from its confirmation review', async () => {
+    const saved = deferred<unknown>(); const requestId = mockPreparation(saved);
+    const { host } = await mount(withPermissions());
+    await reviewPermission(host);
+    expect(scroll).not.toHaveBeenCalled();
+    await act(async () => saved.resolve(response({ operation: op({ id: requestId(), action: 'set_permissions' }) })));
+    const heading = host.querySelector('[aria-label="Intento clínico actual"] h2');
+    expect(heading?.textContent).toBe('Actualizar permisos · Pendiente de tu firma');
+    expect(document.activeElement).toBe(heading); expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll.mock.calls[0]).toEqual([{ block: 'center' }]);
+    expect(deps.fetch.mock.calls.filter(call => call[0].endsWith('/sign'))).toHaveLength(0);
+    const review = getButton(host, 'Revisar confirmación');
+    await act(async () => review.click()); expect(document.activeElement?.textContent).toBe('Actualizar permisos');
+    await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(document.activeElement).toBe(review);
+    await act(async () => review.click()); await act(async () => getButton(host, 'Volver').click());
+    expect(document.activeElement).toBe(review); expect(scroll).toHaveBeenCalledOnce();
+    expect(deps.fetch.mock.calls.filter(call => call[0].endsWith('/sign'))).toHaveLength(0);
+  });
+  it('uses the same handoff for creating a history and for preparing a correction', async () => {
+    let requestId = ''; let requestAction: ClinicalOperation['action'] = 'create_history';
+    deps.fetch.mockImplementation((path, init) => {
+      if (path === '/api/private-clinical-history') return Promise.resolve(response({ ...snapshot(), history: null }));
+      const body = JSON.parse(init.body); requestId = body.requestId; requestAction = body.action;
+      return Promise.resolve(response({ operation: op({ id: requestId, action: requestAction }) }));
+    });
+    const first = await mount(createElement(ClinicalHistory));
+    await act(async () => getButton(first.host, 'Preparar mi historial').click());
+    expect(document.activeElement?.textContent).toBe('Crear mi historial · Pendiente de tu firma');
+    expect(scroll).toHaveBeenCalledOnce();
+    await act(async () => first.root.unmount()); roots = roots.filter(item => item.root !== first.root); first.host.remove();
+    deps.fetch.mockImplementation((path, init) => {
+      if (path === '/api/private-clinical-history') return Promise.resolve(response(snapshot([version({ version: 2 })])));
+      const body = JSON.parse(init.body); requestId = body.requestId;
+      expect(body).toMatchObject({ action: 'append_version', entryId: '1'.repeat(64), expectedVersion: 2 });
+      return Promise.resolve(response({ operation: op({ id: requestId }) }));
+    });
+    const second = await mount(createElement(ClinicalHistory));
+    await act(async () => getButton(second.host, 'Corregir mi aporte').click());
+    await act(async () => second.host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await act(async () => getButton(second.host, 'Preparar firma').click());
+    expect(document.activeElement?.textContent).toBe('Guardar aporte · Pendiente de tu firma');
+    expect(scroll).toHaveBeenCalledTimes(2); expect(second.host.querySelector('form')).toBeNull();
+  });
+  it.each([400, 401, 403, 503])('does not hand focus to a failed preparation (%s)', async status => {
+    const saved = deferred<unknown>(); mockPreparation(saved);
+    const { host } = await mount(withPermissions());
+    const review = await reviewPermission(host);
+    await act(async () => saved.resolve(response({ error: 'clinical_request_invalid' }, status)));
+    expect(scroll).not.toHaveBeenCalled();
+    expect(host.querySelector('[aria-label="Intento clínico actual"] h2')).not.toBe(document.activeElement);
+    if (status === 400) expect(document.activeElement).toBe(review);
+    if ([401, 403].includes(status)) { expect(host.textContent).not.toContain(note.title); expect(host.querySelector('input[type="checkbox"]')).toBeNull(); }
+  });
+  it('discards an old session’s prepared response without moving focus or bringing back old content', async () => {
+    const saved = deferred<unknown>(); const requestId = mockPreparation(saved);
+    const { root, host } = await mount(withPermissions()); await reviewPermission(host);
+    deps.userId = 'did:privy:another-patient';
+    deps.fetch.mockImplementation(path => Promise.resolve(response(path === '/api/private-clinical-history' ? snapshot() : { error: 'clinical_request_invalid' })));
+    await act(async () => root.render(withPermissions()));
+    const outside = document.createElement('button'); outside.textContent = 'Foco de la nueva sesión'; document.body.append(outside); outside.focus();
+    await act(async () => saved.resolve(response({ operation: op({ id: requestId(), action: 'set_permissions' }) })));
+    expect(document.activeElement).toBe(outside); expect(scroll).not.toHaveBeenCalled();
+    expect(host.querySelector('[aria-label="Intento clínico actual"]')).toBeNull(); expect(host.textContent).not.toContain(note.title);
+    outside.remove();
   });
 });

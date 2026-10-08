@@ -77,12 +77,24 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
   const [filter, setFilter] = useState('all');
   const [actionError, setActionError] = useState('');
   const [signReview, setSignReview] = useState(false);
+  const [preparedFocus, setPreparedFocus] = useState<{ identity: string; operationId: string } | null>(null);
   const lastRefresh = useRef('');
   const signButton = useRef<HTMLButtonElement>(null);
   const formOpener = useRef<HTMLButtonElement | null>(null);
   const signHeading = useRef<HTMLHeadingElement>(null);
+  const operationHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (signReview) signHeading.current?.focus(); }, [signReview]);
-  useEffect(() => { setEditing(null); setFilter('all'); setActionError(''); setSignReview(false); lastRefresh.current = ''; }, [identity]);
+  useEffect(() => { setEditing(null); setFilter('all'); setActionError(''); setSignReview(false); setPreparedFocus(null); lastRefresh.current = ''; }, [identity]);
+  useEffect(() => {
+    if (!preparedFocus) return;
+    if (preparedFocus.identity !== identity || operation.accessLost) { setPreparedFocus(null); return; }
+    if (operation.busy || operation.operation?.id !== preparedFocus.operationId) return;
+    const heading = operationHeading.current;
+    if (!heading) return;
+    setPreparedFocus(null);
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: 'center' });
+  }, [preparedFocus, identity, operation.operation?.id, operation.busy, operation.accessLost]);
   useEffect(() => {
     const current = operation.operation;
     if (current && ['confirmed', 'cancelled', 'failed'].includes(current.state) && lastRefresh.current !== `${current.id}:${current.state}`) {
@@ -95,7 +107,8 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
   const newBlocked = blocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state);
   async function prepare(input: ClinicalIntent) {
     const result = await operation.controller.prepare(input);
-    setEditing(null); setSignReview(false); setActionError(''); return result;
+    setEditing(null); setSignReview(false); setActionError('');
+    setPreparedFocus({ identity, operationId: result.id }); return result;
   }
   async function act(action: 'sign' | 'cancel' | 'check' | 'retry' | 'prepareSaved') {
     setActionError('');
@@ -116,7 +129,7 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
     {(snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">No mostramos información anterior como verificada. {operation.accessLost ? 'Vuelve a ingresar con Privy antes de continuar.' : 'Puedes actualizar para volver a comprobar el historial.'}</p></div>}
     {snapshot.loading && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">Comprobando acceso, versiones y recibos…</p>}
     {current || operation.uncertain ? <section aria-label="Intento clínico actual" className={`space-y-3 rounded-xl border p-4 ${current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-sky-200 bg-sky-50'}`}>
-      <p className="font-semibold text-slate-900">{current ? `${actionLabels[current.action]} · ${labels[current.state]}` : 'Preparación sin resultado comprobado'}</p>
+      <h2 ref={operationHeading} tabIndex={-1} className="font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{current ? `${actionLabels[current.action]} · ${labels[current.state]}` : 'Preparación sin resultado comprobado'}</h2>
       {operation.uncertain && <p className="text-sm leading-relaxed text-slate-700">No recibimos un resultado verificable. Consultaremos el mismo intento; no prepares ni firmes otro.</p>}
       {current?.state === 'submitted' && <p className="text-sm leading-relaxed text-slate-700">El cambio sigue pendiente. Puedes recargar y consultar este mismo intento; todavía no está confirmado.</p>}
       {current?.state === 'awaiting_signature' && !operation.canSign && <p className="text-sm leading-relaxed text-slate-700">Este intento se recuperó sin su revisión de contenido. Puedes consultar su estado o cancelar la firma pendiente.</p>}
