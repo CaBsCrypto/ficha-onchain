@@ -342,7 +342,10 @@ test('completed inspection rejects changed receipt facts and final permissions',
 
 test('failed completed-journal reinspection preserves resumable audited phases', async () => {
   const h = harness(); await run(h); h.args.mode = 'inspect'; h.faults.auditAt = 'append_note';
-  assert.equal((await run(h)).status, 'failed'); assert.ok(h.store.state.steps.every(s => s.phase === 'audited'));
+  const report = await run(h);
+  assert.equal(report.status, 'failed'); assert.ok(h.store.state.steps.every(s => s.phase === 'audited'));
+  assert.equal(report.steps[1].status, 'passed');
+  assert.ok(report.steps.slice(2).every(s => s.status === 'pending' && !s.receiptVerified && !s.readbackVerified && s.historicalVerificationSaved));
   h.faults.auditAt = undefined; assert.equal((await run(h)).status, 'passed'); assert.equal(h.calls.sign.length, 8);
 });
 

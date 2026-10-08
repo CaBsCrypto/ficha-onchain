@@ -37,7 +37,8 @@ function publicChecks(value) {
   const strings = new Set(['network', 'contractId', 'registryId', 'wasmHash', 'registryWasmHash', 'method', 'source', 'feeSource']);
   const numbers = new Set(['ledger', 'interfaceVersion', 'observedLedger']);
   const flags = new Set(['signatureVerified', 'sourceSignatureVerified', 'payerSignatureVerified', 'argumentsVerified', 'envelopeVerified',
-    'returnVerified', 'operationVerified', 'deploymentVerified', 'networkVerified', 'sourceFunded', 'doctorAuthorized', 'wasmVerified', 'configurationVerified', 'interfaceVerified']);
+    'returnVerified', 'operationVerified', 'deploymentVerified', 'networkVerified', 'sourceFunded', 'doctorAuthorized', 'wasmVerified', 'configurationVerified', 'interfaceVerified',
+    'patientAccountExists', 'relayerBalanceChecked', 'chainProofVerified']);
   for (const [key, item] of Object.entries(value ?? {})) {
     if (flags.has(key) && typeof item === 'boolean') output[key] = item;
     else if (numbers.has(key) && Number.isSafeInteger(item) && item >= 0) output[key] = item;
@@ -156,11 +157,13 @@ function allEntries(snapshot, state) {
 export async function rehearseClinicalWeb({ api, audit, journal, runId, patient, doctor, mode = 'inspect', allowWrites = false,
   evidenceKind = 'isolated_simulation', onProgress = () => {}, pollLimit = 12, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() } = {}) {
   let state, preflight = {}, current, walletId;
+  const checkedNow = new Set();
   const report = (status, error) => ({ status, evidenceKind, runId, publicChecks: publicChecks(preflight),
     steps: (state?.steps ?? []).map(s => ({ name: s.name, action: s.action, requestId: s.requestId,
-      status: s.phase === 'audited' ? 'passed' : s.operation?.state === 'failed' || s.operation?.state === 'cancelled' ? 'failed' : 'pending',
+      status: checkedNow.has(s.name) ? 'passed' : s.operation?.state === 'failed' || s.operation?.state === 'cancelled' ? 'failed' : 'pending',
       ...(s.operation?.transactionHash ? { transactionHash: s.operation.transactionHash } : {}),
-      ...(s.result ? { ...s.result, receiptVerified: true, readbackVerified: s.phase === 'audited' } : {}) })), ...(error ? { error } : {}) });
+      ...(s.result ? checkedNow.has(s.name) ? { ...s.result, receiptVerified: true, readbackVerified: true }
+        : { historicalVerificationSaved: true, receiptVerified: false, readbackVerified: false } : {}) })), ...(error ? { error } : {}) });
   const save = () => journal.save(clone(state));
   async function identity() {
     const binding = await api.wallet();
@@ -260,7 +263,7 @@ export async function rehearseClinicalWeb({ api, audit, journal, runId, patient,
       // Earlier grant receipts remain historical when a later grant has already
       // been audited; the final current permissions are checked below as well.
       if (index >= 5 && !state.steps.slice(index + 1).some(s => s.phase === 'audited')) permissionValue(snapshot, doctor, current.payload);
-      current.phase = 'audited'; await save();
+      current.phase = 'audited'; await save(); checkedNow.add(current.name);
       await onProgress({ step: current.name, index: index + 1, phase: current.phase });
     }
     await identity(); snapshot = snapshotValue(await api.snapshot(), state);
