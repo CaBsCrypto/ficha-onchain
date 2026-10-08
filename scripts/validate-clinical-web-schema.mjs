@@ -1,10 +1,11 @@
 /**
  * Live schema checks against the isolated Neon development branch only.
- * All fixtures are new and synthetic, enclosed in one transaction and rolled back.
+ * All fixtures are new and synthetic, enclosed in transactions and rolled back.
  * This script never applies schema, signs, transmits, or changes an existing record.
  *
  * Run from the main checkout (its .env.local stays there):
  *   TRUSTLEAF_CLINICAL_DB_TEST=true node /absolute/path/to/this-script --rollback
+ * Add --concurrency after --rollback to probe two real sessions instead of single-session constraints.
  * DATABASE_URL may be provided directly; only that variable is read from .env.local.
  */
 import assert from 'node:assert/strict';
@@ -29,7 +30,8 @@ export class ValidationError extends Error {
 }
 
 export function assertRollbackArguments(args, env) {
-  if (args.length !== 1 || args[0] !== '--rollback') throw new ValidationError('explicit_rollback_required');
+  if (args[0] !== '--rollback' || args.length > 2 || args.length < 1 ||
+      (args.length === 2 && args[1] !== '--concurrency')) throw new ValidationError('explicit_rollback_required');
   if (env.TRUSTLEAF_CLINICAL_DB_TEST !== 'true') throw new ValidationError('explicit_database_test_guard_required');
 }
 
@@ -101,21 +103,25 @@ function assertZero(value) {
   assert.deepEqual(value, { histories: 0, operations: 0, attempts: 0 }, 'synthetic_rows_must_be_absent');
 }
 
+function syntheticOperation(syntheticContract, overrides = {}) {
+  const source = overrides.source ?? publicWallet();
+  return {
+    id: randomUUID(), actorId: 'did:privy:sql_' + randomBytes(16).toString('hex'),
+    walletId: 'sql_' + randomBytes(16).toString('hex'), source, action: 'create_history',
+    contractId: syntheticContract, expected: { historyId: hex(), patient: source, operationId: hex() },
+    fingerprint: 'sql.1:' + hex(), envelope: null, state: 'awaiting_signature',
+    unsignedXdr: fixtureXdr, signingHash: hex(), expiresAt: Math.floor(Date.now() / 1000) + 600,
+    signedXdr: null, hash: null, confirmedAt: null, ...overrides,
+  };
+}
+
 export async function runRollbackProbe(client, report) {
   const fixtures = { histories: [], operations: [], attempts: [] };
   const syntheticContract = contract();
   let schemaPresent = false;
   let started = false;
   const row = (overrides = {}) => {
-    const source = overrides.source ?? publicWallet();
-    const result = {
-      id: randomUUID(), actorId: 'did:privy:sql_' + randomBytes(16).toString('hex'),
-      walletId: 'sql_' + randomBytes(16).toString('hex'), source, action: 'create_history',
-      contractId: syntheticContract, expected: { historyId: hex(), patient: source, operationId: hex() },
-      fingerprint: 'sql.1:' + hex(), envelope: null, state: 'awaiting_signature',
-      unsignedXdr: fixtureXdr, signingHash: hex(), expiresAt: Math.floor(Date.now() / 1000) + 600,
-      signedXdr: null, hash: null, confirmedAt: null, ...overrides,
-    };
+    const result = syntheticOperation(syntheticContract, overrides);
     fixtures.operations.push(result.id);
     return result;
   };
@@ -294,6 +300,156 @@ export async function runRollbackProbe(client, report) {
   }
 }
 
+/**
+ * Observe a second backend waiting for the holder's actual advisory lock.
+ * PostgreSQL's blocking evidence, rather than a sleep alone, establishes the wait.
+ * The pids and wallet remain internal and are never included in the report.
+ */
+async function observeAdvisoryWait(holder, holderPid, waitingPid, isSettled) {
+  const startedAt = Date.now(), deadline = startedAt + 5_000;
+  while (!isSettled() && Date.now() < deadline) {
+    const observed = (await holder.query(`
+      SELECT $1::int=ANY(pg_blocking_pids($2::int)) AS blocker_matches,
+        EXISTS(
+          SELECT 1 FROM pg_locks held JOIN pg_locks waiting
+            ON held.locktype=waiting.locktype AND held.database IS NOT DISTINCT FROM waiting.database
+              AND held.classid=waiting.classid AND held.objid=waiting.objid AND held.objsubid=waiting.objsubid
+          WHERE held.pid=$1::int AND waiting.pid=$2::int AND held.locktype='advisory'
+            AND held.granted AND NOT waiting.granted
+        ) AS same_advisory_lock_waiting`, [holderPid, waitingPid])).rows[0];
+    if (observed?.blocker_matches && observed.same_advisory_lock_waiting && !isSettled()) {
+      return { advisoryWaitObserved: true, blockerMatchesHolder: true, secondInsertCompletedWhileHeld: false,
+        observationWaitMs: Date.now() - startedAt };
+    }
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  throw new ValidationError('cross_session_advisory_wait_not_demonstrated');
+}
+
+/**
+ * Five independent, synthetic wallet pairs. No COMMIT is sent on either session.
+ * Rollback makes the holder's row disappear, so the expected outcome is that the
+ * waiter resumes successfully; this is serialization, not a committed-row conflict.
+ */
+export async function runConcurrencyProbe(holder, waiter, report) {
+  const fixtures = { histories: [], operations: [], attempts: [] };
+  let schemaPresent = false;
+  let rollbackCount = 0;
+  report.concurrencyCases = [];
+  report.committedRowConflict = 'not-tested-by-this-rollback-only-concurrency-run';
+  report.timingPurpose = 'lock-observation-not-performance-benchmark';
+  const cases = [
+    { id: 'web_awaiting_to_runner', holderTable: 'web', holderState: 'awaiting_signature', waiterTable: 'runner', waiterState: 'prepared' },
+    { id: 'web_submitted_to_runner', holderTable: 'web', holderState: 'submitted', waiterTable: 'runner', waiterState: 'prepared' },
+    { id: 'runner_prepared_to_web', holderTable: 'runner', holderState: 'prepared', waiterTable: 'web', waiterState: 'awaiting_signature' },
+    { id: 'runner_submitted_to_web', holderTable: 'runner', holderState: 'submitted', waiterTable: 'web', waiterState: 'awaiting_signature' },
+    { id: 'web_awaiting_to_web', holderTable: 'web', holderState: 'awaiting_signature', waiterTable: 'web', waiterState: 'awaiting_signature' },
+  ];
+  const syntheticContract = contract();
+  function statement(table, state, source) {
+    if (table === 'web') {
+      const sample = syntheticOperation(syntheticContract, { source, state,
+        ...(state === 'submitted' ? { signedXdr: fixtureXdr, hash: hex() } : {}) });
+      fixtures.operations.push(sample.id);
+      return { sql: OPERATION_INSERT, values: operationValues(sample) };
+    }
+    const runId = randomUUID();
+    fixtures.attempts.push(runId);
+    return { sql: `INSERT INTO clinical_transaction_attempts
+      (run_id,operation_name,source_wallet,intent,signed_xdr,transaction_hash,state)
+      VALUES ($1::uuid,'sql_concurrent_probe',$2,$3,$4,$5,$6)`,
+    values: [runId, source, hex(), state === 'submitted' ? fixtureXdr : null, state === 'submitted' ? hex() : null, state] };
+  }
+  async function executeCase(sample) {
+    const source = publicWallet();
+    const first = statement(sample.holderTable, sample.holderState, source);
+    const second = statement(sample.waiterTable, sample.waiterState, source);
+    let pending, settled = false, holderRolledBack = false, waiterRolledBack = false;
+    const evidence = { id: sample.id, holderTable: sample.holderTable, holderState: sample.holderState,
+      waiterTable: sample.waiterTable, waiterState: sample.waiterState, passed: false };
+    report.concurrencyCases.push(evidence);
+    try {
+      await holder.query('BEGIN');
+      await waiter.query('BEGIN');
+      // Resolve backend IDs inside each transaction: transaction pooling can
+      // assign another backend between transactions.
+      const backendRows = await Promise.all([holder, waiter].map((connection) => connection.query('SELECT pg_backend_pid() AS backend_pid')));
+      const [holderPid, waiterPid] = backendRows.map((value) => value.rows[0]?.backend_pid);
+      if (!Number.isInteger(holderPid) || !Number.isInteger(waiterPid) || holderPid === waiterPid) {
+        throw new ValidationError('two_distinct_database_sessions_required');
+      }
+      evidence.distinctTransactionBackends = true;
+      for (const connection of [holder, waiter]) {
+        await connection.query("SET LOCAL statement_timeout = '10s'");
+        await connection.query("SET LOCAL lock_timeout = '8s'");
+        await connection.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
+      }
+      assert.equal((await holder.query(first.sql, first.values)).rowCount, 1);
+      // Attach handlers immediately so a timeout is never an unhandled rejection.
+      pending = waiter.query(second.sql, second.values).then(
+        (result) => { settled = true; return { success: true, result }; },
+        () => { settled = true; return { success: false }; },
+      );
+      Object.assign(evidence, await observeAdvisoryWait(holder, holderPid, waiterPid, () => settled));
+      note(report, sample.id + '_advisory_exclusivity');
+      await holder.query('ROLLBACK');
+      holderRolledBack = true;
+      rollbackCount += 1;
+      const resumed = await pending;
+      if (!resumed.success || resumed.result.rowCount !== 1) throw new ValidationError('waiter_did_not_resume_after_holder_rollback');
+      const waiterCounts = await counts(waiter, fixtures);
+      const expectedCounts = { histories: 0, operations: sample.waiterTable === 'web' ? 1 : 0,
+        attempts: sample.waiterTable === 'runner' ? 1 : 0 };
+      assert.deepEqual(waiterCounts, expectedCounts, 'waiter_must_only_see_its_own_synthetic_row');
+      evidence.resumedAfterHolderRollback = true;
+      evidence.waiterOwnSyntheticRows = 1;
+      note(report, sample.id + '_serialization_after_rollback');
+      evidence.passed = true;
+    } finally {
+      if (!holderRolledBack) {
+        await holder.query('ROLLBACK');
+        holderRolledBack = true;
+        rollbackCount += 1;
+      }
+      // If observation failed, release the holder before draining the pending query.
+      if (pending) await pending;
+      await waiter.query('ROLLBACK');
+      waiterRolledBack = true;
+      rollbackCount += 1;
+      evidence.bothSessionsRolledBack = holderRolledBack && waiterRolledBack;
+    }
+  }
+  try {
+    const schemaResults = await Promise.all([holder, waiter].map((connection) => connection.query(`
+      SELECT to_regclass('public.clinical_web_operations') IS NOT NULL AS operations,
+        to_regclass('public.clinical_transaction_attempts') IS NOT NULL AS attempts`)));
+    const [first, second] = schemaResults.map((result) => result.rows[0]);
+    if (!first?.operations || !first.attempts || !second?.operations || !second.attempts) {
+      throw new ValidationError('clinical_web_schema_required');
+    }
+    schemaPresent = true;
+    note(report, 'required_schema_visible_in_both_connections');
+    assertZero(await counts(holder, fixtures));
+    assertZero(await counts(waiter, fixtures));
+    note(report, 'synthetic_rows_absent_before_concurrent_probe');
+    for (const sample of cases) await executeCase(sample);
+    report.crossSessionConcurrency = 'advisory-lock-exclusivity-and-rollback-serialization';
+  } finally {
+    // Redundant rollback on both connections protects setup and partial failures.
+    await Promise.all([holder.query('ROLLBACK'), waiter.query('ROLLBACK')]);
+    report.transactionRollbacks = rollbackCount;
+    report.rollbackCompleted = report.concurrencyCases.every((sample) => sample.bothSessionsRolledBack === true);
+    report.concurrencyCasesPassed = report.concurrencyCases.filter((sample) => sample.passed).length;
+    if (schemaPresent) {
+      const finalCounts = await Promise.all([counts(holder, fixtures), counts(waiter, fixtures)]);
+      finalCounts.forEach(assertZero);
+      report.syntheticRowsRemaining = finalCounts[0];
+      report.syntheticRowsAbsentInBothSessions = true;
+      note(report, 'synthetic_rows_absent_in_both_sessions_after_rollback');
+    }
+  }
+}
+
 function sourceCommit() {
   try {
     const value = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -303,12 +459,13 @@ function sourceCommit() {
 
 export async function main() {
   const observedAt = new Date().toISOString();
-  const report = { kind: 'live-database-rollback-only', observedAt, sourceCommit: sourceCommit(),
+  const concurrent = process.argv.includes('--concurrency');
+  const report = { kind: concurrent ? 'live-database-concurrency-rollback-only' : 'live-database-rollback-only', observedAt, sourceCommit: sourceCommit(),
     environment: 'isolated-development', status: 'failed', checks: [], rollbackCompleted: false,
     syntheticRowsRemaining: null, durableWrites: 0, stellarTransactionsCreated: 0,
     receiptEvidence: 'controlled-sql-fixtures-no-stellar-transactions',
     crossSessionConcurrency: 'not-tested-in-this-run', connectionTimeoutMs: 15_000, queryTimeoutMs: 15_000 };
-  let client, pool;
+  let client, secondClient, pool;
   try {
     assertRollbackArguments(process.argv.slice(2), process.env);
     const databaseUrl = process.env.DATABASE_URL ||
@@ -316,9 +473,12 @@ export async function main() {
     const url = validateDevelopmentUrl(databaseUrl);
     note(report, 'explicit_rollback_and_isolated_dev_guards');
     neonConfig.webSocketConstructor = WebSocket;
-    pool = new Pool({ connectionString: url.href, connectionTimeoutMillis: 15_000, query_timeout: 15_000, max: 1 });
+    pool = new Pool({ connectionString: url.href, connectionTimeoutMillis: 15_000, query_timeout: 15_000, max: concurrent ? 2 : 1 });
     client = await pool.connect();
-    await runRollbackProbe(client, report);
+    if (concurrent) {
+      secondClient = await pool.connect();
+      await runConcurrencyProbe(client, secondClient, report);
+    } else await runRollbackProbe(client, report);
     report.status = 'passed';
   } catch (error) {
     report.errorCode = error instanceof ValidationError ? error.code : 'schema_validation_failed';
@@ -329,6 +489,10 @@ export async function main() {
       await client.query('ROLLBACK').catch(() => {});
       client.release();
     }
+    if (secondClient) {
+      await secondClient.query('ROLLBACK').catch(() => {});
+      secondClient.release();
+    }
     if (pool) await pool.end().catch(() => {});
   }
   const scriptContent = await readFile(new URL(import.meta.url));
@@ -336,7 +500,7 @@ export async function main() {
   report.completedAt = new Date().toISOString();
   const outputDirectory = resolve('.trustleaf-local', 'sow2-validation');
   await mkdir(outputDirectory, { recursive: true });
-  const outputPath = resolve(outputDirectory, 'clinical-web-schema-' + observedAt.replace(/[:.]/g, '-') + '.json');
+  const outputPath = resolve(outputDirectory, (concurrent ? 'clinical-web-concurrency-' : 'clinical-web-schema-') + observedAt.replace(/[:.]/g, '-') + '.json');
   await writeFile(outputPath, JSON.stringify(report, null, 2) + '\n', 'utf8');
   console.log(JSON.stringify(report, null, 2));
   return report;
@@ -345,4 +509,3 @@ export async function main() {
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   main().catch(() => { console.error('clinical_schema_validation_failed'); process.exitCode = 1; });
 }
-
