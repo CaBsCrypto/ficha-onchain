@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "cdddc179fa707168d9bb90d5b1554f9dad4425ac",
+  "scope": "SOW 2 week 2 review evidence",
+  "classification": "SQL reports are reversible real dev checks. Screenshots use synthetic fixtures; no real Privy or Stellar operations are claimed.",
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF",
+  "files": [
+    {
+      "path": "clinical-web-concurrency.json",
+      "bytes": 4978,
+      "sha256": "383612f884c0703ea66ca5ddf233364b6124473a4948e8ab44e7ce554c04954a"
+    },
+    {
+      "path": "clinical-web-schema.json",
+      "bytes": 7159,
+      "sha256": "f8455ec43641cc27b41184195525865b05227563107d2e976a120befbe25e791"
+    },
+    {
+      "path": "historial-fixture-360.jpg",
+      "bytes": 47319,
+      "sha256": "c28d95cead2a32bf28090fa6bba484fe06300689095f4bdc6c0feb40d9ee9d56"
+    },
+    {
+      "path": "historial-fixture-390.jpg",
+      "bytes": 41125,
+      "sha256": "7a1e350ac32db7132a3f7f1a090402d64bbe526347276ab3ebf183582af78343"
+    },
+    {
+      "path": "historial-fixture-430.jpg",
+      "bytes": 40611,
+      "sha256": "817315547ad36f8a07870ab9fe68292c01522ab249d2ae5fdd037a686db7cba6"
+    },
+    {
+      "path": "historial-fixture-correccion-390.jpg",
+      "bytes": 41420,
+      "sha256": "91648defcc5036a9f05ebc377719679cb1ae5fe3cd28ac4caa5b542c43f7f63d"
+    },
+    {
+      "path": "historial-fixture-desktop.jpg",
+      "bytes": 67800,
+      "sha256": "0ed37a6cb7e78c70d59dd9fc02ae1d1c5f183eaede62afbbc79124e2f127b868"
+    },
+    {
+      "path": "historial-fixture-error-360.jpg",
+      "bytes": 43106,
+      "sha256": "f5ebc2ff0823f4bfd774cc4d85c7b109265d582426f90d23cd653d2e774dd2e2"
+    },
+    {
+      "path": "historial-fixture-intento-foco-360.jpg",
+      "bytes": 38182,
+      "sha256": "d1d5acf70eb6daf8e5de27dc5db249118b0c99366bafa799f39e2b8d71717d0c"
+    },
+    {
+      "path": "historial-fixture-permisos-430.jpg",
+      "bytes": 48214,
+      "sha256": "0e8f85ae01c673bb393ce344867f6466646d2fd9efc788708cb79f71d5fbd85a"
+    },
+    {
+      "path": "historial-fixture-sin-historial-360.jpg",
+      "bytes": 42200,
+      "sha256": "e16475159a52fceed649f32fc5192d2cdba7c9a3772602024d999eef57a1ccd8"
+    },
+    {
+      "path": "historial-fixture-versiones-390.jpg",
+      "bytes": 41183,
+      "sha256": "2210a908f58a7ff02d756dce703c15e1df42a8e810cb789ed63835610b61e46b"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 3821,
+      "sha256": "5ff2234ac286282d21b8d5f008e237a8b4554ec71fa596fa06550d8f49f933fd"
+    }
+  ]
+}

@@ -1,25 +1,25 @@
 # SOW 2 · Semana 2 · Guía de validación
 
-Esta guía prepara comprobaciones; no es un informe de resultados. Referencia inicial: `12cf461`, con integración de pantallas y QA final pendientes. Registrar el commit realmente validado al ejecutar el recorrido. No usar esta guía como luz verde para grabar.
+Esta guía prepara comprobaciones; los resultados están en [QA-SEMANA-2.md](QA-SEMANA-2.md). Las pantallas ya están integradas en `codex/sow2-sprint-2`. Registrar el commit realmente validado; esta guía no es luz verde para grabar.
 
-## 1. Preparar local primero
+## 1. Entorno preparado
 
-1. Usar la rama del sprint y un checkout propio; conservar la versión y evidencia de semana 1. Elegir un puerto libre distinto de sus visores locales.
-2. Comprobar Testnet, los contratos existentes, Privy y la conexión Neon dev. La aplicación debe usar la misma base que el esquema; no copiar una conexión de producción.
-3. Preparar las claves clínicas web nuevas en secretos del servidor, con identificador activo y recuperación prevista. No trasladar las claves DPAPI de las ejecuciones sintéticas.
-4. Habilitar el módulo mediante `TRUSTLEAF_CLINICAL_WEB_ENABLED`; mantener `TRUSTLEAF_PRIVATE_WRITES_ENABLED=false` inicialmente. Claves o configuración ausentes deben rechazar el acceso, nunca activar un fallback.
-5. Revisar con el coordinador el estado del esquema. Sólo si falta un paso, ejecutar la migración dev correspondiente, con `TRUSTLEAF_CLINICAL_MIGRATION=true` y `DATABASE_URL` dev comprobada:
+- Aplicación: [127.0.0.1:3016/patient?tab=historial](http://127.0.0.1:3016/patient?tab=historial), con escrituras apagadas.
+- Revisión visual: [127.0.0.1:3017](http://127.0.0.1:3017/). Usa componentes reales con respuestas simuladas, sin firmas ni conexión a Neon. No acredita persistencia ni transacciones.
+- Neon dev, esquema clínico aplicado, clave web nueva y recuperación local comprobada. No trasladar claves de semana 1 ni considerar portable el respaldo DPAPI local.
+
+Conservar semana 1, usar puerto propio y comprobar Privy, Testnet, contratos, autoridad y conexión efectiva. Si faltan claves o configuración, el módulo debe rechazar el acceso, sin fallback.
+
+No repetir migraciones salvo cambio o ausencia del esquema. Sólo en ese caso, con `TRUSTLEAF_CLINICAL_MIGRATION=true` y `DATABASE_URL` dev comprobada:
 
 ```powershell
 node scripts/migrate.mjs --step=clinical-history-v1
 node scripts/migrate.mjs --step=clinical-web-v1
 ```
 
-El segundo paso depende del primero. El guard sólo admite `ep-lingering-water-ahzh89z5`; una base diferente debe detener la preparación. El script lee `DATABASE_URL`, no la variable alternativa de conexión de la aplicación. No ejecutar migraciones generales ni editar datos de main para estas pruebas.
+El segundo paso depende del primero. El guard sólo admite `ep-lingering-water-ahzh89z5`; otra base detiene la preparación. El script lee `DATABASE_URL`, no la conexión alternativa de la aplicación. No ejecutar la migración general ni editar main para validar.
 
-## 2. Pruebas aisladas por commit
-
-Ejecutar las pruebas afectadas durante el desarrollo y, sobre la entrega integrada, registrar resultados nuevos de:
+## 2. Pruebas por commit
 
 ```powershell
 npm test
@@ -29,44 +29,54 @@ npx tsc --noEmit
 npm run build
 ```
 
-Cubrir acceso cruzado, cambio de sesión, claves ausentes, formatos y límites de archivo, contenido alterado, correcciones ajenas, revocación durante lectura, doble clic, firma cancelada, respuesta incierta y recuperación tras recargar. Simular los fallos localmente; no inducirlos en main. Verificar con escrituras apagadas que no se preparan ni transmiten operaciones nuevas. Una lectura de estado o reconciliación local no equivale a una transmisión.
+Cubrir acceso cruzado, cambio de sesión, claves ausentes, formatos y límites, archivos alterados, correcciones ajenas, revocación durante lectura, doble clic, cancelación, respuesta incierta y recuperación tras recargar. Simular fallos localmente, nunca contra main. Con escrituras apagadas no se preparan ni transmiten operaciones.
 
-Conservar commit, comando, fecha y resultado. Los mocks no acreditan una firma real de Privy ni una transacción de Stellar. No reutilizar cifras de semana 1 para declarar aprobada esta versión.
+La comprobación SQL requiere `TRUSTLEAF_CLINICAL_DB_TEST=true` y `node scripts/validate-clinical-web-schema.mjs --rollback`. Sólo usa fixtures nuevos dentro de transacciones revertidas; no aplica esquema ni llama a Stellar. Exigir reporte saneado y cero filas restantes. Un timeout o una desconexión no aprueban exclusividad ni limpieza.
 
-## 3. Recorrido autenticado con datos sintéticos
+Con `--rollback --concurrency`, el mismo validador comprueba el bloqueo entre dos conexiones reales y la continuación después de liberar el bloqueo. Ambas revierten sus fixtures. Este ensayo no confirma filas y no acredita conflicto después de COMMIT. Los informes existentes ya registran 62 controles SQL y 5 escenarios concurrentes; no repetirlos salvo cambios relevantes.
 
-Comenzar cuando las pantallas estén integradas y el coordinador haya comprobado la configuración aislada, claves, saldo y ausencia de intentos inciertos. Habilitar escrituras únicamente para la prueba real acordada. Los códigos de acceso se introducen sólo en Privy, por el usuario; no se registran en el informe.
+Conservar commit, comando, fecha y resultado. Los mocks no acreditan firmas reales de Privy ni Stellar. No reutilizar cifras de semana 1 para aprobar esta versión.
 
-| Paso | Resultado que debe comprobarse | Evidencia prevista |
+## 3. Recorrido autenticado sintético
+
+Primero ingresar y comprobar lectura con escrituras apagadas. Antes de las operaciones reales, comprobar configuración aislada, claves, saldo y ausencia de intentos inciertos. Habilitar escrituras sólo para la prueba acordada. Una wallet sin saldo requiere preparación explícita; no se financia automáticamente. El usuario introduce los códigos únicamente en Privy.
+
+Elegir un único entorno de escritura para la misma wallet, contrato y red. La historia de cadena no se duplica al cambiar Neon: sin su índice local y contenido cifrado, otra base no permite continuarla. Usar una identidad sintética independiente o una transferencia coherente expresamente autorizada; no recrear ni adoptar la historia automáticamente.
+
+| Paso | Resultado esperado | Evidencia |
 | --- | --- | --- |
-| Entrar como paciente | Historial vinculado al DID y wallet comprobados; sin datos de otra sesión | Observación autenticada y versión |
-| Crear historial | Firma explícita y confirmación del contrato existente | Recibo de `create_history` |
-| Agregar antecedente propio | Contenido privado; espera de firma y estado confirmado sólo tras verificación | Recibo de `append_version` y lectura posterior |
-| Agregar PDF, PNG y JPEG | Archivos legibles de hasta 3.000.000 bytes; exceso o formato inválido rechazados sin firmar | Recibos de archivos aceptados; prueba local de rechazos |
-| Consultar y descargar | Versión, autor y comprobante correctos; acceso autenticado e integridad antes de entregar contenido | Lectura real y comparación del archivo sintético |
-| Corregir aporte propio | Versión nueva conserva la anterior; no habilita edición de otro autor | Recibo y lectura de ambas versiones |
-| Cambiar lectura/agregado | Dos permisos independientes; preparar no cambia el permiso confirmado | Recibos de `set_permissions` y lectura posterior |
-| Retirar permisos | Permisos consultados reflejan el retiro; retirada completa permitida si la autorización médica expiró | Recibo y estado; rechazo médico real se registra cuando exista su recorrido |
-| Recargar y cambiar cuenta | Persistencia del mismo historial e intento; datos anteriores desaparecen | Observación autenticada |
+| Entrar como paciente | DID y wallet correctos; sin datos de otra sesión | Observación autenticada y commit |
+| Crear historial | Firma expresa; confirmación del contrato existente | Recibo de `create_history` |
+| Agregar antecedente | Contenido privado; confirmado sólo tras verificación | `append_version` y lectura |
+| Agregar PDF, PNG y JPEG | Archivos legibles de hasta 3.000.000 bytes | Recibos; rechazos de límites en pruebas locales |
+| Consultar y descargar | Versión, autor e integridad comprobados | Lectura real y comparación del archivo sintético |
+| Corregir aporte propio | Versión nueva conserva la anterior; no edita otro autor | Recibo y lectura de ambas versiones |
+| Cambiar lectura/agregado | Independientes; preparar no cambia el permiso confirmado | `set_permissions` y lectura posterior |
+| Retirar permisos | Retiro completo permitido aunque la autorización médica expiró | Recibo y estado; acceso médico real se registra al existir su recorrido |
+| Recargar y cambiar cuenta | Mismo historial/intento; desaparecen datos anteriores | Observación autenticada |
 
-Los archivos, descargas y presentación se manejan fuera de blockchain. Crear historial, agregar una versión y cambiar permisos sí generan operaciones de Stellar. Cada operación nueva debe auditarse por actor, contrato, método, argumentos y recibo; no basta con ver un enlace o un aviso verde.
+El contenido, descargas y presentación se manejan fuera de blockchain. Crear historial, agregar versión y cambiar permisos sí generan operaciones de Stellar. Auditar actor, contrato, método, argumentos y recibo; un enlace o aviso verde no bastan.
 
-Cancelar antes de firmar debe dejar un intento cancelado. Un sobre ya firmado no se reemplaza: si la respuesta es incierta, consultar y reconciliar ese intento. El reintento requiere confirmación expresa y transmite el mismo sobre, sin nueva firma. Un recibo perdido por retención del RPC debe tratarse según la política revisada de evidencia persistida, sin declarar éxito a partir de un hash aislado.
+Cancelar antes de firmar deja un intento cancelado. Si ya hay sobre firmado, consultar y reconciliar el mismo intento; no reemplazarlo. Reintentar requiere confirmación y retransmite el mismo sobre. Los comprobantes históricos se verifican contra el sobre persistido y la operación registrada en el contrato; un hash aislado no acredita éxito.
 
-## 4. Presentación y privacidad
+Si el historial está archivado por TTL, detener las escrituras y conservar los intentos para inspección/restauración explícita. Si RPC devuelve NOT_FOUND fuera de su retención, el intento sigue incierto y bloquea nuevas operaciones de esa wallet. No volver a firmarlo ni declararlo fallido por ausencia del recibo; contrastar el sobre y el comprobante contractual mediante un procedimiento revisado.
 
-Revisar escritorio y anchos efectivos de **360, 390 y 430 px**, teclado, Tab/Shift+Tab, foco visible y texto al 200 %. Comprobar títulos largos, versiones, formularios, mensajes, confirmación y reintento. Abrir/cerrar documentos durante carga y comprobar que respuestas tardías no vuelven a mostrar otro archivo.
+## 4. Presentación
 
-En capturas y video, ocultar códigos, tokens, claves, conexiones y cuentas ajenas. No publicar archivos reales de salud. Mantener separados resultados automatizados, observaciones autenticadas y transacciones reales.
+Revisar escritorio, anchos efectivos **360/390/430 px**, teclado, foco visible y texto al 200 %. Comprobar títulos largos, versiones, formularios, carga, errores y revisión previa. Abrir/cerrar durante carga debe descartar respuestas tardías.
 
-## 5. Preview y criterio para grabar
+En el visor simulado, los enlaces de navegación y recibos están identificados como fixtures. La fecha “comprobado” pertenece a la respuesta simulada; no equivale a consulta real de Stellar. Registrar esas observaciones separadamente.
 
-La configuración del preview requiere **autorización específica** para su base aislada, claves clínicas nuevas y controles de escritura. Las autorizaciones anteriores de otros previews no cubren este sprint. El guard de migración actual sólo permite Neon dev: preparar el esquema del preview requiere un procedimiento revisado, sin eludir esa comprobación.
+Ocultar códigos, tokens, claves, conexiones y cuentas ajenas. Sólo datos sintéticos. Mantener separados automatización, visualización simulada, lectura autenticada y transacciones reales.
 
-Registrar cada resultado con:
+## 5. Preview y grabación
 
-**ID · commit · entorno · fecha · tipo de evidencia · esperado · observado · recibo/captura · estado.**
+La configuración del preview requiere **autorización específica** para base aislada, claves web nuevas y control de escritura. Las autorizaciones de previews anteriores no cubren este sprint. El guard de migración actual sólo permite Neon dev; otro entorno requiere procedimiento revisado, sin eludir el guard.
 
-La entrega podrá declararse lista para grabar después de comprobar el recorrido autenticado, recibos, persistencia, presentación y ausencia de operaciones inciertas; registrar por separado cualquier pendiente y la aceptación del revisor. Narrar el recorrido aprobado, sin atribuir al sprint funciones médicas de semana 3 ni mejoras futuras.
+Formato de registro: **ID · commit · entorno · fecha · tipo · esperado · observado · evidencia · estado**.
 
-La evidencia de semana 1 permanece intacta: [recorrido de grabación](GRABACION-SEMANA-1.md) y [guion narrado](GUION-NARRADO-SEMANA-1.md). No volver a firmar sus operaciones para preparar esta revisión.
+Lista para grabar exige recorrido autenticado, recibos, persistencia, presentación y ausencia de operaciones inciertas. Mantener la PR principal en borrador hasta completar los pendientes correspondientes. La aceptación del revisor va aparte.
+
+Narración sugerida para semana 2: explicar primero el control del paciente y la separación entre archivos privados y comprobantes en Testnet; mostrar un aporte, su descarga y corrección; después lectura/agregado independientes y su retiro; cerrar con recarga, recibos y límites. Mostrar cada firma y confirmación real, distinguiendo las acciones sin transacción. No narrar el visor simulado como recorrido ejecutado.
+
+Semana 1 se conserva: [recorrido de grabación](GRABACION-SEMANA-1.md), [guion](GUION-NARRADO-SEMANA-1.md). No volver a firmar sus operaciones para preparar esta revisión.

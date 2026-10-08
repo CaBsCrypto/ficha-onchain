@@ -1,0 +1,321 @@
+{
+  "kind": "live-database-rollback-only",
+  "observedAt": "2026-10-08T05:04:51.542Z",
+  "sourceCommit": "cdddc179fa707168d9bb90d5b1554f9dad4425ac",
+  "environment": "isolated-development",
+  "status": "passed",
+  "checks": [
+    {
+      "id": "explicit_rollback_and_isolated_dev_guards",
+      "passed": true
+    },
+    {
+      "id": "required_schema_present",
+      "passed": true
+    },
+    {
+      "id": "synthetic_rows_absent_before_probe",
+      "passed": true
+    },
+    {
+      "id": "history_default_network_testnet",
+      "passed": true
+    },
+    {
+      "id": "history_owner_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "history_wallet_binding_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "history_wallet_id_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "history_contract_binding_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "history_delete_rejected",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "history_owner_unique_per_contract",
+      "passed": true,
+      "sqlState": "23505"
+    },
+    {
+      "id": "history_wallet_unique_per_contract",
+      "passed": true,
+      "sqlState": "23505"
+    },
+    {
+      "id": "history_requires_confirmation_hash",
+      "passed": true,
+      "sqlState": "23502"
+    },
+    {
+      "id": "operation_default_network_testnet",
+      "passed": true
+    },
+    {
+      "id": "operation_actor_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "operation_wallet_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "operation_intent_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "request_fingerprint_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "unsigned_envelope_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "signing_hash_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "operation_expiry_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "one_live_operation_per_wallet",
+      "passed": true,
+      "sqlState": "23505"
+    },
+    {
+      "id": "awaiting_signature_cannot_skip_to_confirmed",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "awaiting_to_submitted_allowed",
+      "passed": true
+    },
+    {
+      "id": "submitted_envelope_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "submitted_hash_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "submitted_cannot_return_to_awaiting",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "submitted_cannot_be_cancelled",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "submitted_to_confirmed_allowed",
+      "passed": true
+    },
+    {
+      "id": "confirmed_terminal_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "confirmed_delete_rejected",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "awaiting_to_failed_allowed",
+      "passed": true
+    },
+    {
+      "id": "failed_terminal_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "awaiting_to_cancelled_allowed",
+      "passed": true
+    },
+    {
+      "id": "cancelled_terminal_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "unknown_state_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "submitted_requires_envelope_and_hash",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "signature_and_hash_required_together",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "confirmed_requires_confirmation_time",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "fingerprint_format_required",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "private_metadata_not_allowed_in_intent",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "wrong_patient_binding_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "selected_doctor_id_allowed_for_permission_intent",
+      "passed": true
+    },
+    {
+      "id": "selected_doctor_id_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "selected_doctor_id_zero_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "selected_doctor_id_negative_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "selected_doctor_id_fractional_rejected",
+      "passed": true,
+      "sqlState": "22P02"
+    },
+    {
+      "id": "selected_doctor_id_string_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "selected_doctor_id_null_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "selected_doctor_id_for_create_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "encrypted_prepared_envelope_allowed",
+      "passed": true
+    },
+    {
+      "id": "prepared_envelope_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "submitted_prepared_envelope_immutable",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "prepared_envelope_size_limit",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "prepared_envelope_extra_plaintext_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "prepared_envelope_wrong_cipher_format_rejected",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "append_requires_prepared_envelope",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "create_cannot_have_prepared_envelope",
+      "passed": true,
+      "sqlState": "23514"
+    },
+    {
+      "id": "web_awaiting_signature_blocks_synthetic_runner",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "web_submitted_blocks_synthetic_runner",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "synthetic_runner_prepared_blocks_web",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "synthetic_runner_submitted_blocks_web",
+      "passed": true,
+      "sqlState": "P0001"
+    },
+    {
+      "id": "synthetic_rows_absent_after_rollback",
+      "passed": true
+    }
+  ],
+  "rollbackCompleted": true,
+  "syntheticRowsRemaining": {
+    "histories": 0,
+    "operations": 0,
+    "attempts": 0
+  },
+  "durableWrites": 0,
+  "stellarTransactionsCreated": 0,
+  "receiptEvidence": "controlled-sql-fixtures-no-stellar-transactions",
+  "crossSessionConcurrency": "not-tested-in-this-run",
+  "connectionTimeoutMs": 15000,
+  "queryTimeoutMs": 15000,
+  "validatorSha256": "02df00a54ebe99e895ca80725598db6fb045c7c2b579ad41df9d56c30ca0649d",
+  "completedAt": "2026-10-08T05:05:22.312Z"
+}

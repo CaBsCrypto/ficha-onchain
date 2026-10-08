@@ -1,0 +1,166 @@
+{
+  "kind": "live-database-concurrency-rollback-only",
+  "observedAt": "2026-10-08T04:52:59.725Z",
+  "sourceCommit": "dda2dd219e6b0ad4e7415426b1de668c9dcd6927",
+  "environment": "isolated-development",
+  "status": "passed",
+  "checks": [
+    {
+      "id": "explicit_rollback_and_isolated_dev_guards",
+      "passed": true
+    },
+    {
+      "id": "required_schema_visible_in_both_connections",
+      "passed": true
+    },
+    {
+      "id": "synthetic_rows_absent_before_concurrent_probe",
+      "passed": true
+    },
+    {
+      "id": "web_awaiting_to_runner_advisory_exclusivity",
+      "passed": true
+    },
+    {
+      "id": "web_awaiting_to_runner_serialization_after_rollback",
+      "passed": true
+    },
+    {
+      "id": "web_submitted_to_runner_advisory_exclusivity",
+      "passed": true
+    },
+    {
+      "id": "web_submitted_to_runner_serialization_after_rollback",
+      "passed": true
+    },
+    {
+      "id": "runner_prepared_to_web_advisory_exclusivity",
+      "passed": true
+    },
+    {
+      "id": "runner_prepared_to_web_serialization_after_rollback",
+      "passed": true
+    },
+    {
+      "id": "runner_submitted_to_web_advisory_exclusivity",
+      "passed": true
+    },
+    {
+      "id": "runner_submitted_to_web_serialization_after_rollback",
+      "passed": true
+    },
+    {
+      "id": "web_awaiting_to_web_advisory_exclusivity",
+      "passed": true
+    },
+    {
+      "id": "web_awaiting_to_web_serialization_after_rollback",
+      "passed": true
+    },
+    {
+      "id": "synthetic_rows_absent_in_both_sessions_after_rollback",
+      "passed": true
+    }
+  ],
+  "rollbackCompleted": true,
+  "syntheticRowsRemaining": {
+    "histories": 0,
+    "operations": 0,
+    "attempts": 0
+  },
+  "durableWrites": 0,
+  "stellarTransactionsCreated": 0,
+  "receiptEvidence": "controlled-sql-fixtures-no-stellar-transactions",
+  "crossSessionConcurrency": "advisory-lock-exclusivity-and-rollback-serialization",
+  "connectionTimeoutMs": 15000,
+  "queryTimeoutMs": 15000,
+  "concurrencyCases": [
+    {
+      "id": "web_awaiting_to_runner",
+      "holderTable": "web",
+      "holderState": "awaiting_signature",
+      "waiterTable": "runner",
+      "waiterState": "prepared",
+      "passed": true,
+      "distinctTransactionBackends": true,
+      "advisoryWaitObserved": true,
+      "blockerMatchesHolder": true,
+      "secondInsertCompletedWhileHeld": false,
+      "observationWaitMs": 331,
+      "resumedAfterHolderRollback": true,
+      "waiterOwnSyntheticRows": 1,
+      "bothSessionsRolledBack": true
+    },
+    {
+      "id": "web_submitted_to_runner",
+      "holderTable": "web",
+      "holderState": "submitted",
+      "waiterTable": "runner",
+      "waiterState": "prepared",
+      "passed": true,
+      "distinctTransactionBackends": true,
+      "advisoryWaitObserved": true,
+      "blockerMatchesHolder": true,
+      "secondInsertCompletedWhileHeld": false,
+      "observationWaitMs": 342,
+      "resumedAfterHolderRollback": true,
+      "waiterOwnSyntheticRows": 1,
+      "bothSessionsRolledBack": true
+    },
+    {
+      "id": "runner_prepared_to_web",
+      "holderTable": "runner",
+      "holderState": "prepared",
+      "waiterTable": "web",
+      "waiterState": "awaiting_signature",
+      "passed": true,
+      "distinctTransactionBackends": true,
+      "advisoryWaitObserved": true,
+      "blockerMatchesHolder": true,
+      "secondInsertCompletedWhileHeld": false,
+      "observationWaitMs": 334,
+      "resumedAfterHolderRollback": true,
+      "waiterOwnSyntheticRows": 1,
+      "bothSessionsRolledBack": true
+    },
+    {
+      "id": "runner_submitted_to_web",
+      "holderTable": "runner",
+      "holderState": "submitted",
+      "waiterTable": "web",
+      "waiterState": "awaiting_signature",
+      "passed": true,
+      "distinctTransactionBackends": true,
+      "advisoryWaitObserved": true,
+      "blockerMatchesHolder": true,
+      "secondInsertCompletedWhileHeld": false,
+      "observationWaitMs": 328,
+      "resumedAfterHolderRollback": true,
+      "waiterOwnSyntheticRows": 1,
+      "bothSessionsRolledBack": true
+    },
+    {
+      "id": "web_awaiting_to_web",
+      "holderTable": "web",
+      "holderState": "awaiting_signature",
+      "waiterTable": "web",
+      "waiterState": "awaiting_signature",
+      "passed": true,
+      "distinctTransactionBackends": true,
+      "advisoryWaitObserved": true,
+      "blockerMatchesHolder": true,
+      "secondInsertCompletedWhileHeld": false,
+      "observationWaitMs": 337,
+      "resumedAfterHolderRollback": true,
+      "waiterOwnSyntheticRows": 1,
+      "bothSessionsRolledBack": true
+    }
+  ],
+  "committedRowConflict": "not-tested-by-this-rollback-only-concurrency-run",
+  "timingPurpose": "lock-observation-not-performance-benchmark",
+  "transactionRollbacks": 10,
+  "concurrencyCasesPassed": 5,
+  "syntheticRowsAbsentInBothSessions": true,
+  "validatorSha256": "c81bef3aab038cb2a09e1b20541bd01078a51ab8d0077095d89defd49b4beef7",
+  "completedAt": "2026-10-08T04:53:12.608Z"
+}
