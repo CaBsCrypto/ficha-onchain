@@ -2,7 +2,7 @@
 
 **Estado:** Comprobado. **Ejecución:** `ed9cf324-b9f1-400c-aae8-3323a66407ad`.
 
-Informe generado: 07-10-2026, 2:17:00 a. m. (Chile); 2026-10-07T05:17:00.411Z. Es evidencia guardada; no una consulta en vivo.
+Informe generado: 07-10-2026, 10:57:30 p. m. (Chile); 2026-10-08T01:57:30.454Z. Es evidencia guardada; no una consulta en vivo.
 
 Commit de referencia de la evidencia: `2565f972401e145740c24211ce09a329e3050c52`.
 

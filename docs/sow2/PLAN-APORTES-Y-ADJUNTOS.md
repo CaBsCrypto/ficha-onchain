@@ -29,3 +29,7 @@ Estado: planificación para semanas 2 y 3; no implementado por este documento. L
 Definir con muestras sintéticas los parámetros de optimización de imágenes y límites de resolución/memoria. Probar fotos de exámenes, texto pequeño, tablas, rotación y formatos admitidos en móvil y escritorio. Verificar límites justo por debajo, en y por encima de 3.000.000 bytes, archivos corruptos, doble envío, cancelación y cambio de cuenta. Las pruebas de cifrado deben usar los bytes definitivos y detectar alteraciones.
 
 La grabación de semana 1 usa únicamente los registros existentes. Esta planificación no crea recetas, archivos ni permisos nuevos.
+
+## Idea para revisar después del cierre
+
+El enlace temporal y QR para compartir una selección privada de sólo lectura con un médico que aún no utiliza TrustLeaf quedan fuera de este SOW. Retomarlos al terminar los cuatro entregables, según el [recordatorio de cierre y próximo ciclo](CIERRE-Y-PROXIMO-CICLO.md).

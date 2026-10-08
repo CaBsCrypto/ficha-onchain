@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
   "network": "testnet",
-  "generatedAt": "2026-10-07T05:17:00.411Z",
+  "generatedAt": "2026-10-08T01:57:30.454Z",
   "sourceCommit": "2565f972401e145740c24211ce09a329e3050c52",
   "state": "passed",
   "liveVerification": false,
@@ -54,13 +54,13 @@
     },
     {
       "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/index.html",
-      "bytes": 21211,
-      "sha256": "5b89d5884687f72039ed91c2d08fc794f9c706c90e1ffe4051515d86f0bfa7c1"
+      "bytes": 25350,
+      "sha256": "36d99422e160e2c537ac5d5d096f923a20c4d8065ce8a0a113b0eb14b3e2dbff"
     },
     {
       "file": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/report.md",
-      "bytes": 7435,
-      "sha256": "0bfdc59b134444d5ed1a3646c5bdbc6fa6fe26d65fce104deacf8bc7eb781c96"
+      "bytes": 7436,
+      "sha256": "0b502d55f9030ef8fa5112fc35c0ee6d1b621800b730c1b2695e11a1012353d4"
     }
   ],
   "limits": [
