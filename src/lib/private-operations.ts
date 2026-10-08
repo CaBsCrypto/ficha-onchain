@@ -54,6 +54,11 @@ export async function preparePrivateOperation(actor:AuthedUser,action:PrivateAct
     if(clinicalSchema && (await client.query("SELECT 1 FROM clinical_transaction_attempts WHERE source_wallet=$1 AND state IN ('prepared','submitted') LIMIT 1",[wallet.address])).rows.length) {
       throw new PrivateFlowError('another_operation_pending');
     }
+    const clinicalWeb=(await client.query("SELECT to_regclass('public.clinical_web_operations') AS relation")).rows[0]?.relation;
+    if(clinicalWeb) await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_request_expired',updated_at=NOW() WHERE source_wallet=$1 AND state='awaiting_signature' AND signed_xdr IS NULL AND expires_at<=EXTRACT(EPOCH FROM NOW())",[wallet.address]);
+    if(clinicalWeb && (await client.query("SELECT 1 FROM clinical_web_operations WHERE source_wallet=$1 AND state IN ('awaiting_signature','submitted') LIMIT 1",[wallet.address])).rows.length) {
+      throw new PrivateFlowError('another_operation_pending');
+    }
     let appointmentId=resource.appointmentId;
     if(resource.prescriptionId)appointmentId=(await client.query('SELECT appointment_id FROM private_prescriptions WHERE id=$1',[resource.prescriptionId])).rows[0]?.appointment_id;
     if(!appointmentId)throw new PrivateFlowError('resource_not_found',404);

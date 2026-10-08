@@ -12,7 +12,8 @@ Rutas nuevas, autenticadas y sin caché:
 - `GET /api/private-clinical-history/document?entryId=<hex>&version=<n>`: versión exacta, con acceso e integridad comprobados; adjuntos como descarga privada.
 - `POST /api/private-clinical-operations`: prepara un intento idempotente con UUID solicitado por el cliente. No firma.
 - `POST /api/private-clinical-operations/<UUID>/sign`: confirmación expresa, firma de la wallet mediante Privy, sobre patrocinado persistido antes de transmisión.
-- `GET /api/private-clinical-operations/<UUID>`: reconcilia el mismo intento.
+- `GET /api/private-clinical-operations/<UUID>`: consulta el recibo del mismo intento, sin transmitir.
+- `POST /api/private-clinical-operations/<UUID>/retry`: confirmación expresa para retransmitir el sobre persistido, sin otra firma.
 - `POST /api/private-clinical-operations/<UUID>/cancel`: cancela sólo si aún no hay sobre firmado.
 
 Los tipos públicos están en `src/types/clinical.ts`. El índice y los intentos web se separan de las ejecuciones sintéticas. El contenido y sus metadatos permanecen dentro del sobre cifrado de `clinical_private_versions`. Claves web versionadas en secretos del servicio, nunca en Neon ni en respaldo DPAPI anterior. No hay fallback de texto plano.

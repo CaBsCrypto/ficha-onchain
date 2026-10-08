@@ -853,6 +853,41 @@ step("clinical-web-v1", async () => {
   await sql`DROP TRIGGER IF EXISTS clinical_web_operation_immutable ON clinical_web_operations`;
   await sql`CREATE TRIGGER clinical_web_operation_immutable BEFORE UPDATE OR DELETE ON clinical_web_operations
     FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_web_operation()`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_clinical_wallet_exclusive() RETURNS trigger AS $$
+  BEGIN
+    IF NEW.state NOT IN ('awaiting_signature','prepared','submitted') THEN RETURN NEW; END IF;
+    PERFORM pg_advisory_xact_lock(hashtext('private-user:' || NEW.source_wallet));
+    IF TG_TABLE_NAME <> 'clinical_web_operations' AND EXISTS(
+      SELECT 1 FROM clinical_web_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+      RAISE EXCEPTION 'another_operation_pending';
+    END IF;
+    IF TG_TABLE_NAME <> 'private_operations' AND to_regclass('public.private_operations') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM private_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    IF TG_TABLE_NAME <> 'clinical_transaction_attempts' AND to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM clinical_transaction_attempts WHERE source_wallet=NEW.source_wallet AND state IN ('prepared','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_web_operations`;
+  await sql`CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_web_operations
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive()`;
+  await sql`DO $$ BEGIN
+    IF to_regclass('public.private_operations') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON private_operations;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON private_operations
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+    IF to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_transaction_attempts;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_transaction_attempts
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+  END $$`;
 });
 
 // Clinical SOW 2 storage is deliberately opt-in. Existing deployments and
