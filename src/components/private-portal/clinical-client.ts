@@ -11,6 +11,9 @@ const HASH = /^[a-f0-9]{64}$/i;
 const actions = ['create_history', 'append_version', 'set_permissions'];
 const states = ['awaiting_signature', 'submitted', 'confirmed', 'failed', 'cancelled'];
 const messages: Record<string, string> = {
+  clinical_configuration_unavailable: 'El historial privado aún no está habilitado en este entorno de prueba.',
+  clinical_account_funding_required: 'Tu cuenta de Testnet necesita preparación antes de crear el historial. Solicita revisar el acceso de prueba.',
+  clinical_chain_unavailable: 'No pudimos comprobar el registro en Stellar. Vuelve a consultar sin preparar otra firma.',
   clinical_version_conflict: 'Existe una versión más reciente. Actualiza el historial antes de corregirla.',
   clinical_permission_conflict: 'Los permisos cambiaron. Actualiza antes de confirmar.',
   clinical_file_invalid: 'Revisa el formato y el tamaño del archivo. El máximo es 3 MB.',

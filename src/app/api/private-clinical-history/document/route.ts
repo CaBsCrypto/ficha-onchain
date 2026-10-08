@@ -15,7 +15,7 @@ export function GET(request: Request) {
     const doc = await clinicalDocument(request, actor, own.history.id, entryId, Number(versionText));
     if (doc.metadata.mediaType === 'application/json') return clinicalJson({ note: clinicalNote(JSON.parse(Buffer.from(doc.content).toString('utf8'))) });
     return new Response(new Uint8Array(doc.content), { headers: {
-      'Cache-Control': 'no-store', 'Vary': 'Authorization', 'Content-Type': 'application/octet-stream',
+      'Cache-Control': 'no-store', 'Vary': 'Authorization', 'Content-Type': doc.metadata.mediaType,
       'Content-Disposition': `attachment; filename="archivo-clinico"; filename*=UTF-8''${encodeURIComponent(doc.metadata.fileName).replace(/'/g, '%27')}`,
       'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox",
     } });
