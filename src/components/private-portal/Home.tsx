@@ -25,6 +25,7 @@ export function PortalHome({ role }: { role: PortalRole }) {
         <div><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-700">Tu portal · Testnet</p><h1>Tu espacio de atención</h1><p className="mt-3 text-base text-slate-600">Tus consultas y recetas, en un solo lugar.</p></div>
         <Link href="/patient?tab=consultas" data-patient-home-card><span><PatientIcon name="consultas" /></span><div><h2>Mis consultas</h2><p>Reserva un horario y revisa tu atención.</p></div><span aria-hidden="true">→</span></Link>
         <Link href="/patient?tab=recetas" data-patient-home-card><span><PatientIcon name="recetas" /></span><div><h2>Mis recetas</h2><p>Abre tus documentos y consulta su estado.</p></div><span aria-hidden="true">→</span></Link>
+        <Link href="/patient?tab=historial" data-patient-home-card><span><PatientIcon name="historial" /></span><div><h2>Mi historial privado</h2><p>Guarda antecedentes, archivos y permisos.</p></div><span aria-hidden="true">→</span></Link>
         <p className="text-xs leading-5">Datos sintéticos · Sin uso clínico · Stellar Testnet</p>
       </div>
     </section>}
@@ -34,6 +35,7 @@ export function PortalHome({ role }: { role: PortalRole }) {
       <Link href={`${base}?tab=consultas`} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-sky-300"><h2 className="font-semibold text-slate-800">Mis consultas</h2><p className="mt-2 text-sm text-slate-500">{role === 'doctor' ? 'Inicia la consulta y prepara la receta para el paciente correcto.' : 'Reserva, confirma tu asistencia y autoriza por separado una emisión.'}</p></Link>
       <Link href={`${base}?tab=recetas`} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-sky-300"><h2 className="font-semibold text-slate-800">Mis recetas</h2><p className="mt-2 text-sm text-slate-500">{role === 'doctor' ? 'Consulta el estado, activa y revoca tus recetas con tu firma.' : 'Consulta sus estados y abre tus documentos privados.'}</p></Link>
     </div>
+    {role === 'patient' && <Link href="/patient?tab=historial" className="block rounded-2xl border border-sky-200 bg-white p-6 shadow-sm hover:border-sky-400"><h2 className="font-semibold text-slate-800">Mi historial privado</h2><p className="mt-2 text-sm text-slate-500">Conserva tus antecedentes y archivos, consulta sus versiones y gestiona permisos para médicos.</p></Link>}
     {role === 'doctor' && <Link href="/doctor?tab=disponibilidad" className="inline-block rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-700">Configurar mi disponibilidad</Link>}
     <p className="text-xs text-slate-500">Entorno de prueba con datos sintéticos. Tus confirmaciones se firman con Privy y TrustLeaf cubre las comisiones.</p>
   </div></>;
