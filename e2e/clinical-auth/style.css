@@ -1,0 +1,27 @@
+:root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #163044; background: #eef4f7; font-synthesis: none; line-height: 1.6; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 36px 18px; }
+.panel { width: min(100%, 680px); margin: 0 auto; padding: 32px; background: #fff; border: 1px solid #d5e3ea; border-radius: 18px; box-shadow: 0 12px 40px #1630440d; }
+.eyebrow { margin: 0 0 10px; color: #2a6579; font-size: 12px; font-weight: 750; letter-spacing: .12em; }
+h1 { margin: 0 0 14px; font-size: clamp(24px, 4.8vw, 32px); line-height: 1.2; letter-spacing: -.025em; }
+h2 { margin: 0 0 8px; font-size: 19px; }
+p { margin: 0 0 14px; }
+.intro { color: #425d6e; }
+.details { display: grid; gap: 14px; margin: 24px 0; padding: 18px; background: #f4f8fa; border-radius: 12px; }
+.details div { min-width: 0; }
+dt { font-size: 12px; font-weight: 750; color: #425d6e; }
+dd { margin: 3px 0 0; overflow-wrap: anywhere; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.session { margin: 24px 0; }
+button { min-height: 46px; padding: 10px 18px; border: 1px solid #086985; border-radius: 9px; font: inherit; font-weight: 700; color: #fff; background: #086985; cursor: pointer; }
+button:hover:enabled { background: #04536a; }
+button:disabled { opacity: .55; cursor: default; }
+button.secondary { color: #163044; background: #fff; border-color: #9bb5c3; }
+button.secondary:hover:enabled { background: #f4f8fa; }
+button.authorize { width: 100%; }
+button:focus-visible, input:focus-visible { outline: 3px solid #2a96b4; outline-offset: 4px; }
+.confirmation { display: flex; align-items: flex-start; gap: 12px; margin: 22px 0; padding: 16px; border: 1px solid #ccdfe7; border-radius: 12px; font-size: 15px; }
+input[type="checkbox"] { flex: 0 0 auto; width: 20px; height: 20px; margin: 3px 0 0; accent-color: #086985; }
+.status { margin-top: 16px; color: #8b3543; }
+.status .success { color: #246348; }
+.footnote { padding-top: 18px; margin: 18px 0 0; border-top: 1px solid #d5e3ea; color: #536e7f; font-size: 13px; }
+@media (max-width: 480px) { body { padding: 16px 10px; } .panel { padding: 22px 18px; border-radius: 12px; } }
