@@ -1,6 +1,6 @@
 # SOW 2 · Semana 2
 
-Estado: código integrado y suites locales aprobadas en `cdddc17`; revisión autenticada y checks remotos pendientes; no aprobado para grabar. Semana 1 conserva su base `2d13e07`. Véanse [estado](SEMANA-2-ESTADO.md), [QA](QA-SEMANA-2.md) y [guía](GUIA-VALIDACION-SEMANA-2.md).
+Estado: código integrado y suites locales aprobadas en `cdddc17`; contribuciones #136–#138 integradas al sprint con CI/Vercel aprobados. Revisión autenticada pendiente; no aprobado para grabar. El gate del head actual se consulta en la PR principal. Semana 1 conserva su base `2d13e07`. Véanse [estado](SEMANA-2-ESTADO.md), [QA](QA-SEMANA-2.md) y [guía](GUIA-VALIDACION-SEMANA-2.md).
 
 ## Acuerdo de integración
 

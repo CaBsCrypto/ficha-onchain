@@ -49,6 +49,14 @@ Una clave clínica web nueva se configuró localmente. Su respaldo DPAPI se recu
 
 ## Validación y próximos pasos
 
+Contribuciones revisadas y fusionadas **sólo a la rama del sprint**, con CI y Vercel aprobados en sus heads:
+
+- [#136 · Núcleo clínico](https://github.com/CaBsCrypto/ficha-onchain/pull/136), `2019b79`.
+- [#137 · Interfaz del paciente](https://github.com/CaBsCrypto/ficha-onchain/pull/137), `e77dac1`.
+- [#138 · Controles finales y evidencia](https://github.com/CaBsCrypto/ficha-onchain/pull/138), `cf76346`.
+
+La PR principal está preparada en borrador contra `codex/sow2-clinical-foundation` (#135, aún sin fusionar). Consultar los checks del head actual en esa PR; los aprobados de las contribuciones no sustituyen su gate ni el recorrido real.
+
 Las rutas `/api/private-clinical-*` exigen autenticación y responden con `no-store`. La lectura verifica identidad, permisos e integridad antes de entregar contenido. GET de una operación no transmite; el reintento confirmado reutiliza el sobre persistido.
 
 Se corrigieron el foco tras preparar permisos, la comprobación del médico antes de firmar y la reconciliación de recibos históricos al cambiar el relayer. Las pruebas locales y SQL están registradas. Los checks remotos corresponden a cada PR y no sustituyen las comprobaciones siguientes:

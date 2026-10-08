@@ -15,6 +15,7 @@ Fecha: 8 de octubre de 2026. Rama `codex/sow2-sprint-2`. Este registro distingue
 | Exclusividad SQL dev | `dda2dd2`; validador `68e4259` identificado por SHA | 5 escenarios / 14 comprobaciones; 10 rollbacks, cero filas en ambas sesiones | Dos conexiones reales; sólo datos sintéticos |
 | Rechazo anónimo | Aplicación local en 3016, `64a37fd` | Historia, documento e intento: HTTP 401, `no-store`, sin contenido | Peticiones HTTP reales, sin token |
 | Recuperación de clave local | Configuración web local | Respaldo DPAPI recuperado y comparación exacta | Local, mismo usuario de Windows; no recuperación alojada |
+| CI y Vercel de contribuciones | #136 `2019b79`, #137 `e77dac1`, #138 `cf76346` | Aprobados antes de integrarlas al sprint | Remoto; no acredita configuración autenticada ni operaciones reales |
 
 Cada reporte SQL conserva el commit observado y el hash exacto del validador. El ensayo concurrente ocurrió antes del último guard de selección del médico; el bloqueo de wallet no cambió después. No se atribuye esa observación a una nueva ejecución.
 
@@ -63,4 +64,4 @@ Después de preparar permisos, el foco quedó en “Actualizar permisos · Pendi
 
 ## Cierre de revisión
 
-Sin transacciones clínicas nuevas ni cambios de main en este trabajo. Semana 1 sigue separada en `2d13e07`. La comprobación médica final y los controles de recuperación están integrados y probados. Falta acreditar los checks del último commit remoto, completar Privy y recibos reales, texto al 200 % y preview autorizado. No declarar semana 2 lista para grabar hasta cerrar esos puntos.
+Sin transacciones clínicas nuevas ni cambios de main en este trabajo. Semana 1 sigue separada en `2d13e07`. La comprobación médica final y los controles de recuperación están integrados y probados. Las contribuciones se integraron con checks aprobados; el gate de la PR principal se consulta sobre su head actual. Falta completar Privy y recibos reales, texto al 200 % y preview autorizado. No declarar semana 2 lista para grabar hasta cerrar esos puntos.
