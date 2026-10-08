@@ -30,7 +30,10 @@ function harness() {
     const proof = { hash, operationId: opId, ledger: ++ledger, historyId: '1'.repeat(64),
       signatureVerified: true, argumentsVerified: true, envelopeVerified: true, returnVerified: true,
       secretDiagnostic: 'must never enter evidence' };
-    if (payload.action === 'create_history') history = { id: proof.historyId, patient: PATIENT, createdAt: 1000 };
+    if (payload.action === 'create_history') {
+      history = { id: proof.historyId, patient: PATIENT, createdAt: 1000 };
+      grants = [{ doctorId:DOCTOR.id,doctorName:'Synthetic doctor',address:DOCTOR.address,authorized:true,canRead:false,canAppend:false,revision:0 }];
+    }
     if (payload.action === 'append_version') {
       proof.entryId = payload.entryId ?? sha(`entry:${id}`); proof.version = (payload.expectedVersion ?? 0) + 1;
       proof.commitment = sha(`commitment:${id}`);
@@ -324,6 +327,16 @@ test('preflight errors and a foreign pending operation stop before signing', asy
   assert.equal((await run(h)).status, 'failed'); assert.equal(h.calls.prepare.length, 0);
   const busy = harness(); busy.faults.snapshot = s => { s.operations.push({ id: RUN, state: 'submitted' }); };
   assert.equal((await run(busy)).error, 'clinical_rehearsal_source_busy'); assert.equal(busy.calls.prepare.length, 0);
+});
+
+test('physician ID and wallet correspondence is checked before granting permission',async()=>{
+  for (const change of [g=>{g.address=OTHER;},g=>{g.authorized=false;},g=>{g.revision=9;}]) {
+    const h=harness(); h.faults.snapshot=s=>{if(s.grants.length&&s.grants[0].revision===0)change(s.grants[0]);};
+    const report=await run(h);
+    assert.equal(report.error,'clinical_rehearsal_permissions_invalid');
+    assert.equal(h.calls.prepare.filter(p=>p.action==='set_permissions').length,0);
+    assert.equal(h.calls.sign.length,5);
+  }
 });
 
 test('completed journal inspection reaudits all receipts and content without prepare/sign', async () => {

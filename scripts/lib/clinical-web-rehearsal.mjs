@@ -133,9 +133,14 @@ async function documentValue(api, result, payload) {
 }
 function permissionValue(snapshot, doctor, payload) {
   const grants = snapshot.grants.filter(g => g.doctorId === doctor.id);
-  check(grants.length === 1 && grants[0].address === doctor.address && grants[0].authorized === true &&
+  check(grants.length === 1 && grants[0].address === doctor.address && (!(payload.canRead || payload.canAppend) || grants[0].authorized === true) &&
     grants[0].canRead === payload.canRead && grants[0].canAppend === payload.canAppend &&
     grants[0].revision === payload.expectedRevision + 1, 'clinical_rehearsal_permissions_invalid');
+}
+function permissionTarget(snapshot, doctor, payload) {
+  const grants = snapshot.grants.filter(g => g.doctorId === doctor.id);
+  check(grants.length === 1 && grants[0].address === doctor.address && grants[0].revision === payload.expectedRevision &&
+    (!(payload.canRead || payload.canAppend) || grants[0].authorized === true), 'clinical_rehearsal_permissions_invalid');
 }
 function allEntries(snapshot, state) {
   const versions = state.steps.filter(s => s.result?.entryId);
@@ -202,7 +207,9 @@ export async function rehearseClinicalWeb({ api, audit, journal, runId, patient,
       snapshot = snapshotValue(await api.snapshot(), state);
       if (current.phase === 'planned') {
         if (mode !== 'execute' || !allowWrites) return report('pending', 'clinical_rehearsal_writes_disabled');
-        current.payload = payloadFor(state, index); current.phase = 'preparing'; await save();
+        current.payload = payloadFor(state, index);
+        if (index >= 5) permissionTarget(snapshot, doctor, current.payload);
+        current.phase = 'preparing'; await save();
       }
       if (current.phase === 'preparing') {
         if (mode !== 'execute' || !allowWrites) {
@@ -220,6 +227,7 @@ export async function rehearseClinicalWeb({ api, audit, journal, runId, patient,
       if (current.phase === 'prepared') {
         if (mode !== 'execute' || !allowWrites) return report('pending', 'clinical_rehearsal_writes_disabled');
         check(current.operation.expiresAt * 1000 > now(), 'clinical_rehearsal_signature_expired');
+        if (index >= 5) permissionTarget(snapshot, doctor, current.payload);
         await identity(); current.phase = 'signing'; await save();
         let response;
         try { response = await api.sign(current.requestId); }
