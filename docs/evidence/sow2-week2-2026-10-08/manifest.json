@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceCommit": "cdddc179fa707168d9bb90d5b1554f9dad4425ac",
   "scope": "SOW 2 week 2 review evidence",
-  "classification": "SQL reports are reversible real dev checks. Screenshots use synthetic fixtures; no real Privy or Stellar operations are claimed.",
+  "classification": "SQL reports are reversible real dev checks. Screenshots use synthetic fixtures. The supplemental flow report uses isolated SQL, Privy and RPC adapters; no authentic sessions or new Stellar operations are claimed.",
   "algorithm": "SHA-256",
   "textEncoding": "UTF-8 LF",
   "files": [
@@ -10,6 +10,12 @@
       "path": "clinical-web-concurrency.json",
       "bytes": 4978,
       "sha256": "383612f884c0703ea66ca5ddf233364b6124473a4948e8ab44e7ce554c04954a"
+    },
+    {
+      "path": "clinical-web-flows.json",
+      "bytes": 5057,
+      "sha256": "ae5277f1b0de7447c601acc44b78df86302f353a1161b88b2ced5561b9943f2c",
+      "sourceCommit": "49099ae45533e6b269a98382e62bc7095a050489"
     },
     {
       "path": "clinical-web-schema.json",
@@ -71,5 +77,6 @@
       "bytes": 3821,
       "sha256": "5ff2234ac286282d21b8d5f008e237a8b4554ec71fa596fa06550d8f49f933fd"
     }
-  ]
+  ],
+  "supplementalSourceCommit": "49099ae45533e6b269a98382e62bc7095a050489"
 }

@@ -16,12 +16,15 @@ Fecha: 8 de octubre de 2026. Rama `codex/sow2-sprint-2`. Este registro distingue
 | Rechazo anónimo | Aplicación local en 3016, `64a37fd` | Historia, documento e intento: HTTP 401, `no-store`, sin contenido | Peticiones HTTP reales, sin token |
 | Recuperación de clave local | Configuración web local | Respaldo DPAPI recuperado y comparación exacta | Local, mismo usuario de Windows; no recuperación alojada |
 | CI y Vercel de contribuciones | #136 `2019b79`, #137 `e77dac1`, #138 `cf76346` | Aprobados antes de integrarlas al sprint | Remoto; no acredita configuración autenticada ni operaciones reales |
+| Recorrido clínico encadenado | `49099ae`, validador `--isolated` | 296 pruebas / 14 suites de aplicación, 58 privadas seleccionadas y 14 del contrato clínico; aprobadas | Automatizado aislado; SQL, Privy y RPC simulados |
+| TypeScript tras añadir el recorrido | `66dfb16`, local | Cero errores; el único cambio posterior de código fue el formato TAP del runner | Automatizado |
 
 Cada reporte SQL conserva el commit observado y el hash exacto del validador. El ensayo concurrente ocurrió antes del último guard de selección del médico; el bloqueo de wallet no cambió después. No se atribuye esa observación a una nueva ejecución.
 
 - [Restricciones SQL](../evidence/sow2-week2-2026-10-08/clinical-web-schema.json).
 - [Concurrencia SQL](../evidence/sow2-week2-2026-10-08/clinical-web-concurrency.json).
 - [Verificación integrada](../evidence/sow2-week2-2026-10-08/verification.json) y [manifiesto de archivos](../evidence/sow2-week2-2026-10-08/manifest.json).
+- [Ensayo encadenado y suites seleccionadas](../evidence/sow2-week2-2026-10-08/clinical-web-flows.json), con commit, SHA, cifras y límites propios; no sustituye las cifras de la suite completa histórica.
 
 El ensayo concurrente demostró que PostgreSQL retiene el mismo advisory lock y que el segundo INSERT espera al primer backend. Al revertir la primera transacción, el segundo continúa y también se revierte. **No demuestra un conflicto tras COMMIT**, porque no confirmó ninguna fila. Las restricciones entre colas se comprobaron por separado dentro de una transacción; no confundirlas con observación de transacciones de Stellar.
 
@@ -45,6 +48,11 @@ El ensayo concurrente demostró que PostgreSQL retiene el mismo advisory lock y 
 | S2-14 | Preview | Base y claves aisladas, escrituras apagadas antes de revisión | PR del sprint | Alta | Pendiente de autorización específica; no secretos transferidos |
 | S2-15 | Cambio de relayer y recibo guardado | GET puede reconciliar un éxito comprobado con el firmante histórico aunque cambie el relayer; retry exige el actual y conserva el sobre | `8c21c69`, `clinical-operations`, `clinical-chain` | Alta | Corregido y aprobado de forma aislada; proveedor real pendiente |
 | S2-16 | Estado archivado o recibo fuera de retención | No crear otra historia ni confirmar una respuesta incierta | Guardas y guía de inspección | Alta | Límite declarado; restauración real y recuperación excepcional pendientes de procedimiento/evidencia |
+| S2-17 | Recorrido sobre un mismo historial | Rutas reales crean/confirman, cifran, leen y corrigen; PDF v1/v2 conservados, permiso de lectura sin agregado, retiro rechazando lectura técnica médica y otra cuenta sin contenido; retry conserva sobre y firma | `831d0f7`; runner en `49099ae`, reporte encadenado | Alta | Automatizado aprobado; no equivale a prueba con proveedores reales |
+
+El caso encadenado usa seis operaciones simuladas, seis firmas Ed25519 locales, siete envíos simulados (uno es reintento del mismo sobre), tres versiones cifradas y cero intentos pendientes. Las peticiones posteriores usan la misma memoria controlada: no acreditan persistencia después de reiniciar Neon. El lector médico es técnico, sin implementar el portal de semana 3. El PDF valida bytes y versiones, no su presentación visual. La respuesta perdida de este caso ocurre antes de aceptar el sobre; los demás fallos de RPC se cubren en las suites específicas.
+
+El runner exige modo explícito `--isolated`, elimina credenciales heredadas y usa `envDir: false`; rechaza suites faltantes y cambios tracked de fuentes sin commit. El primer ensayo detectó que Node emitía un formato distinto al esperado: falló el conteo del runner aunque las pruebas privadas terminaron con exit 0. Se fijó `--test-reporter=tap`, se repitió el comando y el reporte enlazado acredita la ejecución aprobada.
 
 ## Revisión visual con fixtures
 
