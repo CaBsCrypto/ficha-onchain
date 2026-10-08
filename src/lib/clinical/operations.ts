@@ -68,7 +68,16 @@ async function eligible(actor: ClinicalActor, row: Row, replay = false) {
   } else {
     const grant = await c.grant(e.historyId, e.doctor!);
     if ((grant?.revision ?? 0) !== e.expectedRevision) throw new PrivateFlowError('clinical_permission_conflict');
-    if ((e.canRead || e.canAppend) && !await c.doctorAuthorized(e.doctor!)) throw new PrivateFlowError('doctor_not_authorized', 403);
+    if (e.canRead || e.canAppend) {
+      // Re-resolve the original selected doctor immediately before signing or
+      // replaying a saved envelope. A wallet-only legacy intent may be audited
+      // or withdrawn, but never newly grant access to an unbound app target.
+      if (!Number.isSafeInteger(e.doctorId) || Number(e.doctorId) < 1) throw new PrivateFlowError('clinical_saved_intent_invalid', 503);
+      const target = await resolveDoctor(getDb(), e.doctorId!);
+      if (target.address !== e.doctor || target.doctor.status !== 'active' || !await c.doctorAuthorized(e.doctor!)) {
+        throw new PrivateFlowError('doctor_not_authorized', 403);
+      }
+    }
   }
 }
 export async function prepareClinicalOperation(user: AuthedUser, actor: ClinicalActor, input: ClinicalPrepareRequest) {
@@ -113,7 +122,7 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
         const grant = await c.grant(e.historyId, d.address);
         if ((grant?.revision ?? 0) !== input.expectedRevision) throw new PrivateFlowError('clinical_permission_conflict');
         if ((input.canRead || input.canAppend) && (d.doctor.status !== 'active' || !await c.doctorAuthorized(d.address))) throw new PrivateFlowError('doctor_not_authorized', 403);
-        e = { ...e, doctor: d.address, canRead: input.canRead!, canAppend: input.canAppend!, expectedRevision: input.expectedRevision! };
+        e = { ...e, doctorId: input.doctorId!, doctor: d.address, canRead: input.canRead!, canAppend: input.canAppend!, expectedRevision: input.expectedRevision! };
       }
     }
     const tx = await c.prepare(actor.address, input.action, e);
@@ -153,7 +162,9 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
       row = (await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_request_expired',updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
     }
     if (row.state !== 'submitted') return { operation: clinicalPublicOperation(row) };
-    assertClinicalSavedEnvelope(row as ClinicalSavedEnvelope);
+    // Audit the saved payer signature independently of current relayer secrets.
+    // Rotating a payer must not hide an already executed exact receipt.
+    assertClinicalSavedEnvelope(row as ClinicalSavedEnvelope, { historical: true });
     const c = chain(), receipt = await c.receipt(row.transaction_hash);
     if (receipt.status === 'SUCCESS' || receipt.status === 'FAILED') {
       if (!receipt.envelopeXdr || receipt.envelopeXdr.toXDR('base64') !== row.signed_xdr) throw new PrivateFlowError('clinical_receipt_mismatch', 503);
@@ -190,7 +201,7 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
       try { await eligible(actor, row, true); }
       catch { return { operation: { ...clinicalPublicOperation(row), errorCode: 'clinical_retry_unavailable' } }; }
       // No new preparation, signing, fee bump or hash. Uncertainty retains the saved attempt.
-      try { await c.submit(row.signed_xdr); } catch { /* Recoverable; keep submitted. */ }
+      try { assertClinicalSavedEnvelope(row as ClinicalSavedEnvelope); await c.submit(row.signed_xdr); } catch { /* Recoverable; keep submitted. */ }
     }
     return { operation: clinicalPublicOperation(row) };
   });

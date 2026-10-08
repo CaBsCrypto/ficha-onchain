@@ -42,7 +42,7 @@ const USER = /^did:privy:[A-Za-z0-9_-]{1,128}$/;
 const ACTIONS: ClinicalAction[] = ['create_history', 'append_version', 'set_permissions'];
 const STATES: ClinicalOperationState[] = ['awaiting_signature', 'submitted', 'confirmed', 'failed', 'cancelled'];
 const TERMINAL: ClinicalOperationState[] = ['confirmed', 'failed', 'cancelled'];
-const EXPECTED_KEYS = ['historyId', 'patient', 'operationId', 'entryId', 'author', 'commitment', 'previousCommitment', 'expectedVersion', 'expectedGrantRevision', 'doctor', 'canRead', 'canAppend', 'expectedRevision'];
+const EXPECTED_KEYS = ['historyId', 'patient', 'operationId', 'entryId', 'author', 'commitment', 'previousCommitment', 'expectedVersion', 'expectedGrantRevision', 'doctorId', 'doctor', 'canRead', 'canAppend', 'expectedRevision'];
 const CONTEXT_KEYS = ['schemaVersion', 'network', 'contractId', 'historyId', 'entryId', 'author', 'patient', 'version', 'previousCommitment'];
 function invalid(): never { throw Error('clinical_storage_invalid'); }
 function check(value: unknown, regex: RegExp): asserts value is string {
@@ -77,11 +77,12 @@ function expected(value: unknown, action: ClinicalAction, source: string): Clini
   }
   for (const key of ['author', 'doctor']) if (key in e) check(e[key], WALLET);
   for (const key of ['expectedVersion', 'expectedGrantRevision', 'expectedRevision']) if (key in e) uint(e[key], true);
+  if ('doctorId' in e) { uint(e.doctorId); if (Number(e.doctorId) > 2_147_483_647) invalid(); }
   for (const key of ['canRead', 'canAppend']) if (key in e && typeof e[key] !== 'boolean') invalid();
   const permitted = action === 'append_version'
     ? ['historyId', 'patient', 'operationId', 'entryId', 'author', 'commitment', 'previousCommitment', 'expectedVersion', 'expectedGrantRevision']
     : action === 'set_permissions'
-      ? ['historyId', 'patient', 'operationId', 'doctor', 'canRead', 'canAppend', 'expectedRevision']
+      ? ['historyId', 'patient', 'operationId', 'doctorId', 'doctor', 'canRead', 'canAppend', 'expectedRevision']
       : ['historyId', 'patient', 'operationId'];
   if (Object.keys(e).some(key => !permitted.includes(key))) invalid();
   if (action === 'append_version') {
