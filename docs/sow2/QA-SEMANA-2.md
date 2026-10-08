@@ -78,4 +78,3 @@ Sin transacciones clínicas nuevas ni cambios de main en este trabajo. Semana 1 
 Se preparó una contribución independiente desde `0e66f9a`, sin nuevas transacciones ni cambios de main. Código comprobado `a79bfb9`: **929 pruebas de aplicación, 243 privadas, TypeScript y build aprobados**. Los nuevos 80 casos del validador están incluidos en la suite privada. El ingreso real de Privy, preflight efectivo y recorrido de ocho transacciones continúan pendientes; no se atribuyen a los resultados aislados.
 
 Ver [registro de preparación](../evidence/sow2-week2-api-rehearsal-2026-10-08/PREPARATION.md) y [guía del ensayo](ENSAYO-API-TESTNET-SEMANA-2.md). La preparación y lectura se separan de la ejecución explícita; las respuestas inciertas conservan el mismo intento. Los resultados guardados no se presentan como vigentes cuando falla su nueva verificación.
-
