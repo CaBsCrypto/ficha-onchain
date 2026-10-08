@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { Account, Address, Asset, BASE_FEE, Contract, FeeBumpTransaction, Keypair, Memo, Networks, Operation,
   Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { CLINICAL_CONTRACT, CLINICAL_WASM, assertClinicalSavedEnvelope, assertClinicalUnsigned, clinicalInvocation,
@@ -137,6 +138,15 @@ describe('clinical invocation and owner boundary', () => {
     expect(() => assertClinicalSavedEnvelope(row)).not.toThrow();
     expect(() => sponsorClinicalSignature(row.unsigned_xdr, patient.publicKey(), patient.sign(Buffer.from(row.signing_hash, 'hex')).toString('hex'), 'create_history', create)).toThrow('signature_request_expired');
   });
+  it('checks historical signatures after payer rotation without permitting a new submission by that payer', () => {
+    const row = saved();
+    delete process.env.RELAYER_SECRET;
+    expect(() => assertClinicalSavedEnvelope(row, { historical: true })).not.toThrow();
+    expect(() => assertClinicalSavedEnvelope(row)).toThrow();
+    const changed = TransactionBuilder.fromXDR(row.signed_xdr, Networks.TESTNET) as FeeBumpTransaction;
+    changed.sign(doctor);
+    expect(() => assertClinicalSavedEnvelope({ ...row, signed_xdr: changed.toXDR() }, { historical: true })).toThrow();
+  });
   it('missing or malformed relayer fails closed', () => {
     delete process.env.RELAYER_SECRET;
     const unsigned = build();
@@ -148,7 +158,7 @@ function fixture() {
   const state = { ledger: 100, failure: '', restore: false, auth: [] as xdr.SorobanAuthorizationEntry[], missing: '',
     missingAccount: '', wrongNetwork: false, code: CLINICAL_WASM, head: 1, authorized: true, commitment: '5'.repeat(64),
     history: { history_id: Buffer.from(historyId, 'hex'), patient: patient.publicKey(), created_at: BigInt(1) },
-    calls: [] as string[], sent: [] as string[] };
+    proofDigest: '', proofCommitment: '', proofKind: 'Version', calls: [] as string[], sent: [] as string[] };
   const server = {
     getNetwork: vi.fn(async () => ({ passphrase: state.wrongNetwork ? Networks.PUBLIC : Networks.TESTNET })),
     getLedgerEntries: vi.fn(async (key: xdr.LedgerKey) => {
@@ -173,6 +183,10 @@ function fixture() {
         get_history: state.history, get_history_for_patient: state.history, get_entry: { author: patient.publicKey(), head_version: state.head },
         get_grant: { can_read: true, can_append: false, revision: BigInt(1) }, is_authorized: state.authorized,
         get_version: { author: patient.publicKey(), commitment: Buffer.from(state.commitment, 'hex'), previous_commitment: null, version: 1, created_at: BigInt(2) } };
+      const appendPayload = xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('append'), new Address(CLINICAL_CONTRACT).toScVal(),
+        clinicalInvocation('append_version', append).body().invokeHostFunctionOp().hostFunction().invokeContract().args()[0]]);
+      values.get_operation = { digest: Buffer.from(state.proofDigest || createHash('sha256').update(appendPayload.toXDR()).digest('hex'), 'hex'),
+        outcome: [state.proofKind, { ...(values.get_version as object), commitment: Buffer.from(state.proofCommitment || state.commitment, 'hex') }] };
       const result = { latestLedger: state.ledger, transactionData: {}, result: { auth: state.auth, retval: nativeToScVal(values[method], { type: method === 'interface_version' ? 'u32' : undefined }) } };
       return state.restore ? { ...result, restorePreamble: { transactionData: {} } } : result;
     }),
@@ -244,6 +258,24 @@ describe('clinical Testnet RPC boundary', () => {
     expect((await f.chain.receipt(row.transaction_hash)).status).toBe('NOT_FOUND');
     f.server.getTransaction = vi.fn(async () => ({ status: 'SUCCESS', ledger: 100, envelopeXdr: build().toEnvelope() })) as typeof f.server.getTransaction;
     await expect(f.chain.receipt(row.transaction_hash)).rejects.toThrow('clinical_chain_unavailable');
+  });
+  it('reads durable operation evidence without a recent RPC receipt or transmission', async () => {
+    const f = fixture();
+    await expect(f.chain.verifyRecordedOperation('append_version', append)).resolves.toBe(true);
+    expect(f.state.calls).toContain('get_operation');
+    expect(f.server.getTransaction).not.toHaveBeenCalled();
+    expect(f.server.sendTransaction).not.toHaveBeenCalled();
+  });
+  it('rejects missing, mismatched digest, different outcome or altered commitment', async () => {
+    for (const mutate of [
+      (f: ReturnType<typeof fixture>) => { f.state.missing = 'get_operation'; },
+      (f: ReturnType<typeof fixture>) => { f.state.proofDigest = 'a'.repeat(64); },
+      (f: ReturnType<typeof fixture>) => { f.state.proofKind = 'Permissions'; },
+      (f: ReturnType<typeof fixture>) => { f.state.proofCommitment = 'c'.repeat(64); },
+    ]) {
+      const f = fixture(); mutate(f);
+      await expect(f.chain.verifyRecordedOperation('append_version', append)).rejects.toThrow('clinical_chain_unavailable');
+    }
   });
 });
 

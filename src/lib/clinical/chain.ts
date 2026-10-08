@@ -95,8 +95,8 @@ function checkSingleSignature(tx: Transaction | FeeBumpTransaction, address: str
   const key = Keypair.fromPublicKey(address), signatures = tx.signatures;
   if (signatures.length !== 1 || !signatures[0].hint().equals(key.signatureHint()) || !key.verify(tx.hash(), signatures[0].signature())) throw invalid();
 }
-function assertFeeBump(tx: Transaction | FeeBumpTransaction) {
-  if (!(tx instanceof FeeBumpTransaction) || tx.networkPassphrase !== Networks.TESTNET || tx.feeSource !== relayer().publicKey() ||
+function assertFeeBump(tx: Transaction | FeeBumpTransaction, historical = false) {
+  if (!(tx instanceof FeeBumpTransaction) || tx.networkPassphrase !== Networks.TESTNET || (!historical && tx.feeSource !== relayer().publicKey()) ||
       BigInt(tx.fee) > MAX_FEE || BigInt(tx.fee) <= BigInt(tx.innerTransaction.fee)) throw invalid();
   checkSingleSignature(tx, tx.feeSource);
   checkSingleSignature(tx.innerTransaction, tx.innerTransaction.source);
@@ -125,7 +125,7 @@ export interface ClinicalSavedEnvelope {
 }
 /** This record must come from the persistent server store. Expired signed
  * envelopes remain verifiable for reconciliation; never re-sign a pending row. */
-export function assertClinicalSavedEnvelope(row: ClinicalSavedEnvelope) {
+export function assertClinicalSavedEnvelope(row: ClinicalSavedEnvelope, options: { historical?: boolean } = {}) {
   try {
     const unsigned = TransactionBuilder.fromXDR(row.unsigned_xdr, Networks.TESTNET);
     if (!(unsigned instanceof Transaction) || !HEX.test(row.signing_hash) || !HEX.test(row.transaction_hash) ||
@@ -133,7 +133,10 @@ export function assertClinicalSavedEnvelope(row: ClinicalSavedEnvelope) {
         (row.method !== undefined && row.method !== CLINICAL_METHODS[row.action])) throw invalid();
     assertClinicalUnsigned(unsigned, row.source_wallet, row.action, row.expected);
     if (unsigned.hash().toString('hex') !== row.signing_hash) throw invalid();
-    const signed = assertFeeBump(TransactionBuilder.fromXDR(row.signed_xdr, Networks.TESTNET));
+    // Historical receipts retain their payer's public key and verifiable
+    // signature even after a relayer rotation. New submissions still require
+    // the currently configured payer.
+    const signed = assertFeeBump(TransactionBuilder.fromXDR(row.signed_xdr, Networks.TESTNET), options.historical);
     assertClinicalBody(signed.innerTransaction, row.source_wallet, row.action, row.expected);
     if (signed.hash().toString('hex') !== row.transaction_hash || !signed.innerTransaction.hash().equals(unsigned.hash())) throw invalid();
     return signed;
@@ -239,6 +242,35 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server('htt
         historyId, entryId, patient: h.patient, author: value.author, version,
         previousCommitment: value.previous_commitment === null ? null : hex32(value.previous_commitment) });
       return { context, commitment: hex32(value.commitment), createdAt: number(value.created_at), state: 'confirmed' as const };
+    }),
+    /** Durable contract receipt, independent of RPC transaction retention.
+     * The database may only reach confirmed after an exact successful envelope.
+     * Re-reading this proof also checks the immutable invocation and outcome. */
+    verifyRecordedOperation: (action: ClinicalAction, expected: ClinicalExpected) => checked(async () => {
+      const invocation = clinicalInvocation(action, expected).body().invokeHostFunctionOp().hostFunction().invokeContract();
+      const payload = action === 'create_history'
+        ? [xdr.ScVal.scvSymbol('create'), new Address(CLINICAL_CONTRACT).toScVal(), wallet(expected.patient), bytes(expected.historyId), bytes(expected.operationId)]
+        : [xdr.ScVal.scvSymbol(action === 'append_version' ? 'append' : 'grant'), new Address(CLINICAL_CONTRACT).toScVal(), invocation.args()[0]];
+      const digest = createHash('sha256').update(xdr.ScVal.scvVec(payload).toXDR()).digest('hex');
+      const value = await read(CLINICAL_CONTRACT, 'get_operation', [wallet(action === 'append_version' ? expected.author! : expected.patient), bytes(expected.operationId)]);
+      fields(value, ['digest', 'outcome']);
+      if (hex32(value.digest) !== digest || !Array.isArray(value.outcome) || value.outcome.length !== 2) throw unavailable();
+      const [kind, result] = value.outcome;
+      if (action === 'create_history') {
+        if (kind !== 'History') throw unavailable();
+        historyValue(result, expected.historyId, expected.patient);
+      } else if (action === 'set_permissions') {
+        fields(result, ['can_read', 'can_append', 'revision']);
+        if (kind !== 'Permissions' || result.can_read !== expected.canRead || result.can_append !== expected.canAppend ||
+            number(result.revision, 1) !== expected.expectedRevision! + 1) throw unavailable();
+      } else {
+        fields(result, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
+        if (kind !== 'Version' || result.author !== expected.author || hex32(result.commitment) !== expected.commitment ||
+            number(result.version, 1) !== expected.expectedVersion! + 1 ||
+            (result.previous_commitment === null ? null : hex32(result.previous_commitment)) !== expected.previousCommitment) throw unavailable();
+        number(result.created_at);
+      }
+      return true;
     }),
     doctorAuthorized: (address: string) => checked(async () => {
       const value = await read(REGISTRY_PRIVATE, 'is_authorized', [wallet(address)]);

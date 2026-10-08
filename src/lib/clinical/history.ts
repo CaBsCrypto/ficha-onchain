@@ -90,9 +90,8 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
     if (!operation || operation.action !== 'append_version' || operation.source_wallet !== evidence.context.author ||
         operation.expected.operationId !== row.operation_id || operation.expected.commitment !== evidence.commitment || row.commitment !== evidence.commitment ||
         operation.expected.historyId !== own.history.id || operation.expected.entryId !== entryId || operation.expected.expectedVersion+1 !== version) throw new PrivateFlowError('clinical_receipt_mismatch', 503);
-    assertClinicalSavedEnvelope(operation as ClinicalSavedEnvelope);
-    const receipt = await chain.receipt(String(row.transaction_hash));
-    if (receipt.status !== 'SUCCESS' || receipt.envelopeXdr?.toXDR('base64') !== operation.signed_xdr) throw new PrivateFlowError('clinical_receipt_mismatch', 503);
+    assertClinicalSavedEnvelope(operation as ClinicalSavedEnvelope, { historical: true });
+    await chain.verifyRecordedOperation('append_version', operation.expected);
     const note = document.metadata.mediaType === 'application/json' ? clinicalNote(JSON.parse(Buffer.from(document.content).toString('utf8'))) : null;
     entries.push({ entryId, version, author: evidence.context.author, source: evidence.context.author === actor.address ? 'patient' : 'doctor',
       createdAt: evidence.createdAt, title: note?.title ?? document.metadata.fileName, mediaType: document.metadata.mediaType,
