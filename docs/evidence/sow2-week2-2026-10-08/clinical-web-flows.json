@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "isolated-clinical-web-flow-validation",
+  "startedAt": "2026-10-08T05:34:41.823Z",
+  "completedAt": "2026-10-08T05:34:48.449Z",
+  "sourceCommit": "49099ae45533e6b269a98382e62bc7095a050489",
+  "status": "passed",
+  "newStellarTransactions": 0,
+  "liveDatabaseWrites": 0,
+  "authenticPrivySessions": 0,
+  "workspaceEnvironmentFilesLoaded": false,
+  "applicationCredentialsRemovedFromChildren": true,
+  "trackedValidationSourcesMatchCommit": true,
+  "isolatedConfig": {
+    "envDir": false,
+    "sha256": "50969ed01696377aee8cabc043dc1426f35bdc0b7d99d3242cbd9fa61c491d60"
+  },
+  "checks": [
+    {
+      "id": "clinical-application-boundaries-and-shared-state-flow",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 296,
+      "testFiles": 14,
+      "sharedStateIntegrationPassed": true,
+      "allRequestedSuitesPresent": true
+    },
+    {
+      "id": "private-crypto-read-storage-and-recovery",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 58
+    },
+    {
+      "id": "clinical-contract-local-host",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 14
+    }
+  ],
+  "scope": [
+    "create and confirm history",
+    "contribute and read private content",
+    "correct while preserving versions",
+    "independent permissions and withdrawal",
+    "identity, integrity, limits, cancellation and uncertain-attempt recovery"
+  ],
+  "limitations": [
+    "SQL, Privy and RPC in the application lifecycle use controlled adapters.",
+    "Contract tests run in a local Soroban host; not Testnet.",
+    "No authenticated browser session, live database restart/persistence or new Testnet receipts are certified.",
+    "Visual review, 200% text enlargement and specifically authorized preview configuration remain separate."
+  ],
+  "sourceChecksums": [
+    {
+      "path": "src/__tests__/clinical-flow-integration.test.ts",
+      "sha256": "1906e8843a2f410ccd6541a1a227ccb32fe002d95a672e10aa0f808f4fb487db"
+    },
+    {
+      "path": "src/__tests__/clinical-api.test.ts",
+      "sha256": "546aa0ce9316535df60b201557d7ed995758c3eabcbcf0914d6205f895910960"
+    },
+    {
+      "path": "src/__tests__/clinical-chain.test.ts",
+      "sha256": "c06ff41f784158680c41bbc42d7ff4d6b669545f3ceb6e6fb69ac3f7231e0650"
+    },
+    {
+      "path": "src/__tests__/clinical-client.test.ts",
+      "sha256": "a01ae699dcdc4e5ae9c393705dc6274b6e85288f8bbdf4e4d35b173d3fd4a50d"
+    },
+    {
+      "path": "src/__tests__/clinical-document-route.test.ts",
+      "sha256": "53f66e544a61c60395553d7537af92504bb4efdefcc12ce38f4775ae0ad15270"
+    },
+    {
+      "path": "src/__tests__/clinical-history.test.ts",
+      "sha256": "368ebbf73544c468e7e0dd728b2b74dbaeca47dd6086ad9c5d6e24c55e0217c0"
+    },
+    {
+      "path": "src/__tests__/clinical-identity.test.ts",
+      "sha256": "32928131dc4d3f7d6a2b3dbad814adc1c424cabf48afeaed3d51223aec08d118"
+    },
+    {
+      "path": "src/__tests__/clinical-input.test.ts",
+      "sha256": "02576ea64723427f6777e56abf13c92f1cb1b549b148c5b97f3e43b75187e108"
+    },
+    {
+      "path": "src/__tests__/clinical-keys.test.ts",
+      "sha256": "50c315c057b7eacb997dd7ab8d00e3163bfa41d3f93125bb8edc33d7b694356b"
+    },
+    {
+      "path": "src/__tests__/clinical-operations.test.ts",
+      "sha256": "9e917dd76450f532bc00e8d1cf7d2c8a9b537c6040273c45f956b3973e4f4d20"
+    },
+    {
+      "path": "src/__tests__/clinical-permissions.test.ts",
+      "sha256": "b19d533279381a5f9331e8da9e27c05f89c38083da16df55cf301836e663ff67"
+    },
+    {
+      "path": "src/__tests__/clinical-store.test.ts",
+      "sha256": "f946570bba4eff6d8f1fa3a9dc5d2f02d92dba557a2e56038c63b2ecb989921f"
+    },
+    {
+      "path": "src/__tests__/clinical-schema.test.ts",
+      "sha256": "b29003633cfc8af08cd961f3d8f772ef7c72c68dcc67c51ca8e16841bf4a34dc"
+    },
+    {
+      "path": "src/__tests__/clinical-web-schema.test.ts",
+      "sha256": "891c7091d5adad4262e13adcea278da1effef5a394db9d85f3a125294eab35f9"
+    },
+    {
+      "path": "scripts/lib/clinical-crypto.test.mjs",
+      "sha256": "4248df3f7890e4874c3b0485d62ca1c6bb7a65367ed08cd3895a453cbe5825b3"
+    },
+    {
+      "path": "scripts/lib/clinical-read.test.mjs",
+      "sha256": "4b2d65a96cbacb55a4c505544360ae81418fd3677d3f8a765287011a2407f6aa"
+    },
+    {
+      "path": "scripts/lib/clinical-neon-store.test.mjs",
+      "sha256": "5e83fad52a9424a6278aea2e0aff9c9a329b738559060a240ef06c4383c37dbf"
+    },
+    {
+      "path": "scripts/lib/clinical-chain-write.test.mjs",
+      "sha256": "113aeaf542e1825e4ed31b151d7e187a9cf5a0f65fe7e75d3260a9ec1d517fd4"
+    },
+    {
+      "path": "scripts/validate-clinical-web-schema.test.mjs",
+      "sha256": "ce7936c4c7ca6735fbbfd7b49b2a83047bddb53c94865c857fd4763a701567ea"
+    },
+    {
+      "path": "contracts/clinical-history-private/src/test.rs",
+      "sha256": "69eb023ad46848bce2965c8ca4e70d74b77f6387d915edad29e5c7d241da62aa"
+    },
+    {
+      "path": "scripts/validate-clinical-web-flows.mjs",
+      "sha256": "5dd0d025f0b8b336a11b6d6cbaab3970443dc86a512cd5f9aa82868238a0e025"
+    }
+  ]
+}

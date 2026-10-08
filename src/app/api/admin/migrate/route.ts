@@ -714,6 +714,176 @@ const CLINICAL_STATEMENTS: Array<[string, string]> = [
     FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_attempt()`],
 ];
 
+
+// Mirrors the dev-only CLI step; excluded unless both explicit flags permit it.
+const CLINICAL_WEB_STATEMENTS: Array<[string,string]> = [
+  ["clinical_web_1", `CREATE TABLE IF NOT EXISTS clinical_web_histories (
+    history_id TEXT PRIMARY KEY CHECK (history_id ~ '^[a-f0-9]{64}$'),
+    owner_user_id TEXT NOT NULL CHECK (owner_user_id ~ '^did:privy:[A-Za-z0-9_-]{1,128}$'),
+    wallet_id TEXT NOT NULL CHECK (wallet_id ~ '^[A-Za-z0-9:_-]{1,160}$'),
+    patient_wallet TEXT NOT NULL CHECK (patient_wallet ~ '^G[A-Z2-7]{55}$'),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    network TEXT NOT NULL DEFAULT 'testnet' CHECK (network='testnet'),
+    transaction_hash TEXT NOT NULL CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(network,contract_id,owner_user_id),
+    UNIQUE(network,contract_id,patient_wallet)
+  )`],
+  ["clinical_web_2", `CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_web_history() RETURNS trigger AS $$
+  BEGIN
+    RAISE EXCEPTION 'clinical_history_binding_immutable';
+  END; $$ LANGUAGE plpgsql`],
+  ["clinical_web_3", `DROP TRIGGER IF EXISTS clinical_web_history_immutable ON clinical_web_histories`],
+  ["clinical_web_4", `CREATE TRIGGER clinical_web_history_immutable BEFORE UPDATE OR DELETE ON clinical_web_histories
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_web_history()`],
+  ["clinical_web_5", `CREATE TABLE IF NOT EXISTS clinical_web_operations (
+    id UUID PRIMARY KEY,
+    actor_user_id TEXT NOT NULL CHECK (actor_user_id ~ '^did:privy:[A-Za-z0-9_-]{1,128}$'),
+    wallet_id TEXT NOT NULL CHECK (wallet_id ~ '^[A-Za-z0-9:_-]{1,160}$'),
+    source_wallet TEXT NOT NULL CHECK (source_wallet ~ '^G[A-Z2-7]{55}$'),
+    action TEXT NOT NULL CHECK (action IN ('create_history','append_version','set_permissions')),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    network TEXT NOT NULL DEFAULT 'testnet' CHECK (network='testnet'),
+    method TEXT NOT NULL CHECK (method=action),
+    expected JSONB NOT NULL,
+    request_fingerprint TEXT NOT NULL CHECK (request_fingerprint ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[a-f0-9]{64}$'),
+    prepared_envelope JSONB CHECK (octet_length(prepared_envelope::text)<=6000000),
+    state TEXT NOT NULL CHECK (state IN ('awaiting_signature','submitted','confirmed','failed','cancelled')),
+    unsigned_xdr TEXT NOT NULL CHECK (octet_length(unsigned_xdr) BETWEEN 1 AND 1000000),
+    signing_hash TEXT NOT NULL CHECK (signing_hash ~ '^[a-f0-9]{64}$'),
+    expires_at BIGINT NOT NULL CHECK (expires_at>0),
+    signed_xdr TEXT CHECK (octet_length(signed_xdr) BETWEEN 1 AND 1000000),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    error_code TEXT CHECK (error_code ~ '^[a-z][a-z0-9_]{0,95}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    CHECK ((action='append_version')=(prepared_envelope IS NOT NULL)),
+    CHECK (prepared_envelope IS NULL OR (jsonb_typeof(prepared_envelope)='object'
+      AND prepared_envelope ?& ARRAY['schemaVersion','keyId','wrappedKey','payload']
+      AND (prepared_envelope - ARRAY['schemaVersion','keyId','wrappedKey','payload'])='{}'::jsonb
+      AND prepared_envelope->>'schemaVersion'='1'
+      AND prepared_envelope->>'keyId' ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+      AND prepared_envelope->>'wrappedKey' LIKE 'dossier:v1:%'
+      AND prepared_envelope->>'payload' LIKE 'dossier:v1:%') IS TRUE),
+    CHECK ((signed_xdr IS NULL)=(transaction_hash IS NULL)),
+    CHECK ((state IN ('awaiting_signature','cancelled') AND signed_xdr IS NULL)
+      OR (state IN ('submitted','confirmed') AND signed_xdr IS NOT NULL) OR state='failed'),
+    CHECK ((state='confirmed')=(confirmed_at IS NOT NULL)),
+    CHECK (jsonb_typeof(expected)='object' AND expected ?& ARRAY['historyId','patient','operationId']),
+    CHECK ((expected->>'historyId' ~ '^[a-f0-9]{64}$' AND expected->>'patient' ~ '^G[A-Z2-7]{55}$'
+      AND expected->>'operationId' ~ '^[a-f0-9]{64}$') IS TRUE),
+    CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb),
+    CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet)
+      OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
+        AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
+        AND expected->>'entryId' ~ '^[a-f0-9]{64}$' AND expected->>'author'=source_wallet
+        AND expected->>'commitment' ~ '^[a-f0-9]{64}$' AND jsonb_typeof(expected->'expectedVersion')='number'
+        AND (expected->>'expectedVersion')::bigint BETWEEN 0 AND 4294967295
+        AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
+          OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
+      OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
+        AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
+        AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE)
+  )`],
+  ["clinical_web_15", `DO $$ DECLARE old_check RECORD; BEGIN
+    -- Replace only the former unnamed expected-key/action checks. A server
+    -- doctorId is optional for legacy receipt reads, required by signing gates.
+    FOR old_check IN SELECT conname FROM pg_constraint
+      WHERE conrelid='clinical_web_operations'::regclass AND contype='c'
+        AND conname NOT IN ('clinical_web_expected_keys','clinical_web_expected_action')
+        AND pg_get_constraintdef(oid) LIKE '%expected - ARRAY[%'
+    LOOP
+      EXECUTE format('ALTER TABLE clinical_web_operations DROP CONSTRAINT %I', old_check.conname);
+    END LOOP;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_keys') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb);
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_action') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet)
+      OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
+        AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
+        AND expected->>'entryId' ~ '^[a-f0-9]{64}$' AND expected->>'author'=source_wallet
+        AND expected->>'commitment' ~ '^[a-f0-9]{64}$' AND jsonb_typeof(expected->'expectedVersion')='number'
+        AND (expected->>'expectedVersion')::bigint BETWEEN 0 AND 4294967295
+        AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
+          OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
+      OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
+        AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
+        AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE);
+    END IF;
+  END $$`],
+  ["clinical_web_6", `CREATE UNIQUE INDEX IF NOT EXISTS clinical_web_operations_one_live_source
+    ON clinical_web_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`],
+  ["clinical_web_7", `CREATE INDEX IF NOT EXISTS clinical_web_operations_actor
+    ON clinical_web_operations(network,contract_id,actor_user_id,created_at DESC)`],
+  ["clinical_web_8", `CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_web_operation() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_operation_immutable'; END IF;
+    IF ROW(NEW.id,NEW.actor_user_id,NEW.wallet_id,NEW.source_wallet,NEW.action,NEW.contract_id,NEW.network,
+      NEW.method,NEW.expected,NEW.request_fingerprint,NEW.prepared_envelope,NEW.unsigned_xdr,NEW.signing_hash,NEW.expires_at,NEW.created_at)
+      IS DISTINCT FROM ROW(OLD.id,OLD.actor_user_id,OLD.wallet_id,OLD.source_wallet,OLD.action,OLD.contract_id,OLD.network,
+      OLD.method,OLD.expected,OLD.request_fingerprint,OLD.prepared_envelope,OLD.unsigned_xdr,OLD.signing_hash,OLD.expires_at,OLD.created_at)
+      OR (OLD.signed_xdr IS NOT NULL AND ROW(NEW.signed_xdr,NEW.transaction_hash) IS DISTINCT FROM ROW(OLD.signed_xdr,OLD.transaction_hash))
+      OR (OLD.state IN ('confirmed','failed','cancelled') AND NEW IS DISTINCT FROM OLD) THEN
+      RAISE EXCEPTION 'clinical_operation_immutable';
+    END IF;
+    IF (OLD.state='awaiting_signature' AND NEW.state NOT IN ('awaiting_signature','submitted','failed','cancelled'))
+      OR (OLD.state='submitted' AND NEW.state NOT IN ('submitted','confirmed','failed')) THEN
+      RAISE EXCEPTION 'clinical_operation_transition_invalid';
+    END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`],
+  ["clinical_web_9", `DROP TRIGGER IF EXISTS clinical_web_operation_immutable ON clinical_web_operations`],
+  ["clinical_web_10", `CREATE TRIGGER clinical_web_operation_immutable BEFORE UPDATE OR DELETE ON clinical_web_operations
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_web_operation()`],
+  ["clinical_web_11", `CREATE OR REPLACE FUNCTION trustleaf_clinical_wallet_exclusive() RETURNS trigger AS $$
+  BEGIN
+    IF NEW.state NOT IN ('awaiting_signature','prepared','submitted') THEN RETURN NEW; END IF;
+    PERFORM pg_advisory_xact_lock(hashtext('private-user:' || NEW.source_wallet));
+    IF TG_TABLE_NAME <> 'clinical_web_operations' AND EXISTS(
+      SELECT 1 FROM clinical_web_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+      RAISE EXCEPTION 'another_operation_pending';
+    END IF;
+    IF TG_TABLE_NAME <> 'private_operations' AND to_regclass('public.private_operations') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM private_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    IF TG_TABLE_NAME <> 'clinical_transaction_attempts' AND to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM clinical_transaction_attempts WHERE source_wallet=NEW.source_wallet AND state IN ('prepared','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`],
+  ["clinical_web_12", `DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_web_operations`],
+  ["clinical_web_13", `CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_web_operations
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive()`],
+  ["clinical_web_14", `DO $$ BEGIN
+    IF to_regclass('public.private_operations') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON private_operations;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON private_operations
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+    IF to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_transaction_attempts;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_transaction_attempts
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+  END $$`],
+];
+
 export async function POST(request: Request) {
   const auth = await requirePrivyAdmin(request);
   if ("error" in auth) return auth.error;
@@ -740,7 +910,9 @@ export async function POST(request: Request) {
     } catch { /* invalid configuration is rejected below */ }
     if (!clinicalEnabled) return NextResponse.json({error:"clinical_migration_requires_isolated_dev_database"},{status:503});
   }
-  const selectedStatements = clinicalEnabled ? [...STATEMENTS, ...CLINICAL_STATEMENTS] : STATEMENTS;
+  const webEnabled = process.env.TRUSTLEAF_CLINICAL_WEB_MIGRATION === 'true';
+  if (webEnabled && !clinicalEnabled) return NextResponse.json({error:'clinical_migration_requires_isolated_dev_database'},{status:503});
+  const selectedStatements = [...STATEMENTS, ...(clinicalEnabled ? CLINICAL_STATEMENTS : []), ...(webEnabled ? CLINICAL_WEB_STATEMENTS : [])];
   const ran: string[] = [];
   const failed: Array<{ step: string; error: string }> = [];
   for (const [step, stmt] of selectedStatements) {

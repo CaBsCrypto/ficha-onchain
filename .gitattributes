@@ -3,3 +3,5 @@ docs/evidence/sow2-week1-2026-10-05/deployment.json text eol=lf
 docs/evidence/sow2-week1-runs/**/*.json text eol=lf
 docs/evidence/sow2-week1-runs/**/*.md text eol=lf
 docs/evidence/sow2-week1-runs/**/*.html text eol=lf
+docs/evidence/sow2-week2-2026-10-08/*.json text eol=lf
+docs/evidence/sow2-week2-2026-10-08/*.jpg -text

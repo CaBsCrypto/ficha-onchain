@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-10-08 05:10:16 UTC",
+  "sourceCommit": "cdddc179fa707168d9bb90d5b1554f9dad4425ac",
+  "branch": "codex/sow2-sprint-2",
+  "scope": "SOW 2 week 2: patient clinical history, files, versions and grants",
+  "environment": "local-isolated-development",
+  "clinicalWritesEnabled": false,
+  "newStellarTransactions": 0,
+  "mainModified": false,
+  "results": [
+    {
+      "command": "npm test -- --reporter=dot",
+      "type": "isolated-automated",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 928,
+      "testFilesPassed": 73
+    },
+    {
+      "command": "npm run test:private",
+      "type": "isolated-automated",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 163
+    },
+    {
+      "command": "cargo test --locked --manifest-path contracts/Cargo.toml",
+      "type": "isolated-automated",
+      "status": "passed",
+      "exitCode": 0,
+      "testsPassed": 25,
+      "byContract": {
+        "clinicalHistoryPrivate": 14,
+        "doctorRegistryPrivate": 4,
+        "prescriptionPrivate": 7
+      }
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "type": "automated",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build",
+      "type": "automated",
+      "status": "passed",
+      "exitCode": 0,
+      "nextVersion": "16.2.10"
+    },
+    {
+      "command": "node scripts/validate-clinical-web-schema.mjs --rollback",
+      "type": "live-dev-sql-rollback-only",
+      "status": "passed",
+      "checksPassed": 62,
+      "evidence": "clinical-web-schema.json",
+      "durableFixtureWrites": 0,
+      "newStellarTransactions": 0
+    },
+    {
+      "command": "node scripts/validate-clinical-web-schema.mjs --rollback --concurrency",
+      "type": "live-dev-sql-concurrent-rollback-only",
+      "status": "passed",
+      "sourceCommit": "dda2dd219e6b0ad4e7415426b1de668c9dcd6927",
+      "casesPassed": 5,
+      "checksPassed": 14,
+      "rollbacks": 10,
+      "evidence": "clinical-web-concurrency.json",
+      "limitation": "No committed-row conflict was tested; wallet lock code was not changed after this run."
+    },
+    {
+      "type": "visual-simulated-components",
+      "status": "passed",
+      "effectiveWidths": [
+        360,
+        390,
+        430
+      ],
+      "horizontalOverflowObserved": false,
+      "evidence": "historial-fixture-desktop.jpg",
+      "authentication": "fixture",
+      "providerTransactions": "none",
+      "scope": "Timeline, versions, long text, filters, forms, permission controls, loading/error, keyboard focus and preparation focus"
+    },
+    {
+      "type": "anonymous-local-http",
+      "status": "passed",
+      "sourceCommit": "64a37fd",
+      "responseStatus": 401,
+      "cacheControl": "no-store",
+      "routes": [
+        "history",
+        "document",
+        "operation"
+      ],
+      "scope": "No token and no private content; authentication gates unchanged after this observation."
+    },
+    {
+      "type": "local-key-recovery",
+      "status": "passed",
+      "scope": "DPAPI backup recovered under the same Windows user and compared exactly",
+      "limitations": "Not portable recovery or hosted key management"
+    }
+  ],
+  "pending": [
+    "Authenticated read with real Privy patient session",
+    "Approved synthetic authenticated write flow, receipt audit, persistence and account switching",
+    "Manual text enlargement to 200%",
+    "Specific authorization and configuration for an isolated preview",
+    "Remote checks on the final review PR",
+    "Archived-state restoration and exceptional recovery outside RPC retention"
+  ],
+  "evidenceClassification": "Automated fixtures, reversible real SQL and simulated visual observations are separate from real Privy/Stellar operations.",
+  "week1BasePreserved": "2d13e07"
+}

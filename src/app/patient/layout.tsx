@@ -7,10 +7,10 @@ import { privyEmail } from '@/lib/auth/privy-email';
 import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 import { PatientIcon } from '@/components/private-portal/PatientIcon';
 import styles from '@/components/private-portal/patient-mobile.module.css';
-const tabs = [{ id: 'inicio', label: 'Inicio' }, { id: 'consultas', label: 'Consultas' }, { id: 'recetas', label: 'Recetas' }, { id: 'perfil', label: 'Cuenta' }];
+const tabs = [{ id: 'inicio', label: 'Inicio' }, { id: 'consultas', label: 'Consultas' }, { id: 'historial', label: 'Historial' }, { id: 'recetas', label: 'Recetas' }, { id: 'perfil', label: 'Cuenta' }];
 function Navigation({ mobile = false }: { mobile?: boolean }) {
   const current = useSearchParams().get('tab') ?? 'inicio';
-  return <nav aria-label={mobile ? 'Menú móvil del paciente' : 'Menú del paciente'} className={mobile ? 'flex justify-around gap-1 p-2' : 'space-y-1 p-2'}>{tabs.map(tab => <Link key={tab.id} href={`/patient?tab=${tab.id}`} aria-current={current === tab.id ? 'page' : undefined} className={`${mobile ? 'flex-1 text-center' : 'block'} rounded-xl px-3 py-3 text-sm font-medium ${current === tab.id ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>{mobile && <PatientIcon name={tab.id as 'inicio' | 'consultas' | 'recetas' | 'perfil'} />}<span>{tab.label}</span></Link>)}</nav>;
+  return <nav aria-label={mobile ? 'Menú móvil del paciente' : 'Menú del paciente'} className={mobile ? 'flex justify-around gap-1 p-2' : 'space-y-1 p-2'}>{tabs.map(tab => <Link key={tab.id} href={`/patient?tab=${tab.id}`} aria-current={current === tab.id ? 'page' : undefined} className={`${mobile ? 'flex-1 text-center' : 'block'} rounded-xl px-3 py-3 text-sm font-medium ${current === tab.id ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>{mobile && <PatientIcon name={tab.id as 'inicio' | 'consultas' | 'historial' | 'recetas' | 'perfil'} />}<span>{tab.label}</span></Link>)}</nav>;
 }
 function AccountActions({ children }: { children: React.ReactNode }) {
   const current = useSearchParams().get('tab');
