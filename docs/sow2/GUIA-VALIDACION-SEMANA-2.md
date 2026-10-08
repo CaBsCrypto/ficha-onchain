@@ -37,6 +37,18 @@ Con `--rollback --concurrency`, el mismo validador comprueba el bloqueo entre do
 
 Conservar commit, comando, fecha y resultado. Los mocks no acreditan firmas reales de Privy ni Stellar. No reutilizar cifras de semana 1 para aprobar esta versión.
 
+### Ensayo del recorrido mediante script
+
+```powershell
+node scripts/validate-clinical-web-flows.mjs --isolated
+```
+
+El script reúne las suites clínicas pertinentes, un escenario encadenado con estado compartido y las pruebas del contrato clínico en un host local. El recorrido conecta crear/confirmar historia, agregar, leer, corregir conservando versiones y conceder/retirar permisos. Usa módulos de aplicación, cifrado, sobres y firmas Ed25519 locales; SQL, Privy y RPC emplean adaptadores controlados.
+
+No carga la configuración real `.env.local` ni usa credenciales de aplicación heredadas en sus procesos hijos. Vitest se ejecuta con `envDir: false`. No llama a Neon real ni genera transacciones de Testnet. Guarda un reporte saneado en `.trustleaf-local/sow2-validation/`, con commit, SHA de los archivos ejecutados, cifras y límites. Exige las 14 suites solicitadas, el escenario encadenado y las pruebas privadas y contractuales; rechaza fuentes modificadas sin commit o cualquier grupo fallido.
+
+Este ensayo comprueba la integración aislada entre módulos. La sesión auténtica, persistencia después de reiniciar la base, recibos nuevos y presentación en navegador se acreditan por separado. `validate-clinical-testnet.mjs --readback` corresponde a la ejecución técnica de semana 1 y no reemplaza el recorrido web de semana 2.
+
 ## 3. Recorrido autenticado sintético
 
 Primero ingresar y comprobar lectura con escrituras apagadas. Antes de las operaciones reales, comprobar configuración aislada, claves, saldo y ausencia de intentos inciertos. Habilitar escrituras sólo para la prueba acordada. Una wallet sin saldo requiere preparación explícita; no se financia automáticamente. El usuario introduce los códigos únicamente en Privy.
