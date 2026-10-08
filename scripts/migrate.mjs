@@ -555,7 +555,7 @@ step("private doctor dossiers", async () => {
     network TEXT NOT NULL CHECK (network = 'testnet'),
     contract_id TEXT NOT NULL,
     wallet TEXT NOT NULL,
-    version INTEGER NOT NULL CHECK (version > 0),
+    version BIGINT NOT NULL CHECK (version BETWEEN 1 AND 4294967295),
     schema_version INTEGER NOT NULL DEFAULT 1,
     valid_until BIGINT NOT NULL,
     commitment TEXT NOT NULL,
@@ -742,6 +742,98 @@ step("private operations", async () => {
   )`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS private_operations_one_live_source ON private_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`;
   await sql`CREATE INDEX IF NOT EXISTS private_operations_appointment ON private_operations(appointment_id)`;
+});
+
+// Clinical SOW 2 storage is deliberately opt-in. Existing deployments and
+// the default migration do not provision this feature accidentally.
+step("clinical-history-v1", async () => {
+  if (!process.argv.includes('--step=clinical-history-v1')) return;
+  const db = new URL(process.env.DATABASE_URL);
+  if (process.env.TRUSTLEAF_CLINICAL_MIGRATION !== 'true' ||
+      !['postgres:', 'postgresql:'].includes(db.protocol) ||
+      !/^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(db.hostname)) {
+    throw Error('clinical_migration_requires_isolated_dev_database');
+  }
+  await sql`CREATE TABLE IF NOT EXISTS clinical_private_versions (
+    network TEXT NOT NULL CHECK (network='testnet'),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    history_id TEXT NOT NULL CHECK (history_id ~ '^[a-f0-9]{64}$'),
+    entry_id TEXT NOT NULL CHECK (entry_id ~ '^[a-f0-9]{64}$'),
+    version BIGINT NOT NULL CHECK (version BETWEEN 1 AND 4294967295),
+    context JSONB NOT NULL,
+    commitment TEXT NOT NULL CHECK (commitment ~ '^[a-f0-9]{64}$'),
+    envelope JSONB NOT NULL CHECK (octet_length(envelope::text) <= 6000000),
+    operation_id TEXT NOT NULL CHECK (operation_id ~ '^[a-f0-9]{64}$'),
+    state TEXT NOT NULL CHECK (state IN ('prepared','confirmed')),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    PRIMARY KEY (network,contract_id,history_id,entry_id,version),
+    CHECK ((state='confirmed' AND transaction_hash IS NOT NULL AND confirmed_at IS NOT NULL)
+       OR (state='prepared' AND transaction_hash IS NULL AND confirmed_at IS NULL)),
+    CHECK (jsonb_typeof(context)='object' AND context ?& ARRAY['schemaVersion','network','contractId','historyId','entryId','author','patient','version','previousCommitment']),
+    CHECK ((context->>'schemaVersion'='1' AND context->>'network'=network AND context->>'contractId'=contract_id
+      AND context->>'historyId'=history_id AND context->>'entryId'=entry_id
+      AND (context->>'version')::bigint=version) IS TRUE),
+    CHECK (jsonb_typeof(envelope)='object' AND envelope ?& ARRAY['schemaVersion','keyId','wrappedKey','payload']),
+    CHECK ((envelope->>'schemaVersion'='1' AND envelope->>'keyId' ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+      AND envelope->>'wrappedKey' LIKE 'dossier:v1:%'
+      AND envelope->>'payload' LIKE 'dossier:v1:%') IS TRUE)
+  )`;
+  await sql`ALTER TABLE clinical_private_versions ALTER COLUMN version TYPE BIGINT`;
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clinical_private_versions'::regclass AND conname='clinical_version_u32') THEN
+      ALTER TABLE clinical_private_versions ADD CONSTRAINT clinical_version_u32 CHECK (version BETWEEN 1 AND 4294967295);
+    END IF;
+  END $$`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_private_version_operation
+    ON clinical_private_versions (network,contract_id,(context->>'author'),operation_id)`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_version() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_version_immutable'; END IF;
+    IF ROW(NEW.network,NEW.contract_id,NEW.history_id,NEW.entry_id,NEW.version,NEW.context,NEW.commitment,NEW.operation_id,NEW.created_at)
+       IS DISTINCT FROM ROW(OLD.network,OLD.contract_id,OLD.history_id,OLD.entry_id,OLD.version,OLD.context,OLD.commitment,OLD.operation_id,OLD.created_at)
+       OR NEW.envelope->>'payload' IS DISTINCT FROM OLD.envelope->>'payload'
+       OR (OLD.state='confirmed' AND ROW(NEW.state,NEW.transaction_hash,NEW.confirmed_at)
+           IS DISTINCT FROM ROW(OLD.state,OLD.transaction_hash,OLD.confirmed_at)) THEN
+      RAISE EXCEPTION 'clinical_version_immutable';
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_version_immutable ON clinical_private_versions`;
+  await sql`CREATE TRIGGER clinical_version_immutable BEFORE UPDATE OR DELETE ON clinical_private_versions
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_version()`;
+  await sql`CREATE TABLE IF NOT EXISTS clinical_transaction_attempts (
+    run_id UUID NOT NULL, operation_name TEXT NOT NULL CHECK (operation_name ~ '^[a-z][a-z0-9_-]{0,63}$'),
+    source_wallet TEXT NOT NULL CHECK (source_wallet ~ '^G[A-Z2-7]{55}$'),
+    intent TEXT NOT NULL CHECK (intent ~ '^[a-f0-9]{64}$'),
+    signed_xdr TEXT CHECK (octet_length(signed_xdr)<=1000000),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    state TEXT NOT NULL CHECK (state IN ('prepared','submitted','confirmed','failed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(run_id,operation_name),
+    CHECK ((state='prepared' AND signed_xdr IS NULL AND transaction_hash IS NULL)
+      OR (state IN ('submitted','confirmed','failed') AND signed_xdr IS NOT NULL AND transaction_hash IS NOT NULL))
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_attempt_one_live_source
+    ON clinical_transaction_attempts(source_wallet) WHERE state IN ('prepared','submitted')`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_attempt() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_attempt_immutable'; END IF;
+    IF ROW(NEW.run_id,NEW.operation_name,NEW.source_wallet,NEW.intent,NEW.created_at)
+      IS DISTINCT FROM ROW(OLD.run_id,OLD.operation_name,OLD.source_wallet,OLD.intent,OLD.created_at)
+      OR (OLD.signed_xdr IS NOT NULL AND ROW(NEW.signed_xdr,NEW.transaction_hash) IS DISTINCT FROM ROW(OLD.signed_xdr,OLD.transaction_hash))
+      OR (OLD.state IN ('confirmed','failed') AND NEW.state IS DISTINCT FROM OLD.state) THEN
+      RAISE EXCEPTION 'clinical_attempt_immutable';
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_attempt_immutable ON clinical_transaction_attempts`;
+  await sql`CREATE TRIGGER clinical_attempt_immutable BEFORE UPDATE OR DELETE ON clinical_transaction_attempts
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_attempt()`;
+
 });
 
 step("doctor onboarding requests", async () => {

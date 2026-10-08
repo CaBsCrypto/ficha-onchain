@@ -48,6 +48,12 @@ export async function preparePrivateOperation(actor:AuthedUser,action:PrivateAct
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`private-user:${wallet.address}`]);
+    // Clinical and prescription intents share the wallet's Stellar sequence.
+    // The clinical schema is opt-in; existing deployments may not have it yet.
+    const clinicalSchema=(await client.query("SELECT to_regclass('public.clinical_transaction_attempts') AS relation")).rows[0]?.relation;
+    if(clinicalSchema && (await client.query("SELECT 1 FROM clinical_transaction_attempts WHERE source_wallet=$1 AND state IN ('prepared','submitted') LIMIT 1",[wallet.address])).rows.length) {
+      throw new PrivateFlowError('another_operation_pending');
+    }
     let appointmentId=resource.appointmentId;
     if(resource.prescriptionId)appointmentId=(await client.query('SELECT appointment_id FROM private_prescriptions WHERE id=$1',[resource.prescriptionId])).rows[0]?.appointment_id;
     if(!appointmentId)throw new PrivateFlowError('resource_not_found',404);

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "syntheticOnly": true,
+  "runId": "f1a575bc-0146-47e1-a192-f259876f3b82",
+  "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+  "wasmHash": "29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0",
+  "registryId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "identityEvidence": "real Ed25519 technical challenges; no Privy/browser login",
+  "database": "isolated Neon dev, direct connection",
+  "files": {
+    "pdfVersions": 2,
+    "pngVersions": 1,
+    "maximumOriginalBytes": 3000000
+  },
+  "checks": {
+    "patientIntegrityAndPreviousVersion": true,
+    "authorizedDoctorRead": true,
+    "revocationDeniesSubsequentReadAndAppend": true,
+    "alteredCiphertextRejected": true
+  },
+  "transactions": {
+    "create_history": {
+      "transactionHash": "dd033d680b0a5e494618638f2b8afc628c6e8eb57b1b6ebae1cccd14216f808c",
+      "source": "GC6HMNCSFQZNX5DQKTIKHLZ2R7A6RGBUC5NTOLEGBFCZPFSTFLXCHPM4",
+      "status": "SUCCESS",
+      "ledger": 5039582,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/dd033d680b0a5e494618638f2b8afc628c6e8eb57b1b6ebae1cccd14216f808c"
+    },
+    "grant": {
+      "transactionHash": "eace60df97769df9bfdad7fe8c4b3a32ef1928019d67c4dbadffecf547895188",
+      "source": "GC6HMNCSFQZNX5DQKTIKHLZ2R7A6RGBUC5NTOLEGBFCZPFSTFLXCHPM4",
+      "status": "SUCCESS",
+      "ledger": 5039584,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/eace60df97769df9bfdad7fe8c4b3a32ef1928019d67c4dbadffecf547895188"
+    },
+    "append_pdf": {
+      "transactionHash": "20e3c2c7070b9983270172ec037d20a302b61f5a87836a5597494ab31860b67f",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5039586,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/20e3c2c7070b9983270172ec037d20a302b61f5a87836a5597494ab31860b67f"
+    },
+    "correct_pdf": {
+      "transactionHash": "a52707ec544fb629f43b41328edbe3a984899568e0de5984e6568e6fc04acc8b",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5039588,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/a52707ec544fb629f43b41328edbe3a984899568e0de5984e6568e6fc04acc8b"
+    },
+    "append_image": {
+      "transactionHash": "1aa9f8575bd15e6690246a859f8977bfeecd33263d49a10dfeacff33a1e21060",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5039591,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/1aa9f8575bd15e6690246a859f8977bfeecd33263d49a10dfeacff33a1e21060"
+    },
+    "revoke": {
+      "transactionHash": "513f36393f6eb2d9a5099a0dcf84e185f51ebaaf547159407577092a22783424",
+      "source": "GC6HMNCSFQZNX5DQKTIKHLZ2R7A6RGBUC5NTOLEGBFCZPFSTFLXCHPM4",
+      "status": "SUCCESS",
+      "ledger": 5039598,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/513f36393f6eb2d9a5099a0dcf84e185f51ebaaf547159407577092a22783424"
+    }
+  },
+  "confirmedAttemptCount": 6,
+  "pendingAttemptCount": 0,
+  "readbackAfterProcessRestart": true,
+  "observedAt": "2026-10-05T18:11:16.593Z"
+}

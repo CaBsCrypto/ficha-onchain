@@ -288,3 +288,26 @@ describe('strict private admin profile and migration routes',()=>{
     expect(result.failed[0].error).toBe('migration_step_failed');expect(JSON.stringify(result)).not.toContain('private connection details');
   });
 });
+
+
+describe('clinical schema migration isolation', () => {
+  it('does not provision clinical storage during default migration', async () => {
+    vi.stubEnv('TRUSTLEAF_CLINICAL_MIGRATION', 'false');
+    const response = await migratePOST(post({confirm:'MIGRATE'}));
+    expect(response.status).toBe(200);
+    expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes('clinical_private_versions'))).toBe(false);
+  });
+  it('provisions clinical storage only with explicit isolated development configuration', async () => {
+    vi.stubEnv('TRUSTLEAF_CLINICAL_MIGRATION', 'true');
+    const response = await migratePOST(post({confirm:'MIGRATE'}));
+    expect(response.status).toBe(200);
+    expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes('CREATE TABLE IF NOT EXISTS clinical_private_versions'))).toBe(true);
+  });
+  it('rejects enabling clinical migration against another database before executing SQL', async () => {
+    vi.stubEnv('TRUSTLEAF_CLINICAL_MIGRATION', 'true');
+    vi.stubEnv('DATABASE_URL', 'postgres://test:test@another.example.test/test');
+    const response = await migratePOST(post({confirm:'MIGRATE'}));
+    expect(response.status).toBe(503);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+});
