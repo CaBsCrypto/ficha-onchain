@@ -236,6 +236,24 @@ export async function runRollbackProbe(client, report) {
       expected: { historyId: hex(), patient: publicWallet(), operationId: hex() },
     }));
 
+    const grant = row({ action: 'set_permissions' });
+    grant.expected = { ...grant.expected, doctor: publicWallet(), doctorId: 777,
+      canRead: true, canAppend: false, expectedRevision: 0 };
+    await insert(grant);
+    note(report, 'selected_doctor_id_allowed_for_permission_intent');
+    await reject('selected_doctor_id_immutable',
+      "UPDATE clinical_web_operations SET expected=jsonb_set(expected,'{doctorId}','778') WHERE id=$1::uuid", [grant.id]);
+    for (const [label, doctorId] of [['zero', 0], ['negative', -1], ['fractional', 1.5], ['string', '777'], ['null', null]]) {
+      const invalidGrant = row({ action: 'set_permissions' });
+      invalidGrant.expected = { ...invalidGrant.expected, doctor: publicWallet(), doctorId,
+        canRead: true, canAppend: false, expectedRevision: 0 };
+      await rejectInsert('selected_doctor_id_' + label + '_rejected', invalidGrant,
+        label === 'fractional' ? ['23514', '22P02'] : ['23514']);
+    }
+    const invalidCreate = row();
+    invalidCreate.expected.doctorId = 777;
+    await rejectInsert('selected_doctor_id_for_create_rejected', invalidCreate);
+
     const append = row();
     append.action = 'append_version';
     append.expected = { ...append.expected, entryId: hex(), author: append.source, commitment: hex(),
