@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { StrKey } from '@stellar/stellar-sdk';
-import { rehearseClinicalWeb } from './clinical-web-rehearsal.mjs';
+import { rehearseClinicalWeb, clinicalRehearsalDiagnostic } from './clinical-web-rehearsal.mjs';
 import { syntheticClinicalPdf, syntheticClinicalImage } from './clinical-fixtures.mjs';
 
 const RUN = '01234567-89ab-4cde-8fab-0123456789ab';
@@ -279,6 +279,20 @@ test('journal failure before signing cannot reach the signer', async () => {
   const h = harness(); h.faults.save = state => state.steps[0].phase === 'signing';
   const result = await run(h); assert.equal(result.status, 'failed'); assert.equal(h.calls.sign.length, 0);
   assert.equal(result.error, 'clinical_rehearsal_unavailable'); assert.equal(JSON.stringify(result).includes('secret provider'), false);
+});
+
+test('transport failure diagnostics are fixed codes without provider or credential content', async () => {
+  for (const message of ['rehearsal_session_expired', 'rehearsal_access_denied', 'rehearsal_response_uncertain', 'rehearsal_http_503']) {
+    const h = harness();
+    h.api.snapshot = async () => { throw Error(message, { cause: Error('secret provider credential') }); };
+    const result = await run(h);
+    assert.equal(result.error, `clinical_${message}`);
+    assert.equal(result.status, 'failed'); assert.equal(h.calls.sign.length, 0);
+    assert.equal(JSON.stringify(result).includes('secret provider'), false);
+  }
+  for (const message of ['secret provider credential', 'rehearsal_session_expired secret', 'rehearsal_http_503?token=secret', 'rehearsal_http_200', 'rehearsal_unknown']) {
+    assert.equal(clinicalRehearsalDiagnostic(Error(message)), 'clinical_rehearsal_unavailable');
+  }
 });
 
 test('missing or mismatched receipt evidence cannot pass, even after successful API confirmation', async () => {

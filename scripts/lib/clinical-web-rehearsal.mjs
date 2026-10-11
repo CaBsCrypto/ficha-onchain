@@ -281,7 +281,27 @@ export async function rehearseClinicalWeb({ api, audit, journal, runId, patient,
     check(state.steps.every(step => step.phase === 'audited'), 'clinical_rehearsal_incomplete');
     return report('passed');
   } catch (error) {
-    const code = typeof error?.code === 'string' && /^clinical_rehearsal_[a-z_]+$/.test(error.code) ? error.code : 'clinical_rehearsal_unavailable';
+    const code = clinicalRehearsalDiagnostic(error);
     return report('failed', code);
   }
+}
+
+/** Only transport-owned, fixed diagnostics may leave this boundary. Never
+ * expose a provider body, arbitrary error message, stack or cause. */
+export function clinicalRehearsalDiagnostic(error) {
+  if (typeof error?.code === 'string' && /^clinical_rehearsal_[a-z_]+$/.test(error.code)) return error.code;
+  const allowed = new Map([
+    ['rehearsal_session_expired', 'clinical_rehearsal_session_expired'],
+    ['rehearsal_access_denied', 'clinical_rehearsal_access_denied'],
+    ['rehearsal_response_uncertain', 'clinical_rehearsal_response_uncertain'],
+    ['rehearsal_cache_policy_invalid', 'clinical_rehearsal_cache_policy_invalid'],
+    ['rehearsal_response_too_large', 'clinical_rehearsal_response_too_large'],
+    ['rehearsal_response_invalid', 'clinical_rehearsal_response_invalid'],
+    ['rehearsal_document_invalid', 'clinical_rehearsal_document_invalid'],
+    ['rehearsal_signature_invalid', 'clinical_rehearsal_signature_invalid'],
+  ]);
+  const message = typeof error?.message === 'string' ? error.message : '';
+  if (allowed.has(message)) return allowed.get(message);
+  if (/^rehearsal_http_[45][0-9]{2}$/.test(message)) return `clinical_${message}`;
+  return 'clinical_rehearsal_unavailable';
 }
