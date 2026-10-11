@@ -15,22 +15,28 @@ const help = `Ensayo local del historial clínico por APIs + Privy (Stellar Test
 node scripts/validate-clinical-web-testnet.mjs --inspect --patient G... --doctor-id N --doctor-wallet G... --relayer G...
 node scripts/validate-clinical-web-testnet.mjs --run --run-id UUID --confirm-synthetic-testnet --patient G... --doctor-id N --doctor-wallet G... --relayer G...
 
-Opciones: --target http://127.0.0.1:3016 --auth-port 3018
+Opciones: --target http://127.0.0.1:3016 --auth-port 3018 --auth-wait-minutes 5
+Espera de autorización configurable entre 1 y 30 minutos; por defecto, 5.
 Por defecto inspecciona: no prepara, firma ni transmite. Los GET pueden actualizar
 el vínculo de wallet o reconciliar intentos en Neon. No usa base ni claves directas.
 Para reanudar, conserva el mismo run-id. Nunca sustituye un intento incierto.
 Los códigos se introducen únicamente en el modal de Privy del acompañante local.
 No acepta JWT, secretos o conexiones de base por argumentos. No admite previews.
 `;
+export function clinicalAuthWaitMs(value) {
+  if (typeof value !== 'string' || !/^(?:[1-9]|[12][0-9]|30)$/.test(value)) throw Error('rehearsal_configuration_invalid');
+  return Number(value) * 60_000;
+}
 export async function main(argv = process.argv.slice(2)) {
   const {values} = parseArgs({args:argv,options:{help:{type:'boolean'},inspect:{type:'boolean'},run:{type:'boolean'},
     'run-id':{type:'string'},'confirm-synthetic-testnet':{type:'boolean'},patient:{type:'string'},'doctor-id':{type:'string'},
-    'doctor-wallet':{type:'string'},relayer:{type:'string'},target:{type:'string',default:'http://127.0.0.1:3016'},'auth-port':{type:'string',default:'3018'}},strict:true});
+    'doctor-wallet':{type:'string'},relayer:{type:'string'},target:{type:'string',default:'http://127.0.0.1:3016'},'auth-port':{type:'string',default:'3018'},'auth-wait-minutes':{type:'string',default:'5'}},strict:true});
   if (values.help) {process.stdout.write(help);return;}
   if (values.run && (values.inspect || !values['confirm-synthetic-testnet'] || !values['run-id'])) throw Error('rehearsal_explicit_consent_required');
   const target=clinicalLoopbackTarget(values.target),mode=values.run?'execute':'inspect',runId=values['run-id']??randomUUID();
   const patient=values.patient,doctor={id:Number(values['doctor-id']),address:values['doctor-wallet']};
   const port=Number(values['auth-port']);
+  const authWaitMs=clinicalAuthWaitMs(values['auth-wait-minutes']);
   if (!StrKey.isValidEd25519PublicKey(patient??'') || !StrKey.isValidEd25519PublicKey(doctor.address??'') ||
       !StrKey.isValidEd25519PublicKey(values.relayer??'') || !Number.isSafeInteger(doctor.id) || doctor.id<1 || !Number.isSafeInteger(port) || port<1024 || port>65535 || port===Number(new URL(target).port)) throw Error('rehearsal_configuration_invalid');
   const base=resolve('.trustleaf-local/clinical-web-rehearsal'),journal=await openClinicalWebJournal({directory:base,runId});
@@ -38,8 +44,8 @@ export async function main(argv = process.argv.slice(2)) {
   const stop=()=>abort.abort();process.once('SIGINT',stop);process.once('SIGTERM',stop);
   try {
     const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
-    auth=await startClinicalLocalAuth({appId:'cmrix722m03d30clewd1fuffq',port,mode,runId,target,expectedPatient:patient,signal:abort.signal});
-    process.stdout.write(`Run: ${runId}\nModo: ${mode}\nPrivy: ${auth.url}\nIngresa y confirma allí; no pegues códigos en la terminal.\n`);
+    auth=await startClinicalLocalAuth({appId:'cmrix722m03d30clewd1fuffq',port,mode,runId,target,expectedPatient:patient,timeoutMs:authWaitMs,signal:abort.signal});
+    process.stdout.write(`Run: ${runId}\nModo: ${mode}\nPrivy: ${auth.url}\nEspera de autorización: ${authWaitMs/60_000} minutos\nIngresa y confirma allí; no pegues códigos en la terminal.\n`);
     const handoff=await auth.waitForAuthorization();
     api=createClinicalWebApi({target,accessToken:handoff.accessToken,signal:abort.signal});handoff.accessToken='';
     const report=await rehearseClinicalWeb({api,audit:createClinicalWebAuditor({relayer:values.relayer}),journal,runId,patient,doctor,mode,

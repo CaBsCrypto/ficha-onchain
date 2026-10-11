@@ -23,6 +23,8 @@ node scripts/validate-clinical-web-testnet.mjs --inspect --patient G_PUBLICA_PAC
 
 Sustituir los cuatro valores por identificadores públicos reales. La terminal muestra un enlace local en el puerto **3018**. Abrirlo, ingresar a Privy y pulsar el botón del modo de inspección. Los códigos van únicamente en el modal de Privy. No pegar tokens en terminal, chat o archivos.
 
+La solicitud local vence después de **5 minutos** por defecto. Para una sesión guiada puede añadirse `--auth-wait-minutes 15`; admite entre 1 y 30 minutos. Esto sólo amplía la espera previa al consentimiento, no la vigencia de una transacción ni del permiso médico. Si vence, el acompañante se cierra: reiniciar con el mismo `--run-id` conserva los intentos y genera una nueva autorización. No borrar el journal ni retirar un bloqueo de un proceso activo.
+
 La inspección no llama a preparación, firma o reintento. Sus GET pueden actualizar el vínculo de wallet o reconciliar operaciones en Neon: significa **cero transacciones nuevas**, no cero escrituras de base. Un intento incierto o un fallo de consulta detiene el ensayo y queda pendiente; no aprueba el recorrido.
 
 ## Ejecución sintética
