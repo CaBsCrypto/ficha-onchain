@@ -49,6 +49,8 @@ No carga la configuración real `.env.local` ni usa credenciales de aplicación 
 
 Este ensayo comprueba la integración aislada entre módulos. La sesión auténtica, persistencia después de reiniciar la base, recibos nuevos y presentación en navegador se acreditan por separado. `validate-clinical-testnet.mjs --readback` corresponde a la ejecución técnica de semana 1 y no reemplaza el recorrido web de semana 2.
 
+Para el ensayo **real por API y Privy**, usar [ENSAYO-API-TESTNET-SEMANA-2.md](ENSAYO-API-TESTNET-SEMANA-2.md). Incluye acompañante local de autenticación, inspección sin nuevas transacciones, ocho pasos sintéticos y recuperación del mismo intento. La preparación del script no acredita su ejecución ni habilita escrituras.
+
 ## 3. Recorrido autenticado sintético
 
 Primero ingresar y comprobar lectura con escrituras apagadas. Antes de las operaciones reales, comprobar configuración aislada, claves, saldo y ausencia de intentos inciertos. Habilitar escrituras sólo para la prueba acordada. Una wallet sin saldo requiere preparación explícita; no se financia automáticamente. El usuario introduce los códigos únicamente en Privy.

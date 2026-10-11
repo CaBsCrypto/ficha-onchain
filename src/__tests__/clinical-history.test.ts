@@ -101,6 +101,13 @@ describe('clinical history identity and response boundaries', () => {
     const f = fixture(); f.state.own = null; const snapshot = await clinicalSnapshot(request(), user, actor);
     expect(snapshot).toMatchObject({ history: null, entries: [], grants: [], operations: [] }); expect(m.reader.readAccess).not.toHaveBeenCalled(); expect(m.doctor).not.toHaveBeenCalled();
   });
+  it('exposes only the signing hash of an own pending unexpired intent, never XDR or content', () => {
+    const expiresAt=Math.floor(Date.now()/1000)+120;
+    const row={id:'saved-id',action:'create_history',state:'awaiting_signature',expires_at:expiresAt,source_wallet:actor.address,signing_hash:'1'.repeat(64),unsigned_xdr:'PRIVATE_XDR',prepared_envelope:'PRIVATE_CONTENT'};
+    expect(clinicalPublicOperation(row).signing).toEqual({address:actor.address,hash:'1'.repeat(64),network:'testnet',expiresAt});
+    expect(JSON.stringify(clinicalPublicOperation(row))).not.toMatch(/PRIVATE_XDR|PRIVATE_CONTENT/);
+    for(const change of [{state:'confirmed'},{state:'submitted'},{signed_xdr:'saved'},{expires_at:1}]) expect(clinicalPublicOperation({...row,...change})).not.toHaveProperty('signing');
+  });
   it('exposes only public operation status fields and scopes operations to current identity and wallet', async () => {
     const f = fixture(); const v = f.addVersion(); const result = await clinicalOperations(actor);
     expect(Object.keys(result[0]).sort()).toEqual(['action', 'errorCode', 'expiresAt', 'id', 'state', 'transactionHash']);

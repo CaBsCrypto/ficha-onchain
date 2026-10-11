@@ -1,19 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { Account, BASE_FEE, Keypair, Networks, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
-import { CLINICAL_CONTRACT, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
+import { Account, BASE_FEE, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
+import { CLINICAL_CONTRACT, assertClinicalUnsigned, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import type { ClinicalAction, ClinicalActor, ClinicalExpected, ClinicalPrepareRequest } from '@/types/clinical';
 
-const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), sign: vi.fn(), doctor: vi.fn(), seal: vi.fn(), chain: {} as Record<string, any> }));
+const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), sponsor: vi.fn(), doctor: vi.fn(), seal: vi.fn(), chain: {} as Record<string, any> }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ getDbConnection: m.connection, getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
-vi.mock('@privy-io/server-auth', () => ({ PrivyClient: class {} }));
-vi.mock('@/lib/stellar/privy-owner-signing', () => ({ signPreparedOwnerTransaction: m.sign }));
 vi.mock('@/lib/clinical/history', () => ({ clinicalPublicOperation: (r: Record<string, any>) => ({ id: r.id, action: r.action, state: r.state, expiresAt: Number(r.expires_at), transactionHash: r.transaction_hash ?? null, errorCode: r.error_code ?? null }) }));
 vi.mock('@/lib/clinical/config', () => ({ CLINICAL_ID: 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U', assertClinicalEnvironment: (write = false) => { if (write && process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
 vi.mock('@/lib/private-config', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/private-config')>(), assertPrivateWrites: () => { if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
-vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: () => m.chain }));
+vi.mock('@/lib/clinical/chain', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/clinical/chain')>(); return { ...actual, createClinicalWebChain: () => m.chain, sponsorClinicalSignature: (...args: Parameters<typeof actual.sponsorClinicalSignature>) => { m.sponsor(...args); return actual.sponsorClinicalSignature(...args); } }; });
 vi.mock('../../scripts/lib/clinical-crypto.mjs', async importOriginal => {
   const actual = await importOriginal<typeof import('../../scripts/lib/clinical-crypto.mjs')>();
   return { ...actual, sealClinicalVersion: (...args: Parameters<typeof actual.sealClinicalVersion>) => { m.seal(...args); return actual.sealClinicalVersion(...args); } };
@@ -21,6 +19,7 @@ vi.mock('../../scripts/lib/clinical-crypto.mjs', async importOriginal => {
 import { cancelClinicalOperation, prepareClinicalOperation, reconcileClinicalOperation, signClinicalOperation } from '@/lib/clinical/operations';
 
 // Local deterministic identities only; no deployed secret or provider is used.
+let testSignature: () => string;
 const patient = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41));
 const doctor = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 42));
 const payer = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 43));
@@ -112,17 +111,14 @@ function fixture(ownHistory = false) {
     submit: vi.fn(async xdr => { state.events.push('RPC_SUBMIT'); if (state.rpcFailure) throw Error('isolated_response_lost'); return { status: 'PENDING', xdr }; }),
   };
   m.doctor.mockResolvedValue({ address: doctor.publicKey(), doctor: { status: 'active' } });
-  m.sign.mockImplementation(async (_token, owner, prepared) => {
-    expect(owner).toEqual(actor); expect(prepared.userId).toBe(actor.userId); expect(prepared.walletId).toBe(actor.walletId); expect(prepared.address).toBe(actor.address);
-    const tx = TransactionBuilder.fromXDR(prepared.unsignedXdr, Networks.TESTNET) as Transaction;
-    expect(tx.hash().toString('hex')).toBe(prepared.hash); tx.sign(patient); state.events.push('PRIVY_SIGN'); return { signedXdr: tx.toXDR() };
-  });
+  testSignature = () => patient.sign(Buffer.from(state.row?.signing_hash ?? '1'.repeat(64), 'hex')).toString('hex');
+
   function seed(action: ClinicalAction = 'create_history') {
     const expected: ClinicalExpected = { historyId, patient: actor.address, operationId: opId };
     if (action === 'append_version') Object.assign(expected, { entryId: deriveClinicalEntryId(historyId, actor.address, opId), author: actor.address, commitment: '6'.repeat(64), expectedVersion: 0, expectedGrantRevision: 0, previousCommitment: null });
     const tx = build(action, expected), signed = sponsorClinicalSignature(tx.toXDR(), actor.address, patient.sign(tx.hash()).toString('hex'), action, expected);
     state.row = { id: ID, actor_user_id: actor.userId, wallet_id: actor.walletId, source_wallet: actor.address, action, contract_id: CLINICAL_CONTRACT, method: action, expected, unsigned_xdr: tx.toXDR(), signing_hash: tx.hash().toString('hex'), expires_at: Number(tx.timeBounds!.maxTime), signed_xdr: signed.xdr, transaction_hash: signed.hash, state: 'submitted', error_code: null };
-    return state.row;
+    m.sponsor.mockClear(); return state.row;
   }
   return { state, client, seed };
 }
@@ -133,6 +129,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe('clinical operation preparation and private idempotency', () => {
+  it('a rejected prepared fee budget rolls back without persisting an intent, requesting Privy or submitting', async () => {
+    const f=fixture();
+    m.chain.prepare.mockImplementation(async (source,action,expected) => {
+      const tx=new TransactionBuilder(new Account(source,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
+        .addOperation(clinicalInvocation(action,expected)).setTimeout(180)
+        .setSorobanData(new SorobanDataBuilder().setResourceFee('496000001').build()).build();
+      assertClinicalUnsigned(tx,source,action,expected); return tx;
+    });
+    await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toThrow('clinical_fee_budget_exceeded');
+    expect(f.state.row).toBeNull(); expect(f.state.events.some(q=>q.startsWith('INSERT'))).toBe(false);
+    expect(f.state.events).toContain('ROLLBACK'); expect(f.client.release).toHaveBeenCalledOnce();
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
   it('persists one encrypted payload and one intent for two exact preparations of the same UUID', async () => {
     const f = fixture(true); const first = await prepareClinicalOperation(user, actor, appendInput), second = await prepareClinicalOperation(user, actor, clone(appendInput));
     expect(second).toEqual(first); expect(m.seal).toHaveBeenCalledTimes(1); expect(m.chain.prepare).toHaveBeenCalledTimes(1);
@@ -151,7 +160,7 @@ describe('clinical operation preparation and private idempotency', () => {
   });
   it.each(['private_operations', 'clinical_transaction_attempts', 'clinical_web_operations'])('respects a live wallet intent in %s', async queue => {
     const f = fixture(); f.state.queue = queue; await expect(prepareClinicalOperation(user, actor, createInput)).rejects.toThrow('another_operation_pending');
-    expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled(); expect(f.state.row).toBeNull(); expect(f.client.release).toHaveBeenCalledOnce();
+    expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled(); expect(f.state.row).toBeNull(); expect(f.client.release).toHaveBeenCalledOnce();
   });
   it('rejects correction of a doctor-authored entry before encryption or preparation', async () => {
     const f = fixture(true); f.state.head = { author: doctor.publicKey(), headVersion: 1 };
@@ -179,8 +188,8 @@ describe('clinical operation preparation and private idempotency', () => {
     const f = fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
     m.doctor.mockResolvedValue({ address: condition === 'wallet-changed' ? payer.publicKey() : doctor.publicKey(), doctor: { status: condition === 'inactive' ? 'revoked' : 'active' } });
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('doctor_not_authorized');
-    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('doctor_not_authorized');
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
     expect(f.state.row!.state).toBe('awaiting_signature');
   });
   it('does not replace the original selected doctor behind an existing request UUID', async () => {
@@ -193,49 +202,49 @@ describe('clinical operation preparation and private idempotency', () => {
     const f = fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: true, expectedRevision: 0 });
     m.doctor.mockRejectedValue(Error(failure));
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow(failure);
-    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.state.row!.state).toBe('awaiting_signature');
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow(failure);
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.state.row!.state).toBe('awaiting_signature');
   });
   it('requires a persisted original target for a legacy unsigned positive grant', async () => {
     const f = fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: true, expectedRevision: 0 });
     expect(f.state.row!.expected.doctorId).toBe(1); delete f.state.row!.expected.doctorId;
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('clinical_saved_intent_invalid');
-    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('clinical_saved_intent_invalid');
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('allows full withdrawal without requiring a still-active physician target', async () => {
     const f = fixture(true); m.chain.grant.mockResolvedValue({ canRead: true, canAppend: true, revision: 3 });
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: false, canAppend: false, expectedRevision: 3 });
     m.doctor.mockRejectedValue(Error('isolated_doctor_no_longer_bound')); m.chain.doctorAuthorized.mockResolvedValue(false);
-    const result = await signClinicalOperation(user, actor, ID, 'isolated-credential');
+    const result = await signClinicalOperation(user, actor, ID, testSignature());
     expect(result.operation.state).toBe('submitted'); expect(f.state.row!.expected).toMatchObject({ doctorId: 1, canRead: false, canAppend: false });
-    expect(m.doctor).toHaveBeenCalledTimes(1); expect(m.sign).toHaveBeenCalledOnce();
+    expect(m.doctor).toHaveBeenCalledTimes(1); expect(m.sponsor).toHaveBeenCalledOnce();
   });
   it('rechecks registry authorization before granting access with an unchanged active app target', async () => {
     fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: true, expectedRevision: 0 });
     m.chain.doctorAuthorized.mockResolvedValue(false);
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('doctor_not_authorized');
-    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('doctor_not_authorized');
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
     expect(m.doctor).toHaveBeenLastCalledWith(expect.anything(), 1);
   });
   it.each(['inactive', 'wallet-changed'])('retains the exact uncertain grant when its target becomes %s', async condition => {
     const f = fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
-    await signClinicalOperation(user, actor, ID, 'isolated-credential'); const saved = clone(f.state.row);
+    await signClinicalOperation(user, actor, ID, testSignature()); const saved = clone(f.state.row);
     m.doctor.mockResolvedValue({ address: condition === 'wallet-changed' ? payer.publicKey() : doctor.publicKey(), doctor: { status: condition === 'inactive' ? 'revoked' : 'active' } });
-    m.sign.mockClear(); m.chain.submit.mockClear();
+    m.sponsor.mockClear(); m.chain.submit.mockClear();
     const result = await reconcileClinicalOperation(actor, ID, true);
     expect(result.operation).toMatchObject({ state: 'submitted', errorCode: 'clinical_retry_unavailable', transactionHash: saved.transaction_hash });
-    expect(f.state.row).toEqual(saved); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(f.state.row).toEqual(saved); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('allows exact successful receipt reconciliation of a legacy grant without another target lookup or signature', async () => {
     const f = fixture(true);
     await prepareClinicalOperation(user, actor, { requestId: ID, action: 'set_permissions', doctorId: 1, canRead: true, canAppend: false, expectedRevision: 0 });
-    await signClinicalOperation(user, actor, ID, 'isolated-credential'); delete f.state.row!.expected.doctorId; f.state.receipt = 'SUCCESS';
-    m.doctor.mockRejectedValue(Error('isolated_target_unavailable')); m.doctor.mockClear(); m.sign.mockClear(); m.chain.submit.mockClear();
+    await signClinicalOperation(user, actor, ID, testSignature()); delete f.state.row!.expected.doctorId; f.state.receipt = 'SUCCESS';
+    m.doctor.mockRejectedValue(Error('isolated_target_unavailable')); m.doctor.mockClear(); m.sponsor.mockClear(); m.chain.submit.mockClear();
     expect((await reconcileClinicalOperation(actor, ID)).operation.state).toBe('confirmed');
-    expect(m.doctor).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.doctor).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('releases and rolls back when deployment or storage preparation fails', async () => {
     const f = fixture(); m.chain.verifyDeployment.mockRejectedValue(Error('isolated_deployment_error'));
@@ -247,33 +256,33 @@ describe('clinical operation preparation and private idempotency', () => {
 describe('clinical exact owner signing, transmission and reconciliation', () => {
   it('commits and releases the exact owner-signed fee bump before any RPC transmission', async () => {
     const f = fixture(); await prepareClinicalOperation(user, actor, createInput); f.state.events.length = 0;
-    const result = await signClinicalOperation(user, actor, ID, 'isolated-credential');
-    expect(result.operation.state).toBe('submitted'); expect(m.sign).toHaveBeenCalledOnce(); expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(f.state.row!.signed_xdr);
+    const result = await signClinicalOperation(user, actor, ID, testSignature());
+    expect(result.operation.state).toBe('submitted'); expect(m.sponsor).toHaveBeenCalledOnce(); expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(f.state.row!.signed_xdr);
     expect(f.state.events.indexOf('COMMIT')).toBeLessThan(f.state.events.indexOf('RPC_RECEIPT'));
     expect(f.state.events.indexOf('RELEASE_CLIENT')).toBeLessThan(f.state.events.indexOf('RPC_SUBMIT'));
     expect(f.client.query.mock.calls.some(([q]) => q.includes('signed_xdr=$2,transaction_hash=$3,state=\'submitted\''))).toBe(true);
   });
-  it('rejects changed unsigned method/hash before asking Privy to sign', async () => {
+  it('rejects changed unsigned method/hash before sponsoring a received signature', async () => {
     const f = fixture(); await prepareClinicalOperation(user, actor, createInput); f.state.row!.signing_hash = '0'.repeat(64);
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('clinical_saved_intent_invalid');
-    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.client.release).toHaveBeenCalledTimes(2);
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('clinical_saved_intent_invalid');
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.client.release).toHaveBeenCalledTimes(2);
   });
   it('does not persist or broadcast a signature from another owner', async () => {
     const f = fixture(); await prepareClinicalOperation(user, actor, createInput);
-    m.sign.mockImplementation(async (_token, _owner, prepared) => { const tx = TransactionBuilder.fromXDR(prepared.unsignedXdr, Networks.TESTNET) as Transaction; tx.sign(doctor); return { signedXdr: tx.toXDR() }; });
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('owner_signature_invalid');
+    testSignature = () => doctor.sign(Buffer.from(f.state.row!.signing_hash, 'hex')).toString('hex');
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('owner_signature_invalid');
     expect(f.state.row!.state).toBe('awaiting_signature'); expect(f.state.row!.signed_xdr).toBeNull(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
-  it('repeated sign clicks reuse the submitted envelope and do not request another owner signature', async () => {
+  it('repeated sign clicks reuse the submitted envelope and do not sponsor a different envelope', async () => {
     const f = fixture(); await prepareClinicalOperation(user, actor, createInput);
-    const first = await signClinicalOperation(user, actor, ID, 'isolated-credential');
-    const second = await signClinicalOperation(user, actor, ID, 'isolated-credential');
-    expect(second.operation.transactionHash).toBe(first.operation.transactionHash); expect(m.sign).toHaveBeenCalledOnce();
+    const first = await signClinicalOperation(user, actor, ID, testSignature());
+    const second = await signClinicalOperation(user, actor, ID, testSignature());
+    expect(second.operation.transactionHash).toBe(first.operation.transactionHash); expect(m.sponsor).toHaveBeenCalledOnce();
     expect(m.chain.submit.mock.calls.map(([xdr]) => xdr)).toEqual([f.state.row!.signed_xdr, f.state.row!.signed_xdr]);
   });
-  it('a cancelled provider signing request leaves no persisted or transmitted signature', async () => {
-    const f = fixture(); await prepareClinicalOperation(user, actor, createInput); m.sign.mockRejectedValue(Error('isolated_signature_cancelled'));
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('isolated_signature_cancelled');
+  it('an absent browser signature leaves no persisted or transmitted signature', async () => {
+    const f = fixture(); await prepareClinicalOperation(user, actor, createInput); testSignature = () => '';
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('owner_signature_invalid');
     expect(f.state.row!.state).toBe('awaiting_signature'); expect(f.state.row!.signed_xdr).toBeNull(); expect(f.state.row!.transaction_hash).toBeNull();
     expect(m.chain.submit).not.toHaveBeenCalled(); expect(f.client.release).toHaveBeenCalledTimes(2);
   });
@@ -281,12 +290,12 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
     const f = fixture(); const row = f.seed(); const before = clone(row);
     await reconcileClinicalOperation(actor, ID); expect(m.chain.submit).not.toHaveBeenCalled();
     await reconcileClinicalOperation(actor, ID, true); expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(before.signed_xdr);
-    expect(f.state.row).toEqual(before); expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled();
+    expect(f.state.row).toEqual(before); expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled();
   });
   it('does not call a lost transmission response confirmed or create a replacement attempt', async () => {
     const f = fixture(); f.seed(); m.chain.submit.mockRejectedValue(Error('isolated_response_lost')); const hash = f.state.row!.transaction_hash;
     const result = await reconcileClinicalOperation(actor, ID, true); expect(result.operation.state).toBe('submitted'); expect(result.operation.transactionHash).toBe(hash);
-    await reconcileClinicalOperation(actor, ID, true); expect(m.chain.submit.mock.calls.map(([xdr]) => xdr)).toEqual([f.state.row!.signed_xdr, f.state.row!.signed_xdr]); expect(m.sign).not.toHaveBeenCalled();
+    await reconcileClinicalOperation(actor, ID, true); expect(m.chain.submit.mock.calls.map(([xdr]) => xdr)).toEqual([f.state.row!.signed_xdr, f.state.row!.signed_xdr]); expect(m.sponsor).not.toHaveBeenCalled();
   });
   it('records an exact FAILED receipt without treating it as success or broadcasting again', async () => {
     const f = fixture(); f.seed(); f.state.receipt = 'FAILED';
@@ -309,7 +318,7 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
   });
   it('persists the confirmed encrypted version and operation atomically through savepoints', async () => {
     const f = fixture(true); await prepareClinicalOperation(user, actor, appendInput);
-    await signClinicalOperation(user, actor, ID, 'isolated-credential'); f.state.receipt = 'SUCCESS';
+    await signClinicalOperation(user, actor, ID, testSignature()); f.state.receipt = 'SUCCESS';
     const e = f.state.row!.expected; f.state.version = { commitment: e.commitment, context: { schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT, historyId, entryId: e.entryId, author: actor.address, patient: actor.address, version: 1, previousCommitment: null } };
     const result = await reconcileClinicalOperation(actor, ID);
     expect(result.operation.state).toBe('confirmed'); expect(Object.values(f.state.versions)).toHaveLength(1);
@@ -319,7 +328,7 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
     expect(f.state.events.filter(e => e === 'BEGIN')).toHaveLength(4);
   });
   it('rolls back storage and releases the connection without confirming when the encrypted save fails', async () => {
-    const f = fixture(true); await prepareClinicalOperation(user, actor, appendInput); await signClinicalOperation(user, actor, ID, 'isolated-credential');
+    const f = fixture(true); await prepareClinicalOperation(user, actor, appendInput); await signClinicalOperation(user, actor, ID, testSignature());
     f.state.receipt = 'SUCCESS'; f.state.failStorage = true; const e = f.state.row!.expected;
     f.state.version = { commitment: e.commitment, context: { schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT, historyId, entryId: e.entryId, author: actor.address, patient: actor.address, version: 1, previousCommitment: null } };
     await expect(reconcileClinicalOperation(actor, ID)).rejects.toThrow('isolated_storage_failure');
@@ -327,38 +336,38 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
   });
   it('cancelled or expired unsigned signatures cannot be broadcast', async () => {
     const f = fixture(); await prepareClinicalOperation(user, actor, createInput); await cancelClinicalOperation(actor, ID);
-    const result = await signClinicalOperation(user, actor, ID, 'isolated-credential'); expect(result.operation.state).toBe('cancelled'); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    const result = await signClinicalOperation(user, actor, ID, testSignature()); expect(result.operation.state).toBe('cancelled'); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
     const expired = fixture(); await prepareClinicalOperation(user, actor, createInput); expired.state.row!.expires_at = Math.floor(Date.now()/1000)-1;
-    expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('cancelled'); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('cancelled'); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('turning writes off prevents preparation, signing and transmission but permits receipt reconciliation', async () => {
     const f = fixture(); f.seed(); vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
     await expect(prepareClinicalOperation(user, actor, createInput)).rejects.toThrow('private_writes_paused');
-    await expect(signClinicalOperation(user, actor, ID, 'isolated-credential')).rejects.toThrow('private_writes_paused');
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('private_writes_paused');
     expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('submitted');
-    expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.chain.prepare).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it.each(['missing', 'rotated'])('audits an exact successful saved receipt when the current relayer is %s', async condition => {
     const f = fixture(); f.seed(); f.state.receipt = 'SUCCESS';
     vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false'); vi.stubEnv('RELAYER_SECRET', condition === 'missing' ? '' : doctor.secret());
     const result = await reconcileClinicalOperation(actor, ID);
     expect(result.operation.state).toBe('confirmed'); expect(result.operation.transactionHash).toBe(f.state.row!.transaction_hash);
-    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it.each(['missing', 'rotated'])('does not retransmit an uncertain saved envelope when the current relayer is %s', async condition => {
     const f = fixture(); const saved = clone(f.seed()); vi.stubEnv('RELAYER_SECRET', condition === 'missing' ? '' : doctor.secret());
     const result = await reconcileClinicalOperation(actor, ID, true);
     expect(result.operation.state).toBe('submitted'); expect(f.state.row).toEqual(saved);
-    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.chain.receipt).toHaveBeenCalledOnce(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('still rejects a different successful envelope after relayer rotation', async () => {
     const f = fixture(); f.seed(); f.state.receipt = 'SUCCESS'; f.state.wrongReceipt = true; vi.stubEnv('RELAYER_SECRET', doctor.secret());
     await expect(reconcileClinicalOperation(actor, ID)).rejects.toThrow('clinical_receipt_mismatch');
-    expect(f.state.row!.state).toBe('submitted'); expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(f.state.row!.state).toBe('submitted'); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it('expired uncertain attempts retain the exact hash and never submit again', async () => {
     const f = fixture(); f.seed(); f.state.row!.expires_at = Math.floor(Date.now()/1000)-1;
-    expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('submitted'); expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sign).not.toHaveBeenCalled();
+    expect((await reconcileClinicalOperation(actor, ID, true)).operation.state).toBe('submitted'); expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled();
   });
   it('releases and rolls back after a provider receipt error while retaining the durable attempt', async () => {
     const f = fixture(); f.seed(); f.state.rpcFailure = true; const before = clone(f.state.row);

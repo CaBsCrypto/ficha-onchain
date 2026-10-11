@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "runId": "4fad0a02-3603-43ce-b2fd-8dc02e8d42ec",
+  "scope": "SOW 2 week 2 authenticated patient rehearsal, Neon dev and Stellar Testnet",
+  "classification": "Eight real clinical transactions signed through the Privy browser companion. Independent inspection creates no Stellar transactions. Product-button signing and remaining manual visual checks are not approved by these reports.",
+  "applicationSourceCommit": "6b9041fc478f4ef42d2949484fecc5219842616a",
+  "applicationBuildId": "o8AlhZfG1CiuqaeO3SmUJ",
+  "validatorSourceCommit": "2189c1d27c05b9378025a54fc6e6b711038f2d7c",
+  "runningApplicationCommitVerifiedByScript": false,
+  "execution": {
+    "checkedAt": "2026-10-11T19:46:31.960Z",
+    "status": "passed",
+    "distinctTransactionReceipts": 8
+  },
+  "persistence": {
+    "checkedAt": "2026-10-11T20:42:53.504Z",
+    "status": "passed",
+    "mode": "inspect",
+    "newStellarTransactions": 0,
+    "privateWritesEnabled": false
+  },
+  "tests": {
+    "application": {
+      "passed": 938,
+      "files": 74,
+      "sourceCommit": "6b9041fc478f4ef42d2949484fecc5219842616a",
+      "kind": "isolated"
+    },
+    "privateServices": {
+      "passed": 260,
+      "sourceCommit": "2189c1d27c05b9378025a54fc6e6b711038f2d7c",
+      "kind": "isolated"
+    },
+    "contracts": {
+      "passed": 25,
+      "date": "2026-10-08",
+      "kind": "historical isolated; not rerun for this rehearsal"
+    }
+  },
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF (normalize CRLF before checking text files)",
+  "binaryEncoding": "Exact bytes; screenshots",
+  "files": [
+    {
+      "path": "INFORME.md",
+      "bytes": 8588,
+      "sha256": "da955ddf5018effb475b88cadfbd0dc388da8f2e4f26ffdd95d0f95c41adaa63"
+    },
+    {
+      "path": "execution.json",
+      "bytes": 8689,
+      "sha256": "33d8164f5ac9089991dfc324cd51aaa1210f0c180f68138d01884fa278528c0e"
+    },
+    {
+      "path": "historial-live-360.png",
+      "bytes": 41363,
+      "sha256": "4ce93c4f3c7060955b0233ab544779d8a49ee283d0d00832d7b68d24bb94a610"
+    },
+    {
+      "path": "historial-live-390.png",
+      "bytes": 39810,
+      "sha256": "3e5c60617d40b30470ecbbdea1f4790836de30a5003204d17a9a631a738f1922"
+    },
+    {
+      "path": "permisos-finales-390.png",
+      "bytes": 40626,
+      "sha256": "5f3ecfa61d8b1a71861778b66dd4fdb96a5f6e9116b66bcd1ef83b0185deae69"
+    },
+    {
+      "path": "permisos-lectura-360.png",
+      "bytes": 45354,
+      "sha256": "9fb7840085f191ce525c2e9c75c606760d54499b2e4c0e873796b2e06e6cd29b"
+    },
+    {
+      "path": "persistence.json",
+      "bytes": 8690,
+      "sha256": "809618aebea524995f9a69b548978976dac7b91b92fbf8f27410c98e93003a1d"
+    }
+  ]
+}

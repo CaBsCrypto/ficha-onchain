@@ -6,12 +6,12 @@ import { Account, Address, BASE_FEE, Contract, FeeBumpTransaction, Keypair, Netw
 import { PRIVATE_ADMIN, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private-config';
 import type { ClinicalAction, ClinicalExpected } from '@/types/clinical';
 import { validateClinicalContext } from '../../../scripts/lib/clinical-crypto.mjs';
+import { clinicalWebFeeQuote, assertClinicalWebSponsoredFee, CLINICAL_WEB_SPONSOR_BASE_FEE } from '../../../scripts/lib/clinical-web-fee-policy.mjs';
 
 export const CLINICAL_CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
 export const CLINICAL_WASM = '29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0';
 const REGISTRY_WASM = 'b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02';
 const HEX = /^[a-f0-9]{64}$/;
-const MAX_FEE = BigInt(100_000_000);
 const unavailable = () => new PrivateFlowError('clinical_chain_unavailable', 503);
 const invalid = () => new PrivateFlowError('clinical_prepared_operation_invalid');
 export const CLINICAL_METHODS: Record<ClinicalAction, string> = {
@@ -74,7 +74,7 @@ function assertClinicalBody(tx: Transaction, source: string, action: ClinicalAct
       op.type !== 'invokeHostFunction' || op.source !== undefined || body.memo().switch().name !== 'memoNone' ||
       body.cond().switch().name !== 'precondTime' || minTime !== 0 || !Number.isSafeInteger(maxTime) || maxTime < 1 ||
       maxTime > Math.floor(Date.now() / 1000) + 300 || !/^\d+$/.test(tx.sequence) || BigInt(tx.sequence) < BigInt(1) ||
-      BigInt(tx.fee) < BigInt(BASE_FEE) || BigInt(tx.fee) > MAX_FEE || !op.func.toXDR().equals(invocation.toXDR()) ||
+      !op.func.toXDR().equals(invocation.toXDR()) ||
       (op.auth?.length ?? 0) > 1) throw invalid();
   for (const auth of op.auth ?? []) {
     const root = auth.rootInvocation();
@@ -82,10 +82,12 @@ function assertClinicalBody(tx: Transaction, source: string, action: ClinicalAct
         root.function().switch().name !== 'sorobanAuthorizedFunctionTypeContractFn' ||
         !root.function().contractFn().toXDR().equals(invocation.invokeContract().toXDR())) throw invalid();
   }
+  try { clinicalWebFeeQuote(tx); }
+  catch { throw new PrivateFlowError('clinical_fee_budget_exceeded', 503); }
 }
 export function assertClinicalUnsigned(tx: Transaction, source: string, action: ClinicalAction, expected: ClinicalExpected) {
   try { if (!(tx instanceof Transaction) || tx.signatures.length) throw invalid(); assertClinicalBody(tx, source, action, expected); }
-  catch { throw invalid(); }
+  catch (error) { if (error instanceof PrivateFlowError && error.message === 'clinical_fee_budget_exceeded') throw error; throw invalid(); }
 }
 function relayer() {
   try { if (!process.env.RELAYER_SECRET) throw Error(); return Keypair.fromSecret(process.env.RELAYER_SECRET); }
@@ -97,7 +99,8 @@ function checkSingleSignature(tx: Transaction | FeeBumpTransaction, address: str
 }
 function assertFeeBump(tx: Transaction | FeeBumpTransaction, historical = false) {
   if (!(tx instanceof FeeBumpTransaction) || tx.networkPassphrase !== Networks.TESTNET || (!historical && tx.feeSource !== relayer().publicKey()) ||
-      BigInt(tx.fee) > MAX_FEE || BigInt(tx.fee) <= BigInt(tx.innerTransaction.fee)) throw invalid();
+      BigInt(tx.fee) <= BigInt(tx.innerTransaction.fee)) throw invalid();
+  try { assertClinicalWebSponsoredFee(tx); } catch { throw invalid(); }
   checkSingleSignature(tx, tx.feeSource);
   checkSingleSignature(tx.innerTransaction, tx.innerTransaction.source);
   return tx;
@@ -113,7 +116,7 @@ export function sponsorClinicalSignature(unsignedXdr: string, source: string, si
   if (Number(parsed.timeBounds?.maxTime) <= Math.floor(Date.now() / 1000)) throw new PrivateFlowError('signature_request_expired');
   parsed.addSignature(source, Buffer.from(hex, 'hex').toString('base64'));
   const payer = relayer();
-  const bumped = TransactionBuilder.buildFeeBumpTransaction(payer, '2000000', parsed, Networks.TESTNET);
+  const bumped = TransactionBuilder.buildFeeBumpTransaction(payer, CLINICAL_WEB_SPONSOR_BASE_FEE, parsed, Networks.TESTNET);
   bumped.sign(payer);
   assertFeeBump(bumped);
   return { xdr: bumped.toXDR(), hash: bumped.hash().toString('hex') };
@@ -293,7 +296,7 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server('htt
         assertClinicalUnsigned(prepared, source, action, expected);
         if (prepared.sequence !== unsigned.sequence || JSON.stringify(prepared.timeBounds) !== JSON.stringify(unsigned.timeBounds)) throw invalid();
         return prepared;
-      } catch { throw unavailable(); }
+      } catch (error) { if (error instanceof PrivateFlowError && error.message === 'clinical_fee_budget_exceeded') throw error; throw unavailable(); }
     },
     async receipt(hash: string) {
       if (!HEX.test(hash)) throw invalid();

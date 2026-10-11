@@ -121,16 +121,11 @@ function fixture() {
     walletApi: {
       getWallet: async ({ id }: { id: string }) => wallet(people.find(p => p.walletId === id)!),
       createWallet: () => { throw Error('unexpected_wallet_creation'); },
-      generateUserSigner: async ({ userJwt }: { userJwt: string }) => ({ authorizationKey: 'isolated-provider-placeholder', expiresAt: new Date(Date.now() + 60_000), wallets: [wallet(people.find(p => p.token === userJwt)!)] }),
+      generateUserSigner: () => { throw Error('unexpected_server_signature'); },
     },
   };
-  vi.stubGlobal('fetch', vi.fn(async (url: string, options: RequestInit) => {
-    const person = people.find(p => url === `https://api.privy.io/v1/wallets/${p.walletId}/raw_sign`);
-    if (!person || options.method !== 'POST') throw Error('unexpected_local_provider_request');
-    counts.signatures++;
-    const body = JSON.parse(String(options.body));
-    return Response.json({ method: 'raw_sign', data: { encoding: 'hex', signature: person.key.sign(Buffer.from(body.params.hash.slice(2), 'hex')).toString('hex') } });
-  }));
+  vi.stubGlobal('fetch', vi.fn(async () => { throw Error('unexpected_provider_request'); }));
+
   function outcome(tx: FeeBumpTransaction) {
     const call = (tx.innerTransaction as Transaction).operations[0];
     if (call.type !== 'invokeHostFunction') throw Error('unexpected_local_operation');
@@ -216,7 +211,8 @@ it('chains the actual clinical web services across creation, file/version reads,
     expect(duplicate).toEqual(prepared); expect(prepared.operation.state).toBe('awaiting_signature');
     expect(f.db.operations.filter(o => o.id === requestId)).toHaveLength(1);
     f.flags.loseSendReply = loseReply;
-    const signed = await json<{ operation: ClinicalOperation }>(await sign(request(`/api/private-clinical-operations/${requestId}/sign`, 'POST', { confirmed: true }), context(requestId)));
+    f.counts.signatures++;
+    const signed = await json<{ operation: ClinicalOperation }>(await sign(request(`/api/private-clinical-operations/${requestId}/sign`, 'POST', { confirmed: true, signature: '0x' + patient.sign(Buffer.from(prepared.operation.signing!.hash, 'hex')).toString('hex') }), context(requestId)));
     expect(signed.operation.state).toBe('submitted'); const before = clone(f.db.operations.find(o => o.id === requestId));
     if (loseReply) {
       f.flags.receiptVisible = false; const signatureCount = f.counts.signatures, sendCount = f.counts.sends;

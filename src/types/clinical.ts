@@ -12,6 +12,7 @@ export interface ClinicalPrepareRequest {
 export interface ClinicalOperation {
   id: string; action: ClinicalAction; state: ClinicalOperationState; expiresAt: number;
   transactionHash: string | null; errorCode: string | null;
+  signing?: { address: string; hash: string; network: 'testnet'; expiresAt: number };
 }
 export interface ClinicalVersion {
   entryId: string; version: number; author: string; source: 'patient' | 'doctor';

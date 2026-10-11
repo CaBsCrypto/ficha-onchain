@@ -1,5 +1,6 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSignRawHash } from '@privy-io/react-auth/extended-chains';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { jsonBody } from './client';
 import { portalErrorMessage } from './errors';
@@ -50,12 +51,25 @@ export function verifiedClinicalOperation(value: unknown, expected?: Pick<Clinic
       (expected && (op.id !== expected.id || op.action !== expected.action))) {
     throw new ClinicalClientError(503, 'clinical_operation_unavailable');
   }
-  return Object.freeze({ id: op.id, action: op.action, state: op.state, expiresAt: op.expiresAt, transactionHash: op.transactionHash, errorCode: op.errorCode });
+  const signing = op.signing;
+  if (signing && (op.state !== 'awaiting_signature' || Object.keys(signing).sort().join(',') !== 'address,expiresAt,hash,network' ||
+      !/^G[A-Z2-7]{55}$/.test(signing.address) || !HASH.test(signing.hash) || signing.network !== 'testnet' || signing.expiresAt !== op.expiresAt)) {
+    throw new ClinicalClientError(503, 'clinical_operation_unavailable');
+  }
+  return Object.freeze({ id: op.id, action: op.action, state: op.state, expiresAt: op.expiresAt, transactionHash: op.transactionHash, errorCode: op.errorCode,
+    ...(signing ? { signing: Object.freeze({ ...signing }) } : {}) });
+}
+export function clinicalSigningPayload(op: ClinicalOperation, address: string) {
+  verifiedClinicalOperation(op);
+  if (!op.signing || op.signing.address !== address || op.expiresAt*1000 <= Date.now()) throw new ClinicalClientError(400, 'signature_request_expired');
+  return { address, chainType: 'stellar' as const, hash: `0x${op.signing.hash}` as `0x${string}` };
 }
 function mergeOperation(previous: ClinicalOperation | null, incoming: ClinicalOperation) {
   if (!previous) return incoming;
   verifiedClinicalOperation(incoming, previous);
   if ((previous.transactionHash && incoming.transactionHash !== previous.transactionHash) ||
+      previous.expiresAt !== incoming.expiresAt || (previous.signing && incoming.signing &&
+      (previous.signing.address !== incoming.signing.address || previous.signing.hash !== incoming.signing.hash || previous.signing.network !== incoming.signing.network)) ||
       (previous.state === 'submitted' && ['awaiting_signature', 'cancelled'].includes(incoming.state)) ||
       (['confirmed', 'failed', 'cancelled'].includes(previous.state) && incoming.state !== previous.state)) {
     throw new ClinicalClientError(503, 'clinical_operation_unavailable');
@@ -67,6 +81,7 @@ export interface ClinicalClientState {
 }
 const emptyState = (): ClinicalClientState => ({ operation: null, busy: false, uncertain: false, error: '', canSign: false, accessLost: false });
 type Requester = <T>(path: string, init?: RequestInit) => Promise<T>;
+type OwnerSigner = (payload: ReturnType<typeof clinicalSigningPayload>) => Promise<{ signature: string }>;
 
 /** The exact pending intent lives only in memory; persisted attempts remain on the server. */
 export class ClinicalOperationController {
@@ -76,7 +91,7 @@ export class ClinicalOperationController {
   private active = true;
   private inFlight: AbortController | null = null;
   constructor(private readonly request: Requester, private readonly publish: (state: ClinicalClientState) => void,
-    private readonly newId: () => string = () => crypto.randomUUID()) {}
+    private readonly newId: () => string = () => crypto.randomUUID(), private readonly signer?: { address: string; sign: OwnerSigner }) {}
   activate() { this.active = true; this.state = emptyState(); this.pending = null; this.emit(); }
   dispose() { this.active = false; this.epoch++; this.inFlight?.abort(); this.pending = null; this.state = emptyState(); }
   snapshot() { return { ...this.state }; }
@@ -136,8 +151,21 @@ export class ClinicalOperationController {
   async sign() {
     const op = this.state.operation;
     if (!op || op.state !== 'awaiting_signature' || this.state.uncertain || !this.state.canSign) throw new Error('Primero consulta el intento y revisa su contenido antes de firmar.');
-    return this.perform(async signal => verifiedClinicalOperation((await this.request<{ operation: ClinicalOperation }>(
-      `/api/private-clinical-operations/${encodeURIComponent(op.id)}/sign`, { ...jsonBody({ confirmed: true }), signal })).operation, op));
+    const epoch = this.epoch;
+    return this.perform(async signal => {
+      if (!this.signer) throw new ClinicalClientError(400, 'clinical_signing_unavailable');
+      const payload = clinicalSigningPayload(op, this.signer.address);
+      let signed;
+      try { signed = await this.signer.sign(payload); }
+      catch { throw new ClinicalClientError(400, 'signature_cancelled'); }
+      // A Privy prompt cannot be aborted by fetch's signal. Do not deliver a
+      // late signature after leaving this identity, or after the intent expires.
+      if (!this.active || epoch !== this.epoch || signal.aborted) throw new Error('La sesión cambió. No se enviará la firma anterior.');
+      clinicalSigningPayload(op, this.signer.address);
+      if (!/^(?:0x)?[a-f0-9]{128}$/i.test(signed.signature)) throw new ClinicalClientError(400, 'owner_signature_invalid');
+      return verifiedClinicalOperation((await this.request<{ operation: ClinicalOperation }>(
+        `/api/private-clinical-operations/${encodeURIComponent(op.id)}/sign`, { ...jsonBody({ confirmed: true, signature: signed.signature }), signal })).operation, op);
+    });
   }
   async retry() {
     const op = this.state.operation;
@@ -152,9 +180,15 @@ export class ClinicalOperationController {
       `/api/private-clinical-operations/${encodeURIComponent(op.id)}/cancel`, { ...jsonBody({ confirmed: true }), signal })).operation, op));
   }
 }
-export function useClinicalOperation(identity: string) {
+export function useClinicalOperation(identity: string, address: string) {
+  const { signRawHash } = useSignRawHash();
+  const live = useRef({ identity, signRawHash }); live.current = { identity, signRawHash };
   const [view, setView] = useState<{ identity: string; state: ClinicalClientState }>({ identity: '', state: emptyState() });
-  const controller = useMemo(() => new ClinicalOperationController(clinicalApi, state => setView({ identity, state })), [identity]);
+  const controller = useMemo(() => new ClinicalOperationController(clinicalApi, state => setView({ identity, state }), undefined, { address, sign: async payload => {
+    const signed = await live.current.signRawHash(payload);
+    if (live.current.identity !== identity) throw new Error('La sesión cambió.');
+    return signed;
+  } }), [identity, address]);
   useEffect(() => { controller.activate(); return () => controller.dispose(); }, [controller]);
   const state = view.identity === identity && identity ? view.state : emptyState();
   useEffect(() => {

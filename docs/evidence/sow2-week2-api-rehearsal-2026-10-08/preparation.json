@@ -1,0 +1,37 @@
+{
+  "application": {
+    "envDirDisabled": true,
+    "files": 74,
+    "passed": 929
+  },
+  "mainChanged": false,
+  "sourceSha256": {
+    "scripts/lib/clinical-web-transport.mjs": "a82215772fe1b27745199e08694989df4033964a1b0e4848038f57690667116b",
+    "e2e/clinical-auth/index.html": "37781fbfa5bd9924e74f9abbeeb6e1f2af0ff723550bfede886f63a06dd2ee6c",
+    "e2e/clinical-auth/main.tsx": "61aab6868059e9c31fea7773b21933211643ae7389e4f4c21404aff6eaf00825",
+    "package.json": "eaf68cb5aef96e9bba840a1e96641af681650459dbcefdd2159ada3c823d9dea",
+    "scripts/lib/clinical-local-auth.mjs": "feb5a70467f5e41b45869b96dbd0419de8919298805f826bda43c0db9699ef4b",
+    "scripts/lib/clinical-web-rehearsal.mjs": "14a152e9417f6e7371d2d5578b62d30730a716c99ae00e0b028ec46044a788d0",
+    "scripts/lib/clinical-web-receipt-audit.test.mjs": "9e42e0060046f81d585e229f7977a0ec23596e6dc0bda4a59657dc4e788176c8",
+    "scripts/lib/clinical-web-transport.test.mjs": "f38943228f964a814a18f28d2862c3dc2182002a89d0dc9d6f4030df1f20cafc",
+    "scripts/lib/clinical-web-receipt-audit.mjs": "8d36052eb7e7e4ececc1a6e57a30ce7ad3c932dad934388cdaa770c3fab29d6d",
+    "e2e/clinical-auth/style.css": "030ef930cd90bf2368a20e1b493c9b2fd75987c311cf8fc3bc418813cc924313",
+    "scripts/lib/clinical-web-rehearsal.test.mjs": "9b99300394999465b24cb8083f3b550272871dc6bcaf34249e80963bb7692e14",
+    "scripts/validate-clinical-web-testnet.test.mjs": "8f6224b825d8bacb6e55fa2f4f9bf1bc52672bb17d044f5d8b1b48125e471747",
+    "scripts/validate-clinical-web-testnet.mjs": "d7b1c890bc13ad8ded658af684899ffdd5afdfe6349d40b4a56c2a964976b74a",
+    "scripts/lib/clinical-local-auth.test.mjs": "475e0aeef49ac25d13a7b32472ced94115610f9ddff96258c7cae3d74bf36c70"
+  },
+  "newOnchainTransactions": 0,
+  "checkedAt": "2026-10-08T06:14:08.5131717Z",
+  "category": "isolated_preparation",
+  "privateServices": {
+    "newIncluded": 80,
+    "passed": 243
+  },
+  "typecheck": "passed",
+  "sourceCommit": "a79bfb99dda73217108c16a2fbe1f976eef0d569",
+  "build": "passed",
+  "realTestnetRehearsal": "pending",
+  "realPrivy": "pending",
+  "schemaVersion": 1
+}
