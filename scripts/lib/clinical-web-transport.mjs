@@ -12,7 +12,7 @@ export function clinicalLoopbackTarget(value) {
 
 /** Credentials exist only in this closure. Requests cannot redirect them to
  * another host. Provider payloads and raw exceptions never become diagnostics. */
-export function createClinicalWebApi({ target, accessToken, fetchImpl = fetch, signal }) {
+export function createClinicalWebApi({ target, accessToken, fetchImpl = fetch, signal, ownerSign }) {
   const origin = clinicalLoopbackTarget(target);
   if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 16000) throw Error('rehearsal_auth_invalid');
   const uuid = id => { if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) throw Error('rehearsal_operation_invalid'); return id; };
@@ -48,7 +48,14 @@ export function createClinicalWebApi({ target, accessToken, fetchImpl = fetch, s
     wallet: () => request('/api/privy/stellar-wallet'),
     snapshot: () => request('/api/private-clinical-history'),
     prepare: payload => request('/api/private-clinical-operations', payload),
-    sign: id => request(`/api/private-clinical-operations/${uuid(id)}/sign`, { confirmed: true }),
+    sign: async id => {
+      if (typeof ownerSign !== 'function') throw Error('rehearsal_browser_signing_required');
+      const value = await request(`/api/private-clinical-operations/${uuid(id)}`);
+      if (value?.operation?.id !== id || value.operation.state !== 'awaiting_signature') throw Error('rehearsal_operation_invalid');
+      const { signature } = await ownerSign(value.operation);
+      if (signal?.aborted || !/^0x[a-f0-9]{128}$/i.test(signature) || value.operation.expiresAt*1000 <= Date.now()) throw Error('rehearsal_signature_invalid');
+      return request(`/api/private-clinical-operations/${uuid(id)}/sign`, { confirmed: true, signature });
+    },
     inspect: id => request(`/api/private-clinical-operations/${uuid(id)}`),
     document: (entryId, version) => {
       if (!/^[a-f0-9]{64}$/.test(entryId) || !Number.isSafeInteger(version) || version < 1) throw Error('rehearsal_document_invalid');

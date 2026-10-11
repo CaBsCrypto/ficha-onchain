@@ -39,6 +39,8 @@ node scripts/validate-clinical-web-testnet.mjs --run --run-id UUID_V4 --confirm-
 
 Crear un UUID una vez, conservarlo y reutilizarlo al reanudar. El acompañante explica el alcance y exige otra confirmación antes de entregar la sesión al script. Autoriza únicamente los fixtures sintéticos de este ensayo, no operaciones con datos clínicos reales.
 
+Mantener el acompañante abierto durante los ocho pasos: la firma se realiza en el navegador mediante `useSignRawHash` con la wallet existente de Privy, igual que las recetas. El script sólo entrega un intento preparado por la API y recibe su firma mediante capacidades locales de un solo uso, ligadas a ejecución, operación, wallet, hash, Testnet y vencimiento. No admite solicitudes de hashes arbitrarios desde el navegador. La API toma el sobre y argumentos de su fila guardada, verifica la firma del paciente, patrocina y persiste antes de transmitir. Un cierre, cambio de cuenta o firma vencida detiene el proceso.
+
 | Paso | Firma | Resultado comprobado |
 | --- | --- | --- |
 | Crear historial | Paciente, mediante Privy | Propietario e identificador del historial |

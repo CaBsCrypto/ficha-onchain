@@ -8,14 +8,15 @@ import { ClinicalEntryForm } from '@/components/private-portal/ClinicalEntryForm
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
 import { ClinicalPermissions } from '@/components/private-portal/ClinicalPermissions';
 
-const deps = vi.hoisted(() => ({ fetch: vi.fn(), userId: 'did:privy:patient1' }));
+const deps = vi.hoisted(() => ({ fetch: vi.fn(), sign: vi.fn(async () => ({ signature: '0x' + '7'.repeat(128) })), userId: 'did:privy:patient1' }));
+vi.mock('@privy-io/react-auth/extended-chains', () => ({ useSignRawHash: () => ({ signRawHash: deps.sign }) }));
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: deps.fetch }));
 vi.mock('@privy-io/react-auth', () => ({ usePrivy: () => ({ ready: true, authenticated: true, user: { id: deps.userId } }) }));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({ usePortalWallet: () => ({ walletId: 'wallet1', address: 'G' + 'A'.repeat(55) }) }));
 vi.mock('@/components/private-portal/Operation', () => ({ ReceiptLink: ({ hash }: { hash: string }) => createElement('a', { href: `https://stellar.expert/explorer/testnet/tx/${hash}` }, 'Ver recibo') }));
 const ID = '09fedaff-8110-4415-8b5c-3409bf0a5731';
 const OTHER = '18d482c5-aeae-448b-a37c-a17bfc8042d2';
-const op = (overrides: Partial<ClinicalOperation> = {}): ClinicalOperation => ({ id: ID, action: 'append_version', state: 'awaiting_signature', expiresAt: 1_900_000_000, transactionHash: null, errorCode: null, ...overrides });
+const op = (overrides: Partial<ClinicalOperation> = {}): ClinicalOperation => ({ id: ID, action: 'append_version', state: 'awaiting_signature', expiresAt: 1_900_000_000, transactionHash: null, errorCode: null, signing: overrides.state && overrides.state !== 'awaiting_signature' ? undefined : { address: 'G' + 'A'.repeat(55), hash: '1'.repeat(64), network: 'testnet', expiresAt: overrides.expiresAt ?? 1_900_000_000 }, ...overrides });
 const note = { title: 'Antecedente sintético', text: 'Información de prueba', eventDate: null };
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -27,6 +28,41 @@ beforeEach(() => { vi.clearAllMocks(); deps.userId = 'did:privy:patient1'; (glob
 afterEach(async () => { for (const { root, host } of roots) { await act(async () => root.unmount()); host.remove(); } roots = []; vi.unstubAllGlobals(); });
 
 describe('clinical attempt recovery', () => {
+  it('discards a late Privy signature after disposal and activation without posting it', async () => {
+    const late=deferred<{signature:string}>(), sign=vi.fn(()=>late.promise), request=vi.fn().mockResolvedValue({operation:op()});
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign});
+    await client.prepare({action:'append_version',note}); const pending=client.sign();
+    client.dispose();client.activate();late.resolve({signature:'0x'+'7'.repeat(128)});
+    await expect(pending).rejects.toThrow('sesión cambió');expect(request).toHaveBeenCalledTimes(1);expect(client.snapshot().operation).toBeNull();
+  });
+  it('double signing clicks use one hook and one delivery to the exact operation', async () => {
+    const late=deferred<{signature:string}>(), sign=vi.fn(()=>late.promise), request=vi.fn().mockResolvedValueOnce({operation:op()}).mockResolvedValueOnce({operation:op({state:'submitted',transactionHash:'a'.repeat(64)})});
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign});
+    await client.prepare({action:'append_version',note});const pending=client.sign();await expect(client.sign()).rejects.toThrow('anterior');
+    late.resolve({signature:'0x'+'7'.repeat(128)});await pending;expect(sign).toHaveBeenCalledOnce();
+    expect(JSON.parse(request.mock.calls[1][1].body)).toEqual({confirmed:true,signature:'0x'+'7'.repeat(128)});
+  });
+  it('a cancelled hook sends nothing and preserves the same unsigned attempt', async () => {
+    const request=vi.fn().mockResolvedValue({operation:op()}), sign=vi.fn().mockRejectedValue(Error('provider cancellation'));
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign});
+    await client.prepare({action:'append_version',note});await expect(client.sign()).rejects.toThrow();
+    expect(request).toHaveBeenCalledOnce();expect(client.snapshot()).toMatchObject({uncertain:false,operation:{id:ID,state:'awaiting_signature'}});
+  });
+  it('does not deliver a signature when the intent expires while Privy is signing', async () => {
+    const original=Date.now(), expiry=Math.floor(original/1000)+10;
+    const request=vi.fn().mockResolvedValue({operation:op({expiresAt:expiry})}), sign=vi.fn(async()=>{vi.spyOn(Date,'now').mockReturnValue(expiry*1000+1);return{signature:'0x'+'7'.repeat(128)};});
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign});
+    try {await client.prepare({action:'append_version',note});await expect(client.sign()).rejects.toThrow();expect(request).toHaveBeenCalledOnce();}
+    finally {vi.restoreAllMocks();}
+  });
+  it('rejects a changed signing wallet or hash for the same saved intent', async () => {
+    const original=op(), request=vi.fn().mockResolvedValueOnce({operation:original});
+    const client=new ClinicalOperationController(request,()=>{},()=>ID);await client.prepare({action:'append_version',note});
+    for(const change of [{hash:'2'.repeat(64)},{address:'G'+'B'.repeat(55)}]) {
+      request.mockResolvedValueOnce({operation:{...original,signing:{...original.signing,...change}}});await expect(client.check()).rejects.toThrow();
+      expect(client.snapshot().operation).toEqual(original);
+    }
+  });
   it('prevents double preparation and preserves an immutable request ID and payload after a lost response', async () => {
     const lost = deferred<{ operation: ClinicalOperation }>(); const request = vi.fn().mockReturnValueOnce(lost.promise); const newId = vi.fn(() => ID);
     const client = new ClinicalOperationController(request, () => {}, newId);
@@ -44,7 +80,7 @@ describe('clinical attempt recovery', () => {
   it('recovers a lost signing response without another signature or a new operation', async () => {
     const submitted = op({ state: 'submitted', transactionHash: 'a'.repeat(64) });
     const request = vi.fn().mockResolvedValueOnce({ operation: op() }).mockRejectedValueOnce(new ClinicalClientError(0, 'network_unavailable')).mockResolvedValueOnce({ operation: submitted }).mockResolvedValueOnce({ operation: submitted });
-    const client = new ClinicalOperationController(request, () => {}, () => ID);
+    const client = new ClinicalOperationController(request, () => {}, () => ID, { address: 'G' + 'A'.repeat(55), sign: deps.sign });
     await client.prepare({ action: 'append_version', note }); await expect(client.sign()).rejects.toThrow();
     await expect(client.sign()).rejects.toThrow('consulta'); await client.check();
     expect(request.mock.calls[2][0]).toBe(`/api/private-clinical-operations/${ID}`);

@@ -12,18 +12,18 @@ test('only exact HTTP loopback origins are accepted',()=>{
   for(const bad of ['https://trustleaf-demo.vercel.app','http://example.org:3016','http://localhost:3016/patient','http://localhost:3016/?token=x','http://u:p@localhost:3016','http://localhost:3016/#x','http://localhost']) assert.throws(()=>clinicalLoopbackTarget(bad));
 });
 test('real API transport pins origin, no-store, redirects, and keeps token off URLs',async()=>{
-  const calls=[]; const api=createClinicalWebApi({target:'http://localhost:3016',accessToken:token,fetchImpl:async(url,options)=>{calls.push({url,options});return json({ok:true});}});
-  await api.wallet(); await api.prepare({action:'create_history'}); await api.sign(randomUUID());
+  const calls=[]; const id=randomUUID(),signature='0x'+'1'.repeat(128); const api=createClinicalWebApi({target:'http://localhost:3016',accessToken:token,ownerSign:async()=>({signature}),fetchImpl:async(url,options)=>{calls.push({url,options});return json({operation:{id,state:'awaiting_signature',expiresAt:Math.floor(Date.now()/1000)+120}});}});
+  await api.wallet(); await api.prepare({action:'create_history'}); await api.sign(id);
   assert.ok(calls.every(c=>!c.url.includes(token)&&c.options.redirect==='error'&&c.options.cache==='no-store'&&c.options.headers.Origin==='http://localhost:3016'));
   assert.equal(calls[0].options.headers.Authorization,`Bearer ${token}`); assert.equal(calls[0].options.method,'GET');
-  assert.equal(calls[2].options.body,'{"confirmed":true}');
-  api.dispose(); await api.wallet(); assert.equal(calls[3].options.headers.Authorization,'Bearer ');
+  assert.equal(calls[3].options.body,JSON.stringify({confirmed:true,signature}));
+  api.dispose(); await api.wallet(); assert.equal(calls[4].options.headers.Authorization,'Bearer ');
 });
 test('provider diagnostics cannot leak through HTTP or connection errors',async()=>{
   const api=createClinicalWebApi({target:'http://localhost:3016',accessToken:token,fetchImpl:async()=>new Response(token,{status:401})});
   await assert.rejects(api.snapshot(),{message:'rehearsal_session_expired'});
   const lost=createClinicalWebApi({target:'http://localhost:3016',accessToken:token,fetchImpl:async()=>{throw Error(token);}});
-  await assert.rejects(lost.sign(randomUUID()),{message:'rehearsal_response_uncertain'});
+  await assert.rejects(lost.wallet(),{message:'rehearsal_response_uncertain'});
 });
 test('uncached, non-JSON and oversized responses are rejected',async()=>{
   for(const response of [new Response('{}',{headers:{'content-type':'application/json'}}),new Response('<html>',{headers:{'content-type':'text/html','cache-control':'no-store'}}),json({text:'x'.repeat(1000001)})]) {

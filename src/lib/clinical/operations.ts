@@ -1,12 +1,10 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
-import { PrivyClient } from '@privy-io/server-auth';
 import { Networks, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { PoolClient } from '@neondatabase/serverless';
 import { getDbConnection, getDb } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { resolveDoctor } from '@/lib/doctor-authorizations';
-import { PrivateFlowError, PRIVY_APP, assertPrivateWrites } from '@/lib/private-config';
-import { signPreparedOwnerTransaction } from '@/lib/stellar/privy-owner-signing';
+import { PrivateFlowError, assertPrivateWrites } from '@/lib/private-config';
 import type { ClinicalActor, ClinicalPrepareRequest, ClinicalExpected } from '@/types/clinical';
 import { sealClinicalVersion } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalNeonStore } from '../../../scripts/lib/clinical-neon-store.mjs';
@@ -133,7 +131,7 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
     return { operation: clinicalPublicOperation(row) };
   });
 }
-export async function signClinicalOperation(user: AuthedUser, actor: ClinicalActor, id: string, token: string) {
+export async function signClinicalOperation(_user: AuthedUser, actor: ClinicalActor, id: string, signature: string) {
   assertClinicalEnvironment(true);
   await locked(actor, async client => {
     const row = await operation(client, actor, id);
@@ -142,13 +140,9 @@ export async function signClinicalOperation(user: AuthedUser, actor: ClinicalAct
     const unsigned = TransactionBuilder.fromXDR(row.unsigned_xdr, Networks.TESTNET);
     if (!(unsigned instanceof Transaction) || unsigned.hash().toString('hex') !== row.signing_hash || Number(unsigned.timeBounds?.maxTime) !== Number(row.expires_at)) throw new PrivateFlowError('clinical_saved_intent_invalid', 503);
     assertClinicalUnsigned(unsigned, actor.address, row.action, row.expected); await eligible(actor, row);
-    if (!process.env.PRIVY_APP_SECRET) throw new PrivateFlowError('clinical_signing_unavailable', 503);
-    const signed = await signPreparedOwnerTransaction(token, actor, { ...actor, network: 'testnet', unsignedXdr: row.unsigned_xdr, hash: row.signing_hash, expiresAt: Number(row.expires_at)*1000 }, {
-      privy: new PrivyClient(PRIVY_APP, process.env.PRIVY_APP_SECRET), appId: PRIVY_APP, appSecret: process.env.PRIVY_APP_SECRET,
-    });
-    const tx = TransactionBuilder.fromXDR(signed.signedXdr, Networks.TESTNET);
-    if (!(tx instanceof Transaction) || tx.signatures.length !== 1) throw new PrivateFlowError('clinical_signature_invalid');
-    const sponsored = sponsorClinicalSignature(row.unsigned_xdr, actor.address, tx.signatures[0].signature().toString('hex'), row.action, row.expected);
+    // The browser signs with the patient's existing Privy wallet. All intent
+    // fields come from this locked row; the client supplies only the signature.
+    const sponsored = sponsorClinicalSignature(row.unsigned_xdr, actor.address, signature, row.action, row.expected);
     await client.query("UPDATE clinical_web_operations SET signed_xdr=$2,transaction_hash=$3,state='submitted',updated_at=NOW() WHERE id=$1 AND state='awaiting_signature'", [id, sponsored.xdr, sponsored.hash]);
   });
   // Persisted first; a response lost after this point recovers this exact envelope.

@@ -44,13 +44,14 @@ export async function main(argv = process.argv.slice(2)) {
   const stop=()=>abort.abort();process.once('SIGINT',stop);process.once('SIGTERM',stop);
   try {
     const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
-    auth=await startClinicalLocalAuth({appId:'cmrix722m03d30clewd1fuffq',port,mode,runId,target,expectedPatient:patient,timeoutMs:authWaitMs,signal:abort.signal});
+    auth=await startClinicalLocalAuth({appId:'cmrix722m03d30clewd1fuffq',port,mode,runId,target,expectedPatient:patient,timeoutMs:authWaitMs,signal:abort.signal,enableSigning:mode==='execute'});
     process.stdout.write(`Run: ${runId}\nModo: ${mode}\nPrivy: ${auth.url}\nEspera de autorización: ${authWaitMs/60_000} minutos\nIngresa y confirma allí; no pegues códigos en la terminal.\n`);
     const handoff=await auth.waitForAuthorization();
-    api=createClinicalWebApi({target,accessToken:handoff.accessToken,signal:abort.signal});handoff.accessToken='';
+    let currentIndex=0;
+    api=createClinicalWebApi({target,accessToken:handoff.accessToken,signal:abort.signal,ownerSign:operation=>auth.requestSignature(operation,currentIndex)});handoff.accessToken='';
     const report=await rehearseClinicalWeb({api,audit:createClinicalWebAuditor({relayer:values.relayer}),journal,runId,patient,doctor,mode,
       allowWrites:mode==='execute'&&handoff.confirmedSynthetic===true,evidenceKind:'real_api_testnet_readback',
-      onProgress:({step,index,phase})=>process.stdout.write(`Paso ${index}: ${step} · ${phase}\n`),
+      onProgress:({step,index,phase})=>{currentIndex=index;process.stdout.write(`Paso ${index}: ${step} · ${phase}\n`);},
       sleep:ms=>new Promise((done,reject)=>{
         if(abort.signal.aborted){reject(Error('rehearsal_interrupted'));return;}
         const cancelled=()=>{clearTimeout(timer);reject(Error('rehearsal_interrupted'));};

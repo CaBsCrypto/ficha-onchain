@@ -2,6 +2,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clinicalLocalSignatures } from './clinical-local-signatures.mjs';
 
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const authDirectory = join(root, 'e2e', 'clinical-auth');
@@ -24,7 +25,7 @@ class RequestFailure extends Error {
 const failure = code => new Error(code);
 function configuration(input) {
   const { appId, port = 3018, mode = 'inspect', runId, target, expectedPatient,
-    timeoutMs = 300_000, signal } = input;
+    timeoutMs = 300_000, signal, enableSigning = false } = input;
   let targetUrl;
   try { targetUrl = new URL(target); } catch { throw failure('clinical_local_auth_configuration_invalid'); }
   if (typeof appId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(appId) ||
@@ -40,7 +41,8 @@ function configuration(input) {
       (signal !== undefined && !(signal instanceof AbortSignal))) {
     throw failure('clinical_local_auth_configuration_invalid');
   }
-  return { appId, port, mode, runId, target: targetUrl.origin, expectedPatient, timeoutMs, signal };
+  if (typeof enableSigning !== 'boolean' || enableSigning && (mode === 'inspect' || !expectedPatient)) throw failure('clinical_local_auth_configuration_invalid');
+  return { appId, port, mode, runId, target: targetUrl.origin, expectedPatient, timeoutMs, signal, enableSigning };
 }
 function oneHeader(request, name) {
   let count = 0;
@@ -134,6 +136,7 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
     throw failure('clinical_local_auth_configuration_invalid');
   }
   const nonce = randomBytes(32);
+  const signatures = options.enableSigning ? clinicalLocalSignatures({ patient: options.expectedPatient, runId: options.runId, now }) : null;
   let phase = 'waiting', url, expectedHost, expiresAt, timer, closing;
   let resolveAuthorization, rejectAuthorization;
   let authorization = new Promise((resolve, reject) => { resolveAuthorization = resolve; rejectAuthorization = reject; });
@@ -153,7 +156,8 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
         send(response, 403, { error: 'clinical_local_auth_forbidden' }); return;
       }
       const path = request.url;
-      const control = path === '/__context' || path === '/__auth';
+      const signingControl = path === '/__signature-poll' || path === '/__signature-result';
+      const control = path === '/__context' || path === '/__auth' || signingControl;
       if (control && (request.method !== 'POST' || oneHeader(request, 'origin') !== url ||
           (request.headers['sec-fetch-site'] !== undefined && request.headers['sec-fetch-site'] !== 'same-origin'))) {
         send(response, 403, { error: 'clinical_local_auth_forbidden' }); return;
@@ -162,6 +166,18 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
         send(response, 403, { error: 'clinical_local_auth_forbidden' }); return;
       }
       if (phase === 'waiting' && now() >= expiresAt) rejectWaiting('clinical_local_auth_expired');
+      if (signingControl) {
+        if (phase !== 'authorized' || !signatures) { send(response, 410, { error: 'clinical_local_auth_unavailable' }); return; }
+        const body = await readJson(request);
+        if (phase !== 'authorized' || !signatures.authorized(body.capability)) throw new RequestFailure(403, 'clinical_local_auth_forbidden');
+        try {
+          if (path === '/__signature-poll') {
+            if (Object.keys(body).join(',') !== 'capability') throw Error();
+            send(response, 200, { request: signatures.poll(body.capability) });
+          } else { signatures.receive(body); send(response, 200, { accepted: true }); }
+        } catch { throw new RequestFailure(400, 'clinical_local_signing_invalid'); }
+        return;
+      }
       if (phase !== 'waiting' && control) {
         send(response, 410, { error: 'clinical_local_auth_unavailable' }); return;
       }
@@ -187,7 +203,7 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
           throw new RequestFailure(403, 'clinical_local_auth_forbidden');
         }
         phase = 'authorized'; nonce.fill(0); clearTimeout(timer);
-        send(response, 200, { accepted: true });
+        send(response, 200, { accepted: true, ...(signatures ? { signingCapability: signatures.capability } : {}) });
         resolveAuthorization({ accessToken: body.accessToken, confirmedSynthetic: body.confirmedSynthetic });
         resolveAuthorization = null; rejectAuthorization = null;
         return;
@@ -213,6 +229,7 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', onAbort);
     rejectWaiting(code);
+    signatures?.close();
     phase = 'closed'; pageAssets.clear();
     closing = new Promise(resolve => {
       server.close(() => resolve());
@@ -245,6 +262,10 @@ export async function createClinicalLocalAuthServer(input, { assets = new Map(),
       return pending;
     },
     close() { return stop('clinical_local_auth_closed'); },
+    requestSignature(operation, index) {
+      if (phase !== 'authorized' || !signatures) return Promise.reject(failure('clinical_local_signing_unavailable'));
+      return signatures.request(operation, index);
+    },
   };
 }
 

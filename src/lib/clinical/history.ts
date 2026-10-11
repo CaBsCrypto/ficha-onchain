@@ -23,7 +23,9 @@ export async function ownClinicalHistory(actor: ClinicalActor) {
   return { row, history: observed };
 }
 export function clinicalPublicOperation(row: Record<string, any>) {
-  return { id: row.id as string, action: row.action, state: row.state, expiresAt: Number(row.expires_at), transactionHash: row.transaction_hash ?? null, errorCode: row.error_code ?? null };
+  return { id: row.id as string, action: row.action, state: row.state, expiresAt: Number(row.expires_at), transactionHash: row.transaction_hash ?? null, errorCode: row.error_code ?? null,
+    ...(row.state === 'awaiting_signature' && !row.signed_xdr && Number(row.expires_at) > Date.now()/1000
+      ? { signing: { address: row.source_wallet as string, hash: row.signing_hash as string, network: 'testnet' as const, expiresAt: Number(row.expires_at) } } : {}) };
 }
 export async function clinicalOperations(actor: ClinicalActor) {
   const rows = await getDb().query(`SELECT * FROM clinical_web_operations WHERE actor_user_id=$1 AND wallet_id=$2 AND source_wallet=$3 AND contract_id=$4 ORDER BY created_at DESC LIMIT 50`, [actor.userId, actor.walletId, actor.address, CLINICAL_ID]);

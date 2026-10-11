@@ -2,10 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { createClinicalLocalAuthServer } from './clinical-local-auth.mjs';
+import { Keypair } from '@stellar/stellar-sdk';
 
 const base = { appId: 'public-app-test', mode: 'inspect', runId: 'auth-test',
   target: 'http://localhost:3000', port: 0, timeoutMs: 60_000 };
 const fakeToken = 'test-header.test-payload.test-signature';
+test('signing controls require authorized capabilities and reject cross-origin, replay and delivery after abort', async t => {
+  const patient=Keypair.fromRawEd25519Seed(Buffer.alloc(32,83)),abort=new AbortController();
+  const auth=await fixture(t,{mode:'execute',expectedPatient:patient.publicKey(),enableSigning:true,signal:abort.signal});
+  assert.equal((await exchange(auth.url,'/__signature-poll',{body:{capability:'0'.repeat(64)}})).status,410);
+  const ctx=await context(auth),captured=await exchange(auth.url,'/__auth',{body:authorization(ctx,true)});await auth.waitForAuthorization();
+  const capability=captured.data.signingCapability;assert.match(capability,/^[a-f0-9]{64}$/);
+  assert.equal((await exchange(auth.url,'/__signature-poll',{body:{capability},headers:{Origin:'https://foreign.invalid'}})).status,403);
+  assert.equal((await exchange(auth.url,'/__signature-poll',{body:{capability:'0'.repeat(64)}})).status,403);
+  const expiresAt=Math.floor(Date.now()/1000)+120,operation={id:'82ef88cf-ef6e-4e24-bb8a-ab21e185cd52',action:'create_history',state:'awaiting_signature',expiresAt,signing:{address:patient.publicKey(),network:'testnet',hash:'1'.repeat(64),expiresAt}};
+  const pending=auth.requestSignature(operation,1);
+  const intent=(await exchange(auth.url,'/__signature-poll',{body:{capability}})).data.request;
+  const body={capability,nonce:intent.nonce,operationId:intent.operationId,signature:'0x'+patient.sign(Buffer.from(intent.hash,'hex')).toString('hex')};
+  assert.equal((await exchange(auth.url,'/__signature-result',{body:{...body,nonce:'0'.repeat(64)}})).status,400);
+  assert.equal((await exchange(auth.url,'/__signature-result',{body})).status,200);assert.deepEqual(await pending,{signature:body.signature});
+  assert.equal((await exchange(auth.url,'/__signature-result',{body})).status,400);
+  const next=auth.requestSignature({...operation,id:'3179d84f-0ca8-4de8-98cc-b6d372dc92c0',action:'append_version'},2);abort.abort();
+  await assert.rejects(next,{message:'clinical_local_signing_closed'});await auth.close();
+});
 const assets = () => new Map([
   ['/index.html', Buffer.from('<!doctype html><title>Local test</title>')],
   ['/assets/page.js', Buffer.from('export {};')],
