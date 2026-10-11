@@ -1,6 +1,6 @@
 # SOW 2 · Semana 2 · Estado de la entrega
 
-Referencia: `codex/sow2-sprint-2`, 8 de octubre de 2026. Código comprobado: `cdddc179fa707168d9bb90d5b1554f9dad4425ac`. Historial, archivos, cronología y permisos ya están integrados. Los resultados y sus commits están en [QA-SEMANA-2.md](QA-SEMANA-2.md). No se ha publicado en main ni se acredita aún un recorrido autenticado listo para grabar.
+Actualización: 11 de octubre de 2026. Base integrada `codex/sow2-sprint-2`; ensayo en `codex/sow2-testnet-api-rehearsal`, [#141](https://github.com/CaBsCrypto/ficha-onchain/pull/141) en borrador. Aplicación comprobada `6b9041f`; validador final `2189c1d`. Historial, archivos, cronología y permisos están integrados y el ensayo autenticado de ocho transacciones del paciente está aprobado en Testnet. Ver [informe real](../evidence/sow2-week2-testnet-2026-10-11/INFORME.md) y [QA](QA-SEMANA-2.md). No está publicado en main; revisión manual restante y preview siguen separados.
 
 ## Alcance integrado
 
@@ -19,16 +19,16 @@ Los commits identifican código integrado; no equivalen a aceptación manual ni 
 
 | Frente | Responsable | Estado | Evidencia |
 | --- | --- | --- | --- |
-| 1 · Identidad y acceso | Agente identidad | Integrado; sesión real pendiente | `5b0482e`: DID y wallet vinculados |
+| 1 · Identidad y acceso | Agente identidad | Integrado; sesión real del paciente observada; cambio de cuenta manual pendiente | `5b0482e`; ensayo `4fad0a02` |
 | 2 · Cifrado y claves | Agente identidad | Integrado; configuración y recuperación locales comprobadas | `5b0482e`; clave web y respaldo privados |
 | 3 · Persistencia | Agente persistencia | Integrado; 62 comprobaciones SQL y 5 escenarios concurrentes aprobados con rollback | `8682d47`, `6e8f1bf`, `dda2dd2`, `68e4259`, `cdddc17` |
-| 4 · Stellar y firmas | Agente Stellar | Integrado; firma real pendiente | `a5790b1`, `2019b79`: validación estricta y comprobantes durables |
+| 4 · Stellar y firmas | Agente Stellar | Ocho firmas y recibos reales auditados; firma desde botón del producto pendiente | `6b9041f`; ocho recibos del informe |
 | 5 · APIs | Coordinador y revisión delegada | Integrado; identidad, errores e integridad probados | `916617b`, `2019b79` |
 | 6 · Antecedentes y archivos | Agente interfaz | Integrado; formularios y descargas comprobados con fixtures | `31ad3f8`, `64a37fd` |
 | 7 · Cronología y correcciones | Agente interfaz | Integrado; filtros, autor y versiones probados | `31ad3f8` |
 | 8 · Permisos | Agente permisos | Integrado; lectura/agregado independientes; médico comprobado otra vez antes de firmar | `12cf461`, `8c21c69` |
-| 9 · Seguridad e integración | Coordinador y agente QA | 928 pruebas de aplicación, 163 privadas, 25 contractuales y TypeScript aprobados; build registrado en QA | `3d3b5fd`, `8c21c69`, `cdddc17` |
-| 10 · Visual y entrega | Coordinador y agente entrega | Fixtures y foco corregido revisados; 200 % y sesión real pendientes | `68f4559`; [QA](QA-SEMANA-2.md), [guía](GUIA-VALIDACION-SEMANA-2.md) |
+| 9 · Seguridad e integración | Coordinador y agente QA | 938 de aplicación, 260 privadas, TypeScript/build y CI/Vercel aprobados; 25 contractuales históricas | `6b9041f`, `2189c1d`; QA distingue fechas y entornos |
+| 10 · Visual y entrega | Coordinador y agente entrega | Sesión real, filtros, foco y móvil 360/390 revisados; 200 % y visual completo 430 pendientes | [QA](QA-SEMANA-2.md), [informe real](../evidence/sow2-week2-testnet-2026-10-11/INFORME.md) |
 
 ## Entorno local y claves
 
@@ -61,9 +61,9 @@ Las rutas `/api/private-clinical-*` exigen autenticación y responden con `no-st
 
 Se corrigieron el foco tras preparar permisos, la comprobación del médico antes de firmar y la reconciliación de recibos históricos al cambiar el relayer. Las pruebas locales y SQL están registradas. Los checks remotos corresponden a cada PR y no sustituyen las comprobaciones siguientes:
 
-1. Entrar con Privy en local, primero sólo lectura.
-2. Realizar el recorrido sintético acordado, auditar recibos y persistencia.
-3. Completar texto al 200 % y contrastar presentación con la sesión real.
+1. Privy y ocho operaciones del paciente comprobados: historial, PDF, antecedente, imagen, corrección, lectura, agregado y revocación. Los seis recibos previos se conservaron durante la reanudación; sin duplicarlos.
+2. Recarga tras reiniciar con escrituras apagadas y reauditoría desde otro proceso aprobadas; los ocho recibos y el contenido persistieron, sin nuevas transacciones. [Informe separado](../evidence/sow2-week2-testnet-2026-10-11/persistence.json).
+3. Completar texto al 200 %, visual completo a 430 px, legibilidad de PDF, cambio de cuenta y recorrido del botón de firma del producto. La demora de lectura medida queda documentada.
 4. Autorizar específicamente la configuración aislada del preview antes de trasladar claves o conexión.
 
 Usar un único entorno de escritura por paciente, contrato y red. La misma wallet determina el mismo historial en cadena; cambiar de base sin conservar su índice y contenido cifrado no crea otra historia. No adoptar registros automáticamente ni intentar crearlos otra vez para eludir esa separación.

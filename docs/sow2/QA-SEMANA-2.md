@@ -1,5 +1,17 @@
 # SOW 2 · Semana 2 · Registro de QA
 
+## Actualización · 11 de octubre de 2026
+
+**Ensayo real del paciente aprobado:** ocho transacciones distintas en Testnet con Privy, recibos y contenido auditados; PDF v1/v2 conservados; lectura y agregado independientes, retirados al terminar. La recarga tras reiniciar la aplicación con escrituras apagadas mantuvo tres entradas, cuatro versiones y permisos finales sin conceder. La reauditoría completa desde otro proceso también aprobó los mismos ocho recibos y contenido, sin nuevas transacciones.
+
+Ver [informe y recibos](../evidence/sow2-week2-testnet-2026-10-11/INFORME.md), [ejecución original](../evidence/sow2-week2-testnet-2026-10-11/execution.json) y [persistencia desde otro proceso](../evidence/sow2-week2-testnet-2026-10-11/persistence.json). Aplicación `6b9041f`: 938 pruebas, TypeScript y build aprobados. Validador `2189c1d`: 260 pruebas privadas; CI/Vercel aprobados. Las 25 contractuales siguientes son históricas del 8 de octubre, no una ejecución nueva.
+
+Observado en sesión real: filtros, versiones, corrección propia sin preparar una operación, cierre y retorno del foco, Tab/Shift+Tab, descarga de PNG legible, móvil 360/390 px y ausencia de desbordamiento en DOM a 430 px. La captura a 430 px quedó recortada por la herramienta; revisión visual completa, texto al 200 %, legibilidad de PDF, cambio de cuenta y firma desde el botón del producto siguen pendientes. El preview requiere autorización específica; no se trasladaron secretos ni se fusionó main.
+
+Se corrigieron la firma clínica mediante el mecanismo de navegador ya utilizado por recetas, el límite de patrocinio de Soroban y el diagnóstico saneado del ensayo. Una lectura real tardó 47.191 ms: superaba los 45 segundos del script. Sus GET de historial/documentos ahora admiten 120 segundos; no se afirma mejora de rendimiento. La ejecución conservó su UUID y las seis confirmaciones anteriores al continuar con los dos pasos finales. Detalles y límites en el informe.
+
+## Registro histórico · 8 de octubre de 2026
+
 Fecha: 8 de octubre de 2026. Rama `codex/sow2-sprint-2`. Este registro distingue pruebas aisladas, SQL real reversible, observaciones visuales con fixtures y comprobaciones autenticadas pendientes. No acredita aceptación del revisor ni ausencia total de errores.
 
 ## Resultados acreditados
