@@ -29,6 +29,8 @@ La solicitud local vence después de **5 minutos** por defecto. Para una sesión
 
 La inspección no llama a preparación, firma o reintento. Sus GET pueden actualizar el vínculo de wallet o reconciliar operaciones en Neon: significa **cero transacciones nuevas**, no cero escrituras de base. Un intento incierto o un fallo de consulta detiene el ensayo y queda pendiente; no aprueba el recorrido.
 
+Las lecturas de historial y documentos tienen una espera máxima de **120 segundos** en el script. El 11 de octubre, una lectura real de cuatro versiones respondió HTTP 200 en 47.191 ms, superando el corte anterior de 45 segundos. Esta ampliación permite comprobar el resultado; no acredita una mejora de rendimiento. Preparación, firma y otras peticiones mantienen 45 segundos. Los errores del transporte se registran mediante códigos saneados; no se publican cuerpos ni mensajes del proveedor.
+
 ## Ejecución sintética
 
 Tras revisar la inspección, acordar el ensayo real y habilitar explícitamente las escrituras **sólo en el entorno local aislado**. La herramienta no lo hace automáticamente.

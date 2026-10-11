@@ -18,9 +18,13 @@ export function createClinicalWebApi({ target, accessToken, fetchImpl = fetch, s
   const uuid = id => { if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) throw Error('rehearsal_operation_invalid'); return id; };
   async function request(path, body, binary = false) {
     let response;
+    // A verified history reads every version before delivery. The real four-
+    // version rehearsal exceeded 45 s; give only these GETs a bounded 120 s.
+    // Signature/submission requests keep their original deadline.
+    const timeoutMs = body === undefined && path.startsWith('/api/private-clinical-history') ? 120000 : 45000;
     try {
       response = await fetchImpl(origin + path, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', cache: 'no-store',
-        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(45000)]) : AbortSignal.timeout(45000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
         headers: { Authorization: `Bearer ${accessToken}`, Origin: origin, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     } catch { throw Error('rehearsal_response_uncertain'); }
