@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { Account, BASE_FEE, Keypair, Networks, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
-import { CLINICAL_CONTRACT, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
+import { Account, BASE_FEE, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
+import { CLINICAL_CONTRACT, assertClinicalUnsigned, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import type { ClinicalAction, ClinicalActor, ClinicalExpected, ClinicalPrepareRequest } from '@/types/clinical';
 
 const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), sign: vi.fn(), doctor: vi.fn(), seal: vi.fn(), chain: {} as Record<string, any> }));
@@ -133,6 +133,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe('clinical operation preparation and private idempotency', () => {
+  it('a rejected prepared fee budget rolls back without persisting an intent, requesting Privy or submitting', async () => {
+    const f=fixture();
+    m.chain.prepare.mockImplementation(async (source,action,expected) => {
+      const tx=new TransactionBuilder(new Account(source,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
+        .addOperation(clinicalInvocation(action,expected)).setTimeout(180)
+        .setSorobanData(new SorobanDataBuilder().setResourceFee('496000001').build()).build();
+      assertClinicalUnsigned(tx,source,action,expected); return tx;
+    });
+    await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toThrow('clinical_fee_budget_exceeded');
+    expect(f.state.row).toBeNull(); expect(f.state.events.some(q=>q.startsWith('INSERT'))).toBe(false);
+    expect(f.state.events).toContain('ROLLBACK'); expect(f.client.release).toHaveBeenCalledOnce();
+    expect(m.sign).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
   it('persists one encrypted payload and one intent for two exact preparations of the same UUID', async () => {
     const f = fixture(true); const first = await prepareClinicalOperation(user, actor, appendInput), second = await prepareClinicalOperation(user, actor, clone(appendInput));
     expect(second).toEqual(first); expect(m.seal).toHaveBeenCalledTimes(1); expect(m.chain.prepare).toHaveBeenCalledTimes(1);

@@ -15,6 +15,8 @@ El ensayo automatiza **el recorrido del paciente de semana 2**. No sustituye la 
 
 El preflight consulta red, WASM e interfaces del contrato clínico y registro médico, autoridad, autorización médica con al menos 15 minutos de margen, existencia de la cuenta paciente y saldo del relayer. La API mantiene sus propias comprobaciones de entorno, identidad, permisos e intentos de otras colas.
 
+La política clínica web ofrece como máximo **50 XLM de Testnet por operación patrocinada**, incluyendo recursos de Soroban. Mantiene la tarifa de inclusión existente y comprueba el total antes de Privy; si excede el límite devuelve `clinical_fee_budget_exceeded` sin firma. Aplicación y auditor comparten la política. El preflight exige saldo disponible para ocho máximos (400 XLM), descontando pasivos y la reserva del mismo ledger; es una lectura inicial, no una reserva de fondos ni garantía ante otros consumidores. El importe ofrecido no es necesariamente la comisión cobrada. No financia cuentas ni cambia el contrato o su retención.
+
 ## Inspección sin nuevas transacciones
 
 ```powershell

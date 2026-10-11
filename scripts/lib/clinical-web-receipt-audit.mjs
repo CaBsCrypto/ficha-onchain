@@ -3,6 +3,7 @@ import { Account, Address, BASE_FEE, Contract, FeeBumpTransaction, Keypair, Netw
   TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { createClinicalContractAuditor } from './clinical-contract-audit.mjs';
 import { PRIVATE_REGISTRY_ID } from './private-registry.mjs';
+import { clinicalWebFeeQuote, assertClinicalWebSponsoredFee, checkClinicalWebRelayerBudget } from './clinical-web-fee-policy.mjs';
 
 export const WEB_CLINICAL_CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
 const CLINICAL_WASM = '29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0';
@@ -53,7 +54,8 @@ function invocation(transaction, patient, action, historyId, doctor, payload) {
       op.type !== 'invokeHostFunction' || op.source !== undefined || op.func.switch().name !== 'hostFunctionTypeInvokeContract' ||
       body.memo().switch().name !== 'memoNone' || body.cond().switch().name !== 'precondTime' || Number(transaction.timeBounds?.minTime) !== 0 ||
       !Number.isSafeInteger(Number(transaction.timeBounds?.maxTime)) || Number(transaction.timeBounds.maxTime) < 1 ||
-      BigInt(transaction.sequence) < 1n || BigInt(transaction.fee) < BigInt(BASE_FEE) || BigInt(transaction.fee) > 100000000n) throw fail();
+      BigInt(transaction.sequence) < 1n) throw fail();
+  clinicalWebFeeQuote(transaction);
   const call = op.func.invokeContract(), args = call.args();
   if (!call.contractAddress().toXDR().equals(new Address(WEB_CLINICAL_CONTRACT).toScAddress().toXDR()) || call.functionName().toString() !== action || (op.auth?.length ?? 0) > 1) throw fail();
   for (const auth of op.auth ?? []) {
@@ -117,10 +119,7 @@ export function createClinicalWebAuditor({ server = new rpc.Server('https://soro
       const authorization = await auditor.doctor(doctor.address,Math.floor(now()/1000));
       if (!authorization.authorized || authorization.remainingSeconds < 900) throw Error('rehearsal_doctor_unavailable');
       const account = await server.getAccount(patient); if (account.accountId() !== patient) throw Error('rehearsal_patient_unfunded');
-      const key = xdr.LedgerKey.account(new xdr.LedgerKeyAccount({accountId:Keypair.fromPublicKey(relayer).xdrPublicKey()}));
-      const payer = await server.getLedgerEntries(key), entry = payer.entries?.[0];
-      if (payer.entries?.length!==1 || !entry.key.toXDR().equals(key.toXDR()) || entry.val.switch().name !== 'account' ||
-          BigInt(entry.val.account().balance().toString()) < 20000000n) throw Error('rehearsal_relayer_unfunded');
+      await checkClinicalWebRelayerBudget(server,relayer);
       return {network:'testnet',deployments,doctorAuthorized:true,patientAccountExists:true,relayerBalanceChecked:true,
         contractId:WEB_CLINICAL_CONTRACT,registryId:PRIVATE_REGISTRY_ID,wasmHash:CLINICAL_WASM,registryWasmHash:REGISTRY_WASM,
         interfaceVersion:1,networkVerified:true,deploymentVerified:true,wasmVerified:true,configurationVerified:true,interfaceVerified:true,
@@ -134,7 +133,8 @@ export function createClinicalWebAuditor({ server = new rpc.Server('https://soro
         if (receipt.status !== 'SUCCESS' || receipt.feeBump !== true || integer(receipt.ledger,1) < 1 || !receipt.envelopeXdr || !receipt.returnValue) throw fail();
         const outer = TransactionBuilder.fromXDR(receipt.envelopeXdr,Networks.TESTNET);
         if (!(outer instanceof FeeBumpTransaction) || outer.hash().toString('hex') !== operation.transactionHash || outer.feeSource !== relayer ||
-            BigInt(outer.fee) > 100000000n || BigInt(outer.fee) <= BigInt(outer.innerTransaction.fee)) throw fail();
+            BigInt(outer.fee) <= BigInt(outer.innerTransaction.fee)) throw fail();
+        assertClinicalWebSponsoredFee(outer);
         signature(outer,relayer); signature(outer.innerTransaction,patient);
         successfulResult(receipt,outer.innerTransaction);
         const historyId = webClinicalHistoryId(patient);

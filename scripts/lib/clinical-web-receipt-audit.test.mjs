@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Account, Address, Asset, BASE_FEE, Contract, Keypair, Memo, Networks, Operation,
-  TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
+  SorobanDataBuilder, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { createClinicalWebAuditor, WEB_CLINICAL_CONTRACT, webClinicalHistoryId } from './clinical-web-receipt-audit.mjs';
 
 // Deterministic local keys and controlled SDK responses only. No credentials,
@@ -104,7 +104,7 @@ function fixture(action = 'create_history', { correction = false, metaVersion = 
   function rebuild({
     source = patient, innerSigner = patient, feeSource = payer, outerSigner = feeSource,
     selectedCall = call, extraOperations = [], auth = [], explicitSource, memo,
-    network = Networks.TESTNET, additionalInner, additionalOuter,
+    network = Networks.TESTNET, additionalInner, additionalOuter, resourceFee, sponsorBaseFee='2000000',
   } = {}) {
     if (auth.length) {
       selectedCall = xdr.Operation.fromXDR(selectedCall.toXDR());
@@ -117,11 +117,12 @@ function fixture(action = 'create_history', { correction = false, metaVersion = 
     const builder = new TransactionBuilder(new Account(source.publicKey(), '100'), { fee: BASE_FEE, networkPassphrase: network })
       .addOperation(selectedCall).setTimebounds(0, 1600000000); // Historical receipts remain auditable after expiry.
     if (memo) builder.addMemo(memo);
+    if (resourceFee !== undefined) builder.setSorobanData(new SorobanDataBuilder().setResourceFee(resourceFee).build());
     for (const extra of extraOperations) builder.addOperation(extra);
     const inner = builder.build();
     if (innerSigner) inner.sign(innerSigner);
     if (additionalInner) inner.sign(additionalInner);
-    outer = TransactionBuilder.buildFeeBumpTransaction(feeSource, '2000000', inner, network);
+    outer = TransactionBuilder.buildFeeBumpTransaction(feeSource, sponsorBaseFee, inner, network);
     if (outerSigner) outer.sign(outerSigner);
     if (additionalOuter) outer.sign(additionalOuter);
     receipt.envelopeXdr = outer.toEnvelope();
@@ -168,6 +169,14 @@ async function rejected(f) {
   await assert.rejects(f.verify, { message: 'rehearsal_receipt_invalid' });
   assert.equal(f.state.forbiddenCalls, 0);
 }
+
+test('real-sized Soroban fee remains independently auditable; excessive or altered sponsorship is rejected', async () => {
+  const valid=fixture(); valid.rebuild({resourceFee:'353053728'});
+  assert.equal(valid.outer.fee,'357053728'); assert.equal((await valid.verify()).signatureVerified,true);
+  for (const options of [{resourceFee:'496000001'},{resourceFee:'353053728',sponsorBaseFee:'2000001'}]) {
+    const f=fixture(); f.rebuild(options); await rejected(f);
+  }
+});
 
 
 test('history derivation is pinned to a fixed patient, Testnet and the clinical contract', () => {

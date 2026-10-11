@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { Account, Address, Asset, BASE_FEE, Contract, FeeBumpTransaction, Keypair, Memo, Networks, Operation,
-  Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
+  SorobanDataBuilder, Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { CLINICAL_CONTRACT, CLINICAL_WASM, assertClinicalSavedEnvelope, assertClinicalUnsigned, clinicalInvocation,
   createClinicalWebChain, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import { PRIVATE_ADMIN, REGISTRY_PRIVATE } from '@/lib/private-config';
@@ -18,14 +18,15 @@ const append: ClinicalExpected = { ...create, entryId: deriveClinicalEntryId(his
   author: patient.publicKey(), commitment: '5'.repeat(64), expectedVersion: 0, expectedGrantRevision: 0, previousCommitment: null };
 const grant: ClinicalExpected = { ...create, doctor: doctor.publicKey(), canRead: true, canAppend: false, expectedRevision: 0 };
 function build(action: ClinicalAction = 'create_history', expected = create, options: {
-  source?: string; operation?: xdr.Operation; network?: string; timeout?: number; memo?: Memo; auth?: xdr.SorobanAuthorizationEntry[];
+  source?: string; operation?: xdr.Operation; network?: string; timeout?: number; memo?: Memo; auth?: xdr.SorobanAuthorizationEntry[]; resourceFee?: string; inclusionFee?: string;
 } = {}) {
   const invocation = options.operation ?? clinicalInvocation(action, expected);
   if (options.auth) invocation.body().invokeHostFunctionOp().auth(options.auth);
   const builder = new TransactionBuilder(new Account(options.source ?? patient.publicKey(), '10'), {
-    fee: BASE_FEE, networkPassphrase: options.network ?? Networks.TESTNET,
+    fee: options.inclusionFee ?? BASE_FEE, networkPassphrase: options.network ?? Networks.TESTNET,
   }).addOperation(invocation);
   if (options.memo) builder.addMemo(options.memo);
+  if (options.resourceFee !== undefined) builder.setSorobanData(new SorobanDataBuilder().setResourceFee(options.resourceFee).build());
   return builder.setTimeout(options.timeout ?? 180).build();
 }
 function authFor(op: xdr.Operation, nested = false, addressAuth = false) {
@@ -198,6 +199,21 @@ function fixture() {
 }
 
 describe('clinical Testnet RPC boundary', () => {
+  it('accepts a real-sized Soroban fee, signs the exact intent and submits its bounded sponsored envelope', async () => {
+    const f = fixture(); f.server.prepareTransaction = vi.fn(async () => build('create_history', create, {resourceFee:'353053728'}));
+    const tx = await f.chain.prepare(patient.publicKey(), 'create_history', create);
+    expect(tx.fee).toBe('353053828'); expect(tx.signatures).toHaveLength(0);
+    const sponsored = sponsorClinicalSignature(tx.toXDR(), patient.publicKey(), patient.sign(tx.hash()).toString('hex'), 'create_history', create);
+    const row = {unsigned_xdr:tx.toXDR(),signed_xdr:sponsored.xdr,transaction_hash:sponsored.hash,signing_hash:tx.hash().toString('hex'),source_wallet:patient.publicKey(),action:'create_history' as const,expected:create};
+    expect(assertClinicalSavedEnvelope(row).fee).toBe('357053728');
+    await expect(f.chain.submit(row.signed_xdr)).resolves.toBe('PENDING');
+    expect(f.state.sent).toEqual([row.signed_xdr]);
+  });
+  it('rejects a prepared outer budget above 50 Testnet XLM before any signature or transmission', async () => {
+    const f = fixture(); f.server.prepareTransaction = vi.fn(async () => build('create_history', create, {resourceFee:'496000001'}));
+    await expect(f.chain.prepare(patient.publicKey(), 'create_history', create)).rejects.toThrow('clinical_fee_budget_exceeded');
+    expect(f.server.sendTransaction).not.toHaveBeenCalled();
+  });
   it('pins code, configuration and registry using unsigned reads, once per request factory', async () => {
     const f = fixture(); expect(await f.chain.verifyDeployment()).toMatchObject({ contractId: CLINICAL_CONTRACT, wasmHash: CLINICAL_WASM });
     expect(await f.chain.historyForPatient(patient.publicKey())).toMatchObject({ id: historyId, patient: patient.publicKey() });
