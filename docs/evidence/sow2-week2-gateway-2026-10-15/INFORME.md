@@ -1,6 +1,6 @@
 # Semana 2 · Opción Gateway y reapertura local
 
-**Estado: historial recuperado con Gateway; revisión manual en curso.** El zoom al 200 % fue aplicado según el usuario; falta confirmar legibilidad y controles en el historial cargado. Cambio real de cuenta y firma desde el botón del producto continúan pendientes. No se declara semana 2 lista para grabar.
+**Estado: historial recuperado con Gateway; revisión manual en curso.** El usuario confirmó que al 200 % los textos y controles del historial y permisos siguen legibles y accesibles, sin recortes ni elementos tapados. Es una comprobación realizada por el usuario. Cambio real de cuenta y firma desde el botón del producto continúan pendientes. No se declara semana 2 lista para grabar.
 
 ## Cambio comprobado
 
@@ -30,7 +30,7 @@ La primera ejecución de pruebas no llegó a ejecutar casos debido a un bloqueo 
 
 ## Pendientes y límites
 
-1. Confirmar que el historial y los permisos siguen legibles y accesibles al 200 % aplicado por el usuario.
+1. Zoom al 200 %: **aprobado por el usuario**, con textos y controles del historial y permisos legibles y accesibles. No se presenta como zoom automatizado por la herramienta.
 2. Cambiar a una segunda cuenta existente, comprobar que no aparecen datos anteriores y volver a la cuenta original. Códigos sólo en Privy.
 3. Preparar una única nota sintética desde el producto, revisar y firmar expresamente, auditar recibo y persistencia y volver a apagar escrituras. No sustituir intentos inciertos ni repetir las ocho operaciones.
 

@@ -1,0 +1,28 @@
+{
+  "updatedAt": "2026-10-15T20:18:34.614Z",
+  "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+  "environment": "local / Neon dev / Testnet",
+  "zoom200": {
+    "status": "passed",
+    "evidenceKind": "user_reported",
+    "confirmed": "Text and controls remain legible and accessible across history and medical permissions; no clipping or obstruction."
+  },
+  "logout": {
+    "status": "passed",
+    "evidenceKind": "observed_UI",
+    "result": "Prior authenticated history removed; landing presents sign-in."
+  },
+  "accountSwitch": {
+    "status": "pending",
+    "stage": "Privy confirmation code requested for existing secondary test account; authenticated isolation and return not yet observed"
+  },
+  "productSignature": {
+    "status": "pending",
+    "clinicalWritesEnabled": false,
+    "newClinicalTransactions": 0
+  },
+  "limits": [
+    "A completed logout is not yet an approved account switch.",
+    "No codes, tokens, private contacts or screenshots of authentication fields included."
+  ]
+}

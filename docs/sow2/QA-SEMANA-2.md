@@ -4,7 +4,7 @@
 
 La sesión del paciente se recuperó al reiniciar la web, pero el RPC SDF devolvía HTTP 503. El usuario aprobó añadir una selección explícita de Gateway Testnet. Código `f98f0e7`, PR #143 en borrador: **965 pruebas de aplicación / 75 archivos, 263 privadas, TypeScript y build aprobados**. Gateway pasó 24 consultas reales sin firmas ni transmisiones. El historial autenticado muestra las tres entradas y cuatro versiones originales, con permisos retirados y escrituras apagadas. No se repitió ninguna operación clínica.
 
-El usuario confirmó aplicar el zoom al 200 %; la confirmación de legibilidad sobre el historial recuperado, el cambio real de cuenta y la firma desde el botón del producto siguen pendientes. Ver [informe y límites de la reapertura](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md). Las secciones siguientes conservan las observaciones históricas de sus versiones y momentos.
+El usuario confirmó la revisión al 200 % sobre el historial recuperado: textos y controles legibles y accesibles, incluidos los permisos. Se registra como comprobación realizada por el usuario. Cambio real de cuenta y firma desde el botón del producto siguen pendientes. Ver [informe y límites de la reapertura](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md). Las secciones siguientes conservan las observaciones históricas de sus versiones y momentos.
 
 ## Actualización · 15 de octubre de 2026
 

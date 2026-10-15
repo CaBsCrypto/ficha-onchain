@@ -41,8 +41,8 @@
     "clinicalWritesEnabled": false
   },
   "manual": {
-    "zoom200": "user reports setting applied; readability confirmation pending",
-    "realAccountChange": "pending",
+    "zoom200": "passed_user_reported: history and medical permission text and controls readable and accessible, no clipping or obstruction",
+    "realAccountChange": "in_progress: logout observed and Privy awaiting second-account code; authenticated isolation/return pending",
     "signatureFromProductButton": "pending"
   },
   "newClinicalTransactions": 0,
@@ -75,5 +75,7 @@
   "vercel": {
     "status": "ignored_by_project_build_rules",
     "authenticatedPreviewVerified": false
-  }
+  },
+  "manualValidationUpdatedAt": "2026-10-15T20:18:34.614Z",
+  "manualEvidence": "manual-validation.json"
 }
