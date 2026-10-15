@@ -1,6 +1,6 @@
 # Semana 2 · Opción Gateway y reapertura local
 
-**Estado: historial recuperado con Gateway; revisión manual en curso.** El usuario confirmó que al 200 % los textos y controles del historial y permisos siguen legibles y accesibles, sin recortes ni elementos tapados. Es una comprobación realizada por el usuario. Cambio real de cuenta y firma desde el botón del producto continúan pendientes. No se declara semana 2 lista para grabar.
+**Estado: revisión local lista para grabar sobre ejecuciones ya realizadas.** El usuario aprobó el texto al 200 % y se observó el cambio real de cuenta sin datos anteriores, incluida recarga y retorno. El paciente confirmó una única nota sintética mediante el botón del producto y Privy; su recibo, firmas, contenido e integridad pasaron auditoría independiente. Tras reiniciar con escrituras apagadas y recargar, el historial muestra cuatro entradas y cinco versiones. Los ocho recibos originales se conservan. Preview, publicación, grabación terminada y aceptación del revisor siguen separados.
 
 ## Cambio comprobado
 
@@ -20,9 +20,19 @@ La nueva selección de servidor `TRUSTLEAF_CLINICAL_RPC_PROVIDER=gateway` se apl
 | TypeScript y build | Aprobados | Código de esta opción; contratos sin cambios ni nueva ejecución Rust |
 | Gateway | [24 lecturas correctas](contract-readback.json), sin archivo ni auth inesperada | Simulaciones RPC reales sin firmas ni transmisiones |
 | Neon dev | [Ocho hashes clínicos originales conservados](database-preflight.json), sin estados inciertos en las colas inspeccionadas del paciente y relayer | Transacción SQL de sólo lectura |
-| Historial autenticado | Tres entradas y cuatro versiones; contenido y recibos comprobados a las 19:49:56 UTC | Aplicación real y sesión existente de Privy |
+| Historial autenticado | Cuatro entradas y cinco versiones; comprobadas a las 23:55:25 UTC tras reiniciar con escrituras apagadas y recargar | Aplicación real y sesión existente de Privy |
+| Cambio de cuenta | Segunda cuenta vacía tras recargar; retorno a los datos y recibos propios de la cuenta principal | Observado en interfaz; no se creó otro historial |
+| Firma desde el producto | Una nota sintética, confirmada por el usuario mediante Privy; firmas del paciente y relayer, argumentos, resultado y comprobante verificados | [Auditoría independiente](product-signature-audit.json), SQL de sólo lectura y RPC real |
 
-El médico sigue vencido y sus permisos de lectura/agregado retirados. Las escrituras clínicas continúan apagadas. No se repite el ensayo anterior ni se crea una nueva transacción clínica. Una contribución propia del paciente no necesita renovar al médico, pero su firma manual todavía no se ha realizado.
+El médico sigue vencido y sus permisos de lectura/agregado retirados. Las escrituras clínicas se habilitaron temporalmente sólo para la nota acordada y se apagaron tras confirmar. Una contribución propia del paciente no necesita renovar al médico. No se repitieron el ensayo anterior ni sus ocho operaciones.
+
+## Nota adicional firmada desde la aplicación
+
+[Recibo `b991c3e6…`](https://stellar.expert/explorer/testnet/tx/b991c3e6cc4bbfc077656e9543ca612fb80f04ec16f25dfe86ff3fa7a8471c6f), ledger `5216962`, método `append_version`. Comisión realmente cobrada: **0,0828838 XLM de Testnet**; el máximo ofrecido de 50 XLM no fue el costo cobrado.
+
+La auditoría verificó las firmas del paciente y relayer, red, contrato, método, argumentos, resultado, comprobante contractual y coincidencia con el sobre guardado. La versión cifrada confirmada en Neon dev conserva el mismo recibo y comprobante; su descifrado e integridad coinciden con la nota sintética revisada. No se publican texto, claves, tokens ni sobres firmados en la evidencia. Las tres colas inspeccionadas del paciente y relayer tienen cero intentos pendientes. El auditor sólo leyó datos; no firmó ni transmitió.
+
+La lectura posterior se realizó desde el servidor reiniciado con escrituras apagadas. A las 23:55:25 UTC la interfaz volvió a mostrar la nota y los registros anteriores, cuatro entradas y cinco versiones. La consulta no fue instantánea: conservar la indicación de carga en la demostración. Esta comprobación no acredita una mejora de rendimiento.
 
 La primera inspección fue bloqueada por revisión automática al interpretar los identificadores como contenido sensible. Antes del reintento se comprobó que el repositorio es público y que el [alcance de las consultas](rpc-payload-scope.json) contiene sólo direcciones, IDs opacos y versiones de la ejecución sintética ya publicada. No se envían correos, tokens, claves, documentos cifrados ni contenido clínico. El reintento aprobado pasó sin firmas ni transmisiones.
 
@@ -31,7 +41,9 @@ La primera ejecución de pruebas no llegó a ejecutar casos debido a un bloqueo 
 ## Pendientes y límites
 
 1. Zoom al 200 %: **aprobado por el usuario**, con textos y controles del historial y permisos legibles y accesibles. No se presenta como zoom automatizado por la herramienta.
-2. Cambiar a una segunda cuenta existente, comprobar que no aparecen datos anteriores y volver a la cuenta original. Códigos sólo en Privy.
-3. Preparar una única nota sintética desde el producto, revisar y firmar expresamente, auditar recibo y persistencia y volver a apagar escrituras. No sustituir intentos inciertos ni repetir las ocho operaciones.
+2. Cambio de cuenta: **aprobado por observación de interfaz**. La segunda cuenta muestra «Comienza tu historial», cero entradas anteriores y cero enlaces a recibos, también tras recargar. No se creó otro historial. Al volver a la principal reaparecen sus tres entradas, cuatro versiones y recibos. Códigos sólo en Privy; no se guardan en la evidencia.
+3. Firma desde el producto: **aprobada**, con una nota sintética nueva, auditoría independiente, recarga y persistencia. Escrituras apagadas de nuevo y cero pendientes. [Guía de grabación local](../../sow2/GRABACION-SEMANA-2.md).
+
+La luz verde corresponde a grabar una **revisión local de ejecuciones ya realizadas**. Concesiones y revocación se explican mediante sus recibos históricos y el estado actual; no se simulan nuevas firmas ni se renueva al médico para grabar. Una nueva ejecución de esos pasos requeriría preparación y autorización aparte.
 
 Los portales anteriores, workers, herramientas de semana 1 y el auditor independiente de recibos conservan su proveedor SDF; la guía explica la inyección explícita de Gateway al auditor. No se modifican main, contratos, APIs, esquema, claves ni variables de preview. El estado de CI se consulta en la PR; el estado Vercel omitido por las reglas de build no acredita un preview ejecutado o configurado. La aceptación del revisor sigue separada.

@@ -4,11 +4,6 @@
   "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
   "files": [
     {
-      "path": "INFORME.md",
-      "bytes": 4555,
-      "sha256": "e61e7e1d612fd5b565de87425f1fe521192f82c528cff4977c32b232d42abd18"
-    },
-    {
       "path": "contract-readback.json",
       "bytes": 4945,
       "sha256": "da4c111a7634fa99c5863616150524da391e18e4342bc088fb1b0fadc60f341e"
@@ -19,9 +14,19 @@
       "sha256": "b505325a96789a51ed6061bc0e8c8072fa3fed9e99bb015b6079b44ad589b320"
     },
     {
+      "path": "INFORME.md",
+      "bytes": 7039,
+      "sha256": "2a599eb8af384c0a33b0bdddb9b2a37cc0116638e41ab5f40c8e12003cfddc1c"
+    },
+    {
       "path": "manual-validation.json",
-      "bytes": 1015,
-      "sha256": "41a0e3324ae940946c4cd1fea0fa00fb7b185611300a1fd92ad0ccdf5ff2fe5c"
+      "bytes": 2621,
+      "sha256": "2bf2dc4758f46406ea1567d448c3f30c57bc1f6e6a139c4f7592e0b2c636f35c"
+    },
+    {
+      "path": "product-signature-audit.json",
+      "bytes": 1831,
+      "sha256": "637f297415f70ce8f248fca1598eea9dba16b5dcb41cb46a149adf7d61cee55a"
     },
     {
       "path": "rpc-payload-scope.json",
@@ -30,8 +35,8 @@
     },
     {
       "path": "verification.json",
-      "bytes": 2635,
-      "sha256": "ae48d6f834e2f526e1dc3bda77175bd29062725514724bdc4428ccd4ffee8e09"
+      "bytes": 3265,
+      "sha256": "281e8ca4288ef34860546d06a4908968b6aaa7c822826010012fea783b9e590b"
     }
   ]
 }

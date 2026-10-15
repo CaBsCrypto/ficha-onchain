@@ -1,6 +1,6 @@
 # SOW 2 · Semana 2 · Estado de la entrega
 
-**Reapertura con Gateway, 15 de octubre:** el usuario aprobó la opción explícita `TRUSTLEAF_CLINICAL_RPC_PROVIDER=gateway` tras observar SDF HTTP 503. Rama `codex/sow2-testnet-rpc-provider`, código `f98f0e7`, PR #143 en borrador. Pasaron 965 pruebas de aplicación, 263 privadas, TypeScript y build; 24 lecturas reales en Gateway y la carga autenticada del historial. Ocho hashes originales conservados, cero transacciones clínicas nuevas, permisos retirados y escrituras apagadas. La revisión al 200 % quedó aprobada por el usuario; faltan el cambio real de cuenta y la firma desde el producto. [Informe actual](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md). La recuperación anterior y sus dos mantenimientos se conservan a continuación.
+**Revisión local lista para grabar, 15 de octubre:** código `f98f0e7`, PR #143 en borrador. Pasaron 965 pruebas de aplicación, 263 privadas, TypeScript y build; la opción explícita Gateway recuperó la lectura ante SDF HTTP 503. Texto al 200 % aprobado por el usuario y cambio real de cuenta comprobado, incluida recarga vacía y retorno. Una nota nueva fue firmada desde el producto con Privy y auditada: `b991c3e6…`, ledger `5216962`, comisión `0,0828838 XLM de Testnet`. Tras reiniciar con escrituras apagadas y recargar se comprobaron cuatro entradas y cinco versiones, ocho hashes originales conservados y cero intentos pendientes. El médico sigue vencido y sus permisos retirados. La luz verde es para una revisión de lo ya ejecutado; preview, publicación y aceptación siguen pendientes por separado. [Informe actual](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md) · [Guía para grabar](GRABACION-SEMANA-2.md). La recuperación anterior y sus dos mantenimientos se conservan a continuación.
 
 **15 de octubre de 2026:** versión local corregida `daf18d6`, rama `codex/sow2-clinical-ledger-read-fix`, PR #142 en borrador. El código pasó 950 pruebas de aplicación, 263 privadas, TypeScript y build; CI/Vercel aprobaron `4d7f09b`. Las dos restauraciones autorizadas están confirmadas: `966fe5e7` (instancia/código) y `ae17e228` (registro del médico), con comisión total de 3,0159417 XLM de Testnet dentro de sus límites. **La lectura autenticada volvió a cargar**, con 24 consultas finales correctas, ocho hashes clínicos sin cambios, tres entradas y cuatro versiones. Sin intentos inciertos del relayer en las tablas inspeccionadas. PDF v1/v2 y móvil completo a 430 px comprobados. Firma desde el botón del producto, cambio real de cuenta y zoom al 200 % siguen pendientes; no se declara el cierre de semana 2. Escrituras clínicas apagadas, sin publicación en main. [Informe y evidencia](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md). La actualización siguiente describe el ensayo histórico del 11 de octubre.
 
@@ -23,16 +23,16 @@ Los commits identifican código integrado; no equivalen a aceptación manual ni 
 
 | Frente | Responsable | Estado | Evidencia |
 | --- | --- | --- | --- |
-| 1 · Identidad y acceso | Agente identidad | Integrado; sesión real del paciente observada; cambio de cuenta manual pendiente | `5b0482e`; ensayo `4fad0a02` |
+| 1 · Identidad y acceso | Agente identidad | Integrado; cambio entre dos cuentas reales, recarga vacía y retorno al historial propio comprobados | `5b0482e`; revisión Gateway del 15 de octubre |
 | 2 · Cifrado y claves | Agente identidad | Integrado; configuración y recuperación locales comprobadas | `5b0482e`; clave web y respaldo privados |
 | 3 · Persistencia | Agente persistencia | Integrado; 62 comprobaciones SQL y 5 escenarios concurrentes aprobados con rollback | `8682d47`, `6e8f1bf`, `dda2dd2`, `68e4259`, `cdddc17` |
-| 4 · Stellar y firmas | Agente Stellar | Ocho firmas y recibos reales auditados; firma desde botón del producto pendiente | `6b9041f`; ocho recibos del informe |
+| 4 · Stellar y firmas | Agente Stellar | Ocho recibos originales conservados y una nota adicional firmada desde el botón del producto y auditada | `f98f0e7`; recibo nuevo `b991c3e6…` |
 | 5 · APIs | Coordinador y revisión delegada | Integrado; identidad, errores e integridad probados | `916617b`, `2019b79` |
 | 6 · Antecedentes y archivos | Agente interfaz | Integrado; PNG y PDF v1/v2 descargados mediante sesión real; PDF renderizados legibles el 15 de octubre | `31ad3f8`, `64a37fd`; informe de recuperación |
 | 7 · Cronología y correcciones | Agente interfaz | Integrado; filtros, autor y versiones probados | `31ad3f8` |
 | 8 · Permisos | Agente permisos | Integrado; lectura/agregado independientes; médico comprobado otra vez antes de firmar | `12cf461`, `8c21c69` |
-| 9 · Seguridad e integración | Coordinador y agente QA | 950 de aplicación, 263 privadas, TypeScript/build aprobados en la corrección; 25 contractuales históricas sin repetir | `daf18d6`; QA distingue fechas y entornos |
-| 10 · Visual y entrega | Coordinador y agente entrega | Sesión real, filtros, foco y móvil 360/390/430 revisados; 200 % pendiente | [QA](QA-SEMANA-2.md), [recuperación](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md) |
+| 9 · Seguridad e integración | Coordinador y agente QA | 965 de aplicación, 263 privadas, TypeScript/build aprobados; 25 contractuales históricas sin repetir | `f98f0e7`; QA distingue fechas y entornos |
+| 10 · Visual y entrega | Coordinador y agente entrega | Sesión real, filtros, foco y móvil 360/390/430 revisados; 200 % aprobado por el usuario; grabación pendiente | [QA](QA-SEMANA-2.md), [guía](GRABACION-SEMANA-2.md) |
 
 ## Entorno local y claves
 
@@ -67,7 +67,7 @@ Se corrigieron el foco tras preparar permisos, la comprobación del médico ante
 
 1. Privy y ocho operaciones del paciente comprobados: historial, PDF, antecedente, imagen, corrección, lectura, agregado y revocación. Los seis recibos previos se conservaron durante la reanudación; sin duplicarlos.
 2. Recarga tras reiniciar con escrituras apagadas y reauditoría desde otro proceso aprobadas; los ocho recibos y el contenido persistieron, sin nuevas transacciones. [Informe separado](../evidence/sow2-week2-testnet-2026-10-11/persistence.json).
-3. Completar texto al 200 %, cambio real de cuenta y recorrido del botón de firma del producto. PDF y visual completo a 430 px quedaron comprobados el 15 de octubre. La demora de lectura medida queda documentada.
+3. Texto al 200 % aprobado por el usuario; cambio real de cuenta, firma desde el producto y persistencia tras reiniciar/recargar aprobados el 15 de octubre. PDF y visual completo a 430 px también comprobados. Grabar según la [guía local](GRABACION-SEMANA-2.md), distinguiendo ocho operaciones previas y una nota nueva; la demora de lectura queda documentada.
 4. Autorizar específicamente la configuración aislada del preview antes de trasladar claves o conexión.
 
 Usar un único entorno de escritura por paciente, contrato y red. La misma wallet determina el mismo historial en cadena; cambiar de base sin conservar su índice y contenido cifrado no crea otra historia. No adoptar registros automáticamente ni intentar crearlos otra vez para eludir esa separación.

@@ -30,9 +30,9 @@
   },
   "authenticatedHistory": {
     "status": "loaded",
-    "lastVerifiedAt": "2026-10-15T19:49:56Z",
-    "entries": 3,
-    "versions": 4,
+    "lastVerifiedAt": "2026-10-15T23:55:25Z",
+    "entries": 4,
+    "versions": 5,
     "doctorAuthorized": false,
     "permissions": {
       "read": false,
@@ -42,16 +42,16 @@
   },
   "manual": {
     "zoom200": "passed_user_reported: history and medical permission text and controls readable and accessible, no clipping or obstruction",
-    "realAccountChange": "in_progress: logout observed and Privy awaiting second-account code; authenticated isolation/return pending",
-    "signatureFromProductButton": "pending"
+    "realAccountChange": "passed_observed_UI: secondary account empty including reload; original three entries and four versions return only after primary sign-in",
+    "signatureFromProductButton": "passed_real_signature_from_product_UI_and_independent_audit"
   },
-  "newClinicalTransactions": 0,
+  "newClinicalTransactions": 1,
   "originalEightClinicalTransactions": "retained; not repeated",
   "limits": [
     "No main merge or preview configuration.",
     "Vercel check may be ignored by project build rules; it does not prove an authenticated preview.",
     "No change to legacy portals, workers or week1 scripts.",
-    "No formal reviewer acceptance or week2 recording readiness claimed."
+    "Local recording readiness covers a review of existing executions only; no main publication or formal reviewer acceptance."
   ],
   "localLogHashes": [
     {
@@ -76,6 +76,21 @@
     "status": "ignored_by_project_build_rules",
     "authenticatedPreviewVerified": false
   },
-  "manualValidationUpdatedAt": "2026-10-15T20:18:34.614Z",
-  "manualEvidence": "manual-validation.json"
+  "manualValidationUpdatedAt": "2026-10-15T23:57:11.100Z",
+  "manualEvidence": "manual-validation.json",
+  "productSignatureEvidence": "product-signature-audit.json",
+  "readOnlyRestart": {
+    "clinicalWritesEnabled": false,
+    "confirmedServerResponds": true,
+    "reloadUI": "passed",
+    "verifiedAt": "2026-10-15T23:55:25Z"
+  },
+  "recordingReadiness": {
+    "status": "ready_for_local_review_of_existing_executions",
+    "newPermissionTransactionsApproved": false,
+    "previewConfigured": false,
+    "mainPublished": false,
+    "recordingCompleted": false,
+    "reviewerAccepted": false
+  }
 }
