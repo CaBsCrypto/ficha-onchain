@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-10-15T06:59:09.466Z",
+  "network": "testnet",
+  "readOnly": true,
+  "restoreTransactionHash": "966fe5e7ceacf9195959729b9eccfff5bff412d5017967e8fe350a96a1cf0fe4",
+  "registryId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "wasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+  "entries": [
+    {
+      "kind": "contractData",
+      "liveUntilLedgerSeq": 5325736
+    },
+    {
+      "kind": "contractCode",
+      "liveUntilLedgerSeq": 5325736
+    }
+  ],
+  "reads": [
+    {
+      "label": "registry-interface",
+      "method": "interface_version",
+      "live": true,
+      "archivedEntries": 0,
+      "ledger": 5204792
+    },
+    {
+      "label": "registry-admin",
+      "method": "get_admin",
+      "live": true,
+      "archivedEntries": 0,
+      "ledger": 5204792
+    },
+    {
+      "label": "doctor-current",
+      "method": "is_authorized",
+      "live": false,
+      "archivedEntries": 1,
+      "archivedKeys": [
+        "AAAABgAAAAFbjTSy8jdDl8aG0EgbjhQHtJ4RIPM9EEOunF1NzumAaQAAABAAAAABAAAAAgAAAA8AAAAGRG9jdG9yAAAAAAASAAAAAAAAAAAV1v4vNlhzFcn+UiF3Ah+tQ5mMSwoWGZ1JmKnXan1i6QAAAAE="
+      ],
+      "ledger": 5204792
+    },
+    {
+      "label": "patient-history",
+      "method": "get_history",
+      "live": true,
+      "archivedEntries": 0,
+      "ledger": 5204792
+    }
+  ],
+  "signaturesCreated": 0,
+  "transactionsSubmitted": 0
+}

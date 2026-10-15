@@ -16,15 +16,28 @@
   },
   "testKind": "isolated",
   "readOnlyRpc": {
-    "status": "blocked_archived_registry",
-    "archivedEntries": 2
+    "status": "registry-instance-and-code-live_doctor-record-archived",
+    "knownQueries": 24,
+    "liveQueries": 23,
+    "remainingArchivedEntries": 1
   },
   "maintenance": {
-    "signaturesCreated": 0,
-    "transactionsSubmitted": 0,
-    "authorization": "pending",
-    "maxProposedFeeXlmTestnet": 5
+    "authorization": "first restoration explicitly authorized; additional physician record pending",
+    "signaturesCreated": 1,
+    "transactionsSubmitted": 1,
+    "status": "SUCCESS",
+    "transactionHash": "966fe5e7ceacf9195959729b9eccfff5bff412d5017967e8fe350a96a1cf0fe4",
+    "chargedFeeStroops": "29948101",
+    "approvedMaxFeeXlmTestnet": 5
   },
-  "authenticatedReadAfterMaintenance": "pending",
-  "mainChanged": false
+  "authenticatedReadAfterMaintenance": "blocked_by_additional_archived_doctor_record",
+  "mainChanged": false,
+  "additionalMaintenance": {
+    "authorization": "pending",
+    "keys": 1,
+    "estimatedFeeXlmTestnet": 0.0246352,
+    "maxProposedFeeXlmTestnet": 0.1,
+    "signaturesCreated": 0,
+    "transactionsSubmitted": 0
+  }
 }

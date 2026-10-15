@@ -5,8 +5,13 @@
   "files": [
     {
       "path": "INFORME.md",
-      "bytes": 4858,
-      "sha256": "aa5c75e781673c7eeaa1834d5e94d3674778779bfb9e7e71deb8b69699b36a7a"
+      "bytes": 6941,
+      "sha256": "29276bae55b1b4291e1ab926c5303b06c6d979c4650fcd900eaba296b9cd6c56"
+    },
+    {
+      "path": "registry-post-restore-readback.json",
+      "bytes": 1402,
+      "sha256": "4f787716eac095fe3f90b65a6ba9f0dceb8172a1ddbd99138e65544b45cc5dc4"
     },
     {
       "path": "registry-restoration-inspection.json",
@@ -14,9 +19,41 @@
       "sha256": "f27e7566c6ea29b82b86be8f1641b0360914fbb29edc295cc33f34ef3bc2686c"
     },
     {
+      "path": "registry-restoration-result.json",
+      "bytes": 916,
+      "sha256": "796366a16c3491611dcfa3513897b9db2562716228a1d55e0a5eca1f438060a4"
+    },
+    {
+      "path": "remaining-state-inspection.json",
+      "bytes": 6093,
+      "sha256": "356a7481e55000638ff76413e9e8e28fc721a8915c1fcf09ec6de94b41cb4a27"
+    },
+    {
       "path": "verification.json",
-      "bytes": 660,
-      "sha256": "7cba2e42215cfe2f899bd9a59509c38044c61300da0a418e3d2fdca7e64c584a"
+      "bytes": 1222,
+      "sha256": "b39a79f1d3c491ef8a3a082ceab9fdfe8663e4805b3091cca73df9699bb1ac8a"
+    }
+  ],
+  "localMaintenanceTools": [
+    {
+      "path": ".trustleaf-local/execute-registry-restoration.mjs",
+      "sha256": "4a51984fa5d809e8894eb4d49650a89a9c8e7caab5261a7a6b59cbb5786eecbb",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/registry-restoration-policy.test.mjs",
+      "sha256": "21619c808859b2e4380d064f702350bd8b41a952f518cfca21af6136f92f34b7",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/execute-doctor-record-restoration.mjs",
+      "sha256": "dfd480943243a89989741ce20ceb9654eb9b03da3ea5b8708ddca50369dd9dc7",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/doctor-record-restoration-policy.test.mjs",
+      "sha256": "dc9bc5ea1e3e86ae65279fa810ed56ffe0ee54c594783c29354c0838d7e68e5e",
+      "classification": "local maintenance tooling; no secret contents in manifest"
     }
   ]
 }
