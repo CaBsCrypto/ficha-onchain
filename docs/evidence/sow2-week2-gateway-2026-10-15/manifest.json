@@ -1,0 +1,32 @@
+{
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF",
+  "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+  "files": [
+    {
+      "path": "INFORME.md",
+      "bytes": 4407,
+      "sha256": "c8ed20e9de4819d71f1bcecf65850ce183b1cbaa71430a5d28ece47fc4d27999"
+    },
+    {
+      "path": "contract-readback.json",
+      "bytes": 4945,
+      "sha256": "da4c111a7634fa99c5863616150524da391e18e4342bc088fb1b0fadc60f341e"
+    },
+    {
+      "path": "database-preflight.json",
+      "bytes": 662,
+      "sha256": "b505325a96789a51ed6061bc0e8c8072fa3fed9e99bb015b6079b44ad589b320"
+    },
+    {
+      "path": "rpc-payload-scope.json",
+      "bytes": 860,
+      "sha256": "1da3b46ef4d75bda39f53b135ba1d6a98a185de719f4d8ae00679c0d02b9dee7"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 2370,
+      "sha256": "c20e094abafb21ae3c29a85675c01fce1a1ca9e5dd1985747d291ea08a0ce92b"
+    }
+  ]
+}

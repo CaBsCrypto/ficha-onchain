@@ -1,0 +1,79 @@
+{
+  "checkedAt": "2026-10-15T19:51:49.931Z",
+  "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+  "buildId": "w84CZMnfdwQQlIQaThwRX",
+  "environment": "local / Neon dev / Stellar Testnet",
+  "provider": "gateway",
+  "configuration": "TRUSTLEAF_CLINICAL_RPC_PROVIDER=gateway; legacy public RPC unchanged",
+  "application": {
+    "tests": 965,
+    "files": 75,
+    "status": "passed"
+  },
+  "privateServices": {
+    "tests": 263,
+    "status": "passed"
+  },
+  "targetedTests": {
+    "tests": 130,
+    "status": "passed"
+  },
+  "typescript": "passed",
+  "build": "passed",
+  "contracts": "unchanged; not rerun",
+  "realReads": {
+    "queries": 24,
+    "failed": 0,
+    "signaturesCreated": 0,
+    "transactionsSubmitted": 0,
+    "report": "contract-readback.json"
+  },
+  "authenticatedHistory": {
+    "status": "loaded",
+    "lastVerifiedAt": "2026-10-15T19:49:56Z",
+    "entries": 3,
+    "versions": 4,
+    "doctorAuthorized": false,
+    "permissions": {
+      "read": false,
+      "append": false
+    },
+    "clinicalWritesEnabled": false
+  },
+  "manual": {
+    "zoom200": "user reports setting applied; readability confirmation pending",
+    "realAccountChange": "pending",
+    "signatureFromProductButton": "pending"
+  },
+  "newClinicalTransactions": 0,
+  "originalEightClinicalTransactions": "retained; not repeated",
+  "limits": [
+    "No main merge or preview configuration.",
+    "Vercel check may be ignored by project build rules; it does not prove an authenticated preview.",
+    "No change to legacy portals, workers or week1 scripts.",
+    "No formal reviewer acceptance or week2 recording readiness claimed."
+  ],
+  "localLogHashes": [
+    {
+      "name": "gateway-application-tests.log",
+      "sha256": "b140ab45ce3488824dd606e29eec656a58f192f8646ea395e8c725eadb346e75"
+    },
+    {
+      "name": "gateway-private-tests.log",
+      "sha256": "0c35a1d1f3205b184b9027a16c62e82070d17fe7c08e3533db64b305816e3f27"
+    },
+    {
+      "name": "gateway-build.log",
+      "sha256": "a51d72283ff88ed1f753d75dec8a51d963ddb884186b741cf1a194e6963a91b6"
+    }
+  ],
+  "ci": {
+    "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+    "status": "passed",
+    "url": "https://github.com/CaBsCrypto/ficha-onchain/actions/runs/38797005086"
+  },
+  "vercel": {
+    "status": "ignored_by_project_build_rules",
+    "authenticatedPreviewVerified": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-10-15T19:21:31.408Z",
+  "readOnly": true,
+  "environment": "Neon dev / Testnet",
+  "states": {
+    "private_operations": [
+      {
+        "state": "confirmed",
+        "count": 4
+      }
+    ],
+    "clinical_transaction_attempts": [
+      {
+        "state": "confirmed",
+        "count": 2
+      }
+    ],
+    "clinical_web_operations": [
+      {
+        "state": "cancelled",
+        "count": 1
+      },
+      {
+        "state": "confirmed",
+        "count": 8
+      }
+    ]
+  },
+  "originalClinicalHashesRetained": true,
+  "originalClinicalTransactions": 8,
+  "confirmedClinicalTransactionsForPatient": 8,
+  "transactionsSubmitted": 0
+}

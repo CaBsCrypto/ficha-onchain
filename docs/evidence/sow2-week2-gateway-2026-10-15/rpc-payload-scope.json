@@ -1,0 +1,39 @@
+{
+  "readOnly": true,
+  "source": "public synthetic Testnet evidence already committed in repository",
+  "input": "docs/evidence/sow2-week2-testnet-2026-10-11/execution.json",
+  "provider": "Gateway Testnet",
+  "requestMethods": [
+    "getNetwork",
+    "getAccount",
+    "simulateTransaction"
+  ],
+  "contractMethods": [
+    "interface_version",
+    "get_admin",
+    "is_authorized",
+    "get_registry",
+    "get_history",
+    "can_read",
+    "get_grant",
+    "get_operation",
+    "get_entry",
+    "get_version"
+  ],
+  "payloadTypes": [
+    "public Testnet contract IDs",
+    "public Testnet wallet addresses",
+    "opaque history/entry/operation IDs",
+    "version integers"
+  ],
+  "excluded": [
+    "emails",
+    "Privy tokens",
+    "patient names",
+    "medical content",
+    "encrypted documents",
+    "keys",
+    "signed envelopes"
+  ],
+  "queries": 24
+}
