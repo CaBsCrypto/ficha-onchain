@@ -1,0 +1,42 @@
+{
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF",
+  "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+  "files": [
+    {
+      "path": "contract-readback.json",
+      "bytes": 4945,
+      "sha256": "da4c111a7634fa99c5863616150524da391e18e4342bc088fb1b0fadc60f341e"
+    },
+    {
+      "path": "database-preflight.json",
+      "bytes": 662,
+      "sha256": "b505325a96789a51ed6061bc0e8c8072fa3fed9e99bb015b6079b44ad589b320"
+    },
+    {
+      "path": "INFORME.md",
+      "bytes": 7039,
+      "sha256": "2a599eb8af384c0a33b0bdddb9b2a37cc0116638e41ab5f40c8e12003cfddc1c"
+    },
+    {
+      "path": "manual-validation.json",
+      "bytes": 2621,
+      "sha256": "2bf2dc4758f46406ea1567d448c3f30c57bc1f6e6a139c4f7592e0b2c636f35c"
+    },
+    {
+      "path": "product-signature-audit.json",
+      "bytes": 1831,
+      "sha256": "637f297415f70ce8f248fca1598eea9dba16b5dcb41cb46a149adf7d61cee55a"
+    },
+    {
+      "path": "rpc-payload-scope.json",
+      "bytes": 860,
+      "sha256": "1da3b46ef4d75bda39f53b135ba1d6a98a185de719f4d8ae00679c0d02b9dee7"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 3265,
+      "sha256": "281e8ca4288ef34860546d06a4908968b6aaa7c822826010012fea783b9e590b"
+    }
+  ]
+}

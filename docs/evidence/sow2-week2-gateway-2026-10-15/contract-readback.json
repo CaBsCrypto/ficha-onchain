@@ -1,0 +1,179 @@
+{
+  "checkedAt": "2026-10-15T19:47:42.110Z",
+  "provider": "gateway",
+  "network": "testnet",
+  "readOnly": true,
+  "originalRunId": "4fad0a02-3603-43ce-b2fd-8dc02e8d42ec",
+  "queries": [
+    {
+      "method": "interface_version",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_admin",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "is_authorized",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "interface_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_registry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_history",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "can_read",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_grant",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false
+    }
+  ],
+  "signaturesCreated": 0,
+  "transactionsSubmitted": 0
+}

@@ -1,8 +1,8 @@
 import { Account, Address, BASE_FEE, Contract, Networks, StrKey, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { validateClinicalContext } from './clinical-crypto.mjs';
 import { clinicalTtlMetadataUsable, clinicalSimulationIsLive } from './clinical-live-read.mjs';
+import { clinicalRpcUrl } from './clinical-rpc.mjs';
 
-const TESTNET_RPC = 'https://soroban-testnet.stellar.org';
 const HEX_32 = /^[a-f0-9]{64}$/;
 const READ_METHODS = new Set(['interface_version', 'get_registry', 'get_history', 'get_grant', 'can_read', 'get_version']);
 const unavailable = () => new Error('clinical_chain_unavailable');
@@ -41,7 +41,7 @@ function grantFrom(value) {
  * parameter is a trusted test dependency, never an HTTP/request parameter.
  * No method signs, submits, funds, restores or extends actual ledger state.
  * Simulation TTL changes are not submitted and do not maintain contract TTL. */
-export function createClinicalChainReader(configuration, { server = new rpc.Server(TESTNET_RPC) } = {}) {
+export function createClinicalChainReader(configuration, { server = new rpc.Server(clinicalRpcUrl()) } = {}) {
   try {
     if (!configuration || configuration.network !== 'testnet' || !StrKey.isValidContract(configuration.contractId) ||
         !StrKey.isValidContract(configuration.registryId) || typeof configuration.wasmHash !== 'string' ||

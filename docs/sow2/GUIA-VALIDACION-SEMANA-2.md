@@ -2,6 +2,8 @@
 
 Esta guía prepara comprobaciones; los resultados están en [QA-SEMANA-2.md](QA-SEMANA-2.md). Las pantallas ya están integradas en `codex/sow2-sprint-2`. Registrar el commit realmente validado; esta guía no es luz verde para grabar.
 
+**Actualización del 15 de octubre:** la revisión local de ejecuciones existentes está aprobada en `f98f0e7`, incluido 200 %, cambio de cuenta y una nota firmada desde el producto con persistencia posterior. Usar la [guía de grabación local](GRABACION-SEMANA-2.md) y el [informe actual](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md). Las instrucciones de ensayo siguientes son referencia, no una indicación de repetir operaciones. Preview y publicación conservan sus gates separados.
+
 ## 1. Entorno preparado
 
 - Aplicación: [127.0.0.1:3016/patient?tab=historial](http://127.0.0.1:3016/patient?tab=historial), con escrituras apagadas.
