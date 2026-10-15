@@ -1,0 +1,22 @@
+{
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF",
+  "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
+  "files": [
+    {
+      "path": "INFORME.md",
+      "bytes": 4858,
+      "sha256": "aa5c75e781673c7eeaa1834d5e94d3674778779bfb9e7e71deb8b69699b36a7a"
+    },
+    {
+      "path": "registry-restoration-inspection.json",
+      "bytes": 1133,
+      "sha256": "f27e7566c6ea29b82b86be8f1641b0360914fbb29edc295cc33f34ef3bc2686c"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 660,
+      "sha256": "7cba2e42215cfe2f899bd9a59509c38044c61300da0a418e3d2fdca7e64c584a"
+    }
+  ]
+}

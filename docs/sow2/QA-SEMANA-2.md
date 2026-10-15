@@ -1,5 +1,11 @@
 # SOW 2 · Semana 2 · Registro de QA
 
+## Actualización · 15 de octubre de 2026
+
+La reapertura local encontró un **bloqueo real de lectura por archivo de la instancia y código del registro médico**. RPC devolvía TTL cero y una simulación exitosa; la extensión de recursos mostró dos entradas archivadas. No se considera cargado ni verificado el historial actual. El ensayo del 11 de octubre conserva su evidencia histórica.
+
+Corrección `daf18d6`: TTL desconocido exige simulaciones estrictas sin restauración automática; se rechazan estados archivados, TTL vencido/inválido, datos malformados y cambios de identidad/contrato. **950 pruebas de aplicación, 263 privadas, TypeScript y build aprobados** sobre esas fuentes. No se repitieron transacciones. Restauración específica propuesta y pendiente de autorización, con escrituras locales apagadas. Ver [diagnóstico, límites y plan de recuperación](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md).
+
 ## Actualización · 11 de octubre de 2026
 
 **Ensayo real del paciente aprobado:** ocho transacciones distintas en Testnet con Privy, recibos y contenido auditados; PDF v1/v2 conservados; lectura y agregado independientes, retirados al terminar. La recarga tras reiniciar la aplicación con escrituras apagadas mantuvo tres entradas, cuatro versiones y permisos finales sin conceder. La reauditoría completa desde otro proceso también aprobó los mismos ocho recibos y contenido, sin nuevas transacciones.

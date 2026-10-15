@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
+  "application": {
+    "tests": 950,
+    "files": 74,
+    "status": "passed"
+  },
+  "privateServices": {
+    "tests": 263,
+    "status": "passed"
+  },
+  "typescript": "passed",
+  "build": {
+    "status": "passed",
+    "id": "KmOTlOgm1mC2RPG5ni5y3"
+  },
+  "testKind": "isolated",
+  "readOnlyRpc": {
+    "status": "blocked_archived_registry",
+    "archivedEntries": 2
+  },
+  "maintenance": {
+    "signaturesCreated": 0,
+    "transactionsSubmitted": 0,
+    "authorization": "pending",
+    "maxProposedFeeXlmTestnet": 5
+  },
+  "authenticatedReadAfterMaintenance": "pending",
+  "mainChanged": false
+}

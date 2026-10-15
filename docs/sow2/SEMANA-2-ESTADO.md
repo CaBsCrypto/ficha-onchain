@@ -1,5 +1,7 @@
 # SOW 2 · Semana 2 · Estado de la entrega
 
+**15 de octubre de 2026:** versión local corregida `daf18d6`, rama `codex/sow2-clinical-ledger-read-fix`. El código pasó 950 pruebas de aplicación, 263 privadas, TypeScript y build. La lectura real está bloqueada por dos entradas archivadas del registro médico; se preparó una restauración puntual de Testnet, todavía sin firma ni transmisión y pendiente de autorización específica. No está lista para grabar. [Diagnóstico y recuperación](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md). La actualización siguiente describe el ensayo histórico del 11 de octubre.
+
 Actualización: 11 de octubre de 2026. Base integrada `codex/sow2-sprint-2`; ensayo en `codex/sow2-testnet-api-rehearsal`, [#141](https://github.com/CaBsCrypto/ficha-onchain/pull/141) en borrador. Aplicación comprobada `6b9041f`; validador final `2189c1d`. Historial, archivos, cronología y permisos están integrados y el ensayo autenticado de ocho transacciones del paciente está aprobado en Testnet. Ver [informe real](../evidence/sow2-week2-testnet-2026-10-11/INFORME.md) y [QA](QA-SEMANA-2.md). No está publicado en main; revisión manual restante y preview siguen separados.
 
 ## Alcance integrado
