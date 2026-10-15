@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { Account, Address, FeeBumpTransaction, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Account, Address, FeeBumpTransaction, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { CLINICAL_CONTRACT, CLINICAL_WASM } from '@/lib/clinical/chain';
 import { PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import type { ClinicalOperation, ClinicalPrepareRequest, ClinicalSnapshot } from '@/types/clinical';
@@ -180,7 +180,7 @@ function fixture() {
       else if (method === 'get_version') value = chain.versions.get(versionKey(h, hex(args[1]), args[2]));
       else if (method === 'get_operation') value = chain.proofs.get(`${args[0]}:${hex(args[1])}`);
       else throw Error('unexpected_local_read: ' + method);
-      return value === undefined ? { latestLedger: counts.ledger, error: 'HostError: Error(Contract, #1)' } : { latestLedger: counts.ledger, transactionData: {}, result: { auth: [], retval: nativeToScVal(value, { type: method === 'interface_version' ? 'u32' : undefined }) } };
+      return value === undefined ? { latestLedger: counts.ledger, error: 'HostError: Error(Contract, #1)' } : { latestLedger: counts.ledger, transactionData: new SorobanDataBuilder(), result: { auth: [], retval: nativeToScVal(value, { type: method === 'interface_version' ? 'u32' : undefined }) } };
     },
     sendTransaction: async (tx: FeeBumpTransaction) => {
       counts.sends++;

@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-10-15T07:16:57.839Z",
+  "database": "Neon dev",
+  "readOnly": true,
+  "originalRunId": "4fad0a02-3603-43ce-b2fd-8dc02e8d42ec",
+  "originalOperations": 8,
+  "originalHashesUnchanged": true,
+  "entries": 3,
+  "versions": 4,
+  "relayerOperationStates": {
+    "private_operations": [],
+    "clinical_web_operations": [],
+    "clinical_transaction_attempts": [
+      {
+        "state": "confirmed",
+        "count": 2
+      }
+    ]
+  },
+  "clinicalWritesEnabled": false
+}

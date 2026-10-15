@@ -1,5 +1,6 @@
 import { Account, Address, BASE_FEE, Contract, Networks, StrKey, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { validateClinicalContext } from './clinical-crypto.mjs';
+import { clinicalTtlMetadataUsable, clinicalSimulationIsLive } from './clinical-live-read.mjs';
 
 const TESTNET_RPC = 'https://soroban-testnet.stellar.org';
 const HEX_32 = /^[a-f0-9]{64}$/;
@@ -75,7 +76,7 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
         data.durability().name !== 'persistent' || data.val().switch().name !== 'scvContractInstance') throw unavailable();
     const executable = data.val().instance().executable();
     if (executable.switch().name !== 'contractExecutableWasm' || executable.wasmHash().toString('hex') !== configured.wasmHash ||
-        (entry.liveUntilLedgerSeq !== undefined && uint(entry.liveUntilLedgerSeq) < observedLedger)) throw unavailable();
+        !clinicalTtlMetadataUsable(entry.liveUntilLedgerSeq, observedLedger)) throw unavailable();
     const account = await server.getAccount(configured.readerAddress);
     if (account.accountId() !== configured.readerAddress || !/^\d+$/.test(account.sequenceNumber())) throw unavailable();
     const sourceSequence = account.sequenceNumber();
@@ -94,7 +95,7 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
             /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(simulation.error)) return null;
         throw unavailable();
       }
-      if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !simulation.result ||
+      if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !clinicalSimulationIsLive(simulation) || !simulation.result ||
           !Array.isArray(simulation.result.auth) || simulation.result.auth.length > 0) throw unavailable();
       return scValToNative(simulation.result.retval);
     }

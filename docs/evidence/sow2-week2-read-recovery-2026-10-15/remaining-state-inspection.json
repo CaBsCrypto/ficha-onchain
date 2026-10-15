@@ -1,0 +1,213 @@
+{
+  "checkedAt": "2026-10-15T07:00:25.944Z",
+  "network": "testnet",
+  "readOnly": true,
+  "originalRunId": "4fad0a02-3603-43ce-b2fd-8dc02e8d42ec",
+  "source": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+  "queries": [
+    {
+      "method": "interface_version",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_admin",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "is_authorized",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "success": true,
+      "live": false,
+      "unexpectedAuth": false,
+      "archivedEntries": 1
+    },
+    {
+      "method": "interface_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_registry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_history",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "can_read",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_grant",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_entry",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_version",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    },
+    {
+      "method": "get_operation",
+      "contract": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "success": true,
+      "live": true,
+      "unexpectedAuth": false,
+      "archivedEntries": 0
+    }
+  ],
+  "remainingArchived": [
+    {
+      "key": "AAAABgAAAAFbjTSy8jdDl8aG0EgbjhQHtJ4RIPM9EEOunF1NzumAaQAAABAAAAABAAAAAgAAAA8AAAAGRG9jdG9yAAAAAAASAAAAAAAAAAAV1v4vNlhzFcn+UiF3Ah+tQ5mMSwoWGZ1JmKnXan1i6QAAAAE=",
+      "contract": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "method": "is_authorized"
+    }
+  ],
+  "proposedTransactions": 1,
+  "estimatedFeeStroops": "246352",
+  "estimatedFeeXlmTestnet": 0.0246352,
+  "signaturesCreated": 0,
+  "transactionsSubmitted": 0
+}

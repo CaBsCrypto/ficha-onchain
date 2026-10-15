@@ -1,0 +1,89 @@
+{
+  "algorithm": "SHA-256",
+  "textEncoding": "UTF-8 LF; binary files hashed as stored",
+  "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
+  "files": [
+    {
+      "path": "INFORME.md",
+      "bytes": 9215,
+      "sha256": "a9c0cfd1ba44696d4bbfab46a0eb5c1d209ed5fd564cf9762b79486805136c4b"
+    },
+    {
+      "path": "browser-validation.json",
+      "bytes": 2123,
+      "sha256": "0e2d6471d66c2883ae023d385060de53471c0515e85b963844d4c742f4442aff"
+    },
+    {
+      "path": "doctor-record-restoration-result.json",
+      "bytes": 948,
+      "sha256": "40ec858e23514eee198a2389838e1e905d6f2d074c6e421cb2d50cc2768f7bde"
+    },
+    {
+      "path": "final-registry-readback.json",
+      "bytes": 1338,
+      "sha256": "5f16e7a89da47ae61dabc2a25091d4454409e98af180d433ba959754b8345830"
+    },
+    {
+      "path": "historial-430-permisos.png",
+      "bytes": 53768,
+      "sha256": "b5b533c6f5eec14cff3ff09a8478da257c30c1b3756c77586f61233c6fd6f644"
+    },
+    {
+      "path": "persistence-after-maintenance.json",
+      "bytes": 490,
+      "sha256": "834cc76a201ee07896d848ed6c7a6c05cadfc08667796b01232a6d1f0db66db9"
+    },
+    {
+      "path": "post-restoration-required-reads.json",
+      "bytes": 5782,
+      "sha256": "2af2a0125765e6de8ef3eb9032ef11d152ca5afeb39234bf372ebb02cd95ab18"
+    },
+    {
+      "path": "registry-post-restore-readback.json",
+      "bytes": 1402,
+      "sha256": "4f787716eac095fe3f90b65a6ba9f0dceb8172a1ddbd99138e65544b45cc5dc4"
+    },
+    {
+      "path": "registry-restoration-inspection.json",
+      "bytes": 1133,
+      "sha256": "f27e7566c6ea29b82b86be8f1641b0360914fbb29edc295cc33f34ef3bc2686c"
+    },
+    {
+      "path": "registry-restoration-result.json",
+      "bytes": 916,
+      "sha256": "796366a16c3491611dcfa3513897b9db2562716228a1d55e0a5eca1f438060a4"
+    },
+    {
+      "path": "remaining-state-inspection.json",
+      "bytes": 6093,
+      "sha256": "356a7481e55000638ff76413e9e8e28fc721a8915c1fcf09ec6de94b41cb4a27"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 1858,
+      "sha256": "08d4403481046dbdfeeb721065d0420048cd7daa0a7cae9cb8186f2eefdc29fb"
+    }
+  ],
+  "localMaintenanceTools": [
+    {
+      "path": ".trustleaf-local/execute-registry-restoration.mjs",
+      "sha256": "4a51984fa5d809e8894eb4d49650a89a9c8e7caab5261a7a6b59cbb5786eecbb",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/registry-restoration-policy.test.mjs",
+      "sha256": "21619c808859b2e4380d064f702350bd8b41a952f518cfca21af6136f92f34b7",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/execute-doctor-record-restoration.mjs",
+      "sha256": "dfd480943243a89989741ce20ceb9654eb9b03da3ea5b8708ddca50369dd9dc7",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    },
+    {
+      "path": ".trustleaf-local/doctor-record-restoration-policy.test.mjs",
+      "sha256": "dc9bc5ea1e3e86ae65279fa810ed56ffe0ee54c594783c29354c0838d7e68e5e",
+      "classification": "local maintenance tooling; no secret contents in manifest"
+    }
+  ]
+}
