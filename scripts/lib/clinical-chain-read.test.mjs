@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Account, Address, Networks, StrKey, nativeToScVal, xdr } from '@stellar/stellar-sdk';
+import { Account, Address, Networks, SorobanDataBuilder, StrKey, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 import { createClinicalChainReader } from './clinical-chain-read.mjs';
 
 const wallet = n => StrKey.encodeEd25519PublicKey(Buffer.alloc(32, n));
@@ -11,10 +11,11 @@ const b = value => Buffer.from(value, 'hex');
 
 function fixture() {
   const state = { ledger: 100, patient: wallet(7), authorized: true,
-    grant: { can_read: true, can_append: false, revision: 2n }, calls: [], auth: [], failure: null, restore: false };
+    grant: { can_read: true, can_append: false, revision: 2n }, calls: [], auth: [], failure: null, restore: false,
+    ttl: 500, archived: [], malformedData: false };
   const server = {
     getNetwork: async () => ({ passphrase: Networks.TESTNET }),
-    getLedgerEntries: async key => ({ latestLedger: state.ledger, entries: [{ key, liveUntilLedgerSeq: 500,
+    getLedgerEntries: async key => ({ latestLedger: state.ledger, entries: [{ key, liveUntilLedgerSeq: state.ttl,
       val: xdr.LedgerEntryData.contractData(new xdr.ContractDataEntry({ ext: new xdr.ExtensionPoint(0),
         contract: new Address(config.contractId).toScAddress(), key: xdr.ScVal.scvLedgerKeyContractInstance(),
         durability: xdr.ContractDataDurability.persistent(),
@@ -39,7 +40,9 @@ function fixture() {
       };
       const type = method === 'interface_version' ? 'u32' :
         method === 'get_version' ? { version: ['symbol', 'u32'] } : undefined;
-      const response = { latestLedger: state.ledger, transactionData: {}, result: { auth: state.auth, retval: nativeToScVal(values[method], { type }) } };
+      const data = new SorobanDataBuilder().build();
+      data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: state.archived })));
+      const response = { latestLedger: state.ledger, transactionData: state.malformedData ? {} : new SorobanDataBuilder(data), result: { auth: state.auth, retval: nativeToScVal(values[method], { type }) } };
       if (state.restore) response.restorePreamble = { transactionData: {} };
       return response;
     },
@@ -57,6 +60,34 @@ test('RPC reader pins Testnet, WASM, interface and registry using unsigned simul
   const version = await f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 });
   assert.equal(version.state, 'confirmed'); assert.equal(version.commitment, '8'.repeat(64));
   assert.equal(version.context.patient, f.state.patient);
+});
+
+test('zero TTL is unknown: live owner reads succeed but automatic restoration and malformed data remain errors', async () => {
+  const live = fixture(); live.state.ttl = 0; live.state.patient = selector.reader;
+  assert.equal((await live.reader.readAccess(selector)).canRead, true);
+  for (const mutate of [f => {f.state.archived = [0];}, f => {f.state.malformedData = true;}, f => {f.state.restore = true;}]) {
+    const f = fixture(); f.state.ttl = 0; mutate(f);
+    await assert.rejects(() => f.reader.readAccess(selector), {message:'clinical_chain_unavailable'});
+  }
+});
+
+test('expired, malformed and out-of-range TTL values fail before a simulation', async () => {
+  for (const ttl of [99, -1, 1.5, NaN, Infinity, 0x1_0000_0000, '500', null]) {
+    const f = fixture(); f.state.ttl = ttl;
+    await assert.rejects(() => f.reader.verifyDeployment(), {message:'clinical_chain_unavailable'});
+    assert.equal(f.state.calls.length, 0);
+  }
+});
+
+test('archived document state cannot pass after earlier live reads succeeded', async () => {
+  const f = fixture(); await f.reader.verifyDeployment();
+  const simulate = f.server.simulateTransaction;
+  f.server.simulateTransaction = async tx => {
+    if (tx.operations[0].func.invokeContract().functionName().toString() === 'get_version') f.state.archived = [0];
+    return simulate(tx);
+  };
+  await assert.rejects(() => f.reader.readVersion({...selector, entryId:'9'.repeat(64),version:1}), {message:'clinical_chain_unavailable'});
+  assert.equal(f.state.calls.at(-1), 'get_version');
 });
 
 test('owner access is independent of medical grants; revoked and append-only access is denied', async () => {

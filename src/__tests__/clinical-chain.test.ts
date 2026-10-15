@@ -158,13 +158,14 @@ describe('clinical invocation and owner boundary', () => {
 function fixture() {
   const state = { ledger: 100, failure: '', restore: false, auth: [] as xdr.SorobanAuthorizationEntry[], missing: '',
     missingAccount: '', wrongNetwork: false, code: CLINICAL_WASM, head: 1, authorized: true, commitment: '5'.repeat(64),
+    clinicalTtl: 500 as number | undefined, registryTtl: 500 as number | undefined, archived: [] as number[], extensionV1: false, malformedData: false,
     history: { history_id: Buffer.from(historyId, 'hex'), patient: patient.publicKey(), created_at: BigInt(1) },
     proofDigest: '', proofCommitment: '', proofKind: 'Version', calls: [] as string[], sent: [] as string[] };
   const server = {
     getNetwork: vi.fn(async () => ({ passphrase: state.wrongNetwork ? Networks.PUBLIC : Networks.TESTNET })),
     getLedgerEntries: vi.fn(async (key: xdr.LedgerKey) => {
       const contract = Address.fromScAddress(key.contractData().contract()).toString();
-      return { latestLedger: state.ledger, entries: [{ key, liveUntilLedgerSeq: 500,
+      return { latestLedger: state.ledger, entries: [{ key, liveUntilLedgerSeq: contract === CLINICAL_CONTRACT ? state.clinicalTtl : state.registryTtl,
         val: xdr.LedgerEntryData.contractData(new xdr.ContractDataEntry({ ext: new xdr.ExtensionPoint(0),
           contract: new Address(contract).toScAddress(), key: xdr.ScVal.scvLedgerKeyContractInstance(), durability: xdr.ContractDataDurability.persistent(),
           val: xdr.ScVal.scvContractInstance(new xdr.ScContractInstance({ storage: [], executable: xdr.ContractExecutable.contractExecutableWasm(
@@ -188,7 +189,9 @@ function fixture() {
         clinicalInvocation('append_version', append).body().invokeHostFunctionOp().hostFunction().invokeContract().args()[0]]);
       values.get_operation = { digest: Buffer.from(state.proofDigest || createHash('sha256').update(appendPayload.toXDR()).digest('hex'), 'hex'),
         outcome: [state.proofKind, { ...(values.get_version as object), commitment: Buffer.from(state.proofCommitment || state.commitment, 'hex') }] };
-      const result = { latestLedger: state.ledger, transactionData: {}, result: { auth: state.auth, retval: nativeToScVal(values[method], { type: method === 'interface_version' ? 'u32' : undefined }) } };
+      const data = new SorobanDataBuilder().build();
+      if (state.extensionV1 || state.archived.length) data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: state.archived })));
+      const result = { latestLedger: state.ledger, transactionData: state.malformedData ? {} : new SorobanDataBuilder(data), result: { auth: state.auth, retval: nativeToScVal(values[method], { type: method === 'interface_version' ? 'u32' : undefined }) } };
       return state.restore ? { ...result, restorePreamble: { transactionData: {} } } : result;
     }),
     prepareTransaction: vi.fn(async (tx: Transaction) => tx),
@@ -199,6 +202,31 @@ function fixture() {
 }
 
 describe('clinical Testnet RPC boundary', () => {
+  it.each([0, undefined, 100])('accepts unknown or current registry TTL %s only after live pinned getter checks', async ttl => {
+    const f = fixture(); f.state.registryTtl = ttl; f.state.extensionV1 = true;
+    await expect(f.chain.historyForPatient(patient.publicKey())).resolves.toMatchObject({ id: historyId, patient: patient.publicKey() });
+    expect(f.state.calls).toContain('get_admin'); expect(f.state.calls).toContain('get_history_for_patient');
+    expect(f.server.sendTransaction).not.toHaveBeenCalled(); expect(f.server.prepareTransaction).not.toHaveBeenCalled();
+  });
+  it('does not mistake a successful automatic restoration simulation for live history', async () => {
+    const f = fixture(); f.state.registryTtl = 0; f.state.archived = [0, 1];
+    await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+    expect(f.state.calls).not.toContain('get_history_for_patient'); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+  });
+  it('checks archival on every read after a deployment was verified', async () => {
+    const f = fixture(); await f.chain.verifyDeployment(); f.state.archived = [0];
+    await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+    expect(f.state.calls).toContain('get_history_for_patient'); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+  });
+  it.each([99, -1, 1.5, NaN, Infinity, 0x1_0000_0000])('rejects expired or malformed TTL %s', async ttl => {
+    const f = fixture(); f.state.registryTtl = ttl;
+    await expect(f.chain.verifyDeployment()).rejects.toThrow('clinical_chain_unavailable');
+    expect(f.server.simulateTransaction).not.toHaveBeenCalled();
+  });
+  it('fails closed when simulation transaction data is absent or malformed', async () => {
+    const f = fixture(); f.state.registryTtl = 0; f.state.malformedData = true;
+    await expect(f.chain.verifyDeployment()).rejects.toThrow('clinical_chain_unavailable');
+  });
   it('accepts a real-sized Soroban fee, signs the exact intent and submits its bounded sponsored envelope', async () => {
     const f = fixture(); f.server.prepareTransaction = vi.fn(async () => build('create_history', create, {resourceFee:'353053728'}));
     const tx = await f.chain.prepare(patient.publicKey(), 'create_history', create);

@@ -7,6 +7,7 @@ import { PRIVATE_ADMIN, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private
 import type { ClinicalAction, ClinicalExpected } from '@/types/clinical';
 import { validateClinicalContext } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalWebFeeQuote, assertClinicalWebSponsoredFee, CLINICAL_WEB_SPONSOR_BASE_FEE } from '../../../scripts/lib/clinical-web-fee-policy.mjs';
+import { clinicalTtlMetadataUsable, clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
 
 export const CLINICAL_CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
 export const CLINICAL_WASM = '29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0';
@@ -178,7 +179,7 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server('htt
       if (missing && /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(sim.error)) return null;
       throw unavailable();
     }
-    if (!rpc.Api.isSimulationSuccess(sim) || rpc.Api.isSimulationRestore(sim) || !sim.result ||
+    if (!rpc.Api.isSimulationSuccess(sim) || rpc.Api.isSimulationRestore(sim) || !clinicalSimulationIsLive(sim) || !sim.result ||
         !Array.isArray(sim.result.auth) || sim.result.auth.length) throw unavailable();
     return scValToNative(sim.result.retval);
   }
@@ -192,7 +193,7 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server('htt
     if (instance.entries.length !== 1) throw unavailable();
     const entry = instance.entries[0];
     if (!entry.key.toXDR().equals(key.toXDR()) || entry.val.switch().name !== 'contractData' ||
-        (entry.liveUntilLedgerSeq !== undefined && entry.liveUntilLedgerSeq < observedLedger)) throw unavailable();
+        !clinicalTtlMetadataUsable(entry.liveUntilLedgerSeq, observedLedger)) throw unavailable();
     const data = entry.val.contractData();
     if (!data.contract().toXDR().equals(new Address(contract).toScAddress().toXDR()) || !data.key().toXDR().equals(xdr.ScVal.scvLedgerKeyContractInstance().toXDR()) ||
         data.durability().name !== 'persistent' || data.val().switch().name !== 'scvContractInstance') throw unavailable();
