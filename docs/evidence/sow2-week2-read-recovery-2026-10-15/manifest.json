@@ -1,12 +1,42 @@
 {
   "algorithm": "SHA-256",
-  "textEncoding": "UTF-8 LF",
+  "textEncoding": "UTF-8 LF; binary files hashed as stored",
   "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
   "files": [
     {
       "path": "INFORME.md",
-      "bytes": 6941,
-      "sha256": "29276bae55b1b4291e1ab926c5303b06c6d979c4650fcd900eaba296b9cd6c56"
+      "bytes": 9215,
+      "sha256": "a9c0cfd1ba44696d4bbfab46a0eb5c1d209ed5fd564cf9762b79486805136c4b"
+    },
+    {
+      "path": "browser-validation.json",
+      "bytes": 2123,
+      "sha256": "0e2d6471d66c2883ae023d385060de53471c0515e85b963844d4c742f4442aff"
+    },
+    {
+      "path": "doctor-record-restoration-result.json",
+      "bytes": 948,
+      "sha256": "40ec858e23514eee198a2389838e1e905d6f2d074c6e421cb2d50cc2768f7bde"
+    },
+    {
+      "path": "final-registry-readback.json",
+      "bytes": 1338,
+      "sha256": "5f16e7a89da47ae61dabc2a25091d4454409e98af180d433ba959754b8345830"
+    },
+    {
+      "path": "historial-430-permisos.png",
+      "bytes": 53768,
+      "sha256": "b5b533c6f5eec14cff3ff09a8478da257c30c1b3756c77586f61233c6fd6f644"
+    },
+    {
+      "path": "persistence-after-maintenance.json",
+      "bytes": 490,
+      "sha256": "834cc76a201ee07896d848ed6c7a6c05cadfc08667796b01232a6d1f0db66db9"
+    },
+    {
+      "path": "post-restoration-required-reads.json",
+      "bytes": 5782,
+      "sha256": "2af2a0125765e6de8ef3eb9032ef11d152ca5afeb39234bf372ebb02cd95ab18"
     },
     {
       "path": "registry-post-restore-readback.json",
@@ -30,8 +60,8 @@
     },
     {
       "path": "verification.json",
-      "bytes": 1222,
-      "sha256": "b39a79f1d3c491ef8a3a082ceab9fdfe8663e4805b3091cca73df9699bb1ac8a"
+      "bytes": 1858,
+      "sha256": "08d4403481046dbdfeeb721065d0420048cd7daa0a7cae9cb8186f2eefdc29fb"
     }
   ],
   "localMaintenanceTools": [

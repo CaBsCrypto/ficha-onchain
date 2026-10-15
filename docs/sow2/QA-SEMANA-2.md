@@ -2,11 +2,13 @@
 
 ## Actualización · 15 de octubre de 2026
 
-La reapertura local encontró un **bloqueo real de lectura por archivo de la instancia y código del registro médico**. RPC devolvía TTL cero y una simulación exitosa; la extensión de recursos mostró dos entradas archivadas. No se considera cargado ni verificado el historial actual. El ensayo del 11 de octubre conserva su evidencia histórica.
+La reapertura local encontró un **bloqueo real de lectura por archivo de la instancia, código y registro individual del médico**. RPC devolvía TTL cero y una simulación exitosa; la extensión de recursos reveló el archivo. Tras dos restauraciones específicamente autorizadas, el historial autenticado volvió a cargar. El ensayo del 11 de octubre conserva intactas sus ocho operaciones.
 
 Corrección `daf18d6`: TTL desconocido exige simulaciones estrictas sin restauración automática; se rechazan estados archivados, TTL vencido/inválido, datos malformados y cambios de identidad/contrato. **950 pruebas de aplicación, 263 privadas, TypeScript y build aprobados** sobre esas fuentes. CI/Vercel aprobados en `4d7f09b`, PR #142 en borrador.
 
-La primera restauración autorizada confirmó instancia y WASM del registro: recibo `966fe5e7`, ledger `5204777`, comisión cobrada 2,9948101 XLM de Testnet, dentro del máximo de 5. No se repitieron operaciones clínicas. Las 24 consultas posteriores detectaron únicamente el registro individual del médico de prueba todavía archivado. Su restauración separada está preparada y pendiente de autorización adicional; el portal completo sigue bloqueado y las escrituras clínicas apagadas. Ver [diagnóstico, recibo y siguiente límite](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md).
+La primera restauración confirmó instancia y WASM: recibo `966fe5e7`, ledger `5204777`, comisión 2,9948101 XLM de Testnet (máximo 5). La segunda confirmó el registro individual del médico: `ae17e228`, ledger `5204990`, comisión 0,0211316 (máximo 0,1). Las 24 consultas finales no requieren restauración ni autorización inesperada. Neon dev conserva ocho hashes clínicos originales, tres entradas, cuatro versiones y los dos mantenimientos confirmados, sin intentos inciertos del relayer en las tablas inspeccionadas. Las escrituras clínicas siguen apagadas. Ver [informe, recibos y límites](../evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md).
+
+Observado de nuevo con sesión real: historial y permisos cargados, PDF v1/v2 descargables y legibles, versiones anteriores conservadas y presentación completa a 430 px. El médico continúa vencido y ambos permisos retirados; no se renovaron ni concedieron. Pendientes: firma desde el botón del producto, cambio real de cuenta y zoom al 200 %. Los resultados históricos que siguen mantienen su fecha original.
 
 ## Actualización · 11 de octubre de 2026
 

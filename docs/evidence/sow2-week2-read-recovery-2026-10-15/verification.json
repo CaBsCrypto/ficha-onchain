@@ -16,28 +16,46 @@
   },
   "testKind": "isolated",
   "readOnlyRpc": {
-    "status": "registry-instance-and-code-live_doctor-record-archived",
+    "status": "passed",
     "knownQueries": 24,
-    "liveQueries": 23,
-    "remainingArchivedEntries": 1
+    "liveQueries": 24,
+    "remainingArchivedEntries": 0,
+    "unexpectedAuthorizations": 0,
+    "evidence": "post-restoration-required-reads.json"
   },
   "maintenance": {
-    "authorization": "first restoration explicitly authorized; additional physician record pending",
-    "signaturesCreated": 1,
-    "transactionsSubmitted": 1,
+    "authorization": "two separate explicit user authorizations",
+    "signaturesCreated": 2,
+    "transactionsSubmitted": 2,
     "status": "SUCCESS",
-    "transactionHash": "966fe5e7ceacf9195959729b9eccfff5bff412d5017967e8fe350a96a1cf0fe4",
-    "chargedFeeStroops": "29948101",
-    "approvedMaxFeeXlmTestnet": 5
+    "clinicalOperationsCreated": 0,
+    "totalChargedFeeStroops": "30159417",
+    "receipts": [
+      {
+        "transactionHash": "966fe5e7ceacf9195959729b9eccfff5bff412d5017967e8fe350a96a1cf0fe4",
+        "scope": "registry instance and code only",
+        "ledger": 5204777,
+        "chargedFeeStroops": "29948101",
+        "approvedMaxFeeXlmTestnet": 5
+      },
+      {
+        "transactionHash": "ae17e228063d8a8c508dd835ee2006d7441142137aaceb7805601651f0ace156",
+        "scope": "existing Doctor record only",
+        "ledger": 5204990,
+        "chargedFeeStroops": "211316",
+        "approvedMaxFeeXlmTestnet": 0.1
+      }
+    ],
+    "pendingRelayerAttempts": 0,
+    "queueEvidence": "persistence-after-maintenance.json"
   },
-  "authenticatedReadAfterMaintenance": "blocked_by_additional_archived_doctor_record",
+  "authenticatedReadAfterMaintenance": "passed; three entries, four versions, original receipts and withdrawn permissions",
   "mainChanged": false,
-  "additionalMaintenance": {
-    "authorization": "pending",
-    "keys": 1,
-    "estimatedFeeXlmTestnet": 0.0246352,
-    "maxProposedFeeXlmTestnet": 0.1,
-    "signaturesCreated": 0,
-    "transactionsSubmitted": 0
-  }
+  "originalClinicalTransactionsRepeated": false,
+  "manualPending": [
+    "signature via product button",
+    "real account change",
+    "browser text/zoom at 200 percent"
+  ],
+  "week2RecordingAcceptance": "pending remaining manual checks"
 }

@@ -1,0 +1,61 @@
+{
+  "observedAt": "2026-10-15T08:28:45.950Z",
+  "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
+  "environment": "local production build; Neon dev; Stellar Testnet",
+  "url": "http://127.0.0.1:3016/patient?tab=historial",
+  "kind": "observed authenticated UI with existing records; not simulated",
+  "contentLastVerifiedAt": "2026-10-15T07:16:46Z",
+  "entries": 3,
+  "versions": 4,
+  "expandedPreviousVersion": true,
+  "receiptsDisplayedForExistingContributions": true,
+  "doctorAuthorization": "expired; not renewed",
+  "permissions": {
+    "read": false,
+    "append": false,
+    "grantControlsDisabled": true
+  },
+  "pdfs": [
+    {
+      "name": "synthetic-clinical-v1.pdf",
+      "bytes": 964,
+      "sha256": "ff33beb1f5c938fc0b3d264b2b21ab02e3bb3e0e4447a1dacdeb30172bf1c93c",
+      "downloadedThrough": "authenticated clinical history UI; private download prepared",
+      "renderedPages": 1,
+      "visuallyLegible": true,
+      "synthetic": true
+    },
+    {
+      "name": "synthetic-clinical-v2.pdf",
+      "bytes": 974,
+      "sha256": "163796060aaed5bb2019305de6b355c3101f784d93f79be748be9055b98efc8d",
+      "downloadedThrough": "authenticated clinical history UI; private download prepared",
+      "renderedPages": 1,
+      "visuallyLegible": true,
+      "synthetic": true
+    }
+  ],
+  "mobile": {
+    "requestedWidth": 430,
+    "windowInnerWidth": 430,
+    "documentScrollWidth": 415,
+    "visualViewportWidth": 415,
+    "scale": 1,
+    "fullPageInspected": true,
+    "bottomControlsInspected": true,
+    "horizontalOverflow": false,
+    "screenshot": "historial-430-permisos.png"
+  },
+  "clinicalWritesEnabled": false,
+  "clinicalOperationsCreated": 0,
+  "pending": [
+    "signature via product button",
+    "real account change",
+    "browser text/zoom at 200 percent"
+  ],
+  "limitations": [
+    "Eight original receipts were audited in the prior rehearsal; this UI observation does not execute them again.",
+    "Download preparation verifies existing private content; downloading is not a Stellar transaction.",
+    "No permanent availability or formal reviewer acceptance is claimed."
+  ]
+}
