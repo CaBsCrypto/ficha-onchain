@@ -8,6 +8,7 @@ import type { ClinicalAction, ClinicalExpected } from '@/types/clinical';
 import { validateClinicalContext } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalWebFeeQuote, assertClinicalWebSponsoredFee, CLINICAL_WEB_SPONSOR_BASE_FEE } from '../../../scripts/lib/clinical-web-fee-policy.mjs';
 import { clinicalTtlMetadataUsable, clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
+import { clinicalRpcUrl } from '../../../scripts/lib/clinical-rpc.mjs';
 
 export const CLINICAL_CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
 export const CLINICAL_WASM = '29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0';
@@ -160,7 +161,7 @@ function historyValue(value: unknown, id?: string, patient?: string): ClinicalHi
   if (actual.id !== deriveClinicalHistoryId(actual.patient) || (id && actual.id !== id) || (patient && actual.patient !== patient)) throw unavailable();
   return actual;
 }
-export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server('https://soroban-testnet.stellar.org')) {
+export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clinicalRpcUrl())) {
   let observedLedger = 0;
   let verified: Promise<{ network: 'testnet'; contractId: string; registryId: string; wasmHash: string; interfaceVersion: 1; ledger: number }> | undefined;
   async function read(contract: string, method: string, args: xdr.ScVal[] = [], missing = false): Promise<unknown> {

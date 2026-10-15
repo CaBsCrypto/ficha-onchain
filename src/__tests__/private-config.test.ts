@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertPrivateEnvironment, assertPrivateWrites, PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
+import { assertClinicalEnvironment, CLINICAL_ID } from '@/lib/clinical/config';
 
 const localHost = 'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech';
 const env = {
@@ -14,6 +15,22 @@ beforeEach(() => { for (const [key, value] of Object.entries(env)) vi.stubEnv(ke
 afterEach(() => vi.unstubAllEnvs());
 
 describe('explicit private Testnet configuration', () => {
+  it('clinical Gateway selection does not broaden legacy RPC or bypass the write switch', () => {
+    vi.stubEnv('TRUSTLEAF_CLINICAL_WEB_ENABLED', 'true');
+    vi.stubEnv('CLINICAL_HISTORY_PRIVATE_CONTRACT_ID', CLINICAL_ID);
+    vi.stubEnv('TRUSTLEAF_CLINICAL_RPC_PROVIDER', 'gateway');
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
+    expect(() => assertClinicalEnvironment()).not.toThrow();
+    expect(() => assertClinicalEnvironment(true)).toThrow('private_writes_paused');
+    vi.stubEnv('NEXT_PUBLIC_SOROBAN_RPC_URL', 'https://soroban-rpc.testnet.stellar.gateway.fm');
+    expect(() => assertClinicalEnvironment()).toThrow('private_configuration_mismatch');
+  });
+  it('rejects an unsupported clinical provider as a recoverable configuration error', () => {
+    vi.stubEnv('TRUSTLEAF_CLINICAL_WEB_ENABLED', 'true');
+    vi.stubEnv('CLINICAL_HISTORY_PRIVATE_CONTRACT_ID', CLINICAL_ID);
+    vi.stubEnv('TRUSTLEAF_CLINICAL_RPC_PROVIDER', 'mainnet');
+    expect(() => assertClinicalEnvironment()).toThrow('clinical_configuration_unavailable');
+  });
   it('accepts the complete local development environment', () => expect(assertPrivateWrites).not.toThrow());
   it.each([['preview', 'preview'], ['test', 'production']])('accepts an isolated %s database for Vercel %s', (environment, vercel) => {
     vi.stubEnv('TRUSTLEAF_ENV', environment); vi.stubEnv('VERCEL_ENV', vercel);
