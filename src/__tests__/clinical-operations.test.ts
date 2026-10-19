@@ -58,6 +58,7 @@ function fixture(ownHistory = false) {
     if (q.startsWith('RELEASE SAVEPOINT ')) { savedPoints.delete(q.slice(18)); return { rows: [] }; }
     if (q.includes('pg_advisory_xact_lock')) return { rows: [] };
     if (q.startsWith('SELECT to_regclass')) return { rows: [{ relation: values[0] }] };
+    if (q.startsWith("SELECT id FROM clinical_web_operations WHERE source_wallet=")) return { rows: state.row ? [{ id: state.row.id }] : [] };
     if (q.startsWith('SELECT 1 FROM') && q.includes('state IN')) return { rows: state.queue && q.includes(`FROM ${state.queue} `) ? [{}] : [] };
     if (q.startsWith('SELECT * FROM clinical_web_operations')) {
       const visible = state.row && state.row.id === values[0] && (values[1] === undefined || state.row.actor_user_id === values[1]);
@@ -124,9 +125,63 @@ function fixture(ownHistory = false) {
 }
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'true'); vi.stubEnv('PRIVY_APP_SECRET', 'isolated-test-placeholder');
+  for (const key of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL']) vi.stubEnv(key, undefined);
   vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'test-kek');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+describe('single authorized local history creation', () => {
+  function scoped() {
+    vi.stubEnv('TRUSTLEAF_ENV', 'local'); vi.stubEnv('VERCEL_ENV', ''); vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'testnet');
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
+    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', actor.address);
+    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', payer.publicKey());
+    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+480));
+  }
+  it('prepares one selected creation with broad writes off and persists before submitting its exact signed envelope', async () => {
+    const f=fixture(); scoped();
+    await prepareClinicalOperation(user,actor,createInput);
+    expect(f.state.row?.action).toBe('create_history'); expect(f.state.row?.signed_xdr).toBeNull();
+    await signClinicalOperation(user,actor,ID,testSignature());
+    expect(m.sponsor).toHaveBeenCalledTimes(1); expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(f.state.row!.signed_xdr);
+    expect(f.state.row!.state).toBe('submitted');
+    expect(f.state.events.slice(0,f.state.events.indexOf('RPC_SUBMIT')).filter(q=>q==='COMMIT')).toHaveLength(2);
+  });
+  it.each(['append_version', 'set_permissions'] as const)('rejects %s before encryption, preparation or a database transaction', async action => {
+    const f=fixture(); scoped();
+    await expect(prepareClinicalOperation(user,actor,{...createInput,action})).rejects.toThrow('clinical_create_once_scope_rejected');
+    expect(m.connection).not.toHaveBeenCalled(); expect(m.seal).not.toHaveBeenCalled(); expect(m.chain.prepare).not.toHaveBeenCalled(); expect(f.state.row).toBeNull();
+  });
+  it('does not let another UUID consume a second slot, including after confirmation or cancellation', async () => {
+    const f=fixture(); scoped(); await prepareClinicalOperation(user,actor,createInput);
+    for (const state of ['awaiting_signature','confirmed','cancelled','failed']) {
+      f.state.row!.state=state;
+      await expect(prepareClinicalOperation(user,actor,{...createInput,requestId:'1f4929bd-48f9-4b9d-bde4-47f7b66a6d91'})).rejects.toThrow('clinical_create_once_already_used');
+    }
+    expect(m.chain.prepare).toHaveBeenCalledTimes(1); expect(m.sponsor).not.toHaveBeenCalled();
+  });
+  it('rejects the real sponsored fee above 1 XLM before persisting or signing', async () => {
+    const f=fixture(); scoped();
+    m.chain.prepare.mockImplementation(async (source,action,expected)=>new TransactionBuilder(new Account(source,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
+      .addOperation(clinicalInvocation(action,expected)).setTimeout(180).setSorobanData(new SorobanDataBuilder().setResourceFee('6000001').build()).build());
+    await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toThrow('clinical_create_once_fee_exceeded');
+    expect(f.state.row).toBeNull(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('rechecks the cap on a saved unsigned operation immediately before signing', async () => {
+    const f=fixture(); scoped(); await prepareClinicalOperation(user,actor,createInput);
+    const tx=new TransactionBuilder(new Account(actor.address,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
+      .addOperation(clinicalInvocation('create_history',f.state.row!.expected)).setTimeout(180).setSorobanData(new SorobanDataBuilder().setResourceFee('6000001').build()).build();
+    Object.assign(f.state.row!,{unsigned_xdr:tx.toXDR(),signing_hash:tx.hash().toString('hex'),expires_at:Number(tx.timeBounds!.maxTime)});
+    await expect(signClinicalOperation(user,actor,ID,patient.sign(tx.hash()).toString('hex'))).rejects.toThrow('clinical_create_once_fee_exceeded');
+    expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('keeps historical receipt reads working when the scoped authority has expired', async () => {
+    const f=fixture(); f.seed(); scoped(); f.state.receipt='SUCCESS';
+    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL',String(Math.floor(Date.now()/1000)-1));
+    expect((await reconcileClinicalOperation(actor,ID)).operation.state).toBe('confirmed');
+    expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled();
+  });
+});
 
 describe('clinical operation preparation and private idempotency', () => {
   it('a rejected prepared fee budget rolls back without persisting an intent, requesting Privy or submitting', async () => {

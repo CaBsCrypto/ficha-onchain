@@ -10,6 +10,7 @@ import { sealClinicalVersion } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalNeonStore } from '../../../scripts/lib/clinical-neon-store.mjs';
 import { CLINICAL_ID, assertClinicalEnvironment } from './config';
 import { clinicalKeyring } from './keys';
+import { assertClinicalWriteScope, clinicalCreateOnceConfigured, assertClinicalCreateOnceFee, assertClinicalCreateOnceSavedFee, type ClinicalCreateOncePolicy } from './create-once';
 import { createClinicalWebChain, assertClinicalUnsigned, assertClinicalSavedEnvelope, sponsorClinicalSignature, type ClinicalSavedEnvelope } from './chain';
 import { assertClinicalOwner } from './identity';
 import { clinicalPublicOperation } from './history';
@@ -20,6 +21,14 @@ const contextFor = (e: ClinicalExpected) => ({ schemaVersion: 1, network: 'testn
   historyId: e.historyId, entryId: e.entryId!, author: e.author!, patient: e.patient,
   version: e.expectedVersion!+1, previousCommitment: e.previousCommitment ?? null });
 const methods = { create_history: 'create_history', append_version: 'append_version', set_permissions: 'set_permissions' };
+/** Called while holding the same wallet transaction lock as preparation/signing. */
+async function assertCreateOnceQuota(client: PoolClient, policy: ClinicalCreateOncePolicy | null, requestId: string, mustExist = false) {
+  if (!policy) return;
+  const rows = (await client.query("SELECT id FROM clinical_web_operations WHERE source_wallet=$1 AND contract_id=$2 AND network='testnet'", [policy.wallet, CLINICAL_ID])).rows;
+  if (rows.length > 1 || (mustExist && rows.length !== 1) || rows.some(row => row.id !== requestId)) {
+    throw new PrivateFlowError('clinical_create_once_already_used', 409);
+  }
+}
 function fingerprint(input: ClinicalPrepareRequest, saved?: string) {
   const keys = clinicalKeyring();
   const keyId = saved ? saved.slice(0, saved.lastIndexOf(':')) : keys.activeKeyId;
@@ -79,14 +88,16 @@ async function eligible(actor: ClinicalActor, row: Row, replay = false) {
   }
 }
 export async function prepareClinicalOperation(user: AuthedUser, actor: ClinicalActor, input: ClinicalPrepareRequest) {
-  assertClinicalEnvironment(true); clinicalKeyring();
+  const policy = assertClinicalWriteScope(input.action, actor.address); clinicalKeyring();
   return locked(actor, async client => {
+    await assertCreateOnceQuota(client, policy, input.requestId);
     const existing = (await client.query('SELECT * FROM clinical_web_operations WHERE id=$1 FOR UPDATE', [input.requestId])).rows[0];
     if (existing) {
       if (existing.actor_user_id !== actor.userId || existing.wallet_id !== actor.walletId || existing.source_wallet !== actor.address || existing.action !== input.action || existing.contract_id !== CLINICAL_ID) throw new PrivateFlowError('clinical_request_conflict');
       const expected = Buffer.from(fingerprint(input, existing.request_fingerprint)), actual = Buffer.from(existing.request_fingerprint ?? '');
       if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) throw new PrivateFlowError('clinical_request_conflict');
       // A repeated id names its first intent, never a replacement payload.
+      assertClinicalCreateOnceSavedFee(policy, existing.unsigned_xdr);
       return { operation: clinicalPublicOperation(existing) };
     }
     await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_request_expired',updated_at=NOW() WHERE source_wallet=$1 AND state='awaiting_signature' AND signed_xdr IS NULL AND expires_at<=EXTRACT(EPOCH FROM NOW())", [actor.address]);
@@ -124,6 +135,7 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
       }
     }
     const tx = await c.prepare(actor.address, input.action, e);
+    assertClinicalCreateOnceFee(policy, tx);
     const row = (await client.query(`INSERT INTO clinical_web_operations
       (id,actor_user_id,wallet_id,source_wallet,action,contract_id,method,expected,prepared_envelope,state,unsigned_xdr,signing_hash,expires_at,request_fingerprint)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'awaiting_signature',$10,$11,$12,$13) RETURNING *`,
@@ -132,14 +144,17 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
   });
 }
 export async function signClinicalOperation(_user: AuthedUser, actor: ClinicalActor, id: string, signature: string) {
-  assertClinicalEnvironment(true);
+  assertClinicalEnvironment(!clinicalCreateOnceConfigured());
   await locked(actor, async client => {
     const row = await operation(client, actor, id);
+    const policy = assertClinicalWriteScope(row.action, actor.address);
+    await assertCreateOnceQuota(client, policy, id, true);
     if (row.state !== 'awaiting_signature') return;
     if (Number(row.expires_at) <= Date.now()/1000) throw new PrivateFlowError('signature_request_expired');
     const unsigned = TransactionBuilder.fromXDR(row.unsigned_xdr, Networks.TESTNET);
     if (!(unsigned instanceof Transaction) || unsigned.hash().toString('hex') !== row.signing_hash || Number(unsigned.timeBounds?.maxTime) !== Number(row.expires_at)) throw new PrivateFlowError('clinical_saved_intent_invalid', 503);
     assertClinicalUnsigned(unsigned, actor.address, row.action, row.expected); await eligible(actor, row);
+    assertClinicalCreateOnceFee(policy, unsigned);
     // The browser signs with the patient's existing Privy wallet. All intent
     // fields come from this locked row; the client supplies only the signature.
     const sponsored = sponsorClinicalSignature(row.unsigned_xdr, actor.address, signature, row.action, row.expected);
@@ -190,12 +205,15 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
       row = (await client.query("UPDATE clinical_web_operations SET state='confirmed',error_code=NULL,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
     } else if (receipt.status === 'FAILED') {
       row = (await client.query("UPDATE clinical_web_operations SET state='failed',error_code='transaction_failed',updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
-    } else if (retry && receipt.status === 'NOT_FOUND' && Number(row.expires_at) > Date.now()/1000 && process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'true') {
-      assertPrivateWrites();
+    } else if (retry && receipt.status === 'NOT_FOUND' && Number(row.expires_at) > Date.now()/1000 && (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'true' || clinicalCreateOnceConfigured())) {
+      const policy = assertClinicalWriteScope(row.action, actor.address);
+      await assertCreateOnceQuota(client, policy, id, true);
+      assertClinicalCreateOnceSavedFee(policy, row.unsigned_xdr);
+      if (!policy) assertPrivateWrites();
       try { await eligible(actor, row, true); }
       catch { return { operation: { ...clinicalPublicOperation(row), errorCode: 'clinical_retry_unavailable' } }; }
       // No new preparation, signing, fee bump or hash. Uncertainty retains the saved attempt.
-      try { assertClinicalSavedEnvelope(row as ClinicalSavedEnvelope); await c.submit(row.signed_xdr); } catch { /* Recoverable; keep submitted. */ }
+      try { assertClinicalSavedEnvelope(row as ClinicalSavedEnvelope); assertClinicalCreateOnceSavedFee(policy, row.unsigned_xdr); await c.submit(row.signed_xdr); } catch { /* Recoverable; keep submitted. */ }
     }
     return { operation: clinicalPublicOperation(row) };
   });
