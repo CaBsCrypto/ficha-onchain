@@ -375,9 +375,10 @@ describe('read-only clinical release',()=>{
   deps.fetch.mockResolvedValue(response(data));
   const {host}=await mount(createElement(ClinicalHistory,{renderPermissions:props=>createElement(ClinicalPermissions,props)}));
   expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Ver 1 versión anterior');expect(host.textContent).toContain('Permisos consultados');
-  expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
+  expect([...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every(input=>input.disabled)).toBe(true);
   expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
-  for(const text of ['Agregar antecedente o archivo','Corregir mi aporte']){const control=button(host,text);if(control){expect(control.disabled).toBe(true);await act(async()=>control.click());}}
+  for(const text of ['Agregar antecedente o archivo','Corregir mi aporte']){const control=button(host,text);if(control){expect(control.disabled).toBe(false);await act(async()=>control.click());expect(host.textContent).toContain('Borrador temporal');await act(async()=>button(host,'Cerrar')!.click());}}
   await act(async()=>button(host,'Actualizar')!.click());
   expect(deps.fetch.mock.calls.every(call=>call[0]==='/api/private-clinical-history'&&(call[1]?.method??'GET')==='GET')).toBe(true);expect(deps.sign).not.toHaveBeenCalled();
  });
@@ -388,6 +389,82 @@ describe('read-only clinical release',()=>{
   await act(async()=>button(host,'Consultar intento pendiente')!.click());
   for(const text of ['Revisar confirmación','Confirmar con mi cuenta Privy','Cancelar firma pendiente','Reintentar envío del mismo intento'])expect(button(host,text)).toBeUndefined();
   await act(async()=>button(host,'Consultar confirmación')!.click());expect(deps.sign).not.toHaveBeenCalled();
+ });
+});
+describe('local drafts while clinical confirmations are paused',()=>{
+ const writes={create_history:false,append_version:false,set_permissions:false};
+ const getButton=(host:HTMLElement,text:string)=>[...host.querySelectorAll('button')].find(item=>item.textContent===text)!;
+ const view=()=>createElement(ClinicalHistory,{renderPermissions:props=>createElement(ClinicalPermissions,props)});
+ async function textValue(input:HTMLInputElement|HTMLTextAreaElement,value:string){
+  const prototype=input instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+  await act(async()=>{Object.getOwnPropertyDescriptor(prototype,'value')!.set!.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
+ }
+ const onlyReads=()=>{expect(deps.fetch.mock.calls.every(call=>(call[1]?.method??'GET')==='GET')).toBe(true);expect(deps.sign).not.toHaveBeenCalled();};
+ it.each(['paused','missing','create-only'])('opens, edits, reviews and discards a note locally with %s capabilities',async mode=>{
+  const data:Partial<ClinicalSnapshot>={...snapshot([version()]),writes};
+  if(mode==='missing')delete data.writes;
+  if(mode==='create-only')data.writes={...writes,create_history:true};
+  deps.fetch.mockResolvedValue(response(data)); const {host}=await mount(view());
+  const opener=getButton(host,'Agregar antecedente o archivo');await act(async()=>opener.click());
+  await textValue(host.querySelector('input[required]')!,'BORRADOR SIN GUARDAR');
+  await textValue(host.querySelector('textarea')!,'Contenido que sólo existe en esta pantalla.');
+  await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(document.activeElement?.textContent).toBe('Revisa tu borrador');expect(host.textContent).toContain('BORRADOR SIN GUARDAR');
+  expect(getButton(host,'Preparar firma').disabled).toBe(true);await act(async()=>getButton(host,'Preparar firma').click());onlyReads();
+  await act(async()=>getButton(host,'Volver a editar').click());expect(host.querySelector<HTMLInputElement>('input[required]')!.value).toBe('BORRADOR SIN GUARDAR');
+  await act(async()=>getButton(host,'Cerrar').click());expect(document.activeElement).toBe(opener);
+  await act(async()=>opener.click());expect(host.querySelector<HTMLInputElement>('input[required]')!.value).toBe('');
+  expect(host.textContent).not.toContain('BORRADOR SIN GUARDAR');onlyReads();
+ });
+ it('previews only an original patient author’s latest correction without changing earlier versions or preparing a request',async()=>{
+  deps.fetch.mockResolvedValue(response({...snapshot([version({version:2}),version({canCorrect:false}),version({entryId:'2'.repeat(64),source:'doctor',canCorrect:false})]),writes}));
+  const {host}=await mount(view());const corrections=[...host.querySelectorAll('button')].filter(item=>item.textContent==='Corregir mi aporte');expect(corrections).toHaveLength(1);
+  await act(async()=>corrections[0].click());expect(host.textContent).toContain('Las versiones guardadas no cambiarán');
+  await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(getButton(host,'Preparar firma').disabled).toBe(true);await act(async()=>getButton(host,'Preparar firma').click());
+  expect(host.textContent).toContain('Ver 1 versión anterior');expect(host.textContent).toContain('Registrado por médico');onlyReads();
+ });
+ it.each(['ready','pending'])('clears a %s file draft and ignores a late file read after a real identity change',async state=>{
+  const createUrl=vi.fn().mockReturnValue('blob:local-draft'),revoke=vi.fn();class BrowserURL extends URL{static createObjectURL=createUrl;static revokeObjectURL=revoke;}vi.stubGlobal('URL',BrowserURL);
+  deps.fetch.mockResolvedValue(response({...snapshot(),writes}));const {root,host}=await mount(view());
+  await act(async()=>getButton(host,'Agregar antecedente o archivo').click());await act(async()=>host.querySelector<HTMLInputElement>('input[value="file"]')!.click());
+  const bytes=new TextEncoder().encode('%PDF-1.7\nLOCAL DRAFT\n%%EOF\n'),late=deferred<ArrayBuffer>();const file=new File([bytes],'private-draft.pdf',{type:'application/pdf'});
+  Object.defineProperty(file,'arrayBuffer',{value:()=>state==='ready'?Promise.resolve(bytes.buffer):late.promise});
+  const input=host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(input,'files',{value:[file],configurable:true});
+  await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+  if(state==='ready')expect(host.textContent).toContain('private-draft.pdf');
+  deps.userId='did:privy:second-patient';deps.fetch.mockResolvedValue(response({...snapshot(),writes}));
+  await act(async()=>root.render(view()));await act(async()=>late.resolve(bytes.buffer));
+  expect(host.querySelector('form')).toBeNull();expect(host.textContent).not.toContain('private-draft.pdf');
+  if(state==='ready')expect(revoke).toHaveBeenCalledWith('blob:local-draft');else expect(createUrl).not.toHaveBeenCalled();onlyReads();
+ });
+ it('validates and reviews a local PDF with preparation disabled, and rejects an oversize selection',async()=>{
+  const createUrl=vi.fn().mockReturnValue('blob:pdf-draft');class BrowserURL extends URL{static createObjectURL=createUrl;static revokeObjectURL=vi.fn();}vi.stubGlobal('URL',BrowserURL);
+  const prepare=vi.fn();const {host}=await mount(createElement(ClinicalEntryForm,{readOnly:true,onPrepare:prepare,onCancel:vi.fn()}));
+  await act(async()=>host.querySelector<HTMLInputElement>('input[value="file"]')!.click());
+  const bytes=new TextEncoder().encode('%PDF-1.7\nLOCAL DRAFT\n%%EOF\n');const file=new File([bytes],'synthetic-draft.pdf',{type:'application/pdf'});Object.defineProperty(file,'arrayBuffer',{value:async()=>bytes.buffer});
+  const input=host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(input,'files',{value:[file],configurable:true});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+  expect(createUrl).toHaveBeenCalledOnce();expect(host.querySelector('iframe')).toBeNull();
+  await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(host.textContent).toContain('synthetic-draft.pdf');expect(getButton(host,'Preparar firma').disabled).toBe(true);await act(async()=>getButton(host,'Preparar firma').click());
+  expect(prepare).not.toHaveBeenCalled();await act(async()=>getButton(host,'Volver a editar').click());
+  const oversized=new File([new Uint8Array(3_000_001)],'too-large.pdf',{type:'application/pdf'});Object.defineProperty(input,'files',{value:[oversized],configurable:true});
+  const current=host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(current,'files',{value:[oversized],configurable:true});await act(async()=>current.dispatchEvent(new Event('change',{bubbles:true})));
+  expect(host.textContent).toContain('máximo 3 MB');expect(prepare).not.toHaveBeenCalled();expect(deps.fetch).not.toHaveBeenCalled();expect(deps.sign).not.toHaveBeenCalled();
+ });
+ it.each([true,false])('shows only observed permissions and rejects form submission after confirmations pause (doctor authorized=%s)',async authorized=>{
+  const prepare=vi.fn(),grant={doctorId:7,doctorName:'Médico sintético',address:'G'+'B'.repeat(55),authorized,canRead:true,canAppend:false,revision:1};
+  const {root,host}=await mount(createElement(ClinicalPermissions,{grants:[grant],disabled:false,onPrepare:prepare}));
+  await act(async()=>host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async()=>root.render(createElement(ClinicalPermissions,{grants:[grant],disabled:false,readOnly:true,onPrepare:prepare})));
+  const inputs=[...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];expect(inputs.map(input=>input.checked)).toEqual([true,false]);expect(inputs.every(input=>input.disabled)).toBe(true);
+  expect(getButton(host,'Revisar cambio de permisos').disabled).toBe(true);await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(host.textContent).toContain('Confirmar cambios está deshabilitado');expect(prepare).not.toHaveBeenCalled();expect(deps.sign).not.toHaveBeenCalled();
+ });
+ it('keeps draft openers disabled during an unresolved existing operation',async()=>{
+  deps.fetch.mockResolvedValue(response({...snapshot([version()]),writes,operations:[op()]}));const {host}=await mount(view());
+  for(const text of ['Agregar antecedente o archivo','Corregir mi aporte']){expect(getButton(host,text).disabled).toBe(true);await act(async()=>getButton(host,text).click());}
+  expect(host.querySelector('form')).toBeNull();onlyReads();
  });
 });
 it('shows incomplete permission verification separately from verified owner entries',async()=>{
