@@ -41,7 +41,7 @@ function grantFrom(value) {
  * parameter is a trusted test dependency, never an HTTP/request parameter.
  * No method signs, submits, funds, restores or extends actual ledger state.
  * Simulation TTL changes are not submitted and do not maintain contract TTL. */
-export function createClinicalChainReader(configuration, { server = new rpc.Server(clinicalRpcUrl()) } = {}) {
+export function createClinicalChainReader(configuration, { server = new rpc.Server(clinicalRpcUrl()), requestScoped = false } = {}) {
   try {
     if (!configuration || configuration.network !== 'testnet' || !StrKey.isValidContract(configuration.contractId) ||
         !StrKey.isValidContract(configuration.registryId) || typeof configuration.wasmHash !== 'string' ||
@@ -52,6 +52,12 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
     wasmHash: configuration.wasmHash, readerAddress: configuration.readerAddress,
   });
   const deployment = Object.freeze({ network: configured.network, contractId: configured.contractId });
+  // Only trusted HTTP adapters opt in. This cache contains deployment checks,
+  // never permissions, versions, identities or decrypted documents.
+  let sharedSession;
+  let highestLedger = 0;
+  let queue = Promise.resolve();
+  const sessionMaxAge = 30_000;
 
   function checkSelector(selector) {
     if (!selector || !selector.deployment || selector.deployment.network !== configured.network ||
@@ -67,6 +73,8 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
     }));
     const ledger = await server.getLedgerEntries(key);
     let observedLedger = uint(ledger.latestLedger, 1);
+    if (requestScoped && observedLedger < highestLedger) throw unavailable();
+    if (requestScoped) highestLedger = observedLedger;
     if (!Array.isArray(ledger.entries) || ledger.entries.length !== 1) throw unavailable();
     const entry = ledger.entries[0];
     if (!entry.key.toXDR().equals(key.toXDR()) || entry.val.switch().name !== 'contractData') throw unavailable();
@@ -86,8 +94,10 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
         .addOperation(new Contract(configured.contractId).call(method, ...args)).setTimeout(60).build();
       const simulation = await server.simulateTransaction(tx);
       const currentLedger = uint(simulation.latestLedger, 1);
-      if (currentLedger < observedLedger) throw unavailable();
+      if (currentLedger < observedLedger || (requestScoped && currentLedger < highestLedger) ||
+          !clinicalTtlMetadataUsable(entry.liveUntilLedgerSeq, currentLedger)) throw unavailable();
       observedLedger = currentLedger;
+      if (requestScoped) highestLedger = currentLedger;
       if (rpc.Api.isSimulationError(simulation)) {
         // Only this exact contract's Missing error on its grant getter denotes
         // absence. Provider, auth and archival errors are never an empty grant.
@@ -103,19 +113,33 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
     return { read, ledger: () => observedLedger };
   }
 
+  async function readSession() {
+    if (!requestScoped) return verifiedReadSession();
+    if (!sharedSession || Date.now() - sharedSession.startedAt >= sessionMaxAge) {
+      sharedSession = { startedAt: Date.now(), promise: verifiedReadSession() };
+    }
+    return sharedSession.promise;
+  }
+  function serialRead(work) {
+    if (!requestScoped) return work();
+    const result = queue.then(work).catch(error => { sharedSession = undefined; throw error; });
+    queue = result.catch(() => {});
+    return result;
+  }
+
   return {
     deployment,
-    async verifyDeployment() {
+    verifyDeployment: () => serialRead(async () => {
       try {
-        const session = await verifiedReadSession();
+        const session = await readSession();
         return { ...deployment, registryId: configured.registryId, wasmHash: configured.wasmHash, interfaceVersion: 1, ledger: session.ledger() };
       } catch { throw unavailable(); }
-    },
-    async readAccess(selector) {
+    }),
+    readAccess: selector => serialRead(async () => {
       try {
         checkSelector(selector);
         if (!StrKey.isValidEd25519PublicKey(selector.reader)) throw unavailable();
-        const { read } = await verifiedReadSession();
+        const { read } = await readSession();
         const history = historyFrom(await read('get_history', [bytes(selector.historyId)]), selector.historyId);
         if (history.patient === selector.reader) {
           if (await read('can_read', [bytes(selector.historyId), address(selector.reader)]) !== true) throw unavailable();
@@ -132,13 +156,13 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
         return { historyId: selector.historyId, patient: history.patient, reader: selector.reader,
           canRead: allowed, grantRevision: after?.revision ?? 0, doctorAuthorized: allowed };
       } catch { throw unavailable(); }
-    },
-    async readVersion(selector) {
+    }),
+    readVersion: selector => serialRead(async () => {
       try {
         checkSelector(selector);
         if (typeof selector.entryId !== 'string' || !HEX_32.test(selector.entryId) ||
             !Number.isInteger(selector.version) || selector.version < 1 || selector.version > 0xffff_ffff) throw unavailable();
-        const { read } = await verifiedReadSession();
+        const { read } = await readSession();
         const history = historyFrom(await read('get_history', [bytes(selector.historyId)]), selector.historyId);
         const value = await read('get_version', [bytes(selector.historyId), bytes(selector.entryId), nativeToScVal(selector.version, { type: 'u32' })]);
         fields(value, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
@@ -149,6 +173,6 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
           previousCommitment: value.previous_commitment == null ? null : hex(value.previous_commitment) });
         return { context, commitment: hex(value.commitment), state: 'confirmed' };
       } catch { throw unavailable(); }
-    },
+    }),
   };
 }

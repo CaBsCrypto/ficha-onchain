@@ -20,7 +20,9 @@ export async function authedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
+  init.signal?.throwIfAborted();
   const token = await getAccessToken();
+  init.signal?.throwIfAborted();
 
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);

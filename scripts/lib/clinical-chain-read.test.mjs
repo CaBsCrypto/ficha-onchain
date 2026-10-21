@@ -9,12 +9,12 @@ const config = { network: 'testnet', contractId: StrKey.encodeContract(Buffer.al
 const selector = { deployment: { network: 'testnet', contractId: config.contractId }, historyId: '5'.repeat(64), reader: wallet(6) };
 const b = value => Buffer.from(value, 'hex');
 
-function fixture() {
+function fixture({ requestScoped = false } = {}) {
   const state = { ledger: 100, patient: wallet(7), authorized: true,
     grant: { can_read: true, can_append: false, revision: 2n }, calls: [], auth: [], failure: null, restore: false,
-    ttl: 500, archived: [], malformedData: false };
+    ttl: 500, archived: [], malformedData: false, staticChecks: 0 };
   const server = {
-    getNetwork: async () => ({ passphrase: Networks.TESTNET }),
+    getNetwork: async () => { state.staticChecks++; return { passphrase: Networks.TESTNET }; },
     getLedgerEntries: async key => ({ latestLedger: state.ledger, entries: [{ key, liveUntilLedgerSeq: state.ttl,
       val: xdr.LedgerEntryData.contractData(new xdr.ContractDataEntry({ ext: new xdr.ExtensionPoint(0),
         contract: new Address(config.contractId).toScAddress(), key: xdr.ScVal.scvLedgerKeyContractInstance(),
@@ -48,7 +48,7 @@ function fixture() {
     },
     sendTransaction: async () => { throw Error('read_must_never_submit'); },
   };
-  return { state, server, reader: createClinicalChainReader(config, { server }) };
+  return { state, server, reader: createClinicalChainReader(config, { server, requestScoped }) };
 }
 
 test('RPC reader pins Testnet, WASM, interface and registry using unsigned simulations only', async () => {
@@ -128,4 +128,82 @@ test('selectors cannot redirect the verified deployment or request another versi
   await assert.rejects(() => f.reader.readAccess({ ...selector, deployment: { ...selector.deployment, contractId: config.registryId } }));
   for (const version of [0, 1.5, 4294967296]) await assert.rejects(() => f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version }));
   assert.equal(f.state.calls.length, 0);
+});
+
+test('request sessions reuse deployment checks but read access and proofs again on every call', async () => {
+  const f = fixture({ requestScoped: true }); f.state.patient = selector.reader;
+  for (let i = 0; i < 2; i++) {
+    await f.reader.readAccess(selector);
+    await f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 });
+  }
+  assert.equal(f.state.staticChecks, 1);
+  assert.equal(f.state.calls.filter(x => x === 'interface_version').length, 1);
+  assert.equal(f.state.calls.filter(x => x === 'can_read').length, 2);
+  assert.equal(f.state.calls.filter(x => x === 'get_version').length, 2);
+  const anotherRequest = createClinicalChainReader(config, { server: f.server, requestScoped: true });
+  await anotherRequest.readAccess(selector);
+  assert.equal(f.state.staticChecks, 2);
+});
+
+test('a request session never reuses granted access, a successful version, or a failed session', async () => {
+  const f = fixture({ requestScoped: true });
+  assert.equal((await f.reader.readAccess(selector)).canRead, true);
+  f.state.authorized = false; f.state.grant.can_read = false;
+  assert.equal((await f.reader.readAccess(selector)).canRead, false);
+  f.state.archived = [0];
+  await assert.rejects(() => f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 }));
+  f.state.archived = [];
+  await f.reader.readAccess(selector);
+  assert.equal(f.state.staticChecks, 2);
+});
+
+test('request sessions renew static pins after 30 seconds and retain their ledger watermark', async () => {
+  const f = fixture({ requestScoped: true });
+  const originalNow = Date.now; let now = originalNow(); Date.now = () => now;
+  try {
+    await f.reader.readAccess(selector); f.state.ledger = 110;
+    await f.reader.readAccess(selector);
+    now += 30_001; f.state.ledger = 109;
+    await assert.rejects(() => f.reader.readAccess(selector));
+    assert.equal(f.state.staticChecks, 2);
+    f.state.ledger = 111;
+    await f.reader.readAccess(selector);
+    assert.equal(f.state.staticChecks, 3);
+    now += 30_001; f.server.getNetwork = async () => ({ passphrase: Networks.PUBLIC });
+    await assert.rejects(() => f.reader.readAccess(selector));
+  } finally { Date.now = originalNow; }
+});
+
+test('a simulation cannot outlive the known deployment TTL in a reused request session', async () => {
+  const f = fixture({ requestScoped: true }); await f.reader.readAccess(selector);
+  f.state.ledger = 501;
+  await assert.rejects(() => f.reader.readAccess(selector), { message: 'clinical_chain_unavailable' });
+});
+
+test('request session renewal rejects changed WASM and a current session rejects a regressive ledger', async () => {
+  const f = fixture({ requestScoped: true }); const originalNow = Date.now; let now = originalNow(); Date.now = () => now;
+  try {
+    await f.reader.readAccess(selector); f.state.ledger = 101; await f.reader.readAccess(selector);
+    f.state.ledger = 100;
+    await assert.rejects(() => f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 }));
+    f.state.ledger = 102; await f.reader.readAccess(selector);
+    const getEntries = f.server.getLedgerEntries;
+    f.server.getLedgerEntries = async key => {
+      const result = await getEntries(key);
+      result.entries[0].val.contractData().val().instance().executable(xdr.ContractExecutable.contractExecutableWasm(Buffer.alloc(32, 99)));
+      return result;
+    };
+    now += 30_001; await assert.rejects(() => f.reader.readAccess(selector));
+  } finally { Date.now = originalNow; }
+});
+
+test('request readers serialize concurrent methods sharing a ledger watermark', async () => {
+  const f = fixture({ requestScoped: true }); const simulate = f.server.simulateTransaction;
+  let active = 0, maximum = 0;
+  f.server.simulateTransaction = async tx => {
+    active++; maximum = Math.max(active, maximum); await Promise.resolve();
+    try { return await simulate(tx); } finally { active--; }
+  };
+  await Promise.all([f.reader.readAccess(selector), f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 })]);
+  assert.equal(maximum, 1); assert.equal(f.state.staticChecks, 1);
 });

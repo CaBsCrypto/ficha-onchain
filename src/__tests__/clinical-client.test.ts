@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClinicalOperation, ClinicalSnapshot, ClinicalVersion } from '@/types/clinical';
-import { ClinicalClientError, ClinicalOperationController, clinicalApi, readClinicalDownload, readClinicalFile, useClinicalSnapshot, validateClinicalFile, verifiedClinicalOperation } from '@/components/private-portal/clinical-client';
+import { CLINICAL_READ_TIMEOUT_MS, ClinicalClientError, ClinicalOperationController, clinicalApi, readClinicalDownload, readClinicalFile, useClinicalSnapshot, validateClinicalFile, verifiedClinicalOperation } from '@/components/private-portal/clinical-client';
 import { ClinicalEntryForm } from '@/components/private-portal/ClinicalEntryForm';
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
 import { ClinicalPermissions } from '@/components/private-portal/ClinicalPermissions';
@@ -25,7 +25,7 @@ const snapshot = (entries: ClinicalVersion[] = []): ClinicalSnapshot => ({ write
 let roots: Array<{ root: Root; host: HTMLDivElement }> = [];
 async function mount(node: React.ReactNode) { const host = document.createElement('div'); document.body.append(host); const root = createRoot(host); roots.push({ root, host }); await act(async () => root.render(node)); return { root, host }; }
 beforeEach(() => { vi.clearAllMocks(); deps.userId = 'did:privy:patient1'; (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; });
-afterEach(async () => { for (const { root, host } of roots) { await act(async () => root.unmount()); host.remove(); } roots = []; vi.unstubAllGlobals(); });
+afterEach(async () => { for (const { root, host } of roots) { await act(async () => root.unmount()); host.remove(); } roots = []; vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('clinical attempt recovery', () => {
   it('discards a late Privy signature after disposal and activation without posting it', async () => {
@@ -142,12 +142,46 @@ describe('private client transport and file limits', () => {
     deps.fetch.mockResolvedValue({ ok: true, headers: new Headers({ 'content-type': 'application/pdf' }), blob: async () => blob });
     expect(await readClinicalDownload('1'.repeat(64), 2, abort.signal)).toBe(blob);
     expect(deps.fetch.mock.calls[0][0]).toBe(`/api/private-clinical-history/document?entryId=${'1'.repeat(64)}&version=2`);
-    expect(deps.fetch.mock.calls[0][1]).toMatchObject({ cache: 'no-store', signal: abort.signal });
+    expect(deps.fetch.mock.calls[0][1]).toMatchObject({ cache: 'no-store' });
+    expect(deps.fetch.mock.calls[0][1].signal.aborted).toBe(false);
     abort.abort(); await expect(readClinicalDownload('1'.repeat(64), 2, abort.signal)).rejects.toThrow('cancelada');
   });
 });
 
 describe('identity, refresh and history presentation', () => {
+  it.each(['request', 'json'])('ends a stalled %s with a recoverable read error and ignores late content', async phase => {
+    vi.useFakeTimers();
+    const late = deferred<any>(); let readSignal!: AbortSignal;
+    deps.fetch.mockImplementationOnce((_path, init) => {
+      readSignal = init.signal;
+      return phase === 'request' ? late.promise : Promise.resolve({ ok: true, json: () => late.promise });
+    });
+    function View() {
+      const result = useClinicalSnapshot('patient-timeout');
+      return createElement('div', null, result.data?.entries[0]?.title ?? result.error ?? '',
+        createElement('button', { disabled: result.loading, onClick: result.refresh }, result.loading ? 'Consultando' : 'Actualizar'));
+    }
+    const { host } = await mount(createElement(View));
+    await act(async () => { await vi.advanceTimersByTimeAsync(CLINICAL_READ_TIMEOUT_MS); });
+    expect(host.textContent).toContain('tardando demasiado'); expect(readSignal.aborted).toBe(true);
+    expect(host.querySelector('button')?.disabled).toBe(false);
+    await act(async () => late.resolve(phase === 'request' ? response(snapshot([version()])) : snapshot([version()])));
+    expect(host.textContent).not.toContain(note.title);
+    deps.fetch.mockResolvedValueOnce(response(snapshot([version()])));
+    await act(async () => host.querySelector('button')!.click());
+    expect(host.textContent).toContain(note.title);
+    expect(deps.fetch.mock.calls.every(call => (call[1]?.method ?? 'GET') === 'GET')).toBe(true);
+    expect(deps.sign).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
+  });
+  it('bounds a stalled download body without delivering late file content', async () => {
+    vi.useFakeTimers(); const late = deferred<Blob>(); let signal!: AbortSignal;
+    deps.fetch.mockImplementationOnce((_path, init) => { signal = init.signal; return Promise.resolve({ ok: true, headers: new Headers({ 'content-type': 'application/pdf' }), blob: () => late.promise }); });
+    const download = readClinicalDownload('1'.repeat(64), 1, new AbortController().signal);
+    const checked = expect(download).rejects.toThrow('tardando demasiado');
+    await vi.advanceTimersByTimeAsync(CLINICAL_READ_TIMEOUT_MS); await checked;
+    expect(signal.aborted).toBe(true); late.resolve(new Blob(['PRIVATE_LATE_CONTENT']));
+    await Promise.resolve(); expect(vi.getTimerCount()).toBe(0); expect(deps.sign).not.toHaveBeenCalled();
+  });
   it('clears previous data on refresh failure and ignores another identity’s late response', async () => {
     const requests: Array<{ signal: AbortSignal; resolve: (data: unknown) => void }> = [];
     deps.fetch.mockImplementation((_path, init) => new Promise(resolve => requests.push({ signal: init.signal, resolve })));

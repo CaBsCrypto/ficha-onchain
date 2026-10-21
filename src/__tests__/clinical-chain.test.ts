@@ -202,6 +202,18 @@ function fixture() {
 }
 
 describe('clinical Testnet RPC boundary', () => {
+  it('reuses only the simulation source within a request and builds from fresh Account instances', async () => {
+    const f = fixture(); await f.chain.verifyDeployment();
+    await f.chain.historyForPatient(patient.publicKey()); await f.chain.entry(historyId, append.entryId!);
+    expect(f.server.getAccount).toHaveBeenCalledExactlyOnceWith(PRIVATE_ADMIN);
+    const simulated = f.server.simulateTransaction.mock.calls.map(call => call[0]);
+    expect(simulated.every(tx => tx.sequence === '11' && tx.signatures.length === 0)).toBe(true);
+    expect(f.server.sendTransaction).not.toHaveBeenCalled(); expect(f.server.prepareTransaction).not.toHaveBeenCalled();
+    const anotherRequest = createClinicalWebChain(f.server as unknown as Parameters<typeof createClinicalWebChain>[0]);
+    await anotherRequest.verifyDeployment(); expect(f.server.getAccount).toHaveBeenCalledTimes(2);
+    await f.chain.prepare(patient.publicKey(), 'create_history', create);
+    expect(f.server.getAccount).toHaveBeenLastCalledWith(patient.publicKey());
+  });
   it.each([0, undefined, 100])('accepts unknown or current registry TTL %s only after live pinned getter checks', async ttl => {
     const f = fixture(); f.state.registryTtl = ttl; f.state.extensionV1 = true;
     await expect(f.chain.historyForPatient(patient.publicKey())).resolves.toMatchObject({ id: historyId, patient: patient.publicKey() });

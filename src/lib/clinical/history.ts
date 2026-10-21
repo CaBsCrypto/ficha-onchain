@@ -15,11 +15,11 @@ import { clinicalNote } from './input';
 import { clinicalWriteCapabilities } from './create-once';
 
 export function clinicalStorageClient() { return { query: async (sql: string, values?: unknown[]) => ({ rows: await getDb().query(sql, values) }) }; }
-export async function ownClinicalHistory(actor: ClinicalActor) {
+export async function ownClinicalHistory(actor: ClinicalActor, chain = createClinicalWebChain()) {
   const [row] = await getDb().query(`SELECT * FROM clinical_web_histories WHERE owner_user_id=$1 AND contract_id=$2 AND network='testnet'`, [actor.userId, CLINICAL_ID]);
   if (!row) return null;
   assertClinicalOwner(row as { owner_user_id: string; patient_wallet: string; wallet_id: string }, actor);
-  const observed = await createClinicalWebChain().history(String(row.history_id));
+  const observed = await chain.history(String(row.history_id));
   if (!observed || observed.id !== row.history_id || observed.patient !== actor.address) throw new PrivateFlowError('clinical_history_unavailable', 503);
   return { row, history: observed };
 }
@@ -33,18 +33,22 @@ export async function clinicalOperations(actor: ClinicalActor) {
   return rows.map(clinicalPublicOperation);
 }
 /** The reader rechecks live identity and permissions after decrypting, before delivery. */
-export async function clinicalDocument(request: Request, actor: ClinicalActor, historyId: string, entryId: string, version: number) {
+export async function clinicalDocument(request: Request, actor: ClinicalActor, historyId: string, entryId: string, version: number,
+  reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_ID, registryId: REGISTRY_PRIVATE, wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN }, { requestScoped: true })) {
   const credential = request;
-  const reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_ID, registryId: REGISTRY_PRIVATE, wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN });
   const store = clinicalNeonStore(clinicalStorageClient());
+  // Each initial/final identity gate consumes its own fresh authentication.
+  // Avoid authenticating twice inside that same gate; never reuse it after IO.
+  let checkedUser: AuthedUser | null = null;
   return readClinicalVersion({ credential, historyId, entryId, version, signal: request.signal }, {
     deployment: reader.deployment,
     authenticate: async () => {
       const user = await requireUser(request, { strict: true });
+      checkedUser = user;
       return user ? { userId: user.userId, sessionId: createHash('sha256').update(request.headers.get('Authorization') ?? '').digest('hex') } : null;
     },
     findBinding: async (identity: { userId: string }) => {
-      const user = await requireUser(request, { strict: true });
+      const user = checkedUser; checkedUser = null;
       if (!user || user.userId !== identity.userId || user.userId !== actor.userId) return null;
       const current = await resolveClinicalActor(user);
       if (current.address !== actor.address || current.walletId !== actor.walletId) return null;
@@ -55,8 +59,7 @@ export async function clinicalDocument(request: Request, actor: ClinicalActor, h
     getKeyring: async () => clinicalKeyring().keyring,
   });
 }
-export async function clinicalGrants(historyId: string, onUnavailable?: () => void): Promise<ClinicalGrant[]> {
-  const chain = createClinicalWebChain();
+export async function clinicalGrants(historyId: string, onUnavailable?: () => void, chain = createClinicalWebChain()): Promise<ClinicalGrant[]> {
   const rows = await getDb().query('SELECT id,name FROM doctors ORDER BY name,id LIMIT 200');
   const result: ClinicalGrant[] = [];
   for (const row of rows) {
@@ -87,12 +90,13 @@ export async function clinicalGrants(historyId: string, onUnavailable?: () => vo
 }
 export async function clinicalSnapshot(request: Request, _user: AuthedUser, actor: ClinicalActor): Promise<ClinicalSnapshot> {
   const writes = clinicalWriteCapabilities(actor.address);
-  const own = await ownClinicalHistory(actor);
+  const chain = createClinicalWebChain();
+  const own = await ownClinicalHistory(actor, chain);
   const operations = await clinicalOperations(actor);
   if (!own) return { writes, history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
   const rows = await getDb().query(`SELECT entry_id,version,transaction_hash,operation_id,commitment FROM clinical_private_versions
     WHERE history_id=$1 AND contract_id=$2 AND network='testnet' AND state='confirmed' ORDER BY created_at DESC,version DESC`, [own.history.id, CLINICAL_ID]);
-  const chain = createClinicalWebChain();
+  const reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_ID, registryId: REGISTRY_PRIVATE, wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN }, { requestScoped: true });
   const entries: ClinicalVersion[] = [];
   const heads = new Map<string, number>();
   for (const row of rows) {
@@ -103,7 +107,7 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
           rows.filter(r => r.entry_id === entryId).length !== entry.headVersion) throw new PrivateFlowError('clinical_history_unavailable', 503);
       heads.set(entryId, entry.headVersion);
     }
-    const [document, evidence] = await Promise.all([clinicalDocument(request, actor, own.history.id, entryId, version), chain.version(own.history.id, entryId, version)]);
+    const [document, evidence] = await Promise.all([clinicalDocument(request, actor, own.history.id, entryId, version, reader), chain.version(own.history.id, entryId, version)]);
     if (!evidence) throw new PrivateFlowError('clinical_history_unavailable', 503);
     const [operation] = await getDb().query(`SELECT * FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet' AND state='confirmed'`, [row.transaction_hash, CLINICAL_ID]);
     if (!operation || operation.action !== 'append_version' || operation.source_wallet !== evidence.context.author ||
@@ -119,6 +123,6 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
   }
   entries.sort((a,b) => b.createdAt-a.createdAt || b.version-a.version || a.entryId.localeCompare(b.entryId));
   let grantsUnavailable = false;
-  const grants = await clinicalGrants(own.history.id, () => { grantsUnavailable = true; });
+  const grants = await clinicalGrants(own.history.id, () => { grantsUnavailable = true; }, chain);
   return { writes, history: own.history, entries, grants, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
 }
