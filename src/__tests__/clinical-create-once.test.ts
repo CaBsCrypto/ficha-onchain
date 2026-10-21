@@ -59,9 +59,9 @@ describe('one explicitly hosted Testnet history creation', () => {
     expect(() => assertClinicalCreateOnceSavedFee(scope, unsigned().toXDR())).toThrow();
   });
   it('rejects an envelope that could remain valid beyond the temporary authority', () => {
-    vi.stubEnv('TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+60));
+    vi.stubEnv('TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+81));
     const scope = assertClinicalWriteScope('create_history', owner.publicKey());
-    expect(() => assertClinicalCreateOnceFee(scope, unsigned())).toThrow('clinical_create_once_fee_exceeded');
+    expect(() => assertClinicalCreateOnceFee(scope, unsigned())).toThrowError(expect.objectContaining({ message: 'clinical_create_once_window_too_short', status: 409 }));
   });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -84,7 +84,10 @@ describe('one local creation without enabling general private writes', () => {
     vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', flag); expect(() => assertClinicalWriteScope('create_history', owner.publicKey())).toThrow('clinical_create_once_scope_rejected');
   });
   it.each([-1, 0, 601])('rejects expired or overly long deadline offset %s', offset => {
-    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+offset)); expect(() => assertClinicalWriteScope('create_history', owner.publicKey())).toThrow('clinical_create_once_scope_rejected');
+    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+offset));
+    expect(() => assertClinicalWriteScope('create_history', owner.publicKey())).toThrowError(expect.objectContaining({
+      message: offset <= 0 ? 'clinical_create_once_expired' : 'clinical_create_once_scope_rejected', status: offset <= 0 ? 409 : 403,
+    }));
   });
   it.each(['preview', 'production'])('rejects a Vercel %s runtime', value => {
     vi.stubEnv('VERCEL_ENV', value); expect(() => assertClinicalWriteScope('create_history', owner.publicKey())).toThrow();
@@ -103,8 +106,8 @@ describe('one local creation without enabling general private writes', () => {
   it('rechecks expiry before patient signing and retransmission', () => {
     const scope = assertClinicalWriteScope('create_history', owner.publicKey()), tx = unsigned();
     vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)-1));
-    expect(() => assertClinicalCreateOnceFee(scope, tx)).toThrow('clinical_create_once_fee_exceeded');
-    expect(() => assertClinicalCreateOnceSavedFee(scope, tx.toXDR())).toThrow('clinical_create_once_fee_exceeded');
+    expect(() => assertClinicalCreateOnceFee(scope, tx)).toThrowError(expect.objectContaining({ message: 'clinical_create_once_expired', status: 409 }));
+    expect(() => assertClinicalCreateOnceSavedFee(scope, tx.toXDR())).toThrowError(expect.objectContaining({ message: 'clinical_create_once_expired', status: 409 }));
   });
   it('preserves the existing broad policy only when no scoped authority is configured', () => {
     for (const key of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL']) vi.stubEnv(key, undefined);

@@ -101,10 +101,27 @@ describe('clinical attempt recovery', () => {
     const client = new ClinicalOperationController(request, () => {}); client.reopen(submitted);
     for (let i = 0; i < 3; i++) { await expect(client.check()).rejects.toThrow(); expect(client.snapshot().operation).toEqual(submitted); }
   });
-  it('clears local private operation state when access expires', async () => {
-    const request = vi.fn().mockRejectedValue(new ClinicalClientError(401, 'unauthorized'));
+  it.each([[401,'unauthorized'],[403,'clinical_identity_changed']] as const)('clears local private operation state for an actual access failure (%s)', async (status,code) => {
+    const request = vi.fn().mockRejectedValue(new ClinicalClientError(status, code));
     const client = new ClinicalOperationController(request, () => {}); client.reopen(op());
     await expect(client.check()).rejects.toThrow(); expect(client.snapshot().operation).toBeNull(); expect(client.snapshot().accessLost).toBe(true);
+  });
+  it.each(['clinical_create_once_window_too_short','clinical_create_once_expired','clinical_create_once_fee_exceeded'])('reports %s without treating it as a lost session or asking Privy to sign', async code => {
+    const request=vi.fn().mockRejectedValue(new ClinicalClientError(409,code));
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign:deps.sign});
+    await expect(client.prepare({action:'create_history'})).rejects.toThrow();
+    expect(client.snapshot()).toMatchObject({accessLost:false,uncertain:false,operation:null,canSign:false});
+    expect(client.snapshot().error).not.toContain('Tu cuenta no tiene permiso');
+    expect(deps.sign).not.toHaveBeenCalled(); expect(request).toHaveBeenCalledOnce();
+  });
+  it('keeps the exact saved operation when its temporary creation window expires during confirmation', async () => {
+    const saved=op({action:'create_history'}), request=vi.fn().mockResolvedValueOnce({operation:saved}).mockRejectedValueOnce(new ClinicalClientError(409,'clinical_create_once_expired'));
+    const client=new ClinicalOperationController(request,()=>{},()=>ID,{address:'G'+'A'.repeat(55),sign:deps.sign});
+    await client.prepare({action:'create_history'}); await expect(client.sign()).rejects.toThrow('habilitación temporal');
+    expect(client.snapshot()).toMatchObject({accessLost:false,uncertain:false,canSign:false,operation:{id:ID,state:'awaiting_signature'}});
+    await expect(client.prepare({action:'create_history'})).rejects.toThrow('intento anterior');
+    await expect(client.sign()).rejects.toThrow('revisa');
+    expect(deps.sign).toHaveBeenCalledOnce(); expect(request).toHaveBeenCalledTimes(2);
   });
   it('discards late results and aborts requests on disposal, including a subsequent activation', async () => {
     const late = deferred<{ operation: ClinicalOperation }>(); const request = vi.fn().mockReturnValue(late.promise); const publish = vi.fn();

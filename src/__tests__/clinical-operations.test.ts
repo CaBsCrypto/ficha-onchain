@@ -172,6 +172,14 @@ describe.each(['local', 'hosted'])('single authorized %s history creation', mode
     await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toThrow('clinical_create_once_fee_exceeded');
     expect(f.state.row).toBeNull(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
+  it('rejects a creation with only 81 seconds left without persisting or submitting, rather than reporting lost access', async () => {
+    const f=fixture(); scoped();
+    const prefix = mode === 'local' ? 'TRUSTLEAF_CLINICAL_CREATE_ONCE_' : 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_';
+    vi.stubEnv(prefix+'UNTIL', String(Math.floor(Date.now()/1000)+81));
+    await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toMatchObject({ message:'clinical_create_once_window_too_short', status:409 });
+    expect(f.state.row).toBeNull(); expect(f.state.history).toBeNull();
+    expect(f.state.events).toContain('ROLLBACK'); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
   it('rechecks the cap on a saved unsigned operation immediately before signing', async () => {
     const f=fixture(); scoped(); await prepareClinicalOperation(user,actor,createInput);
     const tx=new TransactionBuilder(new Account(actor.address,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
