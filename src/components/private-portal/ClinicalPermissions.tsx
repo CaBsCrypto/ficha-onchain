@@ -45,34 +45,35 @@ function ClinicalDoctorPermission({ grant, disabled, readOnly, onPrepare }: { gr
     <p className="text-sm leading-6 text-slate-600" id={`${id}-observed`}>
       Permisos consultados: lectura <strong>{grant.canRead ? 'concedida' : 'sin conceder'}</strong>; agregado <strong>{grant.canAppend ? 'concedido' : 'sin conceder'}</strong>.
     </p>
-    {!readOnly && <><fieldset disabled={busy} aria-describedby={`${id}-observed ${id}-help`} className="space-y-2">
-      <legend className="mb-2 text-sm font-medium text-slate-900">Elegir permisos para {grant.doctorName}</legend>
+    <fieldset disabled={busy || readOnly} aria-describedby={`${id}-observed ${id}-help`} className="space-y-2">
+      <legend className="mb-2 text-sm font-medium text-slate-900">{readOnly ? 'Permisos consultados para' : 'Elegir permisos para'} {grant.doctorName}</legend>
       <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-200">
-        <input type="checkbox" checked={draft.canRead} disabled={busy || (!grant.authorized && !draft.canRead)}
+        <input type="checkbox" checked={readOnly ? grant.canRead : draft.canRead} disabled={readOnly || busy || (!grant.authorized && !draft.canRead)}
           onChange={event => { setDraft(current => ({ ...current, canRead: event.target.checked })); setError(null); setNotice(null); }}
           className="mt-1 h-4 w-4 shrink-0 accent-sky-600" />
         <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">Leer mi historial</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Consultar antecedentes y abrir sus archivos privados.</span></span>
       </label>
       <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-200">
-        <input type="checkbox" checked={draft.canAppend} disabled={busy || (!grant.authorized && !draft.canAppend)}
+        <input type="checkbox" checked={readOnly ? grant.canAppend : draft.canAppend} disabled={readOnly || busy || (!grant.authorized && !draft.canAppend)}
           onChange={event => { setDraft(current => ({ ...current, canAppend: event.target.checked })); setError(null); setNotice(null); }}
           className="mt-1 h-4 w-4 shrink-0 accent-sky-600" />
         <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">Agregar información</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Añadir sus propios aportes; no editar lo que tú agregaste.</span></span>
       </label>
     </fieldset>
+    {readOnly && <p className="text-xs leading-5 text-sky-800">Estos controles muestran los permisos consultados. Confirmar cambios está deshabilitado en esta demostración.</p>}
     <p id={`${id}-help`} className="text-xs leading-5 text-slate-500">
-      {!grant.authorized ? withdrawalIncomplete ? 'Puedes retirar los permisos existentes desmarcando ambas opciones. No puedes conceder nuevos permisos a este médico.'
+      {readOnly ? 'Lectura y agregado son independientes. Conceder nuevos permisos requiere una autorización médica vigente.' : !grant.authorized ? withdrawalIncomplete ? 'Puedes retirar los permisos existentes desmarcando ambas opciones. No puedes conceder nuevos permisos a este médico.'
         : 'Puedes retirar los permisos existentes. Para concederlos, el médico necesita una autorización vigente.'
         : 'Lectura y agregado son independientes. La selección sólo cambia tus permisos después de firmar y confirmar.'}
     </p>
-    {error && <p role="alert" className="text-sm leading-6 text-rose-700">{error}</p>}
-    {notice && <p role="status" className="text-sm leading-6 text-sky-800">{notice}</p>}
-    {canReview || draft.canRead !== grant.canRead || draft.canAppend !== grant.canAppend ? <button type="button" disabled={busy} onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(null); }} className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">Restablecer selección</button> : null}
-    <button type="submit" disabled={busy || !canReview} className={`${controlClass} w-full sm:w-auto`}>
+    {!readOnly && error && <p role="alert" className="text-sm leading-6 text-rose-700">{error}</p>}
+    {!readOnly && notice && <p role="status" className="text-sm leading-6 text-sky-800">{notice}</p>}
+    {!readOnly && (canReview || draft.canRead !== grant.canRead || draft.canAppend !== grant.canAppend) ? <button type="button" disabled={busy} onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(null); }} className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">Restablecer selección</button> : null}
+    <button type="submit" disabled={readOnly || busy || !canReview} className={`${controlClass} w-full sm:w-auto`}>
       {preparing ? 'Preparando cambio…' : 'Revisar cambio de permisos'}
-    </button></>}
+    </button>
   </form>;
 }
 export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare }: ClinicalPermissionsProps) {

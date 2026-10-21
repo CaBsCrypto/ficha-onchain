@@ -6,11 +6,11 @@ import { readClinicalFile, type ClinicalIntent } from './clinical-client';
 const control = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50';
 const button = 'min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50';
 export interface ClinicalEntryFormProps {
-  correction?: ClinicalVersion | null; disabled?: boolean;
+  correction?: ClinicalVersion | null; disabled?: boolean; readOnly?: boolean;
   onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>; onCancel: () => void;
 }
 /** Review is local. Preparation encrypts a saved intent; confirmation signs it in the operation panel. */
-export function ClinicalEntryForm({ correction = null, disabled = false, onPrepare, onCancel }: ClinicalEntryFormProps) {
+export function ClinicalEntryForm({ correction = null, disabled = false, readOnly = false, onPrepare, onCancel }: ClinicalEntryFormProps) {
   const id = useId();
   const [kind, setKind] = useState<'note' | 'file'>(correction && !correction.note ? 'file' : 'note');
   const [title, setTitle] = useState(correction?.note?.title ?? '');
@@ -64,7 +64,7 @@ export function ClinicalEntryForm({ correction = null, disabled = false, onPrepa
     try { intent(); setReview(true); } catch (failure) { setError(failure instanceof Error ? failure.message : 'Revisa los campos.'); }
   }
   async function prepare() {
-    if (lock.current || disabled || reading) return;
+    if (lock.current || disabled || readOnly || reading) return;
     lock.current = true; setBusy(true); setError('');
     try { await onPrepare(intent()); }
     catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : 'No se pudo preparar el antecedente.'); }
@@ -74,16 +74,17 @@ export function ClinicalEntryForm({ correction = null, disabled = false, onPrepa
   return <section aria-labelledby={`${id}-heading`} className="rounded-2xl border border-sky-200 bg-white p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 ref={initialHeading} tabIndex={-1} id={`${id}-heading`} className="text-lg font-semibold text-slate-900">{correction ? 'Corregir mi aporte' : 'Agregar al historial'}</h2>
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{correction ? `Crearemos la versión ${correction.version + 1}. Las versiones anteriores permanecerán guardadas.` : 'Agrega información que quieras conservar. Tus aportes se identifican como información declarada por ti.'}</p></div>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{readOnly ? correction ? 'Puedes revisar un borrador de corrección. Las versiones guardadas no cambiarán.' : 'Explora cómo agregar un antecedente o seleccionar un archivo, sin guardarlo.' : correction ? `Crearemos la versión ${correction.version + 1}. Las versiones anteriores permanecerán guardadas.` : 'Agrega información que quieras conservar. Tus aportes se identifican como información declarada por ti.'}</p></div>
       <button type="button" disabled={busy} onClick={onCancel} className={`${button} border border-slate-200 text-slate-600`}>Cerrar</button>
     </div>
+    {readOnly && <p id={`${id}-draft-mode`} role="status" className="mt-4 rounded-xl bg-sky-50 p-3 text-sm leading-relaxed text-sky-900">Borrador temporal: sólo existe en esta pantalla. No se guarda, no se firma ni genera transacciones. Al cerrar el formulario se descarta.</p>}
     {review ? <div className="mt-5 space-y-4">
-      <h3 ref={reviewHeading} tabIndex={-1} className="text-base font-semibold text-slate-900 outline-none">Revisa antes de preparar la firma</h3>
+      <h3 ref={reviewHeading} tabIndex={-1} className="text-base font-semibold text-slate-900 outline-none">{readOnly ? 'Revisa tu borrador' : 'Revisa antes de preparar la firma'}</h3>
       {kind === 'note' ? <div className="rounded-xl bg-sky-50 p-4 text-slate-800"><p className="break-words font-semibold">{title.trim()}</p>{date && <p className="mt-2 text-sm">Fecha del antecedente: {date}</p>}<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed">{text.trim()}</p></div> : <div className="rounded-xl bg-sky-50 p-4"><p className="break-all font-semibold text-slate-800">{file?.fileName}</p><p className="mt-2 text-sm text-slate-600">{(fileSize / 1_000_000).toLocaleString('es-CL', { maximumFractionDigits: 2 })} MB · {file?.mediaType === 'application/pdf' ? 'PDF' : 'Imagen'}</p></div>}
-      <p className="text-sm leading-relaxed text-slate-600">El contenido quedará cifrado en el almacenamiento privado. Después confirmarás con tu cuenta Privy; el comprobante del cambio se registrará en Stellar Testnet.</p>
+      <p className="text-sm leading-relaxed text-slate-600">{readOnly ? 'Las confirmaciones están deshabilitadas en esta demostración. Puedes volver a editar o cerrar sin guardar.' : 'El contenido quedará cifrado en el almacenamiento privado. Después confirmarás con tu cuenta Privy; el comprobante del cambio se registrará en Stellar Testnet.'}</p>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button type="button" disabled={unavailable} onClick={() => setReview(false)} className={`${button} border border-slate-200 text-slate-700`}>Volver a editar</button>
-        <button type="button" disabled={unavailable} onClick={() => void prepare()} className={`${button} bg-sky-700 text-white hover:bg-sky-800`}>{busy ? 'Preparando…' : 'Preparar firma'}</button>
+        <button type="button" disabled={unavailable || readOnly} aria-describedby={readOnly ? `${id}-draft-mode` : undefined} onClick={() => void prepare()} className={`${button} bg-sky-700 text-white hover:bg-sky-800`}>{busy ? 'Preparando…' : 'Preparar firma'}</button>
       </div>
     </div> : <form onSubmit={beginReview} className="mt-5 space-y-5">
       {!correction && <fieldset disabled={unavailable} className="flex flex-wrap gap-4"><legend className="mb-2 text-sm font-medium text-slate-700">Qué quieres agregar</legend>
