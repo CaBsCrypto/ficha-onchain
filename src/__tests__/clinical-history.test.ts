@@ -201,3 +201,33 @@ describe('clinical patient-managed permissions', () => {
     const grants = await clinicalGrants(historyId); expect(grants[0].authorized).toBe(false);
   });
 });
+
+it('finishes the grant read before checking registry authorization',async()=>{
+ const f=fixture();f.state.doctors=[{id:1,name:'Synthetic doctor'}];
+ let release!:()=>void,notify!:()=>void;const gate=new Promise<void>(r=>release=r),started=new Promise<void>(r=>notify=r);
+ m.chain.grant.mockImplementation(async()=>{notify();await gate;return {canRead:true,canAppend:false,revision:1};});
+ const result=clinicalGrants(historyId);await started;
+ try{expect(m.chain.doctorAuthorized).not.toHaveBeenCalled();}finally{release();}
+ await expect(result).resolves.toEqual([{doctorId:1,doctorName:'Synthetic doctor',address:doctor.publicKey(),authorized:true,canRead:true,canAppend:false,revision:1}]);
+ expect(m.chain.grant).toHaveBeenCalledExactlyOnceWith(historyId,doctor.publicKey());expect(m.chain.doctorAuthorized).toHaveBeenCalledExactlyOnceWith(doctor.publicKey());
+});
+it('keeps verified owner content when an unrelated doctor authorization cannot be checked',async()=>{
+ const f=fixture();f.addVersion();f.state.doctors=[{id:1,name:'Checked doctor'},{id:2,name:'Unavailable doctor'}];
+ m.chain.doctorAuthorized.mockResolvedValueOnce(true).mockRejectedValueOnce(Error('clinical_chain_unavailable'));
+ const data=await clinicalSnapshot(request(),user,actor);
+ expect(data.entries).toHaveLength(1);expect(data.grantsUnavailable).toBe(true);
+ expect(data.grants).toHaveLength(1);expect(data.grants[0].doctorName).toBe('Checked doctor');
+ expect(JSON.stringify(data.grants)).not.toContain('Unavailable doctor');
+});
+it('does not expose a grant whose authorization check failed',async()=>{
+ const f=fixture();f.addVersion();f.state.doctors=[{id:2,name:'Unchecked'}];f.state.grant={canRead:true,canAppend:true,revision:3};
+ m.chain.doctorAuthorized.mockRejectedValue(Error('clinical_chain_unavailable'));
+ const data=await clinicalSnapshot(request(),user,actor);
+ expect(data.entries).toHaveLength(1);expect(data.grants).toEqual([]);expect(data.grantsUnavailable).toBe(true);
+});
+it('reports an unavailable doctor identity without fabricating a permission state',async()=>{
+ const f=fixture();f.addVersion();f.state.doctors=[{id:2,name:'Unchecked'}];m.doctor.mockRejectedValue(Error('identity_changed'));
+ const data=await clinicalSnapshot(request(),user,actor);
+ expect(data.grantsUnavailable).toBe(true);expect(data.grants).toEqual([]);expect(data.entries).toHaveLength(1);
+ expect(m.chain.grant).not.toHaveBeenCalled();
+});

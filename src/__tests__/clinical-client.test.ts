@@ -357,3 +357,10 @@ describe('read-only clinical release',()=>{
   await act(async()=>button(host,'Consultar confirmación')!.click());expect(deps.sign).not.toHaveBeenCalled();
  });
 });
+it('shows incomplete permission verification separately from verified owner entries',async()=>{
+ const data={...snapshot([version()]),writes:{create_history:false,append_version:false,set_permissions:false},grantsUnavailable:true};
+ deps.fetch.mockResolvedValue(response(data));const {host}=await mount(createElement(ClinicalHistory,{renderPermissions:props=>createElement(ClinicalPermissions,props)}));
+ expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Sólo mostramos los estados verificados');
+ expect(host.querySelector('input[type="checkbox"]')).toBeNull();expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
+ expect(deps.sign).not.toHaveBeenCalled();expect(deps.fetch).toHaveBeenCalledOnce();
+});

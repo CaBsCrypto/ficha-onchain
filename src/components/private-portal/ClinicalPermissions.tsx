@@ -82,7 +82,7 @@ export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare }: C
       <p className="mt-1 text-sm leading-6 text-slate-600">Tú eliges quién puede leer y quién puede agregar información a tu historial.</p>
     </div>
     {grants.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-sm leading-6 text-slate-500">
-      Sin médicos autorizados disponibles para compartir tu historial.
+      Sin médicos con estado verificado disponibles en esta consulta.
     </p> : <div className="grid min-w-0 gap-4 lg:grid-cols-2">{grants.map(grant => <ClinicalDoctorPermission
       key={clinicalPermissionKey(grant)} grant={grant} disabled={disabled} readOnly={readOnly} onPrepare={onPrepare} />)}</div>}
     <p className="text-xs leading-5 text-slate-500">Retirar permisos impide nuevos accesos por TrustLeaf. No elimina copias que el médico ya haya descargado.</p>

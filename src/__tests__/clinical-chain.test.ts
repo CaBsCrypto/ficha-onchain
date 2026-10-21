@@ -323,3 +323,11 @@ describe('clinical Testnet RPC boundary', () => {
   });
 });
 
+
+it('rejects a genuinely older ledger within one chain instance',async()=>{
+ const f=fixture();await f.chain.verifyDeployment();f.state.ledger=101;
+ await expect(f.chain.doctorAuthorized(doctor.publicKey())).resolves.toBe(true);
+ f.state.ledger=100;await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+ f.state.ledger=102;await expect(f.chain.historyForPatient(patient.publicKey())).resolves.toMatchObject({id:historyId,patient:patient.publicKey()});
+ expect(f.server.getNetwork).toHaveBeenCalledTimes(1);expect(f.server.prepareTransaction).not.toHaveBeenCalled();expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
