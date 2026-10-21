@@ -42,5 +42,7 @@ it.each(['anonymous','other-account','cross-origin','expired','missing-mode','mi
  if(failure==='missing-mode')for(const suffix of ['WALLET','RELAYER','UNTIL'])vi.stubEnv('TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_'+suffix,undefined);
  if(failure==='mixed-mode')vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET',actor.address);
  const result=await POST(request(input,failure==='cross-origin'?'https://other.test':'https://www.trustleaf.org'));
- expect([401,403,503]).toContain(result.status);expect(m.prepare).not.toHaveBeenCalled();expect(result.headers.get('Cache-Control')).toBe('no-store');
+ if(failure==='expired'){expect(result.status).toBe(409);expect(await result.json()).toEqual({error:'clinical_create_once_expired'});}
+ else expect([401,403,503]).toContain(result.status);
+ expect(m.prepare).not.toHaveBeenCalled();expect(result.headers.get('Cache-Control')).toBe('no-store');
 });

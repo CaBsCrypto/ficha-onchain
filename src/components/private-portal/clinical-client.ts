@@ -24,6 +24,9 @@ const messages: Record<string, string> = {
   clinical_history_unavailable: 'No pudimos verificar el historial. No mostraremos su contenido hasta comprobarlo.',
   clinical_keys_unavailable: 'El almacenamiento privado no está disponible. Puedes volver a consultar.',
   clinical_wallet_changed: 'Tu cuenta Stellar cambió. El historial queda bloqueado hasta revisar su asociación.',
+  clinical_create_once_expired: 'La habilitación temporal para crear tu ficha venció. No necesitas volver a ingresar con Privy por este motivo. Solicita revisar esta misma prueba.',
+  clinical_create_once_window_too_short: 'Ya no queda tiempo suficiente para preparar y firmar la creación. No vuelvas a firmar ni prepares otro intento; solicita revisar la ventana de esta prueba.',
+  clinical_create_once_fee_exceeded: 'La operación supera el presupuesto o no cumple los límites de esta prueba. No se enviará; solicita revisar la preparación.',
 };
 export class ClinicalClientError extends Error {
   constructor(public readonly status: number, public readonly code: string) {
@@ -133,6 +136,8 @@ export class ClinicalOperationController {
         this.state = { ...this.state, uncertain: !definitive || preservePending && !!this.pending,
           error: error instanceof Error ? error.message : 'No pudimos comprobar el resultado.' };
         if (definitive && !preservePending && !this.state.operation) { this.pending = null; this.state.canSign = false; }
+        if (error instanceof ClinicalClientError && error.status === 409 &&
+            ['clinical_create_once_expired', 'clinical_create_once_window_too_short', 'clinical_create_once_fee_exceeded'].includes(error.code)) this.state.canSign = false;
         if (error instanceof ClinicalClientError && [401, 403].includes(error.status)) { this.pending = null; this.state.operation = null; this.state.canSign = false; this.state.uncertain = false; this.state.accessLost = true; }
         this.emit();
       }

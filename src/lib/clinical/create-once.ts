@@ -26,6 +26,7 @@ export function clinicalWriteCapabilities(wallet: string): Record<ClinicalAction
 export function assertClinicalWriteScope(action: ClinicalAction, wallet: string): ClinicalCreateOncePolicy | null {
   if (!clinicalCreateOnceConfigured()) { assertClinicalEnvironment(true); return null; }
   assertClinicalEnvironment();
+  let policy: ClinicalCreateOncePolicy;
   try {
     const env = process.env;
     const hosted = HOSTED_VARIABLES.some(key => env[key] !== undefined);
@@ -42,23 +43,26 @@ export function assertClinicalWriteScope(action: ClinicalAction, wallet: string)
           [...database.searchParams.keys()].some(key => !['sslmode', 'channel_binding', 'connect_timeout', 'pgbouncer'].includes(key))) throw denied();
     } else if (env.TRUSTLEAF_ENV !== 'local' || env.VERCEL_ENV) throw denied();
     if (env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' || env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'false' || action !== 'create_history' || selected !== wallet ||
-        !selected || !relayer || !/^\d{10}$/.test(untilText) || !Number.isSafeInteger(until) || until <= now || until > now + 600 ||
+        !selected || !relayer || !/^\d{10}$/.test(untilText) || !Number.isSafeInteger(until) || until > now + 600 ||
         Keypair.fromPublicKey(selected).publicKey() !== selected || Keypair.fromPublicKey(relayer).publicKey() !== relayer ||
         Keypair.fromSecret(env.RELAYER_SECRET ?? '').publicKey() !== relayer) throw denied();
-    return Object.freeze({ wallet: selected, relayer, until });
+    policy = Object.freeze({ wallet: selected, relayer, until });
   } catch { throw denied(); }
+  if (policy.until <= Math.floor(Date.now() / 1000)) throw new PrivateFlowError('clinical_create_once_expired', 409);
+  return policy;
 }
 
 /** Check the real fee bump budget before asking for the patient signature. */
 export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | null, unsigned: Transaction) {
   if (!policy) return;
+  const current = assertClinicalWriteScope('create_history', policy.wallet);
+  if (!current || current.relayer !== policy.relayer || current.until !== policy.until) throw denied();
   try {
-    const current = assertClinicalWriteScope('create_history', policy.wallet);
-    if (!current || current.relayer !== policy.relayer || current.until !== policy.until) throw denied();
     if (!(unsigned instanceof Transaction) || unsigned.networkPassphrase !== Networks.TESTNET || unsigned.source !== policy.wallet ||
-        !unsigned.timeBounds || BigInt(unsigned.timeBounds.maxTime) <= BigInt(0) || BigInt(unsigned.timeBounds.maxTime) > BigInt(policy.until) ||
+        !unsigned.timeBounds || BigInt(unsigned.timeBounds.maxTime) <= BigInt(0) ||
         clinicalWebFeeQuote(unsigned).sponsored > CLINICAL_CREATE_ONCE_MAX_FEE) throw denied();
-  } catch { throw new PrivateFlowError('clinical_create_once_fee_exceeded', 403); }
+  } catch { throw new PrivateFlowError('clinical_create_once_fee_exceeded', 409); }
+  if (BigInt(unsigned.timeBounds!.maxTime) > BigInt(policy.until)) throw new PrivateFlowError('clinical_create_once_window_too_short', 409);
 }
 
 /** Recheck the persisted inner transaction before retransmitting the same envelope. */
