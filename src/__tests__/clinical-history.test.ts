@@ -48,6 +48,18 @@ function fixture(author = patient) {
     state.operations.push(operation); state.chainVersions.push({ context, commitment: sealed.commitment, state: 'confirmed', createdAt: version }); state.head = version;
     return { context, sealed, note, operation };
   }
+  function addCreation() {
+    const expected: ClinicalExpected = { historyId, patient: actor.address, operationId: '6'.repeat(64) };
+    const unsigned = new TransactionBuilder(new Account(actor.address, '99'), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
+      .addOperation(clinicalInvocation('create_history', expected)).setTimeout(180).build();
+    const signed = sponsorClinicalSignature(unsigned.toXDR(), actor.address, patient.sign(unsigned.hash()).toString('hex'), 'create_history', expected);
+    const operation = { id: '4b6b8e88-7f9b-471c-a166-1c1d1bda2c32', actor_user_id: actor.userId, wallet_id: actor.walletId,
+      source_wallet: actor.address, action: 'create_history', method: 'create_history', state: 'confirmed', contract_id: CLINICAL_CONTRACT,
+      network: 'testnet', expected, unsigned_xdr: unsigned.toXDR(), signing_hash: unsigned.hash().toString('hex'),
+      signed_xdr: signed.xdr, transaction_hash: signed.hash, expires_at: Number(unsigned.timeBounds!.maxTime), error_code: null };
+    state.operations.push(operation); state.own!.transaction_hash = signed.hash;
+    return operation;
+  }
   m.query.mockImplementation(async (sql: string, values: any[] = []) => {
     if (sql.includes('FROM clinical_web_histories')) return state.own ? [state.own] : [];
     if (sql.startsWith('SELECT id,name FROM doctors')) return state.doctors;
@@ -78,7 +90,7 @@ function fixture(author = patient) {
     readVersion: vi.fn(async ({ version }) => state.chainVersions.find(v => v.context.version === version) ?? null),
   };
   m.doctor.mockResolvedValue({ address: doctor.publicKey(), doctor: { status: 'active' } });
-  return { state, actualEntryId, addVersion };
+  return { state, actualEntryId, addVersion, addCreation };
 }
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'history-test');
@@ -114,6 +126,40 @@ describe('clinical history identity and response boundaries', () => {
     expect(result[0].transactionHash).toBe(v.operation.transaction_hash); expect(JSON.stringify(result)).not.toContain(v.operation.signed_xdr);
     expect(m.query).toHaveBeenCalledWith(expect.stringContaining('actor_user_id=$1 AND wallet_id=$2 AND source_wallet=$3'), [actor.userId, actor.walletId, actor.address, CLINICAL_CONTRACT]);
     expect(clinicalPublicOperation({ ...v.operation, expires_at: '123' }).expiresAt).toBe(123);
+  });
+});
+
+describe('verified history creation receipt', () => {
+  it('links the exact signed creation and durable proof even without contributions or a current relayer key', async () => {
+    const f = fixture(); const creation = f.addCreation(); delete process.env.RELAYER_SECRET;
+    const snapshot = await clinicalSnapshot(request(), user, actor);
+    expect(snapshot.history).toEqual({ id: historyId, patient: actor.address, createdAt: 1, creationTransactionHash: creation.transaction_hash });
+    expect(snapshot.entries).toEqual([]);
+    expect(m.chain.verifyRecordedOperation).toHaveBeenCalledExactlyOnceWith('create_history', creation.expected);
+    expect(m.chain.receipt).not.toHaveBeenCalled();
+    expect(m.query).toHaveBeenCalledWith(expect.stringContaining("AND action='create_history' AND state='confirmed'"),
+      [creation.transaction_hash, CLINICAL_CONTRACT, actor.userId, actor.walletId, actor.address]);
+  });
+  it.each(['missing', 'wrong-hash', 'wrong-owner', 'wrong-wallet', 'wrong-source', 'wrong-history', 'wrong-patient', 'wrong-method', 'wrong-action', 'wrong-network', 'wrong-contract', 'pending', 'bad-envelope', 'bad-proof'])('does not link %s evidence or discard independently verified content', async failure => {
+    const f = fixture(); f.addVersion(); const creation = f.addCreation();
+    if (failure === 'missing') f.state.operations.pop();
+    if (failure === 'wrong-hash') f.state.own!.transaction_hash = '0'.repeat(64);
+    if (failure === 'wrong-owner') creation.actor_user_id = 'did:privy:other';
+    if (failure === 'wrong-wallet') creation.wallet_id = 'other-wallet';
+    if (failure === 'wrong-source') creation.source_wallet = doctor.publicKey();
+    if (failure === 'wrong-history') creation.expected.historyId = '0'.repeat(64);
+    if (failure === 'wrong-patient') creation.expected.patient = doctor.publicKey();
+    if (failure === 'wrong-method') creation.method = 'set_permissions';
+    if (failure === 'wrong-action') creation.action = 'set_permissions';
+    if (failure === 'wrong-network') creation.network = 'public';
+    if (failure === 'wrong-contract') creation.contract_id = 'C' + 'A'.repeat(55);
+    if (failure === 'pending') creation.state = 'submitted';
+    if (failure === 'bad-envelope') creation.signed_xdr = 'INVALID';
+    if (failure === 'bad-proof') m.chain.verifyRecordedOperation.mockImplementation(async action => { if (action === 'create_history') throw Error('clinical_chain_unavailable'); return true; });
+    const snapshot = await clinicalSnapshot(request(), user, actor);
+    expect(snapshot.history?.creationTransactionHash).toBeNull();
+    expect(snapshot.entries).toHaveLength(1); expect(snapshot.entries[0].note?.text).toBe('LOCAL PRIVATE NOTE');
+    expect(m.chain.receipt).not.toHaveBeenCalled();
   });
 });
 

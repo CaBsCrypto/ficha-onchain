@@ -27,7 +27,7 @@ export interface ClinicalSnapshot {
   writes: Record<ClinicalAction, boolean>;
   /** Incomplete doctor directory checks never stand in for verified permissions. */
   grantsUnavailable?: boolean;
-  history: { id: string; patient: string; createdAt: number } | null;
+  history: { id: string; patient: string; createdAt: number; creationTransactionHash?: string | null } | null;
   entries: ClinicalVersion[]; grants: ClinicalGrant[]; operations: ClinicalOperation[];
   verifiedAt: string;
 }
