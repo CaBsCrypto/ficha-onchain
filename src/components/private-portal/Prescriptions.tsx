@@ -31,7 +31,7 @@ export function PrescriptionCard({ prescription, role, onChange, unavailable = f
 }
 
 export function PrivatePrescriptions({ role }: { role: PortalRole }) {
-  const { data, error, loading, refresh } = usePortalData<{ prescriptions: PrivatePrescription[] }>(`/api/private-prescriptions?role=${role}`);
+  const { data, error, loading, refresh } = usePortalData<{ prescriptions: PrivatePrescription[]; checkedAt?: string }>(`/api/private-prescriptions?role=${role}`, role === 'patient' ? 0 : 3000);
   const [filter, setFilter] = useState('all');
   const prescriptions = data?.prescriptions ?? [];
   const shown = prescriptions.filter(rx => filter === 'all' || (filter === 'expired' ? rx.expired && !['Revoked', 'Blocked'].includes(rx.status) : rx.status === filter && (filter === 'Revoked' || !rx.expired) && rx.rxId != null));
@@ -40,7 +40,8 @@ export function PrivatePrescriptions({ role }: { role: PortalRole }) {
     shown.sort((a, b) => Number(active(b)) - Number(active(a)));
   }
   return <section className="space-y-5">
-    <div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">{error ? (data ? 'Datos de la última consulta correcta. No se pudo verificar el estado actual en Stellar Testnet.' : 'No se pudo verificar el estado de las recetas en Stellar Testnet.') : data ? 'Estados verificados en Stellar Testnet.' : 'Consultando estados en Stellar Testnet.'} El documento clínico permanece cifrado.</p></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold text-slate-900">{role === 'doctor' ? 'Mis recetas emitidas' : 'Mis recetas privadas'}</h1><p className="mt-1 text-sm text-slate-500">{error ? (data ? 'Datos de la última consulta correcta. No se pudo verificar el estado actual en Stellar Testnet.' : 'No se pudo verificar el estado de las recetas en Stellar Testnet.') : data ? 'Estados verificados en Stellar Testnet.' : 'Consultando estados en Stellar Testnet.'} El documento clínico permanece cifrado.</p></div><button onClick={refresh} disabled={loading} className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">Actualizar</button></div>
+    {data?.checkedAt && Number.isFinite(Date.parse(data.checkedAt)) && <p className="text-xs text-slate-500">Consulta comprobada: {localDate(Date.parse(data.checkedAt) / 1000)} · Hora de Chile.{role === 'patient' && ' Pulsa Actualizar para volver a comprobar los estados.'}</p>}
     <label data-patient-filter className="block text-sm text-slate-600">Estado<select value={filter} onChange={e => setFilter(e.target.value)} className="ml-3 rounded-xl border border-slate-200 bg-white px-3 py-2"><option value="all">Todas</option><option value="Registered">Registradas</option><option value="Active">Activas</option><option value="Revoked">Revocadas</option><option value="expired">Vencidas</option></select></label>
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error} <button onClick={refresh} className="font-semibold underline">Actualizar</button></div>}
     {loading && <p role="status" className="text-sm text-slate-500">Consultando recetas…</p>}
