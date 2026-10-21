@@ -65,8 +65,8 @@ export function usePrivateOperation(initialOperation?: PrivateOperation | null) 
   return { run, busy: busy || reconciling, error, operation, reconciling };
 }
 
-export function ReceiptLink({ hash }: { hash?: string | null }) {
-  return hash && /^[a-f0-9]{64}$/i.test(hash) ? <a href={`https://stellar.expert/explorer/testnet/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-sky-700 underline">Ver recibo en Stellar Testnet</a> : null;
+export function ReceiptLink({ hash, label = 'Ver recibo en Stellar Testnet' }: { hash?: string | null; label?: string }) {
+  return hash && /^[a-f0-9]{64}$/i.test(hash) ? <a href={`https://stellar.expert/explorer/testnet/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-sky-700 underline">{label}</a> : null;
 }
 export function OperationNotice({ operation }: { operation?: PrivateOperation | null }) {
   if (!operation) return null;
