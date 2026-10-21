@@ -17,7 +17,8 @@ export function clinicalMigrationConnection(env = process.env, web = false) {
         target.hostname !== env.TRUSTLEAF_DB_HOST || DEV.test(target.hostname) ||
         env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' || env.CLINICAL_HISTORY_PRIVATE_CONTRACT_ID !== CONTRACT ||
         env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'false' ||
-        ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET','TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER','TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL'].some(key => env[key] !== undefined)) throw Error();
+        ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET','TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER','TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL',
+         'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET','TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER','TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL'].some(key => env[key] !== undefined)) throw Error();
     return connection;
   } catch { throw Error('clinical_migration_target_not_authorized'); }
 }

@@ -167,6 +167,11 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
   assertClinicalEnvironment();
   return locked(actor, async client => {
     let row = await operation(client, actor, id);
+    if (retry && clinicalCreateOnceConfigured()) {
+      const policy = assertClinicalWriteScope(row.action, actor.address);
+      await assertCreateOnceQuota(client, policy, id, true);
+      assertClinicalCreateOnceSavedFee(policy, row.unsigned_xdr);
+    }
     if (row.state === 'awaiting_signature' && Number(row.expires_at) <= Date.now()/1000) {
       row = (await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_request_expired',updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
     }
@@ -221,6 +226,10 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
 export async function cancelClinicalOperation(actor: ClinicalActor, id: string) {
   return locked(actor, async client => {
     const row = await operation(client, actor, id);
+    if (clinicalCreateOnceConfigured()) {
+      const policy = assertClinicalWriteScope(row.action, actor.address);
+      await assertCreateOnceQuota(client, policy, id, true);
+    }
     if (row.state === 'awaiting_signature' && !row.signed_xdr) {
       const saved = (await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_cancelled',updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
       return { operation: clinicalPublicOperation(saved) };
