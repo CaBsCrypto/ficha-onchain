@@ -13,6 +13,7 @@ it.each([
  {VERCEL_ENV:'preview'},{NEXT_PUBLIC_STELLAR_NETWORK:'mainnet'},{CLINICAL_HISTORY_PRIVATE_CONTRACT_ID:'wrong'},
  {TRUSTLEAF_CLINICAL_MIGRATION:'false'},{TRUSTLEAF_CLINICAL_WEB_MIGRATION:'false'},
  {TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET:''},{TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER:''},{TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL:''},
+ {TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET:''},{TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER:''},{TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL:''},
  ...['ep-lingering-water-ahzh89z5-pooler','ep-rapid-shadow-ahq94785-pooler'].map(endpoint=>({TRUSTLEAF_DATABASE_URL:`postgresql://fixture:fixture@${endpoint}.c-3.us-east-1.aws.neon.tech/test`,TRUSTLEAF_DB_HOST:`${endpoint}.c-3.us-east-1.aws.neon.tech`}))
 ])('rejects an unauthorized migration without leaking configuration %#',changes=>{
  expect(()=>clinicalMigrationConnection({...env,...changes},true)).toThrow(/^clinical_migration_target_not_authorized$/);

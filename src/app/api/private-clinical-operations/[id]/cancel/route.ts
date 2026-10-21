@@ -8,5 +8,5 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
     const { id } = await context.params, body = await privateBody(request, ['confirmed']);
     if (!uuid(id) || body.confirmed !== true) throw new PrivateFlowError('clinical_confirmation_required', 400);
     return cancelClinicalOperation(actor, id);
-  });
+  }, { allowCreateOnce: true });
 }

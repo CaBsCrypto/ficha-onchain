@@ -8,5 +8,5 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
     const { id } = await context.params, body = await privateBody(request, ['confirmed', 'signature']);
     if (!uuid(id) || body.confirmed !== true || typeof body.signature !== 'string' || !/^(?:0x)?[a-f0-9]{128}$/i.test(body.signature)) throw new PrivateFlowError('clinical_confirmation_required', 400);
     return signClinicalOperation(user, actor, id, body.signature);
-  });
+  }, { allowCreateOnce: true });
 }

@@ -125,18 +125,23 @@ function fixture(ownHistory = false) {
 }
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'true'); vi.stubEnv('PRIVY_APP_SECRET', 'isolated-test-placeholder');
-  for (const key of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL']) vi.stubEnv(key, undefined);
+  for (const prefix of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_']) for (const suffix of ['WALLET', 'RELAYER', 'UNTIL']) vi.stubEnv(prefix + suffix, undefined);
   vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'test-kek');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-describe('single authorized local history creation', () => {
+describe.each(['local', 'hosted'])('single authorized %s history creation', mode => {
   function scoped() {
     vi.stubEnv('TRUSTLEAF_ENV', 'local'); vi.stubEnv('VERCEL_ENV', ''); vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'testnet');
     vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
-    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', actor.address);
-    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', payer.publicKey());
-    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL', String(Math.floor(Date.now()/1000)+480));
+    const prefix = mode === 'local' ? 'TRUSTLEAF_CLINICAL_CREATE_ONCE_' : 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_';
+    vi.stubEnv(prefix + 'WALLET', actor.address);
+    vi.stubEnv(prefix + 'RELAYER', payer.publicKey());
+    vi.stubEnv(prefix + 'UNTIL', String(Math.floor(Date.now()/1000)+480));
+    if (mode === 'hosted') {
+      vi.stubEnv('TRUSTLEAF_ENV', 'test'); vi.stubEnv('VERCEL_ENV', 'production');
+      vi.stubEnv('TRUSTLEAF_DATABASE_URL', 'postgres://fixture:fixture@ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech/fixture');
+    }
   }
   it('prepares one selected creation with broad writes off and persists before submitting its exact signed envelope', async () => {
     const f=fixture(); scoped();
@@ -177,9 +182,15 @@ describe('single authorized local history creation', () => {
   });
   it('keeps historical receipt reads working when the scoped authority has expired', async () => {
     const f=fixture(); f.seed(); scoped(); f.state.receipt='SUCCESS';
-    vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL',String(Math.floor(Date.now()/1000)-1));
+    vi.stubEnv(mode === 'local' ? 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL' : 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL',String(Math.floor(Date.now()/1000)-1));
     expect((await reconcileClinicalOperation(actor,ID)).operation.state).toBe('confirmed');
     expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled();
+  });
+  it('cannot cancel or retry an existing append through the creation exception', async () => {
+    const f=fixture(true); f.seed('append_version'); scoped(); const saved=clone(f.state.row);
+    await expect(cancelClinicalOperation(actor,ID)).rejects.toThrow('clinical_create_once_scope_rejected');
+    await expect(reconcileClinicalOperation(actor,ID,true)).rejects.toThrow('clinical_create_once_scope_rejected');
+    expect(f.state.row).toEqual(saved); expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sponsor).not.toHaveBeenCalled();
   });
 });
 
