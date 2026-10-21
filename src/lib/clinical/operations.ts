@@ -10,7 +10,7 @@ import { sealClinicalVersion } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalNeonStore } from '../../../scripts/lib/clinical-neon-store.mjs';
 import { CLINICAL_ID, assertClinicalEnvironment } from './config';
 import { clinicalKeyring } from './keys';
-import { assertClinicalWriteScope, clinicalCreateOnceConfigured, assertClinicalCreateOnceFee, assertClinicalCreateOnceSavedFee, type ClinicalCreateOncePolicy } from './create-once';
+import { assertClinicalWriteScope, clinicalCreateOnceConfigured, assertClinicalCreateOnceFee, assertClinicalCreateOnceSavedFee, CLINICAL_PATIENT_DEMO_MAX_OPERATIONS, type ClinicalCreateOncePolicy } from './create-once';
 import { createClinicalWebChain, assertClinicalUnsigned, assertClinicalSavedEnvelope, sponsorClinicalSignature, type ClinicalSavedEnvelope } from './chain';
 import { assertClinicalOwner } from './identity';
 import { clinicalPublicOperation } from './history';
@@ -25,6 +25,15 @@ const methods = { create_history: 'create_history', append_version: 'append_vers
 async function assertCreateOnceQuota(client: PoolClient, policy: ClinicalCreateOncePolicy | null, requestId: string, mustExist = false) {
   if (!policy) return;
   const rows = (await client.query("SELECT id FROM clinical_web_operations WHERE source_wallet=$1 AND contract_id=$2 AND network='testnet'", [policy.wallet, CLINICAL_ID])).rows;
+  if (policy.mode === 'patient_demo') {
+    const saved = rows.some(row => row.id === requestId);
+    if (mustExist && !saved) throw new PrivateFlowError('clinical_operation_not_found', 404);
+    // Every persisted slot counts, including cancelled/failed operations. The
+    // wallet lock makes this check atomic with INSERT. Existing UUIDs keep
+    // their slot for signing and reconciliation even at the quota boundary.
+    if (!saved && rows.length >= CLINICAL_PATIENT_DEMO_MAX_OPERATIONS) throw new PrivateFlowError('clinical_patient_demo_quota_exceeded', 409);
+    return;
+  }
   if (rows.length > 1 || (mustExist && rows.length !== 1) || rows.some(row => row.id !== requestId)) {
     throw new PrivateFlowError('clinical_create_once_already_used', 409);
   }

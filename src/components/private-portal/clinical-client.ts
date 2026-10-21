@@ -24,6 +24,7 @@ const messages: Record<string, string> = {
   clinical_history_unavailable: 'No pudimos verificar el historial. No mostraremos su contenido hasta comprobarlo.',
   clinical_keys_unavailable: 'El almacenamiento privado no está disponible. Puedes volver a consultar.',
   clinical_wallet_changed: 'Tu cuenta Stellar cambió. El historial queda bloqueado hasta revisar su asociación.',
+  clinical_patient_demo_quota_exceeded: 'Esta cuenta alcanzó el límite de operaciones de la demostración. Los documentos y recibos existentes siguen disponibles; consulta el mismo intento si quedó pendiente.',
   clinical_create_once_expired: 'La habilitación temporal para crear tu ficha venció. No necesitas volver a ingresar con Privy por este motivo. Solicita revisar esta misma prueba.',
   clinical_create_once_window_too_short: 'Ya no queda tiempo suficiente para preparar y firmar la creación. No vuelvas a firmar ni prepares otro intento; solicita revisar la ventana de esta prueba.',
   clinical_create_once_fee_exceeded: 'La operación supera el presupuesto o no cumple los límites de esta prueba. No se enviará; solicita revisar la preparación.',

@@ -115,3 +115,68 @@ describe('one local creation without enabling general private writes', () => {
     vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'true'); expect(assertClinicalWriteScope('append_version', owner.publicKey())).toBeNull();
   });
 });
+
+
+describe('continuous patient recording mode', () => {
+  beforeEach(() => {
+    for (const prefix of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_']) for (const suffix of ['WALLET','RELAYER','UNTIL']) vi.stubEnv(prefix+suffix, undefined);
+    const db='ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech';
+    for(const [key,value] of Object.entries({TRUSTLEAF_ENV:'test',VERCEL_ENV:'production',TRUSTLEAF_DB_HOST:db,DATABASE_URL:`postgres://fixture:fixture@${db}/fixture`,TRUSTLEAF_DATABASE_URL:`postgres://fixture:fixture@${db}/fixture`,
+      TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED:'true',TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS:owner.publicKey(),TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER:payer.publicKey()}))vi.stubEnv(key,value);
+  });
+  it('permits only creation and own append policy for the selected wallet, while broad writes stay off', () => {
+    expect(assertClinicalWriteScope('create_history',owner.publicKey())).toMatchObject({mode:'patient_demo',wallet:owner.publicKey(),relayer:payer.publicKey()});
+    expect(assertClinicalWriteScope('append_version',owner.publicKey())).toMatchObject({mode:'patient_demo'});
+    expect(()=>assertClinicalWriteScope('set_permissions',owner.publicKey())).toThrow('clinical_create_once_scope_rejected');
+    for(const action of ['create_history','append_version','set_permissions'] as const)expect(()=>assertClinicalWriteScope(action,other.publicKey())).toThrow();
+    expect(assertPrivateWrites).toThrow('private_writes_paused');
+  });
+  it('does not expire the demo after ten minutes, while envelopes retain their own signing deadline', () => {
+    vi.useFakeTimers();
+    try {
+      const original=Date.now(), scope=assertClinicalWriteScope('create_history',owner.publicKey());
+      vi.setSystemTime(original+2*24*60*60*1000);
+      expect(assertClinicalWriteScope('append_version',owner.publicKey())).toMatchObject({mode:'patient_demo'});
+      expect(()=>assertClinicalCreateOnceFee(scope,unsigned())).not.toThrow();
+    } finally {vi.useRealTimers();}
+  });
+  it.each(['ENABLED','WALLETS','RELAYER'])('rejects incomplete demo configuration: %s',suffix=>{
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_'+suffix,undefined);
+    expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+  it.each(['false','TRUE',''])('fails closed when the demo flag is %s',flag=>{
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED',flag);expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+  it.each(['local','preview'])('rejects a non-production runtime: %s',runtime=>{
+    vi.stubEnv('VERCEL_ENV',runtime);expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+  it.each(['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET','TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL'])('rejects mixing the demo with a timed mode: %s',key=>{
+    vi.stubEnv(key,'');expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+  it.each(['',owner.publicKey()+','+owner.publicKey(),'invalid',Array(4).fill(owner.publicKey()).join(',')])('rejects a malformed or duplicated wallet list',value=>{
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',value);expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+  it('rechecks the real one-XLM cap for new and saved envelopes',()=>{
+    const scope=assertClinicalWriteScope('append_version',owner.publicKey());
+    expect(()=>assertClinicalCreateOnceFee(scope,unsigned('6000000'))).not.toThrow();
+    expect(()=>assertClinicalCreateOnceFee(scope,unsigned('6000001'))).toThrow('clinical_create_once_fee_exceeded');
+    expect(()=>assertClinicalCreateOnceSavedFee(scope,unsigned('6000001').toXDR())).toThrow('clinical_create_once_fee_exceeded');
+  });
+  it('rejects a relayer, allowlist or database change before using a previously prepared policy',()=>{
+    const scope=assertClinicalWriteScope('create_history',owner.publicKey()),tx=unsigned();
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',owner.publicKey()+','+other.publicKey());
+    expect(()=>assertClinicalCreateOnceFee(scope,tx)).toThrow();
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',owner.publicKey());vi.stubEnv('RELAYER_SECRET',other.secret());
+    expect(()=>assertClinicalCreateOnceFee(scope,tx)).toThrow();
+    vi.stubEnv('RELAYER_SECRET',payer.secret());vi.stubEnv('TRUSTLEAF_DATABASE_URL','postgres://fixture:fixture@other.neon.tech/fixture');vi.stubEnv('TRUSTLEAF_DB_HOST','other.neon.tech');
+    expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow();
+  });
+});
+
+// Configuration with migration authority never grants continuous application writes.
+it.each(['TRUSTLEAF_CLINICAL_MIGRATION','TRUSTLEAF_CLINICAL_WEB_MIGRATION'])('rejects demo writes with %s enabled',key=>{
+ for(const prefix of ['TRUSTLEAF_CLINICAL_CREATE_ONCE_','TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_'])for(const suffix of ['WALLET','RELAYER','UNTIL'])vi.stubEnv(prefix+suffix,undefined);
+ const db='ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech';
+ for(const [name,value]of Object.entries({TRUSTLEAF_ENV:'test',VERCEL_ENV:'production',TRUSTLEAF_DB_HOST:db,TRUSTLEAF_DATABASE_URL:`postgres://fixture:fixture@${db}/test`,TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED:'true',TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS:owner.publicKey(),TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER:payer.publicKey(),[key]:'true'}))vi.stubEnv(name,value);
+ expect(()=>assertClinicalWriteScope('create_history',owner.publicKey())).toThrow('clinical_create_once_scope_rejected');
+});

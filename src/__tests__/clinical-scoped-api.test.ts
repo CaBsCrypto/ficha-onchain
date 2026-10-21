@@ -46,3 +46,14 @@ it.each(['anonymous','other-account','cross-origin','expired','missing-mode','mi
  else expect([401,403,503]).toContain(result.status);
  expect(m.prepare).not.toHaveBeenCalled();expect(result.headers.get('Cache-Control')).toBe('no-store');
 });
+
+
+it('allows selected continuous patient creation and append through the real wrapper without enabling ordinary writes',async()=>{
+ for(const suffix of ['WALLET','RELAYER','UNTIL'])vi.stubEnv('TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_'+suffix,undefined);
+ vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED','true');vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',actor.address);vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER',payer.publicKey());
+ for(const body of [input,{...input,action:'append_version',note:{title:'Fixture',text:'Synthetic',eventDate:null}}])expect((await POST(request(body))).status).toBe(200);
+ const forbidden=await POST(request({...input,action:'set_permissions',doctorId:2,canRead:true,canAppend:false,expectedRevision:0}));
+ expect(forbidden.status).toBe(403);expect(await forbidden.json()).toEqual({error:'clinical_create_once_scope_rejected'});
+ m.actor.mockResolvedValue({...actor,address:payer.publicKey()});expect((await POST(request())).status).toBe(403);
+ const work=vi.fn();expect((await clinicalApi(request(),work)).status).toBe(503);expect(work).not.toHaveBeenCalled();
+});
