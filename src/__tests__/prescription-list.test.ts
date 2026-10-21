@@ -37,7 +37,7 @@ it('shows failure and retry instead of an empty successful result', async () => 
   request.mockResolvedValueOnce(Response.json({ error: 'unauthorized' }, { status: 401 })); await render();
   expect(box.querySelector('[role="alert"]')).not.toBeNull(); expect(box.textContent).not.toContain('No hay recetas');
   request.mockResolvedValueOnce(Response.json({ prescriptions: [] }));
-  await act(async () => box.querySelector('button')!.click());
+  await act(async () => box.querySelector<HTMLButtonElement>('[role="alert"] button')!.click());
   expect(box.querySelector('[role="alert"]')).toBeNull(); expect(box.textContent).toContain('No hay recetas en este estado');
 });
 it('discards late results from the previous role while the next request fails', async () => {
@@ -56,7 +56,7 @@ it('labels retained data after a failed refresh and restores verification only a
     .mockResolvedValueOnce(Response.json({ error: 'private_service_unavailable' }, { status: 503 }));
   await render('doctor');
   expect(box.textContent).toContain('Estados verificados en Stellar Testnet');
-  await act(async () => vi.advanceTimersByTimeAsync(3000));
+  await act(async () => [...box.querySelectorAll('button')].find(button => button.textContent === 'Actualizar')!.click());
   expect(titles()).toEqual(['Receta #4']);
   expect(box.textContent).toContain('Datos de la última consulta correcta');
   expect(box.textContent).not.toContain('Estados verificados en Stellar Testnet');
@@ -70,4 +70,25 @@ it('labels retained data after a failed refresh and restores verification only a
   expect(box.textContent).toContain('Estados verificados en Stellar Testnet');
   expect(box.textContent).not.toContain('Datos de la última consulta correcta');
   expect(box.querySelector('[data-prescription-status="Revoked"]')).not.toBeNull();
+});
+
+it('does not poll a verified list and refreshes only when explicitly requested', async () => {
+  vi.useFakeTimers();
+  request.mockResolvedValue(Response.json({ prescriptions: [rx('4', 'Active')] }));
+  await render();
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
+  expect(request).toHaveBeenCalledOnce();
+  await act(async () => [...box.querySelectorAll('button')].find(button => button.textContent === 'Actualizar')!.click());
+  expect(request).toHaveBeenCalledTimes(2);
+});
+
+it('preserves polling for doctor operations while labeling the time of a completed consultation', async () => {
+  vi.useFakeTimers();
+  const checkedAt = '2026-10-21T15:50:00.000Z';
+  request.mockResolvedValue(Response.json({ prescriptions: [rx('4', 'Active')], checkedAt }));
+  await render('doctor');
+  expect(box.textContent).toContain('Consulta comprobada:');
+  expect(box.textContent).toContain('Hora de Chile');
+  await act(async () => vi.advanceTimersByTimeAsync(3000));
+  expect(request).toHaveBeenCalledTimes(2);
 });

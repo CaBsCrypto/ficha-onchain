@@ -114,9 +114,14 @@ export async function listPrivatePrescriptions(actor:AuthedUser,role:string) {
       JOIN doctors d ON LOWER(d.email)=LOWER(a.doctor_email) WHERE p.${column}=$1 AND b.${identity}=$2 AND p.contract_id=$3
       ${role==='patient'?"AND p.state='confirmed'":''} ORDER BY p.created_at DESC`,[wallet.address,actor.userId,RX_PRIVATE])).rows;
     const chain=createPrivateChain();await chain.verifyDeployment();
-    const prescriptions=[];
-    for(const row of rows)prescriptions.push(await prescriptionView(row,row,chain));
-    return {prescriptions};
+    const prescriptions: Awaited<ReturnType<typeof prescriptionView>>[]=[];
+    // Bound RPC pressure without serializing independent records. Any rejected
+    // record rejects the response; no partially verified list leaves the server.
+    for(let offset=0;offset<rows.length;offset+=3) {
+      const batch=rows.slice(offset,offset+3);
+      prescriptions.push(...await Promise.all(batch.map(row=>prescriptionView(row,row,chain))));
+    }
+    return {prescriptions,checkedAt:new Date().toISOString()};
   }finally{client.release();}
 }
 export async function preparePrescription(actor:AuthedUser,appointmentId:number,document:unknown) {

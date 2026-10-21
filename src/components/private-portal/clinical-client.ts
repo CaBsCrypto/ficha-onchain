@@ -12,6 +12,7 @@ const HASH = /^[a-f0-9]{64}$/i;
 const actions = ['create_history', 'append_version', 'set_permissions'];
 const states = ['awaiting_signature', 'submitted', 'confirmed', 'failed', 'cancelled'];
 const messages: Record<string, string> = {
+  clinical_read_timeout: 'La consulta está tardando demasiado. Vuelve a consultar; no se preparará otra firma.',
   clinical_configuration_unavailable: 'El historial privado aún no está habilitado en este entorno de prueba.',
   clinical_account_funding_required: 'Tu cuenta de Testnet necesita preparación antes de crear el historial. Solicita revisar el acceso de prueba.',
   clinical_chain_unavailable: 'No pudimos comprobar el registro en Stellar. Vuelve a consultar sin preparar otra firma.',
@@ -28,6 +29,26 @@ export class ClinicalClientError extends Error {
   constructor(public readonly status: number, public readonly code: string) {
     super(messages[code] ?? portalErrorMessage(code, status));
   }
+}
+export const CLINICAL_READ_TIMEOUT_MS = 90_000;
+/** Bound the complete read, including Privy's token and response body. Never
+ * wrap signatures or mutation requests: an uncertain write keeps its intent. */
+async function clinicalRead<T>(work: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  let cancel: () => void = () => {};
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      cancel = () => { controller.abort(); reject(new DOMException('Consulta cancelada', 'AbortError')); };
+      timer = setTimeout(() => {
+        reject(new ClinicalClientError(0, 'clinical_read_timeout'));
+        controller.abort();
+      }, CLINICAL_READ_TIMEOUT_MS);
+      if (signal?.aborted) { cancel(); return; }
+      signal?.addEventListener('abort', cancel, { once: true });
+      Promise.resolve().then(() => { controller.signal.throwIfAborted(); return work(controller.signal); }).then(resolve, reject);
+    });
+  } finally { clearTimeout(timer!); signal?.removeEventListener('abort', cancel); }
 }
 /** Privy bearer stays in the existing adapter, never in URLs or browser storage. */
 export async function clinicalApi<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -206,7 +227,7 @@ export function useClinicalSnapshot(identity: string) {
     if (!identity) { setView({ identity, data: null, loading: false, error: '' }); return; }
     let alive = true; const abort = new AbortController();
     setView({ identity, data: null, loading: true, error: '' });
-    void clinicalApi<ClinicalSnapshot>('/api/private-clinical-history', { signal: abort.signal }).then(data => {
+    void clinicalRead(signal => clinicalApi<ClinicalSnapshot>('/api/private-clinical-history', { signal }), abort.signal).then(data => {
       if (!data || !Array.isArray(data.entries) || !Array.isArray(data.grants) || !Array.isArray(data.operations) || !Number.isFinite(Date.parse(data.verifiedAt))) throw new ClinicalClientError(503, 'clinical_history_unavailable');
       data.operations.forEach(op => verifiedClinicalOperation(op));
       if (alive) setView({ identity, data, loading: false, error: '' });
@@ -238,14 +259,16 @@ export async function readClinicalFile(file: File, signal?: AbortSignal): Promis
 }
 export async function readClinicalDownload(entryId: string, version: number, signal: AbortSignal): Promise<Blob> {
   if (!HASH.test(entryId) || !Number.isSafeInteger(version) || version < 1) throw new Error('No se pudo identificar el archivo.');
+  return clinicalRead(async readSignal => {
   let response: Response;
-  try { response = await authedFetch(`/api/private-clinical-history/document?entryId=${entryId}&version=${version}`, { cache: 'no-store', signal }); }
+  try { response = await authedFetch(`/api/private-clinical-history/document?entryId=${entryId}&version=${version}`, { cache: 'no-store', signal: readSignal }); }
   catch { throw new ClinicalClientError(0, 'network_unavailable'); }
   if (!response.ok) throw new ClinicalClientError(response.status, 'clinical_history_unavailable');
   const mediaType = response.headers.get('content-type')?.split(';')[0];
   if (!mediaType || !['application/pdf', 'image/png', 'image/jpeg'].includes(mediaType)) throw new Error('No se pudo verificar el formato del archivo.');
   const blob = await response.blob();
-  if (signal.aborted) throw new DOMException('Descarga cancelada', 'AbortError');
+  if (readSignal.aborted) throw new DOMException('Descarga cancelada', 'AbortError');
   if (!blob.size || blob.size > CLINICAL_MAX_FILE_BYTES) throw new Error('No se pudo verificar el tamaño del archivo.');
   return blob;
+  }, signal);
 }

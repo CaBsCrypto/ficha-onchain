@@ -1,4 +1,4 @@
-import { Address, BASE_FEE, Contract, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Account, Address, BASE_FEE, Contract, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { PRIVATE_ADMIN, RX_PRIVATE, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private-config';
 
 export type PrivateAction = 'consent' | 'withdraw_consent' | 'mint' | 'activate' | 'revoke';
@@ -28,8 +28,18 @@ export function assertUnsignedOperation(tx: Transaction, source: string, action:
   }
 }
 export function createPrivateChain(server=new rpc.Server('https://soroban-testnet.stellar.org')) {
+  // This chain instance belongs to one request. Reuse only the simulation source,
+  // never authorization/results or the mutable Account consumed by a builder.
+  let simulationSource: Promise<{ address: string; sequence: string }> | undefined;
+  async function simulationAccount() {
+    simulationSource ??= server.getAccount(PRIVATE_ADMIN).then(account => ({
+      address: account.accountId(), sequence: account.sequenceNumber(),
+    }));
+    const source = await simulationSource;
+    return new Account(source.address, source.sequence);
+  }
   async function read(method:string,args:xdr.ScVal[]=[],missing=false):Promise<unknown> {
-    const account=await server.getAccount(PRIVATE_ADMIN);
+    const account=await simulationAccount();
     const tx=new TransactionBuilder(account,{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
       .addOperation(new Contract(RX_PRIVATE).call(method,...args)).setTimeout(60).build();
     const sim=await server.simulateTransaction(tx);

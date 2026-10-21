@@ -4,14 +4,14 @@ import { CLINICAL_CONTRACT, clinicalInvocation, deriveClinicalEntryId, deriveCli
 import { sealClinicalVersion } from '../../scripts/lib/clinical-crypto.mjs';
 import type { ClinicalActor, ClinicalExpected } from '@/types/clinical';
 
-const m = vi.hoisted(() => ({ query: vi.fn(), auth: vi.fn(), actor: vi.fn(), doctor: vi.fn(), chain: {} as Record<string, any>, reader: {} as Record<string, any> }));
+const m = vi.hoisted(() => ({ query: vi.fn(), auth: vi.fn(), actor: vi.fn(), doctor: vi.fn(), chainFactory: vi.fn(), readerFactory: vi.fn(), chain: {} as Record<string, any>, reader: {} as Record<string, any> }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: m.auth }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
 vi.mock('@/lib/clinical/identity', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/identity')>(), resolveClinicalActor: m.actor }));
-vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: () => m.chain }));
-vi.mock('../../scripts/lib/clinical-chain-read.mjs', () => ({ createClinicalChainReader: () => m.reader }));
+vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: () => { m.chainFactory(); return m.chain; } }));
+vi.mock('../../scripts/lib/clinical-chain-read.mjs', () => ({ createClinicalChainReader: () => { m.readerFactory(); return m.reader; } }));
 import { clinicalDocument, clinicalGrants, clinicalOperations, clinicalPublicOperation, clinicalSnapshot, ownClinicalHistory } from '@/lib/clinical/history';
 
 // Deterministic local identities and encryption keys; no Testnet or database calls.
@@ -120,14 +120,14 @@ describe('clinical history identity and response boundaries', () => {
 describe('clinical private document reads and integrity', () => {
   it('decrypts only the selected version and rechecks identity, permissions and proof after storage', async () => {
     const f = fixture(); const v = f.addVersion(); const document = await clinicalDocument(request(), actor, historyId, f.actualEntryId, 1);
-    expect(JSON.parse(Buffer.from(document.content).toString('utf8'))).toEqual(v.note); expect(m.auth).toHaveBeenCalledTimes(4); expect(m.actor).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(Buffer.from(document.content).toString('utf8'))).toEqual(v.note); expect(m.auth).toHaveBeenCalledTimes(2); expect(m.actor).toHaveBeenCalledTimes(2);
     expect(m.reader.readAccess).toHaveBeenCalledTimes(2); expect(m.reader.readVersion).toHaveBeenCalledTimes(2);
     expect(Object.keys(document).sort()).toEqual(['content', 'entryId', 'historyId', 'metadata', 'version']);
   });
   it.each(['expired', 'changed-user', 'changed-wallet', 'withdrawn-access'])('discards the document when %s is detected after loading', async condition => {
     const f = fixture(); f.addVersion();
-    if (condition === 'expired') m.auth.mockResolvedValueOnce(user).mockResolvedValueOnce(user).mockResolvedValueOnce(null);
-    if (condition === 'changed-user') m.auth.mockResolvedValueOnce(user).mockResolvedValueOnce(user).mockResolvedValueOnce({ userId: 'did:privy:changed', email: 'changed@example.test' });
+    if (condition === 'expired') m.auth.mockResolvedValueOnce(user).mockResolvedValueOnce(null);
+    if (condition === 'changed-user') m.auth.mockResolvedValueOnce(user).mockResolvedValueOnce({ userId: 'did:privy:changed', email: 'changed@example.test' });
     if (condition === 'changed-wallet') m.actor.mockResolvedValueOnce(actor).mockResolvedValueOnce({ ...actor, walletId: 'changed-wallet' });
     if (condition === 'withdrawn-access') f.state.revokedDuringRead = true;
     await expect(clinicalDocument(request(), actor, historyId, f.actualEntryId, 1)).rejects.toThrow('clinical_version_unavailable');
@@ -148,6 +148,15 @@ describe('clinical private document reads and integrity', () => {
 });
 
 describe('clinical timeline, historical versions and corresponding receipts', () => {
+  it('scopes static readers to one snapshot while checking every version before and after decryption', async () => {
+    const f = fixture(); f.addVersion(); f.addVersion();
+    await clinicalSnapshot(request(), user, actor);
+    expect(m.chainFactory).toHaveBeenCalledOnce(); expect(m.readerFactory).toHaveBeenCalledOnce();
+    expect(m.reader.readAccess).toHaveBeenCalledTimes(4); expect(m.reader.readVersion).toHaveBeenCalledTimes(4);
+    await clinicalSnapshot(request(), user, actor);
+    expect(m.chainFactory).toHaveBeenCalledTimes(2); expect(m.readerFactory).toHaveBeenCalledTimes(2);
+    expect(m.reader.readAccess).toHaveBeenCalledTimes(8); expect(m.reader.readVersion).toHaveBeenCalledTimes(8);
+  });
   it('preserves earlier patient versions while only the latest own contribution can be corrected', async () => {
     const f = fixture(); const v1 = f.addVersion('FIRST VERSION'), v2 = f.addVersion('SECOND VERSION');
     const snapshot = await clinicalSnapshot(request(), user, actor);

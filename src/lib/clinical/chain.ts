@@ -163,11 +163,16 @@ function historyValue(value: unknown, id?: string, patient?: string): ClinicalHi
 }
 export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clinicalRpcUrl())) {
   let observedLedger = 0;
+  let readAccount: Promise<{ address: string; sequence: string }> | undefined;
   let verified: Promise<{ network: 'testnet'; contractId: string; registryId: string; wasmHash: string; interfaceVersion: 1; ledger: number }> | undefined;
   async function read(contract: string, method: string, args: xdr.ScVal[] = [], missing = false): Promise<unknown> {
-    const account = await server.getAccount(PRIVATE_ADMIN);
-    if (account.accountId() !== PRIVATE_ADMIN) throw unavailable();
-    const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
+    // One simulation source per chain instance/request. Never share its mutable
+    // Account with a builder, or reuse this source for transaction preparation.
+    const source = await (readAccount ??= server.getAccount(PRIVATE_ADMIN).then(account => {
+      if (account.accountId() !== PRIVATE_ADMIN || !/^\d+$/.test(account.sequenceNumber())) throw unavailable();
+      return { address: account.accountId(), sequence: account.sequenceNumber() };
+    }).catch(error => { readAccount = undefined; throw error; }));
+    const tx = new TransactionBuilder(new Account(source.address, source.sequence), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
       .addOperation(new Contract(contract).call(method, ...args)).setTimeout(60).build();
     const sim = await server.simulateTransaction(tx);
     const ledger = number(sim.latestLedger, 1);
