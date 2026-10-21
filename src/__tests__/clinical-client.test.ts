@@ -13,7 +13,6 @@ vi.mock('@privy-io/react-auth/extended-chains', () => ({ useSignRawHash: () => (
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: deps.fetch }));
 vi.mock('@privy-io/react-auth', () => ({ usePrivy: () => ({ ready: true, authenticated: true, user: { id: deps.userId } }) }));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({ usePortalWallet: () => ({ walletId: 'wallet1', address: 'G' + 'A'.repeat(55) }) }));
-vi.mock('@/components/private-portal/Operation', () => ({ ReceiptLink: ({ hash }: { hash: string }) => createElement('a', { href: `https://stellar.expert/explorer/testnet/tx/${hash}` }, 'Ver recibo') }));
 const ID = '09fedaff-8110-4415-8b5c-3409bf0a5731';
 const OTHER = '18d482c5-aeae-448b-a37c-a17bfc8042d2';
 const op = (overrides: Partial<ClinicalOperation> = {}): ClinicalOperation => ({ id: ID, action: 'append_version', state: 'awaiting_signature', expiresAt: 1_900_000_000, transactionHash: null, errorCode: null, signing: overrides.state && overrides.state !== 'awaiting_signature' ? undefined : { address: 'G' + 'A'.repeat(55), hash: '1'.repeat(64), network: 'testnet', expiresAt: overrides.expiresAt ?? 1_900_000_000 }, ...overrides });
@@ -397,4 +396,38 @@ it('shows incomplete permission verification separately from verified owner entr
  expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Sólo mostramos los estados verificados');
  expect(host.querySelector('input[type="checkbox"]')).toBeNull();expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
  expect(deps.sign).not.toHaveBeenCalled();expect(deps.fetch).toHaveBeenCalledOnce();
+});
+
+describe('history creation card', () => {
+  const hash = 'b'.repeat(64);
+  const writes = { create_history: false, append_version: false, set_permissions: false };
+  it('shows the creation date and exact receipt before contributions, including an empty history in read-only mode', async () => {
+    const data = snapshot(); data.writes = writes; data.history!.creationTransactionHash = hash;
+    deps.fetch.mockResolvedValue(response(data));
+    const { host } = await mount(createElement(ClinicalHistory));
+    const card = host.querySelector('section[aria-labelledby="clinical-history-created-title"]')!;
+    expect(card.textContent).toContain('Historial clínico creado'); expect(card.textContent).toContain('Creado:');
+    const link = card.querySelector('a')!;
+    expect(link.href).toBe(`https://stellar.expert/explorer/testnet/tx/${hash}`);
+    expect(link.textContent).toBe('Ver transacción de creación en Stellar Testnet');
+    expect(host.textContent).toContain('Aún no hay antecedentes ni archivos');
+    expect(deps.fetch.mock.calls.every(call => call[0] === '/api/private-clinical-history' && (call[1]?.method ?? 'GET') === 'GET')).toBe(true);
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+  it.each([undefined, null, 'unverified'])('keeps a missing or invalid receipt unlinked (%s)', async creationTransactionHash => {
+    const data = snapshot([version()]); data.history!.creationTransactionHash = creationTransactionHash;
+    deps.fetch.mockResolvedValue(response(data));
+    const { host } = await mount(createElement(ClinicalHistory));
+    const card = host.querySelector('section[aria-labelledby="clinical-history-created-title"]')!;
+    expect(card.textContent).toContain('No pudimos comprobar el recibo de creación'); expect(card.querySelector('a')).toBeNull();
+    expect(host.textContent).toContain(note.text); expect(deps.sign).not.toHaveBeenCalled();
+  });
+  it('does not show a created history while loading or when the account has no history', async () => {
+    const pending = deferred<Response>(); deps.fetch.mockReturnValue(pending.promise);
+    const { host } = await mount(createElement(ClinicalHistory));
+    expect(host.querySelector('#clinical-history-created-title')).toBeNull();
+    await act(async () => pending.resolve(response({ ...snapshot(), history: null })));
+    expect(host.textContent).toContain('Comienza tu historial'); expect(host.querySelector('#clinical-history-created-title')).toBeNull();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
 });

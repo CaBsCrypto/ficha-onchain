@@ -32,6 +32,25 @@ export async function clinicalOperations(actor: ClinicalActor) {
   const rows = await getDb().query(`SELECT * FROM clinical_web_operations WHERE actor_user_id=$1 AND wallet_id=$2 AND source_wallet=$3 AND contract_id=$4 ORDER BY created_at DESC LIMIT 50`, [actor.userId, actor.walletId, actor.address, CLINICAL_ID]);
   return rows.map(clinicalPublicOperation);
 }
+/** Link only an audited creation receipt, independently of the recent-intent
+ * list. A missing historical receipt cannot invalidate a live owner history,
+ * but it must never be replaced with an unverified database hash. */
+async function clinicalCreationReceipt(actor: ClinicalActor, historyId: string, hash: unknown, chain: ReturnType<typeof createClinicalWebChain>): Promise<string | null> {
+  try {
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) return null;
+    const rows = await getDb().query(`SELECT * FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet'
+      AND action='create_history' AND state='confirmed' AND actor_user_id=$3 AND wallet_id=$4 AND source_wallet=$5 LIMIT 2`,
+      [hash, CLINICAL_ID, actor.userId, actor.walletId, actor.address]);
+    const operation = rows[0];
+    if (rows.length !== 1 || operation.transaction_hash !== hash || operation.contract_id !== CLINICAL_ID || operation.network !== 'testnet' ||
+        operation.state !== 'confirmed' || operation.action !== 'create_history' || operation.method !== 'create_history' ||
+        operation.actor_user_id !== actor.userId || operation.wallet_id !== actor.walletId || operation.source_wallet !== actor.address ||
+        operation.expected?.historyId !== historyId || operation.expected?.patient !== actor.address) return null;
+    assertClinicalSavedEnvelope(operation as ClinicalSavedEnvelope, { historical: true });
+    await chain.verifyRecordedOperation('create_history', operation.expected);
+    return hash;
+  } catch { return null; }
+}
 /** The reader rechecks live identity and permissions after decrypting, before delivery. */
 export async function clinicalDocument(request: Request, actor: ClinicalActor, historyId: string, entryId: string, version: number,
   reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_ID, registryId: REGISTRY_PRIVATE, wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN }, { requestScoped: true })) {
@@ -122,7 +141,8 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
       canCorrect: evidence.context.author === actor.address && version === heads.get(entryId) });
   }
   entries.sort((a,b) => b.createdAt-a.createdAt || b.version-a.version || a.entryId.localeCompare(b.entryId));
+  const creationTransactionHash = await clinicalCreationReceipt(actor, own.history.id, own.row.transaction_hash, chain);
   let grantsUnavailable = false;
   const grants = await clinicalGrants(own.history.id, () => { grantsUnavailable = true; }, chain);
-  return { writes, history: own.history, entries, grants, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
+  return { writes, history: { ...own.history, creationTransactionHash }, entries, grants, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
 }
