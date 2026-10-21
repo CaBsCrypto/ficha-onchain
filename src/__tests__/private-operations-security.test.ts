@@ -273,6 +273,22 @@ describe('persistent owner operations',()=>{
     expect(d.chain.prepare).not.toHaveBeenCalled();
   });
 
+  it('a persisted uncertain clinical attempt blocks prescription preparation before signing',async()=>{
+    const f=saved(),d=database(f);
+    const previous=mocks.connection.getMockImplementation()!;
+    mocks.connection.mockImplementation(async()=>{
+      const client=await previous(),query=client.query;
+      client.query=async(sql:string,values:unknown[]=[])=>{
+        if(sql.includes("to_regclass('public.clinical_transaction_attempts')"))return {rows:[{relation:'clinical_transaction_attempts'}],rowCount:1};
+        if(sql.includes('SELECT 1 FROM clinical_transaction_attempts'))return {rows:[{exists:1}],rowCount:1};
+        return query(sql,values);
+      };
+      return client;
+    });
+    await expect(preparePrivateOperation(f.actor,'withdraw_consent',{appointmentId:1})).rejects.toThrow('another_operation_pending');
+    expect(d.chain.prepare).not.toHaveBeenCalled();expect(d.chain.submit).not.toHaveBeenCalled();
+  });
+
   it('email reuse cannot read a consultation belonging to another DID before accreditation',async()=>{
     const f=saved(),d=database(f);d.appointment.patient_user_id='did:privy:previous-user';
     await expect(readPrivateConsultation(f.actor,1)).rejects.toThrow('consultation_not_found');

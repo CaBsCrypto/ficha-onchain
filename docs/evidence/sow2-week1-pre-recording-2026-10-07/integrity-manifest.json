@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "observedAt": "2026-10-08T01:43:49.087Z",
+  "sourceCommit": "63600b68b6bd57898474c58f003281ca5c7a477f",
+  "liveVerification": false,
+  "files": [
+    {
+      "file": "contracts-audit.json",
+      "bytes": 4135,
+      "sha256": "57981cdf6476544631125fcdf11b2f52d60c28e48ff96800d717f83a4eabe319"
+    },
+    {
+      "file": "readback.json",
+      "bytes": 6350,
+      "sha256": "51f90e9449a0325fe26cce21c415e72b2e88d689553e53713b0330fe338c440e"
+    },
+    {
+      "file": "funding-audit.json",
+      "bytes": 936,
+      "sha256": "3cc2ee5f906920c7afdddba8a5e007dfffc581a65db375706b3ea82d1e914a8b"
+    },
+    {
+      "file": "preparation.json",
+      "bytes": 1542,
+      "sha256": "29be891f5ed550b4d4a571292eaeb3564eb17cfc864c8d169203e1504a9deeab"
+    },
+    {
+      "file": "README.md",
+      "bytes": 1382,
+      "sha256": "e8354b8a0a0559d71e3d63dc6ea923be914b08a7050852dc40136c4609588e65"
+    }
+  ],
+  "limits": [
+    "Hashes identify these saved files; viewing them does not perform a new verification.",
+    "No new clinical transactions.",
+    "Medical rejection checks from original execution are distinguished from the current revoked permission."
+  ]
+}

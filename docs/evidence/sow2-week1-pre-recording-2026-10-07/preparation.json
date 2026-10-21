@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "observedAt": "2026-10-08T01:43:49.087Z",
+  "sourceCommit": "63600b68b6bd57898474c58f003281ca5c7a477f",
+  "network": "testnet",
+  "syntheticOnly": true,
+  "newTransactions": 0,
+  "checks": {
+    "contractsVerified": 3,
+    "clinicalTestsPassed": 14,
+    "confirmedClinicalReceipts": 6,
+    "encryptedVersions": 3,
+    "pendingAttempts": 0,
+    "patientIntegrity": true,
+    "knownLedgerKeys": 16,
+    "missingLedgerKeys": 0,
+    "ledgerInspectionObservedAt": "2026-10-08T01:43:50.205Z",
+    "fundingReceiptVerified": true,
+    "ciAndVercel": "SUCCESS",
+    "currentMedicalReadPermission": false,
+    "currentGrantRevision": 2
+  },
+  "readyToRecordExistingExecution": true,
+  "readyForNewExecution": false,
+  "doctorAuthorizedNow": false,
+  "doctorValidUntilUtc": "2026-10-07T05:10:40.000Z",
+  "limits": [
+    "Readback preserves original execution checks; it does not recreate the earlier authorized-doctor access.",
+    "Medical authorization expired; new medical writes require separate preparation.",
+    "Archived-state restoration remains unproven.",
+    "The visual report remains a dated static snapshot of the execution.",
+    "PR #135 remains draft and unmerged; video and acceptance are pending."
+  ],
+  "historicalChecks": {
+    "doctorReadBeforeRevocation": "proved during the original execution; not rerun after expiry",
+    "doctorReadAfterRevocationRejected": "proved during the original execution; current readback rechecks the revoked grant"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+  "registryId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "registryWasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+  "wasmHash": "29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0",
+  "wasmBytes": 15533,
+  "sourceSha256": "633ceb28fe66f07790b8616cff8e27bc109d99110a4d0e6aec6f84cdecdd5735",
+  "testSha256": "69eb023ad46848bce2965c8ca4e70d74b77f6387d915edad29e5c7d241da62aa",
+  "deployer": "GA7QOPGPAFB7TYRBYW7RO3WYQQUZNIQTMV3RRENQTQIVYN45E3CMAA2O",
+  "confirmedAt": "2026-10-05T17:25:34.447Z",
+  "upgradeMethod": false,
+  "transactions": {
+    "upload": {
+      "transactionHash": "1361b402c69359dca201433f7229577328a659b0463a5b5e62054f8d2134a5d0",
+      "source": "GA7QOPGPAFB7TYRBYW7RO3WYQQUZNIQTMV3RRENQTQIVYN45E3CMAA2O",
+      "status": "SUCCESS",
+      "ledger": 5039476,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/1361b402c69359dca201433f7229577328a659b0463a5b5e62054f8d2134a5d0"
+    },
+    "deploy": {
+      "transactionHash": "57cbd24a1f3f1b7e44e1e37dd7377881dbc702f65939910bd63a340bbe3c3a90",
+      "source": "GA7QOPGPAFB7TYRBYW7RO3WYQQUZNIQTMV3RRENQTQIVYN45E3CMAA2O",
+      "status": "SUCCESS",
+      "ledger": 5039509,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/57cbd24a1f3f1b7e44e1e37dd7377881dbc702f65939910bd63a340bbe3c3a90"
+    }
+  },
+  "sourceBeforeFormattingSha256": "ff81d2e34fa046d21a84dbc5ef40ca9e2734379b6a8c4cb69dd15e6131a1056a",
+  "testBeforeFormattingSha256": "9db694fd4701ae4ffcefddbb619f84616d0b893c87e77fad7242ed8497e8f15b",
+  "formattingRebuildSameWasm": true
+}

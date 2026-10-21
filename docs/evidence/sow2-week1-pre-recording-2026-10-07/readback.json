@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "syntheticOnly": true,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+  "wasmHash": "29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0",
+  "registryId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "identityEvidence": "real Ed25519 technical challenges; no Privy/browser login",
+  "database": "isolated Neon dev, direct connection",
+  "files": {
+    "pdfVersions": 2,
+    "pngVersions": 1,
+    "maximumOriginalBytes": 3000000
+  },
+  "checks": {
+    "patientIntegrityAndPreviousVersion": true,
+    "authorizedDoctorRead": true,
+    "revocationDeniesSubsequentReadAndAppend": true,
+    "alteredCiphertextRejected": true
+  },
+  "transactions": {
+    "create_history": {
+      "transactionHash": "a0c64f801870891cbec9e833d2c4ca540b4ee6367b5649af8a18f063b45b8cc5",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "status": "SUCCESS",
+      "ledger": 5064897,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/a0c64f801870891cbec9e833d2c4ca540b4ee6367b5649af8a18f063b45b8cc5"
+    },
+    "grant": {
+      "transactionHash": "1bc3b5f667e8412cd8e4c1f96ba1bf4d8e4c574741d168704e63e2b66463069d",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "status": "SUCCESS",
+      "ledger": 5064899,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/1bc3b5f667e8412cd8e4c1f96ba1bf4d8e4c574741d168704e63e2b66463069d"
+    },
+    "append_pdf": {
+      "transactionHash": "d6c35935f93e7e23c2a9c4db19ef88d151104dbfb7dec2b36a8e78864a7e9d6a",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5064901,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/d6c35935f93e7e23c2a9c4db19ef88d151104dbfb7dec2b36a8e78864a7e9d6a"
+    },
+    "correct_pdf": {
+      "transactionHash": "fbfe2df2b8423fd1d56e3e5032d2f8090f0e001f6a44448d4ed522033cc6c1d6",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5064903,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/fbfe2df2b8423fd1d56e3e5032d2f8090f0e001f6a44448d4ed522033cc6c1d6"
+    },
+    "append_image": {
+      "transactionHash": "3860d9dcce162575e50737920375a2def75515d75b24c8c02a8b63947ba0b191",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "status": "SUCCESS",
+      "ledger": 5064906,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/3860d9dcce162575e50737920375a2def75515d75b24c8c02a8b63947ba0b191"
+    },
+    "revoke": {
+      "transactionHash": "43dd5fb356bb578e64d116d390bcb120d158cc536820da4ef8d63875cbda568b",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "status": "SUCCESS",
+      "ledger": 5064912,
+      "explorer": "https://stellar.expert/explorer/testnet/tx/43dd5fb356bb578e64d116d390bcb120d158cc536820da4ef8d63875cbda568b"
+    }
+  },
+  "confirmedAttemptCount": 6,
+  "pendingAttemptCount": 0,
+  "funding": {
+    "transactionHash": "7761539e4c1b0008460e93508e3b12cb32dddfff9f5e7d913bf9edccf17cec92",
+    "source": "Stellar Testnet Friendbot",
+    "explorer": "https://stellar.expert/explorer/testnet/tx/7761539e4c1b0008460e93508e3b12cb32dddfff9f5e7d913bf9edccf17cec92"
+  },
+  "auditedReceipts": [
+    {
+      "name": "create_history",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "create_history",
+      "transactionHash": "a0c64f801870891cbec9e833d2c4ca540b4ee6367b5649af8a18f063b45b8cc5",
+      "status": "SUCCESS",
+      "ledger": 5064897,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    },
+    {
+      "name": "grant",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "set_permissions",
+      "transactionHash": "1bc3b5f667e8412cd8e4c1f96ba1bf4d8e4c574741d168704e63e2b66463069d",
+      "status": "SUCCESS",
+      "ledger": 5064899,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    },
+    {
+      "name": "append_pdf",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "append_version",
+      "transactionHash": "d6c35935f93e7e23c2a9c4db19ef88d151104dbfb7dec2b36a8e78864a7e9d6a",
+      "status": "SUCCESS",
+      "ledger": 5064901,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    },
+    {
+      "name": "correct_pdf",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "append_version",
+      "transactionHash": "fbfe2df2b8423fd1d56e3e5032d2f8090f0e001f6a44448d4ed522033cc6c1d6",
+      "status": "SUCCESS",
+      "ledger": 5064903,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    },
+    {
+      "name": "append_image",
+      "source": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "append_version",
+      "transactionHash": "3860d9dcce162575e50737920375a2def75515d75b24c8c02a8b63947ba0b191",
+      "status": "SUCCESS",
+      "ledger": 5064906,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    },
+    {
+      "name": "revoke",
+      "source": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "method": "set_permissions",
+      "transactionHash": "43dd5fb356bb578e64d116d390bcb120d158cc536820da4ef8d63875cbda568b",
+      "status": "SUCCESS",
+      "ledger": 5064912,
+      "signatureVerified": true,
+      "argumentsVerified": true,
+      "envelopeVerified": true
+    }
+  ],
+  "readbackAfterProcessRestart": true,
+  "observedAt": "2026-10-08T01:43:49.087Z"
+}

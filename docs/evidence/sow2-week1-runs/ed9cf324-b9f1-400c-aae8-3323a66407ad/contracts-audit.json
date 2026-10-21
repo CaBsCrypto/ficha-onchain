@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "network": "testnet",
+  "syntheticOnly": true,
+  "readOnly": true,
+  "observedAt": "2026-10-07T04:40:39.890Z",
+  "sourceCommit": "db9bc2f3eebb5c827321636d1e2275b540aee7be",
+  "newTransactions": 0,
+  "contracts": [
+    {
+      "name": "DoctorRegistryPrivate",
+      "contractId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "explorer": "https://stellar.expert/explorer/testnet/contract/CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+      "expectedWasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+      "observedWasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+      "wasmBytes": 5134,
+      "observedLedger": 5064890,
+      "interfaceVersion": 1,
+      "interfaceVerified": true,
+      "configurationVerified": true,
+      "wasmVerified": true,
+      "status": "verified",
+      "checks": [
+        "network_testnet",
+        "instance_wasm_hash",
+        "code_bytes_sha256",
+        "interface_version",
+        "get_admin"
+      ]
+    },
+    {
+      "name": "PrescriptionPrivate",
+      "contractId": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "explorer": "https://stellar.expert/explorer/testnet/contract/CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+      "expectedWasmHash": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c",
+      "observedWasmHash": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c",
+      "wasmBytes": 11358,
+      "observedLedger": 5064890,
+      "interfaceVersion": 2,
+      "interfaceVerified": true,
+      "configurationVerified": true,
+      "wasmVerified": true,
+      "status": "verified",
+      "checks": [
+        "network_testnet",
+        "instance_wasm_hash",
+        "code_bytes_sha256",
+        "interface_version",
+        "get_registry",
+        "get_admin",
+        "get_booking_authority"
+      ]
+    },
+    {
+      "name": "ClinicalHistoryPrivate",
+      "contractId": "CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "explorer": "https://stellar.expert/explorer/testnet/contract/CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U",
+      "expectedWasmHash": "29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0",
+      "observedWasmHash": "29e5510efc758f66bebc44c156fe13fb288a2ef339159467dd787bf4231e1ce0",
+      "wasmBytes": 15533,
+      "observedLedger": 5064890,
+      "interfaceVersion": 1,
+      "interfaceVerified": true,
+      "configurationVerified": true,
+      "wasmVerified": true,
+      "status": "verified",
+      "checks": [
+        "network_testnet",
+        "instance_wasm_hash",
+        "code_bytes_sha256",
+        "interface_version",
+        "get_registry"
+      ]
+    }
+  ],
+  "doctor": {
+    "status": "verified",
+    "wallet": "GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR",
+    "authorized": true,
+    "revoked": false,
+    "validUntil": 1791349840,
+    "validUntilUtc": "2026-10-07T05:10:40.000Z",
+    "version": 1,
+    "commitment": "88977bd8b66904a240ba347bed45f5e666f679875eb87818b61c34b39c0eb93c",
+    "schemaVersion": 1,
+    "remainingSeconds": 1799,
+    "observedLedger": 5064891
+  },
+  "prescriptionFixture": {
+    "status": "verified",
+    "contractId": "CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE",
+    "rxId": "2",
+    "lifecycleState": "Registered",
+    "expired": true,
+    "isValid": false,
+    "commitment": "80ecad3ca370c9ca007a5a5f20785bb3131ddce23d2f94f61e8daab14172e6d8",
+    "issuedAt": 1788762057,
+    "expiresAt": 1788765649,
+    "correspondenceVerified": true,
+    "contentRead": false,
+    "changed": false,
+    "evidenceKind": "existing_public_record_read",
+    "observedLedger": 5064891,
+    "historicalMintReceipt": "0e7102c770d100ea6b5f9aa375992dbbc76534535f48822fb066afca2cd672c8",
+    "receiptEvidence": "previous_execution_manifest_not_new_rpc_receipt"
+  },
+  "clinicalExecution": {
+    "ready": true,
+    "blockers": []
+  },
+  "contractsVerified": 3,
+  "status": "contracts_verified"
+}

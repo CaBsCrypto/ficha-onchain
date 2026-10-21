@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-15T05:44:58.269Z",
+  "readOnly": true,
+  "network": "testnet",
+  "contractId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "wasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+  "source": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+  "entries": [
+    {
+      "kind": "contractData",
+      "liveUntilLedgerSeq": 0,
+      "key": "AAAABgAAAAFbjTSy8jdDl8aG0EgbjhQHtJ4RIPM9EEOunF1NzumAaQAAABQAAAAB"
+    },
+    {
+      "kind": "contractCode",
+      "liveUntilLedgerSeq": 0,
+      "key": "AAAAB7Md6Jz9cEqpF6/SuQVrl6OCQtkfJFKEaiCJYvfeNY4C"
+    }
+  ],
+  "ledger": 5203902,
+  "archivedIndices": [
+    0,
+    1
+  ],
+  "restoreKeys": [
+    "AAAABgAAAAFbjTSy8jdDl8aG0EgbjhQHtJ4RIPM9EEOunF1NzumAaQAAABQAAAAB",
+    "AAAAB7Md6Jz9cEqpF6/SuQVrl6OCQtkfJFKEaiCJYvfeNY4C"
+  ],
+  "keySetSha256": "da996c5c1f8ebe90f81d4a5201ab4ffc69c342ed3d509c872f6c64bac7133664",
+  "proposedOperation": "restoreFootprint",
+  "proposedTransactionCount": 1,
+  "estimatedFeeStroops": "34518175",
+  "estimatedFeeXlm": "3.4518175",
+  "transactionsSubmitted": 0,
+  "signaturesCreated": 0
+}

@@ -1,0 +1,61 @@
+{
+  "sourceCommit": "daf18d6fb2ebdfdfc2f3071eac03d8bb7b9f9806",
+  "application": {
+    "tests": 950,
+    "files": 74,
+    "status": "passed"
+  },
+  "privateServices": {
+    "tests": 263,
+    "status": "passed"
+  },
+  "typescript": "passed",
+  "build": {
+    "status": "passed",
+    "id": "KmOTlOgm1mC2RPG5ni5y3"
+  },
+  "testKind": "isolated",
+  "readOnlyRpc": {
+    "status": "passed",
+    "knownQueries": 24,
+    "liveQueries": 24,
+    "remainingArchivedEntries": 0,
+    "unexpectedAuthorizations": 0,
+    "evidence": "post-restoration-required-reads.json"
+  },
+  "maintenance": {
+    "authorization": "two separate explicit user authorizations",
+    "signaturesCreated": 2,
+    "transactionsSubmitted": 2,
+    "status": "SUCCESS",
+    "clinicalOperationsCreated": 0,
+    "totalChargedFeeStroops": "30159417",
+    "receipts": [
+      {
+        "transactionHash": "966fe5e7ceacf9195959729b9eccfff5bff412d5017967e8fe350a96a1cf0fe4",
+        "scope": "registry instance and code only",
+        "ledger": 5204777,
+        "chargedFeeStroops": "29948101",
+        "approvedMaxFeeXlmTestnet": 5
+      },
+      {
+        "transactionHash": "ae17e228063d8a8c508dd835ee2006d7441142137aaceb7805601651f0ace156",
+        "scope": "existing Doctor record only",
+        "ledger": 5204990,
+        "chargedFeeStroops": "211316",
+        "approvedMaxFeeXlmTestnet": 0.1
+      }
+    ],
+    "pendingRelayerAttempts": 0,
+    "queueEvidence": "persistence-after-maintenance.json"
+  },
+  "authenticatedReadAfterMaintenance": "passed; three entries, four versions, original receipts and withdrawn permissions",
+  "mainChanged": false,
+  "originalClinicalTransactionsRepeated": false,
+  "manualPending": [
+    "signature via product button",
+    "real account change",
+    "browser text/zoom at 200 percent"
+  ],
+  "week2RecordingAcceptance": "pending remaining manual checks"
+}

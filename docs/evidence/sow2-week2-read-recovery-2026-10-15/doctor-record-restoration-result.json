@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-10-15T07:15:38.805Z",
+  "network": "testnet",
+  "contractId": "CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2",
+  "wasmHash": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02",
+  "source": "GBMKFDNUAQWUPSU73SDLAHJLGYJ55B6OTATX5QRIHXYGVJXTZLF26PHB",
+  "runId": "1f0ba7bc-7231-4962-8cd7-87e28133e2dc",
+  "operation": "restoreFootprint",
+  "keySetSha256": "4c07068571dd568b921916fbb22f927f2c617169df23b1f6c013ee0e1e9aa7de",
+  "keys": [
+    "AAAABgAAAAFbjTSy8jdDl8aG0EgbjhQHtJ4RIPM9EEOunF1NzumAaQAAABAAAAABAAAAAgAAAA8AAAAGRG9jdG9yAAAAAAASAAAAAAAAAAAV1v4vNlhzFcn+UiF3Ah+tQ5mMSwoWGZ1JmKnXan1i6QAAAAE="
+  ],
+  "status": "SUCCESS",
+  "transactionHash": "ae17e228063d8a8c508dd835ee2006d7441142137aaceb7805601651f0ace156",
+  "ledger": 5204990,
+  "offeredFeeStroops": "246492",
+  "chargedFeeStroops": "211316",
+  "receiptEnvelopeVerified": true,
+  "transactionsCreated": 1,
+  "clinicalOperationsCreated": 0
+}

@@ -19,8 +19,8 @@
   .portal main a { min-height: 44px; display: inline-flex; align-items: center; }
   .portal :is(a, button, input, select, summary):focus-visible { outline: 3px solid #0284c7; outline-offset: 3px; }
   .portal [data-patient-navigation] { padding-bottom: env(safe-area-inset-bottom); background: #fff; box-shadow: 0 -4px 24px #16304708; }
-  .portal [data-patient-navigation] nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 8px 12px; }
-  .portal [data-patient-navigation] a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 56px; padding: 6px 2px; font-size: 12px; line-height: 18px; color: #52677a; border-radius: 14px; }
+  .portal [data-patient-navigation] nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px 12px; }
+  .portal [data-patient-navigation] a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 56px; padding: 6px 2px; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; color: #52677a; border-radius: 14px; }
   .portal [data-patient-navigation] a[aria-current=page] { color: #0369a1; background: #e8f5fc; box-shadow: none; }
   .portal [data-patient-home] { display: grid; gap: 20px; }
   .portal [data-patient-home] > p { color: #52677a; }

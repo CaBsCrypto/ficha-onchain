@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-05T17:51:30.470Z",
+  "environment": "isolated-Neon-dev",
+  "storageSmoke": {
+    "realDatabase": true,
+    "originalFileBytes": 3000000,
+    "envelopeBytes": 5334480,
+    "roundtrip": true,
+    "immutableVersions": true,
+    "keyRewrap": true,
+    "rowsRolledBack": true,
+    "receipt": "controlled-fixture"
+  },
+  "lockSmoke": {
+    "twoDirectConnections": true,
+    "oneOwner": true,
+    "reacquiredAfterRelease": true,
+    "lostLockRejected": true,
+    "persistentDataWrites": false
+  },
+  "localKeyRecovery": {
+    "provider": "Windows DPAPI CurrentUser",
+    "sameAccountBackupVerified": true,
+    "portableRecovery": false
+  },
+  "tests": {
+    "application": 634,
+    "private": 98,
+    "contracts": 25,
+    "typeScript": true,
+    "build": true
+  }
+}

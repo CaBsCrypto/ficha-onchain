@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "runId": "ed9cf324-b9f1-400c-aae8-3323a66407ad",
+  "observedAt": "2026-10-07T04:45:22.972Z",
+  "newTransactions": 0,
+  "network": "testnet",
+  "readOnly": true,
+  "status": "verified",
+  "transactionHash": "7761539e4c1b0008460e93508e3b12cb32dddfff9f5e7d913bf9edccf17cec92",
+  "patient": "GDCHM6SC5HB6JOTSHUDQ7BUJCMKEJDLL6OYQ4YCZKXGZBAICGBG7V4D3",
+  "ledger": 5064895,
+  "confirmedAt": "2026-10-07T04:41:02Z",
+  "operation": "create_account",
+  "amountXlm": "10000.0000000",
+  "sourceAccount": "GDMG42HVITEW4QUAPNN7Z5FYLKHVK23AFKVF3Q2LLFH2EM3EXY25TGG2",
+  "operationSource": "GAIH3ULLFQ4DGSECF2AR555KZ4KNDGEKN4AFI4SU2M7B43MGK3QJZNSR",
+  "feeChargedStroops": "100",
+  "envelopeHashVerified": true,
+  "destinationVerified": true,
+  "operationsVerified": 1,
+  "clinicalOperation": false,
+  "explorer": "https://stellar.expert/explorer/testnet/tx/7761539e4c1b0008460e93508e3b12cb32dddfff9f5e7d913bf9edccf17cec92"
+}

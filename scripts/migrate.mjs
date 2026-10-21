@@ -11,6 +11,8 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "node:fs";
+import { databaseConnectionString } from './lib/database-connection.mjs';
+import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -18,12 +20,13 @@ if (!process.env.DATABASE_URL && existsSync(".env.local")) {
     if (m) process.env.DATABASE_URL = m[1].trim();
   }
 }
-if (!process.env.DATABASE_URL) {
+const connection = databaseConnectionString();
+if (!connection) {
   console.error("DATABASE_URL is not set (looked in the environment and .env.local)");
   process.exit(1);
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(connection);
 const steps = [];
 const step = (name, fn) => steps.push({ name, fn });
 
@@ -555,7 +558,7 @@ step("private doctor dossiers", async () => {
     network TEXT NOT NULL CHECK (network = 'testnet'),
     contract_id TEXT NOT NULL,
     wallet TEXT NOT NULL,
-    version INTEGER NOT NULL CHECK (version > 0),
+    version BIGINT NOT NULL CHECK (version BETWEEN 1 AND 4294967295),
     schema_version INTEGER NOT NULL DEFAULT 1,
     valid_until BIGINT NOT NULL,
     commitment TEXT NOT NULL,
@@ -744,6 +747,267 @@ step("private operations", async () => {
   await sql`CREATE INDEX IF NOT EXISTS private_operations_appointment ON private_operations(appointment_id)`;
 });
 
+// Browser-backed clinical histories remain separate from the synthetic week-one
+// runner. A hosted Testnet target requires the explicit migration policy.
+step("clinical-web-v1", async () => {
+  if (!process.argv.includes('--step=clinical-web-v1')) return;
+  clinicalMigrationConnection(process.env, true);
+  const dependency = await sql`SELECT to_regclass('public.clinical_private_versions') AS relation`;
+  if (!dependency[0]?.relation) throw Error('clinical_web_requires_clinical_history_v1');
+  await sql`CREATE TABLE IF NOT EXISTS clinical_web_histories (
+    history_id TEXT PRIMARY KEY CHECK (history_id ~ '^[a-f0-9]{64}$'),
+    owner_user_id TEXT NOT NULL CHECK (owner_user_id ~ '^did:privy:[A-Za-z0-9_-]{1,128}$'),
+    wallet_id TEXT NOT NULL CHECK (wallet_id ~ '^[A-Za-z0-9:_-]{1,160}$'),
+    patient_wallet TEXT NOT NULL CHECK (patient_wallet ~ '^G[A-Z2-7]{55}$'),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    network TEXT NOT NULL DEFAULT 'testnet' CHECK (network='testnet'),
+    transaction_hash TEXT NOT NULL CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(network,contract_id,owner_user_id),
+    UNIQUE(network,contract_id,patient_wallet)
+  )`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_web_history() RETURNS trigger AS $$
+  BEGIN
+    RAISE EXCEPTION 'clinical_history_binding_immutable';
+  END; $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_web_history_immutable ON clinical_web_histories`;
+  await sql`CREATE TRIGGER clinical_web_history_immutable BEFORE UPDATE OR DELETE ON clinical_web_histories
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_web_history()`;
+  await sql`CREATE TABLE IF NOT EXISTS clinical_web_operations (
+    id UUID PRIMARY KEY,
+    actor_user_id TEXT NOT NULL CHECK (actor_user_id ~ '^did:privy:[A-Za-z0-9_-]{1,128}$'),
+    wallet_id TEXT NOT NULL CHECK (wallet_id ~ '^[A-Za-z0-9:_-]{1,160}$'),
+    source_wallet TEXT NOT NULL CHECK (source_wallet ~ '^G[A-Z2-7]{55}$'),
+    action TEXT NOT NULL CHECK (action IN ('create_history','append_version','set_permissions')),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    network TEXT NOT NULL DEFAULT 'testnet' CHECK (network='testnet'),
+    method TEXT NOT NULL CHECK (method=action),
+    expected JSONB NOT NULL,
+    request_fingerprint TEXT NOT NULL CHECK (request_fingerprint ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[a-f0-9]{64}$'),
+    prepared_envelope JSONB CHECK (octet_length(prepared_envelope::text)<=6000000),
+    state TEXT NOT NULL CHECK (state IN ('awaiting_signature','submitted','confirmed','failed','cancelled')),
+    unsigned_xdr TEXT NOT NULL CHECK (octet_length(unsigned_xdr) BETWEEN 1 AND 1000000),
+    signing_hash TEXT NOT NULL CHECK (signing_hash ~ '^[a-f0-9]{64}$'),
+    expires_at BIGINT NOT NULL CHECK (expires_at>0),
+    signed_xdr TEXT CHECK (octet_length(signed_xdr) BETWEEN 1 AND 1000000),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    error_code TEXT CHECK (error_code ~ '^[a-z][a-z0-9_]{0,95}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    CHECK ((action='append_version')=(prepared_envelope IS NOT NULL)),
+    CHECK (prepared_envelope IS NULL OR (jsonb_typeof(prepared_envelope)='object'
+      AND prepared_envelope ?& ARRAY['schemaVersion','keyId','wrappedKey','payload']
+      AND (prepared_envelope - ARRAY['schemaVersion','keyId','wrappedKey','payload'])='{}'::jsonb
+      AND prepared_envelope->>'schemaVersion'='1'
+      AND prepared_envelope->>'keyId' ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+      AND prepared_envelope->>'wrappedKey' LIKE 'dossier:v1:%'
+      AND prepared_envelope->>'payload' LIKE 'dossier:v1:%') IS TRUE),
+    CHECK ((signed_xdr IS NULL)=(transaction_hash IS NULL)),
+    CHECK ((state IN ('awaiting_signature','cancelled') AND signed_xdr IS NULL)
+      OR (state IN ('submitted','confirmed') AND signed_xdr IS NOT NULL) OR state='failed'),
+    CHECK ((state='confirmed')=(confirmed_at IS NOT NULL)),
+    CHECK (jsonb_typeof(expected)='object' AND expected ?& ARRAY['historyId','patient','operationId']),
+    CHECK ((expected->>'historyId' ~ '^[a-f0-9]{64}$' AND expected->>'patient' ~ '^G[A-Z2-7]{55}$'
+      AND expected->>'operationId' ~ '^[a-f0-9]{64}$') IS TRUE),
+    CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb),
+    CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet)
+      OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
+        AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
+        AND expected->>'entryId' ~ '^[a-f0-9]{64}$' AND expected->>'author'=source_wallet
+        AND expected->>'commitment' ~ '^[a-f0-9]{64}$' AND jsonb_typeof(expected->'expectedVersion')='number'
+        AND (expected->>'expectedVersion')::bigint BETWEEN 0 AND 4294967295
+        AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
+          OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
+      OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
+        AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
+        AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE)
+  )`;
+  await sql`DO $$ DECLARE old_check RECORD; BEGIN
+    -- Replace only the former unnamed expected-key/action checks. A server
+    -- doctorId is optional for legacy receipt reads, required by signing gates.
+    FOR old_check IN SELECT conname FROM pg_constraint
+      WHERE conrelid='clinical_web_operations'::regclass AND contype='c'
+        AND conname NOT IN ('clinical_web_expected_keys','clinical_web_expected_action')
+        AND pg_get_constraintdef(oid) LIKE '%expected - ARRAY[%'
+    LOOP
+      EXECUTE format('ALTER TABLE clinical_web_operations DROP CONSTRAINT %I', old_check.conname);
+    END LOOP;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_keys') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_keys CHECK ((expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment',
+      'expectedVersion','expectedGrantRevision','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb);
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='clinical_web_operations'::regclass AND conname='clinical_web_expected_action') THEN
+      ALTER TABLE clinical_web_operations ADD CONSTRAINT clinical_web_expected_action CHECK (((action='create_history' AND (expected - ARRAY['historyId','patient','operationId'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet)
+      OR (action='append_version' AND expected ?& ARRAY['entryId','author','commitment','previousCommitment','expectedVersion']
+        AND (expected - ARRAY['historyId','patient','operationId','entryId','author','commitment','previousCommitment','expectedVersion','expectedGrantRevision'])='{}'::jsonb
+        AND expected->>'entryId' ~ '^[a-f0-9]{64}$' AND expected->>'author'=source_wallet
+        AND expected->>'commitment' ~ '^[a-f0-9]{64}$' AND jsonb_typeof(expected->'expectedVersion')='number'
+        AND (expected->>'expectedVersion')::bigint BETWEEN 0 AND 4294967295
+        AND ((expected->>'expectedVersion'='0' AND expected->'previousCommitment'='null'::jsonb)
+          OR ((expected->>'expectedVersion')::bigint>0 AND expected->>'previousCommitment' ~ '^[a-f0-9]{64}$')))
+      OR (action='set_permissions' AND expected ?& ARRAY['doctor','canRead','canAppend','expectedRevision']
+        AND (expected - ARRAY['historyId','patient','operationId','doctorId','doctor','canRead','canAppend','expectedRevision'])='{}'::jsonb
+        AND expected->>'patient'=source_wallet AND expected->>'doctor' ~ '^G[A-Z2-7]{55}$'
+        AND (NOT (expected ? 'doctorId') OR (jsonb_typeof(expected->'doctorId')='number' AND (expected->>'doctorId')::bigint BETWEEN 1 AND 2147483647))
+        AND jsonb_typeof(expected->'canRead')='boolean' AND jsonb_typeof(expected->'canAppend')='boolean'
+        AND jsonb_typeof(expected->'expectedRevision')='number' AND (expected->>'expectedRevision')::bigint BETWEEN 0 AND 4294967295)) IS TRUE);
+    END IF;
+  END $$`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_web_operations_one_live_source
+    ON clinical_web_operations(source_wallet) WHERE state IN ('awaiting_signature','submitted')`;
+  await sql`CREATE INDEX IF NOT EXISTS clinical_web_operations_actor
+    ON clinical_web_operations(network,contract_id,actor_user_id,created_at DESC)`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_web_operation() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_operation_immutable'; END IF;
+    IF ROW(NEW.id,NEW.actor_user_id,NEW.wallet_id,NEW.source_wallet,NEW.action,NEW.contract_id,NEW.network,
+      NEW.method,NEW.expected,NEW.request_fingerprint,NEW.prepared_envelope,NEW.unsigned_xdr,NEW.signing_hash,NEW.expires_at,NEW.created_at)
+      IS DISTINCT FROM ROW(OLD.id,OLD.actor_user_id,OLD.wallet_id,OLD.source_wallet,OLD.action,OLD.contract_id,OLD.network,
+      OLD.method,OLD.expected,OLD.request_fingerprint,OLD.prepared_envelope,OLD.unsigned_xdr,OLD.signing_hash,OLD.expires_at,OLD.created_at)
+      OR (OLD.signed_xdr IS NOT NULL AND ROW(NEW.signed_xdr,NEW.transaction_hash) IS DISTINCT FROM ROW(OLD.signed_xdr,OLD.transaction_hash))
+      OR (OLD.state IN ('confirmed','failed','cancelled') AND NEW IS DISTINCT FROM OLD) THEN
+      RAISE EXCEPTION 'clinical_operation_immutable';
+    END IF;
+    IF (OLD.state='awaiting_signature' AND NEW.state NOT IN ('awaiting_signature','submitted','failed','cancelled'))
+      OR (OLD.state='submitted' AND NEW.state NOT IN ('submitted','confirmed','failed')) THEN
+      RAISE EXCEPTION 'clinical_operation_transition_invalid';
+    END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_web_operation_immutable ON clinical_web_operations`;
+  await sql`CREATE TRIGGER clinical_web_operation_immutable BEFORE UPDATE OR DELETE ON clinical_web_operations
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_web_operation()`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_clinical_wallet_exclusive() RETURNS trigger AS $$
+  BEGIN
+    IF NEW.state NOT IN ('awaiting_signature','prepared','submitted') THEN RETURN NEW; END IF;
+    PERFORM pg_advisory_xact_lock(hashtext('private-user:' || NEW.source_wallet));
+    IF TG_TABLE_NAME <> 'clinical_web_operations' AND EXISTS(
+      SELECT 1 FROM clinical_web_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+      RAISE EXCEPTION 'another_operation_pending';
+    END IF;
+    IF TG_TABLE_NAME <> 'private_operations' AND to_regclass('public.private_operations') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM private_operations WHERE source_wallet=NEW.source_wallet AND state IN ('awaiting_signature','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    IF TG_TABLE_NAME <> 'clinical_transaction_attempts' AND to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM clinical_transaction_attempts WHERE source_wallet=NEW.source_wallet AND state IN ('prepared','submitted')) THEN
+        RAISE EXCEPTION 'another_operation_pending';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END; $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_web_operations`;
+  await sql`CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_web_operations
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive()`;
+  await sql`DO $$ BEGIN
+    IF to_regclass('public.private_operations') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON private_operations;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON private_operations
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+    IF to_regclass('public.clinical_transaction_attempts') IS NOT NULL THEN
+      DROP TRIGGER IF EXISTS clinical_wallet_exclusive ON clinical_transaction_attempts;
+      CREATE TRIGGER clinical_wallet_exclusive BEFORE INSERT OR UPDATE OF state ON clinical_transaction_attempts
+        FOR EACH ROW EXECUTE FUNCTION trustleaf_clinical_wallet_exclusive();
+    END IF;
+  END $$`;
+});
+
+// Clinical SOW 2 storage is deliberately opt-in. Existing deployments and
+// the default migration do not provision this feature accidentally.
+step("clinical-history-v1", async () => {
+  if (!process.argv.includes('--step=clinical-history-v1')) return;
+  clinicalMigrationConnection();
+  await sql`CREATE TABLE IF NOT EXISTS clinical_private_versions (
+    network TEXT NOT NULL CHECK (network='testnet'),
+    contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
+    history_id TEXT NOT NULL CHECK (history_id ~ '^[a-f0-9]{64}$'),
+    entry_id TEXT NOT NULL CHECK (entry_id ~ '^[a-f0-9]{64}$'),
+    version BIGINT NOT NULL CHECK (version BETWEEN 1 AND 4294967295),
+    context JSONB NOT NULL,
+    commitment TEXT NOT NULL CHECK (commitment ~ '^[a-f0-9]{64}$'),
+    envelope JSONB NOT NULL CHECK (octet_length(envelope::text) <= 6000000),
+    operation_id TEXT NOT NULL CHECK (operation_id ~ '^[a-f0-9]{64}$'),
+    state TEXT NOT NULL CHECK (state IN ('prepared','confirmed')),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    PRIMARY KEY (network,contract_id,history_id,entry_id,version),
+    CHECK ((state='confirmed' AND transaction_hash IS NOT NULL AND confirmed_at IS NOT NULL)
+       OR (state='prepared' AND transaction_hash IS NULL AND confirmed_at IS NULL)),
+    CHECK (jsonb_typeof(context)='object' AND context ?& ARRAY['schemaVersion','network','contractId','historyId','entryId','author','patient','version','previousCommitment']),
+    CHECK ((context->>'schemaVersion'='1' AND context->>'network'=network AND context->>'contractId'=contract_id
+      AND context->>'historyId'=history_id AND context->>'entryId'=entry_id
+      AND (context->>'version')::bigint=version) IS TRUE),
+    CHECK (jsonb_typeof(envelope)='object' AND envelope ?& ARRAY['schemaVersion','keyId','wrappedKey','payload']),
+    CHECK ((envelope->>'schemaVersion'='1' AND envelope->>'keyId' ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+      AND envelope->>'wrappedKey' LIKE 'dossier:v1:%'
+      AND envelope->>'payload' LIKE 'dossier:v1:%') IS TRUE)
+  )`;
+  await sql`ALTER TABLE clinical_private_versions ALTER COLUMN version TYPE BIGINT`;
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clinical_private_versions'::regclass AND conname='clinical_version_u32') THEN
+      ALTER TABLE clinical_private_versions ADD CONSTRAINT clinical_version_u32 CHECK (version BETWEEN 1 AND 4294967295);
+    END IF;
+  END $$`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_private_version_operation
+    ON clinical_private_versions (network,contract_id,(context->>'author'),operation_id)`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_version() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_version_immutable'; END IF;
+    IF ROW(NEW.network,NEW.contract_id,NEW.history_id,NEW.entry_id,NEW.version,NEW.context,NEW.commitment,NEW.operation_id,NEW.created_at)
+       IS DISTINCT FROM ROW(OLD.network,OLD.contract_id,OLD.history_id,OLD.entry_id,OLD.version,OLD.context,OLD.commitment,OLD.operation_id,OLD.created_at)
+       OR NEW.envelope->>'payload' IS DISTINCT FROM OLD.envelope->>'payload'
+       OR (OLD.state='confirmed' AND ROW(NEW.state,NEW.transaction_hash,NEW.confirmed_at)
+           IS DISTINCT FROM ROW(OLD.state,OLD.transaction_hash,OLD.confirmed_at)) THEN
+      RAISE EXCEPTION 'clinical_version_immutable';
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_version_immutable ON clinical_private_versions`;
+  await sql`CREATE TRIGGER clinical_version_immutable BEFORE UPDATE OR DELETE ON clinical_private_versions
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_version()`;
+  await sql`CREATE TABLE IF NOT EXISTS clinical_transaction_attempts (
+    run_id UUID NOT NULL, operation_name TEXT NOT NULL CHECK (operation_name ~ '^[a-z][a-z0-9_-]{0,63}$'),
+    source_wallet TEXT NOT NULL CHECK (source_wallet ~ '^G[A-Z2-7]{55}$'),
+    intent TEXT NOT NULL CHECK (intent ~ '^[a-f0-9]{64}$'),
+    signed_xdr TEXT CHECK (octet_length(signed_xdr)<=1000000),
+    transaction_hash TEXT CHECK (transaction_hash ~ '^[a-f0-9]{64}$'),
+    state TEXT NOT NULL CHECK (state IN ('prepared','submitted','confirmed','failed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(run_id,operation_name),
+    CHECK ((state='prepared' AND signed_xdr IS NULL AND transaction_hash IS NULL)
+      OR (state IN ('submitted','confirmed','failed') AND signed_xdr IS NOT NULL AND transaction_hash IS NOT NULL))
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_attempt_one_live_source
+    ON clinical_transaction_attempts(source_wallet) WHERE state IN ('prepared','submitted')`;
+  await sql`CREATE OR REPLACE FUNCTION trustleaf_preserve_clinical_attempt() RETURNS trigger AS $$
+  BEGIN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'clinical_attempt_immutable'; END IF;
+    IF ROW(NEW.run_id,NEW.operation_name,NEW.source_wallet,NEW.intent,NEW.created_at)
+      IS DISTINCT FROM ROW(OLD.run_id,OLD.operation_name,OLD.source_wallet,OLD.intent,OLD.created_at)
+      OR (OLD.signed_xdr IS NOT NULL AND ROW(NEW.signed_xdr,NEW.transaction_hash) IS DISTINCT FROM ROW(OLD.signed_xdr,OLD.transaction_hash))
+      OR (OLD.state IN ('confirmed','failed') AND NEW.state IS DISTINCT FROM OLD.state) THEN
+      RAISE EXCEPTION 'clinical_attempt_immutable';
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`;
+  await sql`DROP TRIGGER IF EXISTS clinical_attempt_immutable ON clinical_transaction_attempts`;
+  await sql`CREATE TRIGGER clinical_attempt_immutable BEFORE UPDATE OR DELETE ON clinical_transaction_attempts
+    FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_clinical_attempt()`;
+
+});
+
 step("doctor onboarding requests", async () => {
   await sql`CREATE TABLE IF NOT EXISTS doctor_onboarding_requests (
     id UUID PRIMARY KEY,
@@ -801,7 +1065,7 @@ step("doctor onboarding requests", async () => {
 });
 
 // ── Run ─────────────────────────────────────────────────────────────────────
-const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
+const host = new URL(connection).hostname;
 console.log(`\n  target: ${host}\n`);
 
 const selectedStep = process.argv.find((arg) => arg.startsWith("--step="))?.slice(7);

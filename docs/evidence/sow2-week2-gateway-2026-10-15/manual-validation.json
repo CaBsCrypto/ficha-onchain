@@ -1,0 +1,79 @@
+{
+  "updatedAt": "2026-10-15T23:57:11.100Z",
+  "sourceCommit": "f98f0e7e931f445245443a4460dab63845d69770",
+  "environment": "local / Neon dev / Testnet",
+  "zoom200": {
+    "status": "passed",
+    "evidenceKind": "user_reported",
+    "confirmed": "Text and controls remain legible and accessible across history and medical permissions; no clipping or obstruction."
+  },
+  "logout": {
+    "status": "passed",
+    "evidenceKind": "observed_UI",
+    "result": "Prior authenticated history removed; landing presents sign-in."
+  },
+  "accountSwitch": {
+    "status": "passed",
+    "evidenceKind": "observed_UI",
+    "secondaryAccountIsolation": {
+      "status": "passed",
+      "observedAt": "2026-10-15T23:42:59.431Z",
+      "secondaryAccountShown": true,
+      "primaryAccountShown": false,
+      "emptyHistoryMessage": true,
+      "previousClinicalEntriesVisible": 0,
+      "stellarReceiptLinks": 0,
+      "historyCreated": false,
+      "recheckedAfterReload": true
+    },
+    "returnToPrimary": {
+      "status": "passed_observed_UI",
+      "contentVerifiedAt": "2026-10-15T23:45:33Z",
+      "entries": 3,
+      "versions": 4,
+      "originalReceiptsVisible": true,
+      "doctorAuthorized": false,
+      "permissions": {
+        "read": false,
+        "append": false
+      }
+    },
+    "reloadOfSecondary": "passed",
+    "secondaryLogout": "passed_observed_UI"
+  },
+  "productSignature": {
+    "status": "passed",
+    "evidenceKind": "user_confirmation_and_observed_UI_and_independent_audit",
+    "transactionHash": "b991c3e6cc4bbfc077656e9543ca612fb80f04ec16f25dfe86ff3fa7a8471c6f",
+    "ledger": 5216962,
+    "receiptAudit": "product-signature-audit.json",
+    "clinicalWritesEnabled": false,
+    "newClinicalTransactions": 1,
+    "queuesPending": 0,
+    "reloadAfterReadOnlyRestart": {
+      "status": "passed_observed_UI",
+      "verifiedAt": "2026-10-15T23:55:25Z",
+      "entries": 4,
+      "versions": 5,
+      "newNoteAndReceiptVisible": true,
+      "originalEntriesVisible": true,
+      "doctorAuthorized": false,
+      "permissions": {
+        "read": false,
+        "append": false
+      }
+    }
+  },
+  "limits": [
+    "Account switch covers two existing test accounts and the observed return; it is not proof for every identity configuration.",
+    "No codes, tokens, private contacts or screenshots of authentication fields included."
+  ],
+  "recordingReadiness": {
+    "status": "ready_for_local_review_of_existing_executions",
+    "newPermissionTransactionsApproved": false,
+    "previewConfigured": false,
+    "mainPublished": false,
+    "recordingCompleted": false,
+    "reviewerAccepted": false
+  }
+}
