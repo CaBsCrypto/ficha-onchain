@@ -70,7 +70,7 @@ describe('clinical permission accessible presentation', () => {
   }));
   it('shows the empty state without inventing doctors or permissions', () => {
     const html = render([]);
-    expect(html).toContain('Sin médicos autorizados disponibles');
+    expect(html).toContain('Sin médicos con estado verificado disponibles');
     expect(html).not.toContain('type="checkbox"'); expect(html).not.toContain('type="submit"');
   });
   it('distinguishes homonymous doctors by the complete accessible wallet and visible shortened wallet', () => {

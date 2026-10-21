@@ -55,18 +55,33 @@ export async function clinicalDocument(request: Request, actor: ClinicalActor, h
     getKeyring: async () => clinicalKeyring().keyring,
   });
 }
-export async function clinicalGrants(historyId: string): Promise<ClinicalGrant[]> {
+export async function clinicalGrants(historyId: string, onUnavailable?: () => void): Promise<ClinicalGrant[]> {
   const chain = createClinicalWebChain();
   const rows = await getDb().query('SELECT id,name FROM doctors ORDER BY name,id LIMIT 200');
   const result: ClinicalGrant[] = [];
   for (const row of rows) {
     let doctor;
     try { doctor = await resolveDoctor(getDb(), Number(row.id)); }
-    catch (error) { if (error instanceof Error && error.message === 'doctor_privy_login_required') continue; throw error; }
-    const [grant, authorized] = await Promise.all([chain.grant(historyId, doctor.address), chain.doctorAuthorized(doctor.address)]);
-    if (!authorized && !grant) continue;
-    result.push({ doctorId: Number(row.id), doctorName: String(row.name), address: doctor.address, authorized: authorized && doctor.doctor.status === 'active',
-      canRead: grant?.canRead ?? false, canAppend: grant?.canAppend ?? false, revision: grant?.revision ?? 0 });
+    catch (error) {
+      if (error instanceof Error && error.message === 'doctor_privy_login_required') continue;
+      if (!onUnavailable) throw error;
+      onUnavailable(); continue;
+    }
+    // Both calls share a monotonic ledger watermark. Concurrent responses can
+    // finish out of order and make a valid older observation look regressive.
+    try {
+      const grant = await chain.grant(historyId, doctor.address);
+      const authorized = await chain.doctorAuthorized(doctor.address);
+      if (!authorized && !grant) continue;
+      result.push({ doctorId: Number(row.id), doctorName: String(row.name), address: doctor.address, authorized: authorized && doctor.doctor.status === 'active',
+        canRead: grant?.canRead ?? false, canAppend: grant?.canAppend ?? false, revision: grant?.revision ?? 0 });
+    } catch (error) {
+      // The patient's content was independently verified as owner. An unrelated
+      // directory entry cannot authorize access, or invalidate that content.
+      // Omit all unverified flags and controls, and report the incomplete panel.
+      if (!onUnavailable) throw error;
+      onUnavailable();
+    }
   }
   return result;
 }
@@ -103,5 +118,7 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
       canCorrect: evidence.context.author === actor.address && version === heads.get(entryId) });
   }
   entries.sort((a,b) => b.createdAt-a.createdAt || b.version-a.version || a.entryId.localeCompare(b.entryId));
-  return { writes, history: own.history, entries, grants: await clinicalGrants(own.history.id), operations, verifiedAt: new Date().toISOString() };
+  let grantsUnavailable = false;
+  const grants = await clinicalGrants(own.history.id, () => { grantsUnavailable = true; });
+  return { writes, history: own.history, entries, grants, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
 }

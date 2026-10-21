@@ -32,3 +32,11 @@ La disponibilidad de lectura depende de RPC y TTL de Testnet. Si un estado está
 ## Reversión
 
 Reasignar la versión anterior de **trustleaf-demo** si aparece un problema; mantener escrituras apagadas. Conservar las tablas nuevas, el respaldo de claves y los recibos importados. No borrar evidencia ni desactivar triggers para retroceder. No modificar el proyecto **trustleaf**, CNAME, alias ni rutas QR de cannabis.
+
+## Corrección de la consulta del directorio médico
+
+La revisión autenticada del 21 de octubre encontró un bloqueo: después de verificar las cinco versiones y sus recibos, una consulta de autorización de otro médico cancelaba el snapshot completo. La ficha del propietario no requiere el acceso de ese médico.
+
+Las lecturas de cada médico se realizan en secuencia para no solapar el watermark del ledger. Si no puede verificarse su identidad, autorización o permiso, ese médico no se incluye entre los estados comprobados y el portal muestra un aviso de verificación incompleta. No se inventan permisos ni se habilitan controles para entradas desconocidas. La comprobación del propietario, contenido, integridad y recibos sigue siendo obligatoria y un fallo mantiene bloqueados los documentos.
+
+El proveedor de producción se selecciona explícitamente como SDF Testnet tras comprobar que vuelve a responder. No hay fallback automático, nuevas firmas ni restauraciones. El estado del directorio incompleto se registra como límite, separado de la disponibilidad de la ficha propia.
