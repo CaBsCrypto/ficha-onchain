@@ -14,7 +14,6 @@ it('mirrors complete opt-in web history schema including immutable intent and wa
   expect(expected).toHaveLength(15); expect(actual).toEqual(expected);
   expect(expected.join(' ')).toContain('pg_advisory_xact_lock');
   expect(expected.join(' ')).toContain('clinical_operation_immutable');
-  expect(remote).toContain("const webEnabled = process.env.TRUSTLEAF_CLINICAL_WEB_MIGRATION === 'true'");
-  expect(remote).toContain('webEnabled && !clinicalEnabled');
+  expect(remote).toContain('clinicalMigrationConnection(process.env, webEnabled)');
   expect(cli.slice(start, end)).toContain("process.argv.includes('--step=clinical-web-v1')");
 });

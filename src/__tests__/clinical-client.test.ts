@@ -21,7 +21,7 @@ const note = { title: 'Antecedente sintético', text: 'Información de prueba', 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const version = (overrides: Partial<ClinicalVersion> = {}): ClinicalVersion => ({ entryId: '1'.repeat(64), version: 1, author: 'G' + 'A'.repeat(55), source: 'patient', createdAt: 1_800_000_000, title: note.title, mediaType: 'application/json', fileName: 'antecedente.json', note, transactionHash: 'a'.repeat(64), canCorrect: true, ...overrides });
-const snapshot = (entries: ClinicalVersion[] = []): ClinicalSnapshot => ({ history: { id: '9'.repeat(64), patient: 'G' + 'A'.repeat(55), createdAt: 1_800_000_000 }, entries, operations: [], grants: [], verifiedAt: '2026-10-08T05:00:00Z' });
+const snapshot = (entries: ClinicalVersion[] = []): ClinicalSnapshot => ({ writes: {create_history:true,append_version:true,set_permissions:true}, history: { id: '9'.repeat(64), patient: 'G' + 'A'.repeat(55), createdAt: 1_800_000_000 }, entries, operations: [], grants: [], verifiedAt: '2026-10-08T05:00:00Z' });
 let roots: Array<{ root: Root; host: HTMLDivElement }> = [];
 async function mount(node: React.ReactNode) { const host = document.createElement('div'); document.body.append(host); const root = createRoot(host); roots.push({ root, host }); await act(async () => root.render(node)); return { root, host }; }
 beforeEach(() => { vi.clearAllMocks(); deps.userId = 'did:privy:patient1'; (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; });
@@ -332,4 +332,28 @@ describe('prepared history attempt focus', () => {
     expect(host.querySelector('[aria-label="Intento clínico actual"]')).toBeNull(); expect(host.textContent).not.toContain(note.title);
     outside.remove();
   });
+});
+describe('read-only clinical release',()=>{
+ const writes={create_history:false,append_version:false,set_permissions:false};
+ const button=(host:HTMLElement,text:string)=>[...host.querySelectorAll('button')].find(x=>x.textContent===text);
+ it.each([false,true])('keeps versions and receipts readable when writes are disabled or missing (%s)',async missing=>{
+  const data:Partial<ClinicalSnapshot>={...snapshot([version({version:2}),version()]),writes,grants:[{doctorId:7,doctorName:'Médico sintético',address:'G'+'B'.repeat(55),authorized:true,canRead:true,canAppend:false,revision:1}]};
+  if(missing)delete data.writes;
+  deps.fetch.mockResolvedValue(response(data));
+  const {host}=await mount(createElement(ClinicalHistory,{renderPermissions:props=>createElement(ClinicalPermissions,props)}));
+  expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Ver 1 versión anterior');expect(host.textContent).toContain('Permisos consultados');
+  expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+  expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
+  for(const text of ['Agregar antecedente o archivo','Corregir mi aporte']){const control=button(host,text);if(control){expect(control.disabled).toBe(true);await act(async()=>control.click());}}
+  await act(async()=>button(host,'Actualizar')!.click());
+  expect(deps.fetch.mock.calls.every(call=>call[0]==='/api/private-clinical-history'&&(call[1]?.method??'GET')==='GET')).toBe(true);expect(deps.sign).not.toHaveBeenCalled();
+ });
+ it('cannot sign a recovered creation while writes are paused',async()=>{
+  const pending=op({action:'create_history'});
+  deps.fetch.mockImplementation((path,init)=>{expect(init?.method??'GET').toBe('GET');return Promise.resolve(response(path==='/api/private-clinical-history'?{...snapshot(),writes,history:null,operations:[pending]}:{operation:pending}));});
+  const {host}=await mount(createElement(ClinicalHistory));
+  await act(async()=>button(host,'Consultar intento pendiente')!.click());
+  for(const text of ['Revisar confirmación','Confirmar con mi cuenta Privy','Cancelar firma pendiente','Reintentar envío del mismo intento'])expect(button(host,text)).toBeUndefined();
+  await act(async()=>button(host,'Consultar confirmación')!.click());expect(deps.sign).not.toHaveBeenCalled();
+ });
 });

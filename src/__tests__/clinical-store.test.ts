@@ -180,9 +180,9 @@ describe('clinical web migration: explicit dev-only preparation', () => {
   const section = source.slice(source.indexOf('step("clinical-web-v1",'), source.indexOf('// Clinical SOW 2 storage is deliberately opt-in.'));
   it('requires the selected step, explicit clinical flag and exact existing dev host before DDL', () => {
     expect(section).toContain("if (!process.argv.includes('--step=clinical-web-v1')) return;");
-    expect(section).toContain("process.env.TRUSTLEAF_CLINICAL_MIGRATION !== 'true'");
-    expect(section).toContain('ep-lingering-water-ahzh89z5'); expect(section).not.toContain('ep-sweet-term'); expect(section).not.toContain('ep-rapid-shadow');
-    expect(section.indexOf('clinical_migration_requires_isolated_dev_database')).toBeLessThan(section.indexOf('CREATE TABLE'));
+    expect(section).toContain('clinicalMigrationConnection(process.env, true)');
+    expect(section.indexOf('clinicalMigrationConnection(process.env, true)')).toBeLessThan(section.indexOf('CREATE TABLE'));
+
   });
   it('requires the encrypted version dependency, no plaintext data index and a live wallet uniqueness constraint', () => {
     expect(section.indexOf("to_regclass('public.clinical_private_versions')")).toBeLessThan(section.indexOf('CREATE TABLE'));

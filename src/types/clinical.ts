@@ -24,6 +24,7 @@ export interface ClinicalGrant {
   canRead: boolean; canAppend: boolean; revision: number;
 }
 export interface ClinicalSnapshot {
+  writes: Record<ClinicalAction, boolean>;
   history: { id: string; patient: string; createdAt: number } | null;
   entries: ClinicalVersion[]; grants: ClinicalGrant[]; operations: ClinicalOperation[];
   verifiedAt: string;

@@ -12,7 +12,7 @@ const button = 'min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visi
 const labels: Record<ClinicalOperation['state'], string> = { awaiting_signature: 'Pendiente de tu firma', submitted: 'Enviado; confirmación pendiente', confirmed: 'Confirmado en Stellar Testnet', failed: 'No se confirmó el cambio', cancelled: 'Firma cancelada' };
 const actionLabels: Record<ClinicalOperation['action'], string> = { create_history: 'Crear mi historial', append_version: 'Guardar aporte', set_permissions: 'Actualizar permisos' };
 export interface ClinicalPermissionsProps {
-  grants: ClinicalGrant[]; disabled: boolean; onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>;
+  grants: ClinicalGrant[]; disabled: boolean; readOnly?: boolean; onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>;
 }
 export interface ClinicalHistoryProps { renderPermissions?: (props: ClinicalPermissionsProps) => ReactNode }
 
@@ -105,14 +105,17 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
   const pending = data?.operations.filter(op => ['awaiting_signature', 'submitted'].includes(op.state)) ?? [];
   const blocked = snapshot.loading || !!snapshot.error || !data || operation.busy || operation.uncertain || operation.accessLost;
   const newBlocked = blocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state);
+  const canWrite = (action: ClinicalOperation['action']) => data?.writes?.[action] === true;
+  const readOnly = !Object.values(data?.writes ?? {}).some(Boolean);
   async function prepare(input: ClinicalIntent) {
+    if (!canWrite(input.action)) throw new Error('Las escrituras están apagadas. Puedes consultar los registros existentes.');
     const result = await operation.controller.prepare(input);
     setEditing(null); setSignReview(false); setActionError('');
     setPreparedFocus({ identity, operationId: result.id }); return result;
   }
   async function act(action: 'sign' | 'cancel' | 'check' | 'retry' | 'prepareSaved') {
     setActionError('');
-    try { await operation.controller[action](); setSignReview(false); }
+    try { if (action !== 'check' && (action === 'prepareSaved' ? readOnly : !current || !canWrite(current.action))) throw new Error('Las escrituras están apagadas.'); await operation.controller[action](); setSignReview(false); }
     catch (failure) { setActionError(failure instanceof Error ? failure.message : 'No pudimos comprobar el resultado.'); }
   }
   const groups = new Map<string, ClinicalVersion[]>();
@@ -123,10 +126,11 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
   if (!identity) return <p role="status" className="text-sm text-slate-600">Ingresa con Privy para abrir tu historial privado.</p>;
   return <section key={identity} className="space-y-5 pb-4" aria-labelledby="clinical-history-title">
     <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="min-w-0"><h1 id="clinical-history-title" className="text-2xl font-semibold tracking-tight text-slate-900">Mi historial privado</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">Tus antecedentes y archivos, con su autor y sus versiones. Tú decides los permisos de los médicos.</p></div>
+      <div className="min-w-0"><h1 id="clinical-history-title" className="text-2xl font-semibold tracking-tight text-slate-900">Ficha clínica</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">Tus antecedentes y archivos, con su autor y sus versiones. Tú decides los permisos de los médicos.</p></div>
       <button type="button" disabled={snapshot.loading || operation.busy} onClick={snapshot.refresh} className={`${button} border border-slate-200 bg-white text-slate-700`}>{snapshot.loading ? 'Consultando…' : 'Actualizar'}</button>
     </header>
     {(snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">No mostramos información anterior como verificada. {operation.accessLost ? 'Vuelve a ingresar con Privy antes de continuar.' : 'Puedes actualizar para volver a comprobar el historial.'}</p></div>}
+    {data && readOnly && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">Modo de sólo lectura. Las escrituras están apagadas: puedes consultar archivos, versiones, permisos y recibos existentes.</p>}
     {snapshot.loading && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">Comprobando acceso, versiones y recibos…</p>}
     {current || operation.uncertain ? <section aria-label="Intento clínico actual" className={`space-y-3 rounded-xl border p-4 ${current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-sky-200 bg-sky-50'}`}>
       <h2 ref={operationHeading} tabIndex={-1} className="font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{current ? `${actionLabels[current.action]} · ${labels[current.state]}` : 'Preparación sin resultado comprobado'}</h2>
@@ -137,31 +141,31 @@ export function ClinicalHistory({ renderPermissions }: ClinicalHistoryProps = {}
       {current && <ReceiptLink hash={current.transactionHash} />}
       <div className="flex flex-col flex-wrap gap-3 sm:flex-row">
         {(operation.uncertain || current && ['awaiting_signature', 'submitted'].includes(current.state)) && <button type="button" disabled={operation.busy || operation.accessLost} onClick={() => void act('check')} className={`${button} border border-sky-200 bg-white text-sky-800`}>Consultar confirmación</button>}
-        {!current && operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('prepareSaved')} className={`${button} border border-sky-200 bg-white text-sky-800`}>Retomar la misma preparación</button>}
-        {current?.state === 'submitted' && !operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('retry')} className={`${button} border border-sky-200 bg-white text-sky-800`}>Reintentar envío del mismo intento</button>}
-        {current?.state === 'awaiting_signature' && !operation.uncertain && <>
+        {!readOnly && !current && operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('prepareSaved')} className={`${button} border border-sky-200 bg-white text-sky-800`}>Retomar la misma preparación</button>}
+        {!readOnly && current?.state === 'submitted' && !operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('retry')} className={`${button} border border-sky-200 bg-white text-sky-800`}>Reintentar envío del mismo intento</button>}
+        {!readOnly && current?.state === 'awaiting_signature' && !operation.uncertain && <>
           {operation.canSign && <button ref={signButton} type="button" disabled={operation.busy || blocked} onClick={() => setSignReview(true)} className={`${button} bg-sky-700 text-white`}>Revisar confirmación</button>}
           <button type="button" disabled={operation.busy} onClick={() => void act('cancel')} className={`${button} border border-slate-200 bg-white text-slate-700`}>Cancelar firma pendiente</button>
         </>}
       </div>
-      {signReview && current?.state === 'awaiting_signature' && <div onKeyDown={event => { if (event.key === "Escape" && !operation.busy) { setSignReview(false); signButton.current?.focus(); } }} className="space-y-3 border-t border-sky-200 pt-4">
+      {!readOnly && signReview && current?.state === 'awaiting_signature' && <div onKeyDown={event => { if (event.key === "Escape" && !operation.busy) { setSignReview(false); signButton.current?.focus(); } }} className="space-y-3 border-t border-sky-200 pt-4">
         <h2 ref={signHeading} tabIndex={-1} className="font-semibold text-slate-900">{actionLabels[current.action]}</h2><p className="text-sm leading-relaxed text-slate-700">Confirmarás {current.action === 'create_history' ? 'la creación de tu historial' : current.action === 'set_permissions' ? 'los permisos que acabas de revisar' : 'el aporte que acabas de revisar'} con tu cuenta Privy. TrustLeaf cubre la comisión. Espera el recibo antes de considerar el cambio guardado.</p>
         <div className="flex flex-col gap-3 sm:flex-row"><button type="button" disabled={operation.busy || blocked} onClick={() => void act('sign')} className={`${button} bg-sky-700 text-white`}>{operation.busy ? 'Confirmando…' : 'Confirmar con mi cuenta Privy'}</button><button type="button" disabled={operation.busy} onClick={() => { setSignReview(false); signButton.current?.focus(); }} className={`${button} border border-sky-200 bg-white text-sky-800`}>Volver</button></div>
       </div>}
     </section> : null}
-    {data && !data.history && <section className="rounded-2xl border border-sky-200 bg-white p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">Comienza tu historial</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">Crea tu espacio privado para agregar antecedentes y archivos. El contenido clínico permanece cifrado; Stellar registra los permisos y comprobantes.</p><button type="button" disabled={newBlocked} onClick={() => void prepare({ action: 'create_history' }).catch(failure => setActionError(failure.message))} className={`${button} mt-4 bg-sky-700 text-white`}>Preparar mi historial</button></section>}
+    {data && !data.history && <section className="rounded-2xl border border-sky-200 bg-white p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">Comienza tu historial</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">Crea tu espacio privado para agregar antecedentes y archivos. El contenido clínico permanece cifrado; Stellar registra los permisos y comprobantes.</p><button type="button" disabled={newBlocked || !canWrite('create_history')} onClick={() => void prepare({ action: 'create_history' }).catch(failure => setActionError(failure.message))} className={`${button} mt-4 bg-sky-700 text-white`}>Preparar mi historial</button></section>}
     {data?.history && <>
-      <div className="flex flex-wrap items-end justify-between gap-4"><label className="block min-w-0 flex-1 text-sm font-medium text-slate-700" htmlFor="clinical-filter">Mostrar<select id="clinical-filter" value={filter} onChange={event => setFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-800 focus-visible:outline-2 focus-visible:outline-sky-600 sm:max-w-xs"><option value="all">Todo el historial</option><option value="mine">Mis aportes</option><option value="doctor">Aportes médicos</option><option value="notes">Antecedentes escritos</option><option value="files">PDF e imágenes</option></select></label><button type="button" disabled={newBlocked} onClick={event => { formOpener.current = event.currentTarget; setEditing('new'); }} className={`${button} w-full bg-sky-700 text-white sm:w-auto`}>Agregar antecedente o archivo</button></div>
-      {editing && !operation.accessLost && <ClinicalEntryForm key={typeof editing === 'string' ? 'new' : `${editing.entryId}:${editing.version}`} correction={editing === 'new' ? null : editing} disabled={newBlocked} onPrepare={prepare} onCancel={() => { setEditing(null); formOpener.current?.focus(); }} />}
+      <div className="flex flex-wrap items-end justify-between gap-4"><label className="block min-w-0 flex-1 text-sm font-medium text-slate-700" htmlFor="clinical-filter">Mostrar<select id="clinical-filter" value={filter} onChange={event => setFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-800 focus-visible:outline-2 focus-visible:outline-sky-600 sm:max-w-xs"><option value="all">Todo el historial</option><option value="mine">Mis aportes</option><option value="doctor">Aportes médicos</option><option value="notes">Antecedentes escritos</option><option value="files">PDF e imágenes</option></select></label><button type="button" disabled={newBlocked || !canWrite('append_version')} onClick={event => { formOpener.current = event.currentTarget; setEditing('new'); }} className={`${button} w-full bg-sky-700 text-white sm:w-auto`}>Agregar antecedente o archivo</button></div>
+      {editing && canWrite('append_version') && !operation.accessLost && <ClinicalEntryForm key={typeof editing === 'string' ? 'new' : `${editing.entryId}:${editing.version}`} correction={editing === 'new' ? null : editing} disabled={newBlocked} onPrepare={prepare} onCancel={() => { setEditing(null); formOpener.current?.focus(); }} />}
       <p className="text-sm text-slate-500">Contenido y recibos comprobados: {new Date(data.verifiedAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' })} · Hora de Chile</p>
       {shown.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm leading-relaxed text-slate-600">{chronology.length ? 'No hay aportes en este filtro. Puedes elegir «Todo el historial».' : 'Aún no hay antecedentes ni archivos. Agrega tu primer aporte cuando quieras.'}</div>}
       <ol aria-label="Cronología de antecedentes" className="space-y-4">
         {shown.map(([head, ...previous]) => <li key={head.entryId} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"><VersionContent entry={head} onUnavailable={snapshot.refresh} />
-          {head.canCorrect && head.source === 'patient' && <button type="button" disabled={newBlocked} onClick={event => { formOpener.current = event.currentTarget; setEditing(head); }} className={`${button} mt-3 border border-sky-200 text-sky-800`}>Corregir mi aporte</button>}
+          {head.canCorrect && head.source === 'patient' && <button type="button" disabled={newBlocked || !canWrite('append_version')} onClick={event => { formOpener.current = event.currentTarget; setEditing(head); }} className={`${button} mt-3 border border-sky-200 text-sky-800`}>Corregir mi aporte</button>}
           {previous.length > 0 && <details className="mt-3 border-t border-slate-100 pt-2"><summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">Ver {previous.length} {previous.length === 1 ? 'versión anterior' : 'versiones anteriores'}</summary><div className="mt-2 space-y-5 border-l-2 border-sky-100 pl-4">{previous.map(entry => <VersionContent key={entry.version} entry={entry} onUnavailable={snapshot.refresh} />)}</div></details>}
         </li>)}
       </ol>
-      {renderPermissions?.({ grants: data.grants, disabled: newBlocked, onPrepare: prepare })}
+      {renderPermissions?.({ grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'), onPrepare: prepare })}
     </>}
     {pending.filter(op => op.id !== current?.id).map(op => <section key={op.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4"><p className="text-sm font-semibold text-slate-800">{actionLabels[op.action]} · {labels[op.state]}</p><button type="button" disabled={operation.busy || operation.uncertain} onClick={() => { operation.controller.reopen(op); setSignReview(false); }} className={`${button} mt-3 border border-sky-200 bg-white text-sky-800`}>Consultar intento pendiente</button></section>)}
     {actionError && !current && !operation.uncertain && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{actionError}</p>}

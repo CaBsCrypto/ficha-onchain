@@ -12,6 +12,14 @@ const denied = () => new PrivateFlowError('clinical_create_once_scope_rejected',
 
 export function clinicalCreateOnceConfigured() { return VARIABLES.some(key => process.env[key] !== undefined); }
 
+/** Presentation capability only; every mutation still checks the policy again. */
+export function clinicalWriteCapabilities(wallet: string): Record<ClinicalAction, boolean> {
+  const allowed = (action: ClinicalAction) => {
+    try { assertClinicalWriteScope(action, wallet); return true; } catch { return false; }
+  };
+  return { create_history: allowed('create_history'), append_version: allowed('append_version'), set_permissions: allowed('set_permissions') };
+}
+
 export function assertClinicalWriteScope(action: ClinicalAction, wallet: string): ClinicalCreateOncePolicy | null {
   if (!clinicalCreateOnceConfigured()) { assertClinicalEnvironment(true); return null; }
   assertClinicalEnvironment();

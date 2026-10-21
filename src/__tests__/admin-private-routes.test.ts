@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), getDb: vi.fn(), sql: vi.fn(), config: vi.fn(), details: vi.fn(),
-  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn(),onboarding:vi.fn(),list:vi.fn(),invite:vi.fn(),approved:vi.fn() }));
+  request: vi.fn(), wallet: vi.fn(), read: vi.fn(), view: vi.fn(), latest: vi.fn(), legacySigner: vi.fn(), legacySend: vi.fn(),query:vi.fn(),onboarding:vi.fn(),list:vi.fn(),invite:vi.fn(),approved:vi.fn(),connection:vi.fn() }));
 vi.mock('@/lib/reviewed-doctor-authorization',()=>({requestReviewedDoctorAuthorization:mocks.request}));
 vi.mock('@/lib/doctor-onboarding',()=>({onboardingForDoctor:mocks.onboarding,listDoctorOnboarding:mocks.list,createDoctorInvitation:mocks.invite,isDoctorLocallyApproved:mocks.approved}));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: mocks.requireUser,
   isDoctor: vi.fn(), authEnforced: () => false,
   unauthorized: () => Response.json({ error: 'unauthorized' }, { status: 401 }),
   forbidden: () => Response.json({ error: 'forbidden' }, { status: 403 }) }));
-vi.mock('@/lib/db', () => ({ getDb: mocks.getDb }));
+vi.mock('@/lib/db', () => ({ getDb: mocks.getDb, getDbConnection:mocks.connection }));
 vi.mock('@/lib/stellar/client', () => ({ server: {}, isDoctorAuthorized: vi.fn(), getPrescription: vi.fn() }));
 vi.mock('@/lib/stellar/server', () => ({ getDemoDoctorSecret: mocks.legacySigner, feeBumpAndSend: mocks.legacySend }));
 vi.mock('@/lib/doctor-authorizations', () => ({
@@ -310,4 +310,23 @@ describe('clinical schema migration isolation', () => {
     expect(response.status).toBe(503);
     expect(mocks.query).not.toHaveBeenCalled();
   });
+});
+
+it('runs the clinical-only schema atomically without touching legacy tables',async()=>{
+ for(const [k,v] of Object.entries({TRUSTLEAF_CLINICAL_MIGRATION:'true',TRUSTLEAF_CLINICAL_WEB_MIGRATION:'true'}))vi.stubEnv(k,v);
+ const client={query:vi.fn().mockResolvedValue({rows:[]}),release:vi.fn()};mocks.connection.mockResolvedValue(client);
+ const response=await migratePOST(post({confirm:'MIGRATE',step:'clinical-web-v1'}));
+ expect(response.status).toBe(200);expect(mocks.query).not.toHaveBeenCalled();
+ const calls=client.query.mock.calls.map(x=>x[0]);
+ expect(calls[0]).toBe('BEGIN');expect(calls.at(-1)).toBe('COMMIT');
+ expect(calls.some(x=>x.includes('CREATE TABLE IF NOT EXISTS doctors'))).toBe(false);
+ expect(calls.findIndex(x=>x.includes('CREATE TABLE IF NOT EXISTS clinical_private_versions'))).toBeLessThan(calls.findIndex(x=>x.includes('CREATE TABLE IF NOT EXISTS clinical_web_histories')));
+ expect(client.release).toHaveBeenCalledOnce();
+});
+it('rolls back a failed clinical-only migration and releases the connection',async()=>{
+ vi.stubEnv('TRUSTLEAF_CLINICAL_MIGRATION','true');vi.stubEnv('TRUSTLEAF_CLINICAL_WEB_MIGRATION','true');
+ const client={query:vi.fn().mockResolvedValue({rows:[]}),release:vi.fn()};client.query.mockRejectedValueOnce(Error('private provider failure'));mocks.connection.mockResolvedValue(client);
+ const response=await migratePOST(post({confirm:'MIGRATE',step:'clinical-web-v1'}));
+ expect(response.status).toBe(503);expect(await response.text()).not.toContain('private provider failure');
+ expect(client.query).toHaveBeenCalledWith('ROLLBACK');expect(client.release).toHaveBeenCalledOnce();
 });

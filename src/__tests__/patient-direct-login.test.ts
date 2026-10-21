@@ -97,5 +97,5 @@ it('keeps mobile account actions out of the consultation screen',async()=>{
   const navigation=box.querySelector('[data-patient-navigation]')!;
   expect(navigation.querySelector('[aria-current="page"]')?.textContent).toBe('Consultas');
   expect(navigation.querySelectorAll('a')).toHaveLength(5);
-  expect(navigation.querySelector('a[href="/patient?tab=historial"]')?.textContent).toBe('Historial');
+  expect(navigation.querySelector('a[href="/patient?tab=historial"]')?.textContent).toBe('Ficha clínica');
 });

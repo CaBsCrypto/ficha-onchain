@@ -12,11 +12,12 @@
  * This mirrors the relevant steps of scripts/migrate.mjs. Keep them in sync when
  * adding schema; the script stays the source of truth for local/dev.
  */
-import { getDb } from "@/lib/db";
+import { getDb, getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requirePrivyAdmin } from "@/lib/auth/admin";
 import { isSameOrigin } from '@/lib/auth/same-origin';
 import { assertPrivateEnvironment } from '@/lib/private-config';
+import { clinicalMigrationConnection } from '../../../../../scripts/lib/clinical-migration-policy.mjs';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -890,9 +891,9 @@ export async function POST(request: Request) {
   if (!isSameOrigin(request)) return NextResponse.json({error:'forbidden'},{status:403});
   try { assertPrivateEnvironment(); } catch { return NextResponse.json({error:'private_environment_mismatch'},{status:503}); }
 
-  let body: { confirm?: unknown };
+  let body: { confirm?: unknown; step?: unknown };
   try { body = (await request.json()) as typeof body; } catch { body = {}; }
-  if (!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(key=>key!=='confirm') || body.confirm !== "MIGRATE") {
+  if (!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(key=>!['confirm','step'].includes(key)) || (body.step !== undefined && body.step !== 'clinical-web-v1') || body.confirm !== "MIGRATE") {
     return NextResponse.json({ error: "confirmation_required", hint: "send confirm:'MIGRATE'" }, { status: 400 });
   }
 
@@ -901,18 +902,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "migration_database_unavailable" }, { status: 503 });
   }
 
-  let clinicalEnabled = false;
-  if (process.env.TRUSTLEAF_CLINICAL_MIGRATION === "true") {
-    try {
-      const target = new URL(process.env.DATABASE_URL ?? "");
-      clinicalEnabled = ["postgres:", "postgresql:"].includes(target.protocol) &&
-        /^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(target.hostname);
-    } catch { /* invalid configuration is rejected below */ }
-    if (!clinicalEnabled) return NextResponse.json({error:"clinical_migration_requires_isolated_dev_database"},{status:503});
+  const clinicalOnly = body.step === 'clinical-web-v1';
+  const clinicalEnabled = clinicalOnly || process.env.TRUSTLEAF_CLINICAL_MIGRATION === 'true';
+  const webEnabled = clinicalOnly || process.env.TRUSTLEAF_CLINICAL_WEB_MIGRATION === 'true';
+  if (clinicalEnabled || webEnabled) {
+    try { clinicalMigrationConnection(process.env, webEnabled); }
+    catch { return NextResponse.json({error:'clinical_migration_target_not_authorized'},{status:503}); }
   }
-  const webEnabled = process.env.TRUSTLEAF_CLINICAL_WEB_MIGRATION === 'true';
-  if (webEnabled && !clinicalEnabled) return NextResponse.json({error:'clinical_migration_requires_isolated_dev_database'},{status:503});
-  const selectedStatements = [...STATEMENTS, ...(clinicalEnabled ? CLINICAL_STATEMENTS : []), ...(webEnabled ? CLINICAL_WEB_STATEMENTS : [])];
+  const selectedStatements = [...(clinicalOnly ? [] : STATEMENTS), ...(clinicalEnabled ? CLINICAL_STATEMENTS : []), ...(webEnabled ? CLINICAL_WEB_STATEMENTS : [])];
+  if (clinicalOnly) {
+    let client;
+    try {
+      client = await getDbConnection();
+      await client.query('BEGIN');
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('trustleaf-clinical-schema-v1'))");
+      for (const [, statement] of selectedStatements) await client.query(statement);
+      await client.query('COMMIT');
+      return NextResponse.json({ok:true, ran:selectedStatements.map(([name])=>name), failed:[]}, {headers:{'Cache-Control':'no-store'}});
+    } catch {
+      if (client) await client.query('ROLLBACK').catch(()=>{});
+      return NextResponse.json({error:'clinical_migration_failed'}, {status:503});
+    } finally { client?.release(); }
+  }
   const ran: string[] = [];
   const failed: Array<{ step: string; error: string }> = [];
   for (const [step, stmt] of selectedStatements) {

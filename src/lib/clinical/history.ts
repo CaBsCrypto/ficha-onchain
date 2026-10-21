@@ -12,6 +12,7 @@ import { resolveClinicalActor, assertClinicalOwner } from './identity';
 import { clinicalKeyring } from './keys';
 import { createClinicalWebChain, assertClinicalSavedEnvelope, type ClinicalSavedEnvelope } from './chain';
 import { clinicalNote } from './input';
+import { clinicalWriteCapabilities } from './create-once';
 
 export function clinicalStorageClient() { return { query: async (sql: string, values?: unknown[]) => ({ rows: await getDb().query(sql, values) }) }; }
 export async function ownClinicalHistory(actor: ClinicalActor) {
@@ -70,9 +71,10 @@ export async function clinicalGrants(historyId: string): Promise<ClinicalGrant[]
   return result;
 }
 export async function clinicalSnapshot(request: Request, _user: AuthedUser, actor: ClinicalActor): Promise<ClinicalSnapshot> {
+  const writes = clinicalWriteCapabilities(actor.address);
   const own = await ownClinicalHistory(actor);
   const operations = await clinicalOperations(actor);
-  if (!own) return { history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
+  if (!own) return { writes, history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
   const rows = await getDb().query(`SELECT entry_id,version,transaction_hash,operation_id,commitment FROM clinical_private_versions
     WHERE history_id=$1 AND contract_id=$2 AND network='testnet' AND state='confirmed' ORDER BY created_at DESC,version DESC`, [own.history.id, CLINICAL_ID]);
   const chain = createClinicalWebChain();
@@ -101,5 +103,5 @@ export async function clinicalSnapshot(request: Request, _user: AuthedUser, acto
       canCorrect: evidence.context.author === actor.address && version === heads.get(entryId) });
   }
   entries.sort((a,b) => b.createdAt-a.createdAt || b.version-a.version || a.entryId.localeCompare(b.entryId));
-  return { history: own.history, entries, grants: await clinicalGrants(own.history.id), operations, verifiedAt: new Date().toISOString() };
+  return { writes, history: own.history, entries, grants: await clinicalGrants(own.history.id), operations, verifiedAt: new Date().toISOString() };
 }

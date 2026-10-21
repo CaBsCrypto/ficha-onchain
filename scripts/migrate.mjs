@@ -11,6 +11,8 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "node:fs";
+import { databaseConnectionString } from './lib/database-connection.mjs';
+import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -18,12 +20,13 @@ if (!process.env.DATABASE_URL && existsSync(".env.local")) {
     if (m) process.env.DATABASE_URL = m[1].trim();
   }
 }
-if (!process.env.DATABASE_URL) {
+const connection = databaseConnectionString();
+if (!connection) {
   console.error("DATABASE_URL is not set (looked in the environment and .env.local)");
   process.exit(1);
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(connection);
 const steps = [];
 const step = (name, fn) => steps.push({ name, fn });
 
@@ -745,15 +748,10 @@ step("private operations", async () => {
 });
 
 // Browser-backed clinical histories remain separate from the synthetic week-one
-// runner. This step deliberately refuses all non-dev hosts and is never implicit.
+// runner. A hosted Testnet target requires the explicit migration policy.
 step("clinical-web-v1", async () => {
   if (!process.argv.includes('--step=clinical-web-v1')) return;
-  const db = new URL(process.env.DATABASE_URL);
-  if (process.env.TRUSTLEAF_CLINICAL_MIGRATION !== 'true' ||
-      !['postgres:', 'postgresql:'].includes(db.protocol) ||
-      !/^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(db.hostname)) {
-    throw Error('clinical_migration_requires_isolated_dev_database');
-  }
+  clinicalMigrationConnection(process.env, true);
   const dependency = await sql`SELECT to_regclass('public.clinical_private_versions') AS relation`;
   if (!dependency[0]?.relation) throw Error('clinical_web_requires_clinical_history_v1');
   await sql`CREATE TABLE IF NOT EXISTS clinical_web_histories (
@@ -927,12 +925,7 @@ step("clinical-web-v1", async () => {
 // the default migration do not provision this feature accidentally.
 step("clinical-history-v1", async () => {
   if (!process.argv.includes('--step=clinical-history-v1')) return;
-  const db = new URL(process.env.DATABASE_URL);
-  if (process.env.TRUSTLEAF_CLINICAL_MIGRATION !== 'true' ||
-      !['postgres:', 'postgresql:'].includes(db.protocol) ||
-      !/^ep-lingering-water-ahzh89z5(?:-pooler)?\.c-3\.us-east-1\.aws\.neon\.tech$/.test(db.hostname)) {
-    throw Error('clinical_migration_requires_isolated_dev_database');
-  }
+  clinicalMigrationConnection();
   await sql`CREATE TABLE IF NOT EXISTS clinical_private_versions (
     network TEXT NOT NULL CHECK (network='testnet'),
     contract_id TEXT NOT NULL CHECK (contract_id ~ '^C[A-Z2-7]{55}$'),
@@ -1072,7 +1065,7 @@ step("doctor onboarding requests", async () => {
 });
 
 // ── Run ─────────────────────────────────────────────────────────────────────
-const host = process.env.DATABASE_URL.replace(/.*@([^/]+)\/.*/, "$1");
+const host = new URL(connection).hostname;
 console.log(`\n  target: ${host}\n`);
 
 const selectedStep = process.argv.find((arg) => arg.startsWith("--step="))?.slice(7);

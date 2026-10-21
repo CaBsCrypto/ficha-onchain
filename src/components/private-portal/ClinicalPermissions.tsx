@@ -5,10 +5,10 @@ import { clinicalPermissionCanReview, clinicalPermissionChange, clinicalPermissi
   clinicalPermissionKey, initialClinicalPermissionDraft } from './clinical-permission-state';
 
 type PreparePermission = (input: Omit<ClinicalPrepareRequest, 'requestId'>) => Promise<unknown>;
-export interface ClinicalPermissionsProps { grants: ClinicalGrant[]; disabled: boolean; onPrepare: PreparePermission }
+export interface ClinicalPermissionsProps { grants: ClinicalGrant[]; disabled: boolean; readOnly?: boolean; onPrepare: PreparePermission }
 const controlClass = 'min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50';
 
-function ClinicalDoctorPermission({ grant, disabled, onPrepare }: { grant: ClinicalGrant; disabled: boolean; onPrepare: PreparePermission }) {
+function ClinicalDoctorPermission({ grant, disabled, readOnly, onPrepare }: { grant: ClinicalGrant; disabled: boolean; readOnly?: boolean; onPrepare: PreparePermission }) {
   const [draft, setDraft] = useState(() => initialClinicalPermissionDraft(grant));
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ function ClinicalDoctorPermission({ grant, disabled, onPrepare }: { grant: Clini
   const withdrawalIncomplete = !grant.authorized && (draft.canRead || draft.canAppend);
   async function review(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || flight.current || !canReview) return;
+    if (readOnly || busy || flight.current || !canReview) return;
     flight.current = true; setPreparing(true); setError(null); setNotice(null);
     try {
       // The parent owns explicit confirmation and the signature. This form only
@@ -45,7 +45,7 @@ function ClinicalDoctorPermission({ grant, disabled, onPrepare }: { grant: Clini
     <p className="text-sm leading-6 text-slate-600" id={`${id}-observed`}>
       Permisos consultados: lectura <strong>{grant.canRead ? 'concedida' : 'sin conceder'}</strong>; agregado <strong>{grant.canAppend ? 'concedido' : 'sin conceder'}</strong>.
     </p>
-    <fieldset disabled={busy} aria-describedby={`${id}-observed ${id}-help`} className="space-y-2">
+    {!readOnly && <><fieldset disabled={busy} aria-describedby={`${id}-observed ${id}-help`} className="space-y-2">
       <legend className="mb-2 text-sm font-medium text-slate-900">Elegir permisos para {grant.doctorName}</legend>
       <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-200">
         <input type="checkbox" checked={draft.canRead} disabled={busy || (!grant.authorized && !draft.canRead)}
@@ -72,10 +72,10 @@ function ClinicalDoctorPermission({ grant, disabled, onPrepare }: { grant: Clini
     {canReview || draft.canRead !== grant.canRead || draft.canAppend !== grant.canAppend ? <button type="button" disabled={busy} onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(null); }} className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">Restablecer selección</button> : null}
     <button type="submit" disabled={busy || !canReview} className={`${controlClass} w-full sm:w-auto`}>
       {preparing ? 'Preparando cambio…' : 'Revisar cambio de permisos'}
-    </button>
+    </button></>}
   </form>;
 }
-export function ClinicalPermissions({ grants, disabled, onPrepare }: ClinicalPermissionsProps) {
+export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare }: ClinicalPermissionsProps) {
   const id = useId();
   return <section aria-labelledby={`${id}-title`} className="min-w-0 space-y-4">
     <div><h2 id={`${id}-title`} className="text-lg font-semibold text-slate-900">Permisos para médicos</h2>
@@ -84,7 +84,7 @@ export function ClinicalPermissions({ grants, disabled, onPrepare }: ClinicalPer
     {grants.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-sm leading-6 text-slate-500">
       Sin médicos autorizados disponibles para compartir tu historial.
     </p> : <div className="grid min-w-0 gap-4 lg:grid-cols-2">{grants.map(grant => <ClinicalDoctorPermission
-      key={clinicalPermissionKey(grant)} grant={grant} disabled={disabled} onPrepare={onPrepare} />)}</div>}
+      key={clinicalPermissionKey(grant)} grant={grant} disabled={disabled} readOnly={readOnly} onPrepare={onPrepare} />)}</div>}
     <p className="text-xs leading-5 text-slate-500">Retirar permisos impide nuevos accesos por TrustLeaf. No elimina copias que el médico ya haya descargado.</p>
   </section>;
 }
