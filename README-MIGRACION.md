@@ -17,9 +17,9 @@ El SHA final debe obtenerse del resumen de entrega y comprobarse con `git rev-pa
 
 ## Estado de preparación
 
-**Publicación: NO REALIZADA al preparar estos documentos. Continuidad: BLOCKED para reproducción completa del entorno privado; código NOT VERIFIED en la notebook.**
+**Publicación: autorizada sólo para la rama principal y pendiente de verificación remota al cerrar este documento. Continuidad: BLOCKED para reproducción completa del entorno privado; código NOT VERIFIED en la notebook.** El resultado posterior del push y su SHA final se entregan en el resumen del emisor.
 
-Vercel está integrado con el repositorio (`trustleaf-demo`). El commit de origen tiene un check Vercel exitoso. Los filtros remotos de ramas no pudieron leerse: el conector respondió 403. Un push de esta rama podría producir un preview. El usuario no autorizó deployments; no se debe publicar hasta resolver expresamente ese efecto. No se cambiaron CI, hosting, protecciones ni permisos para evitarlo.
+Vercel está integrado con el repositorio (`trustleaf-demo`). El commit de origen tiene un check Vercel exitoso. Los filtros remotos de ramas no pudieron leerse: el conector respondió 403. El usuario autorizó publicar **sólo `codex/migracion-ficha-onchain-2026-10-22` y aceptar un posible preview automático**. Las catorce ramas auxiliares siguen exclusivamente locales. No se autorizó un despliegue manual ni se cambiaron CI, hosting, protecciones o permisos.
 
 El usuario autorizó un paquete cifrado de las claves de wallets Testnet **sólo local, para traslado privado**. El paquete y su clave de apertura separada quedan fuera de esta copia Git y no se subirán a GitHub. El informe privado de recuperación distingue las wallets incluidas de cualquier identidad pendiente. No sustituir las wallets por otras para conseguir que arranque. Las claves de cifrado de datos de la aplicación no están incluidas en esa autorización de claves de wallets y continúan como dependencia privada separada.
 
@@ -42,7 +42,7 @@ No se exportaron bases, datos reales de pacientes ni claves a Git. `.env.example
 
 `INVENTARIO-MIGRACION.md` registra 94 ramas locales, seis worktrees y once stashes. Las rutas externas de worktrees sólo se inventariaron por metadatos: su árbol e índice no se inspeccionaron. Las ramas se mantienen separadas. Los stashes se inspeccionaron sin aplicarlos ni eliminarlos: su contenido se corresponde con versiones ya presentes en el árbol original; no se recuperaron como tareas nuevas.
 
-Se preservaron en la copia aislada 14 referencias auxiliares `codex/migracion-ficha-20261022/<tarea>`, con los tips originales exactos y 17 commits distintos de trabajo local auditado. No agregan documentos ni combinan tareas; el inventario central de esta rama contiene su procedencia. Cuatro ramas adicionales quedan fuera de publicación por identidades vinculadas a evidencia o propuestas internas; no basta borrar el dato del último árbol porque permanecería en sus commits anteriores. No se reescribió ninguno de esos historiales.
+Se preservaron en la copia aislada 14 referencias auxiliares `codex/migracion-ficha-20261022/<tarea>`, con los tips originales exactos y 17 commits distintos de trabajo local auditado. **No se publicarán en esta entrega por elección expresa del usuario**: no intentar traerlas de GitHub desde la notebook. No agregan documentos ni combinan tareas; el inventario central de esta rama contiene su procedencia. Cuatro ramas adicionales quedan fuera de publicación por identidades vinculadas a evidencia o propuestas internas; no basta borrar el dato del último árbol porque permanecería en sus commits anteriores. No se reescribió ninguno de esos historiales.
 
 `MANIFIESTO-MIGRACION.json` enumera rutas y SHA-256 de los archivos del árbol de entrega, excluyendo el propio manifiesto y metadatos Git. Sus hashes se calculan sobre los bytes almacenados en Git; un checkout con conversión CRLF puede presentar bytes de trabajo distintos. Las evidencias históricas conservan sus propios manifiestos anteriores, que no certifican las copias de documentos saneadas.
 

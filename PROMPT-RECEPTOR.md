@@ -20,7 +20,7 @@ git config --show-origin --get-regexp '^(core\.hooksPath|filter\.|init\.template
 
 Compará `git rev-parse HEAD` con el SHA final del resumen ANTES del checkout. Revisá hooks/filtros/plantillas locales; si hay automatizaciones desconocidas, no ejecutarlas ni eludir políticas obligatorias. El árbol recibido no requiere LFS ni submódulos según la auditoría del emisor. Una vez verificado, `git checkout` materializa la rama actual. No ejecutar scripts durante esta lectura.
 
-Un clon de una sola rama no trae las demás: habrá que solicitarlas explícitamente. En un clon existente, primero revisar raíz, origin, `git status`, ramas y trabajo local; no hacer reset, clean, stash ni checkout que sobrescriba cambios. Si hace falta, usar otra carpeta nueva.
+Un clon de una sola rama no trae las demás: habrá que solicitarlas explícitamente. El usuario autorizó publicar sólo la rama principal de migración; las catorce referencias auxiliares del inventario siguen locales en la PC original y no se pueden recuperar de GitHub en esta entrega. En un clon existente, primero revisar raíz, origin, `git status`, ramas y trabajo local; no hacer reset, clean, stash ni checkout que sobrescriba cambios. Si hace falta, usar otra carpeta nueva.
 
 Revisar README-MIGRACION, este prompt, inventario y `MANIFIESTO-MIGRACION.json`. Verificar cada SHA-256 contra los bytes del blob Git de su ruta, no contra un checkout CRLF sin normalización. El manifiesto excluye sólo su propia ruta; sus entradas deben coincidir exactamente con el resto del árbol. No dar por recibidos archivos excluidos ni ramas locales que nunca se publicaron.
 

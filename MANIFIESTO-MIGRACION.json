@@ -81,13 +81,13 @@
     },
     {
       "path": "PROMPT-RECEPTOR.md",
-      "bytes": 8433,
-      "sha256": "3c2d63964912cdd7857707731f6969dae202db8eabf409cafbfdb44f1fc621dc"
+      "bytes": 8637,
+      "sha256": "2af731b3386be6319791e09039a8bde4f7fe3063ddd51803882d7627c136c3ac"
     },
     {
       "path": "README-MIGRACION.md",
-      "bytes": 10672,
-      "sha256": "104b4b99c31289db84312a2fbecf72a8b0c7632e0293d364697a9c514e814fa8"
+      "bytes": 10999,
+      "sha256": "cb575142db23a09817b9844abba01337f0294055b6216032b87580ccb73722d4"
     },
     {
       "path": "README.md",
