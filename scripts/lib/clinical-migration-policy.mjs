@@ -11,6 +11,7 @@ export function clinicalMigrationConnection(env = process.env, web = false) {
         !['postgres:', 'postgresql:'].includes(target.protocol) || !/^[a-z0-9.-]+\.neon\.tech$/.test(target.hostname) ||
         [...target.searchParams.keys()].some(key => !['sslmode','channel_binding','connect_timeout','pgbouncer'].includes(key)) ||
         target.hostname.includes('ep-rapid-shadow-ahq94785')) throw Error();
+    if (['TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED','TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS','TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER'].some(key => env[key] !== undefined)) throw Error();
     if (DEV.test(target.hostname) && !env.VERCEL_ENV && (!env.TRUSTLEAF_ENV || env.TRUSTLEAF_ENV === 'local')
         && (!env.TRUSTLEAF_ENV || target.hostname === env.TRUSTLEAF_DB_HOST)) return connection;
     if (env.TRUSTLEAF_ENV !== 'test' || env.VERCEL_ENV !== 'production' || !env.TRUSTLEAF_DATABASE_URL ||

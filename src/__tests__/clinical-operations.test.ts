@@ -44,7 +44,7 @@ function fixture(ownHistory = false) {
   const state = { row: null as Record<string, any> | null, history: ownHistory ? { history_id: historyId, owner_user_id: actor.userId, wallet_id: actor.walletId, patient_wallet: actor.address, contract_id: CLINICAL_CONTRACT, network: 'testnet', transaction_hash: '1'.repeat(64) } : null,
     versions: {} as Record<string, any>, head: null as { author: string; headVersion: number } | null,
     version: null as Record<string, any> | null, receipt: 'NOT_FOUND', wrongReceipt: false, historyPatient: actor.address,
-    queue: '', rpcFailure: false, failStorage: false, events: [] as string[], releaseCount: 0 };
+    quotaRows: [] as Array<{id:string}>, queue: '', rpcFailure: false, failStorage: false, events: [] as string[], releaseCount: 0 };
   let transaction: { row: typeof state.row; history: typeof state.history; versions: typeof state.versions } | null = null;
   const savedPoints = new Map<string, typeof transaction>();
   const query = vi.fn(async (sql: string, values: any[] = []) => {
@@ -58,7 +58,7 @@ function fixture(ownHistory = false) {
     if (q.startsWith('RELEASE SAVEPOINT ')) { savedPoints.delete(q.slice(18)); return { rows: [] }; }
     if (q.includes('pg_advisory_xact_lock')) return { rows: [] };
     if (q.startsWith('SELECT to_regclass')) return { rows: [{ relation: values[0] }] };
-    if (q.startsWith("SELECT id FROM clinical_web_operations WHERE source_wallet=")) return { rows: state.row ? [{ id: state.row.id }] : [] };
+    if (q.startsWith("SELECT id FROM clinical_web_operations WHERE source_wallet=")) return { rows: [...state.quotaRows, ...(state.row ? [{ id: state.row.id }] : [])] };
     if (q.startsWith('SELECT 1 FROM') && q.includes('state IN')) return { rows: state.queue && q.includes(`FROM ${state.queue} `) ? [{}] : [] };
     if (q.startsWith('SELECT * FROM clinical_web_operations')) {
       const visible = state.row && state.row.id === values[0] && (values[1] === undefined || state.row.actor_user_id === values[1]);
@@ -447,5 +447,77 @@ describe('clinical exact owner signing, transmission and reconciliation', () => 
     const f = fixture(); f.seed(); f.state.rpcFailure = true; const before = clone(f.state.row);
     await expect(reconcileClinicalOperation(actor, ID)).rejects.toThrow('isolated_rpc_unavailable');
     expect(f.state.row).toEqual(before); expect(f.state.events).toContain('ROLLBACK'); expect(f.client.release).toHaveBeenCalledOnce(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('continuous owner recording operations',()=>{
+  function demo(){
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED','false');vi.stubEnv('TRUSTLEAF_ENV','test');vi.stubEnv('VERCEL_ENV','production');vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK','testnet');
+    vi.stubEnv('TRUSTLEAF_DATABASE_URL','postgres://fixture:fixture@ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech/fixture');
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED','true');vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',actor.address);vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER',payer.publicKey());
+  }
+  const previous=(count:number)=>Array.from({length:count},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`}));
+  it('creates the selected history without broad writes and without submitting before the patient signs',async()=>{
+    const f=fixture();demo();await prepareClinicalOperation(user,actor,createInput);
+    expect(f.state.row).toMatchObject({action:'create_history',state:'awaiting_signature',signed_xdr:null});
+    expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+    await signClinicalOperation(user,actor,ID,testSignature());expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(f.state.row!.signed_xdr);
+  });
+  it('allows a patient note or file contribution and enforces the real cap before encryption is committed',async()=>{
+    const f=fixture(true);demo();await prepareClinicalOperation(user,actor,appendInput);
+    expect(f.state.row).toMatchObject({action:'append_version',expected:{author:actor.address,patient:actor.address}});expect(m.seal).toHaveBeenCalledOnce();
+    await signClinicalOperation(user,actor,ID,testSignature());expect(m.chain.submit).toHaveBeenCalledOnce();
+  });
+  it('allows the twentieth persisted slot and its same-ID signing/reconciliation, but rejects slot twenty-one',async()=>{
+    const f=fixture();demo();f.state.quotaRows=previous(19);await prepareClinicalOperation(user,actor,createInput);
+    await prepareClinicalOperation(user,actor,createInput);expect(m.chain.prepare).toHaveBeenCalledOnce();
+    await signClinicalOperation(user,actor,ID,testSignature());await reconcileClinicalOperation(actor,ID);
+    expect(m.sponsor).toHaveBeenCalledOnce();expect(m.chain.submit).toHaveBeenCalledOnce();
+    for(const state of ['confirmed','failed','cancelled']){
+      f.state.row!.state=state;
+      await expect(prepareClinicalOperation(user,actor,{...createInput,requestId:'1f4929bd-48f9-4b9d-bde4-47f7b66a6d91'})).rejects.toMatchObject({message:'clinical_patient_demo_quota_exceeded',status:409});
+    }
+    expect(m.chain.prepare).toHaveBeenCalledOnce();
+  });
+  it('counts cancelled and failed historical slots without resetting the lifetime quota',async()=>{
+    const f=fixture();demo();f.state.quotaRows=previous(20);
+    await expect(prepareClinicalOperation(user,actor,createInput)).rejects.toThrow('clinical_patient_demo_quota_exceeded');
+    expect(f.state.row).toBeNull();expect(m.chain.prepare).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('takes the existing wallet transaction lock before counting or inserting a new slot',async()=>{
+    const f=fixture();demo();await prepareClinicalOperation(user,actor,createInput);
+    const lock=f.state.events.findIndex(q=>q.includes('pg_advisory_xact_lock'));
+    const quota=f.state.events.findIndex(q=>q.startsWith('SELECT id FROM clinical_web_operations'));
+    const insert=f.state.events.findIndex(q=>q.startsWith('INSERT INTO clinical_web_operations'));
+    expect(lock).toBeGreaterThanOrEqual(0);expect(quota).toBeGreaterThan(lock);expect(insert).toBeGreaterThan(quota);
+  });
+  it('keeps permission changes and another wallet blocked before opening a database transaction',async()=>{
+    fixture();demo();await expect(prepareClinicalOperation(user,actor,{...createInput,action:'set_permissions'})).rejects.toThrow();
+    await expect(prepareClinicalOperation(user,{...actor,address:doctor.publicKey()},createInput)).rejects.toThrow();
+    expect(m.connection).not.toHaveBeenCalled();expect(m.chain.prepare).not.toHaveBeenCalled();
+  });
+  it('retains author ownership checks for corrections in continuous mode',async()=>{
+    const f=fixture(true);demo();f.state.head={author:doctor.publicKey(),headVersion:1};
+    await expect(prepareClinicalOperation(user,actor,{...appendInput,entryId:'a'.repeat(64),expectedVersion:1})).rejects.toThrow('clinical_version_conflict');
+    expect(f.state.row).toBeNull();expect(m.seal).not.toHaveBeenCalled();
+  });
+  it('rejects an oversized fee before persisting or sponsoring a patient contribution',async()=>{
+    const f=fixture(true);demo();m.chain.prepare.mockImplementation(async(source,action,expected)=>new TransactionBuilder(new Account(source,'100'),{fee:BASE_FEE,networkPassphrase:Networks.TESTNET}).addOperation(clinicalInvocation(action,expected)).setTimeout(180).setSorobanData(new SorobanDataBuilder().setResourceFee('6000001').build()).build());
+    await expect(prepareClinicalOperation(user,actor,appendInput)).rejects.toThrow('clinical_create_once_fee_exceeded');
+    expect(f.state.row).toBeNull();expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('recovers an uncertain response using the same persisted signed envelope and no second sponsorship',async()=>{
+    const f=fixture();demo();await prepareClinicalOperation(user,actor,createInput);f.state.rpcFailure=true;
+    await expect(signClinicalOperation(user,actor,ID,testSignature())).rejects.toThrow('isolated_rpc_unavailable');
+    const saved=f.state.row!.signed_xdr,hash=f.state.row!.transaction_hash;expect(f.state.row!.state).toBe('submitted');
+    f.state.rpcFailure=false;await reconcileClinicalOperation(actor,ID);expect(m.chain.submit).not.toHaveBeenCalled();
+    await reconcileClinicalOperation(actor,ID,true);expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(saved);
+    expect(f.state.row!.transaction_hash).toBe(hash);expect(m.sponsor).toHaveBeenCalledOnce();expect(m.chain.prepare).toHaveBeenCalledOnce();
+  });
+  it('can still cancel the last unsigned slot without creating a replacement',async()=>{
+    const f=fixture();demo();f.state.quotaRows=previous(19);await prepareClinicalOperation(user,actor,createInput);
+    expect((await cancelClinicalOperation(actor,ID)).operation.state).toBe('cancelled');expect(m.chain.submit).not.toHaveBeenCalled();
+    await expect(prepareClinicalOperation(user,actor,{...createInput,requestId:'1f4929bd-48f9-4b9d-bde4-47f7b66a6d91'})).rejects.toThrow('clinical_patient_demo_quota_exceeded');
   });
 });

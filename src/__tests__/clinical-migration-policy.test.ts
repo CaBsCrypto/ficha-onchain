@@ -24,3 +24,7 @@ it('keeps explicitly selected dev migrations and rejects a contradictory local p
  expect(clinicalMigrationConnection(local,true)).toBe(local.TRUSTLEAF_DATABASE_URL);
  expect(()=>clinicalMigrationConnection({...local,TRUSTLEAF_DB_HOST:host},true)).toThrow();
 });
+
+it.each(['TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED','TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS','TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER'])('rejects a configured patient demo variable before any migration: %s',key=>{
+ for(const value of ['true','false',''])expect(()=>clinicalMigrationConnection({...env,[key]:value},true)).toThrow('clinical_migration_target_not_authorized');
+});
