@@ -1,5 +1,7 @@
 <div align="center">
 
+> Nota de copia pública · 22-10-2026: Copia pública de continuidad: las cuentas identificables se sustituyeron por actores anónimos donde correspondía; no se alteraron recibos ni hashes. Esta copia omite los nuevos archivos locales de `docs/evidence/`, `docs/proposals/` y el cambio local de `readback.json`. El manifiesto histórico `docs/sow-delivery/week4-review/preparation-manifest.json` conserva las huellas de los documentos originales, anteriores al saneamiento; no verifica esta copia. Los siete scripts de validación se conservaron exactos y no se ejecutaron; algunos dependen de una ruta local de configuración Stellar que debe revisarse al cambiar de PC.
+
 <img src="./docs/assets/banner.jpg" alt="TrustLeaf — Private Prescriptions on Stellar Soroban" width="100%" />
 
 # 🌿 TrustLeaf
@@ -14,7 +16,19 @@ TrustLeaf connects doctor and patient portals to **two smart contracts on Stella
 
 </div>
 
-## Current status
+## Project direction and SOW 2 proposal
+
+TrustLeaf's direction is **patient-centered clinical history with patient-controlled access and verifiable traceability**. Patients would collect their own information and authorize doctors to read or contribute to it. Patient permission does not replace the platform's doctor-authorization checks.
+
+The proposed second 30-day SOW covers four deliverables: private storage and access controls; patient history and documents; doctor contributions connected to prescriptions; and end-to-end QA with recorded evidence. This is proposed work, not a claim that clinical history is already implemented or approved.
+
+Clinical content would remain encrypted off-chain. Stellar Testnet would record authorizations and integrity evidence without publishing medical content. TrustLeaf would operate the server and manage decryption for authorized access: this is not fully decentralized storage or patient-exclusive key custody. Revoking access cannot erase previously downloaded copies, and integrity evidence does not certify medical accuracy.
+
+The project owner reports that the SOW 1 recording and changelog have been submitted; formal reviewer acceptance is not confirmed here. SOW 1 comprised four weeks, not four separate SOWs. The historical validation cutoffs below retain their original results and do not describe the latest delivery status.
+
+Las propuestas de SOW 2 y sus enlaces restringidos se conservan fuera de esta copia pública.
+
+## Historical validation status — September 2026 cutoff
 
 **Week 3 preparation:** Week 2 has been delivered according to the project owner. The historical preview evidence below remains a separate cutoff. A new main-domain recording, transaction timestamp map and final QA are being prepared in the [Week 3 package](./docs/sow-delivery/week3-review/README.md). Week 3 is not yet validated or delivered; see its [current checks and outstanding work](./docs/sow-delivery/week3-review/VALIDATION.md).
 
@@ -129,6 +143,6 @@ The Week 1 package, manifests and presentations remain local delivery artifacts 
 
 ## License
 
-**Proprietary — © 2026 Browns Studio / CaBsCrypto. All rights reserved.**
+**Proprietary — © 2026 actor-alterno Studio / CaBsCrypto. All rights reserved.**
 
 This source code is made available for evaluation and SOW validation purposes.

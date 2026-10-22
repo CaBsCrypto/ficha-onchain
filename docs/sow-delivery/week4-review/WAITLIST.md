@@ -1,5 +1,7 @@
 # Semana 4 — Operación del registro de interés
 
+> Nota de copia pública · 22-10-2026: Copia pública de continuidad: las cuentas identificables se sustituyeron por actores anónimos donde correspondía; no se alteraron recibos ni hashes.
+
 ## Alcance
 
 El formulario de landing y su modal usan el mismo componente. El registro guarda correo normalizado y fecha, con rol opcional si lo envía un cliente compatible. No crea cuentas, autoriza médicos, envía correos ni genera transacciones Stellar.
@@ -39,12 +41,13 @@ El aviso desplegable explica almacenamiento, finalidad, acceso restringido y sep
 - Navegador móvil: EN/ES/PT; error de correo inválido; error recuperable cuando el servicio está deshabilitado.
 - Pruebas automatizadas: 592 casos de aplicación, 45 privados, 11 contractuales; TypeScript y build aprobados sobre los cambios de trabajo. Incluyen duplicado, límites, cuerpo grande, fallo de base, doble clic, reintento y autorización del listado. No sustituyen las pruebas autenticadas del preview.
 
-## Pendientes de publicación
+## Publicación comprobada
 
-- Validación de escritura únicamente en preview aislado, con correos sintéticos bajo `example.test`.
-- Verificar duplicado, lectura pública rechazada y control administrativo.
-- CI/Vercel y revisión del preview antes de habilitar main.
-- Registrar commit desplegado y resultado de comprobación pública en el checklist final.
+- #126 fusionada en `6fb3e42`; integrada en la versión final `6e8dfb4`, con CI/Vercel aprobados.
+- Escritura sintética y duplicados comprobados en preview aislado. Administrador: lectura, búsqueda, actualización y recarga observadas; paciente rechazado por el panel.
+- GET sin token Privy comprobado en preview mediante acceso legítimo de Vercel: 401, no-store y ausencia de correos. La limitación inicial de la herramienta quedó resuelta.
+- Main: configuración y esquema verificados antes de habilitar envíos. Dos envíos de un mismo correo sintético, con distinta capitalización, dejaron una sola fila. GET anónimo: 401 sin correos.
+- El resultado de cero registros del 19 de septiembre es histórico, no el estado actual del listado. Las comprobaciones no requieren borrar registros.
 
 ## Panel administrativo de sólo lectura (21 de septiembre)
 
@@ -52,4 +55,4 @@ El aviso desplegable explica almacenamiento, finalidad, acceso restringido y sep
 
 La carga distingue lista vacía de fallo. Una respuesta 401/403 elimina las filas anteriores; al desmontar la pantalla se cancela la petición y se ignoran sus respuestas tardías. Los errores del proveedor no se imprimen en el panel. El cambio de identidad conserva el desmontaje del layout administrativo existente.
 
-Evidencia previa de preview: dos envíos sintéticos con diferencias de mayúsculas produjeron una sola fila, comprobada por lectura independiente. La protección de Vercel frente a una petición anónima no se cuenta como un rechazo de la aplicación. Administrador autorizado: listado, búsqueda, actualización y recarga comprobados en el preview de 82aaff2. Paciente brownsstudiocontact: rechazo observado en /admin/doctors y /admin/waitlist, sin listado visible. El layout impide montar la página: no se presenta este rechazo como una petición directa autenticada a GET /api/waitlist. Permanecen pendientes la comprobación anónima de la API del preview y la publicación.
+Evidencia de preview: dos envíos sintéticos con diferencias de mayúsculas produjeron una sola fila, comprobada por lectura independiente. La protección de Vercel frente a una petición anónima no se cuenta como un rechazo de la aplicación. Administrador autorizado: listado, búsqueda, actualización y recarga comprobados en el preview de 82aaff2. Paciente actor-paciente: rechazo observado en /admin/doctors y /admin/waitlist, sin listado visible. El layout impide montar la página: no se presenta este rechazo como una petición directa autenticada a GET /api/waitlist. La comprobación anónima del endpoint y la publicación se completaron posteriormente, como se registra arriba.

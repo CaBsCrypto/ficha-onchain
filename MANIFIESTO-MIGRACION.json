@@ -1,0 +1,4373 @@
+{
+  "schemaVersion": 1,
+  "sourceBranch": "codex/clinical-recording-mode",
+  "sourceCommit": "66c4deff76b8837628714f5890e41f4ad773c705",
+  "algorithm": "SHA-256",
+  "byteSource": "Canonical Git blobs from the final index, before the manifest is added",
+  "excluded": [
+    "MANIFIESTO-MIGRACION.json",
+    "Git metadata"
+  ],
+  "files": [
+    {
+      "path": ".claude/launch.json",
+      "bytes": 199,
+      "sha256": "2efe55e267d47995e0a7b56f0baa6a3bf5a015261a2812258d0897822a02a4d6"
+    },
+    {
+      "path": ".env.example",
+      "bytes": 4706,
+      "sha256": "9e2d797d743fff3f22f907f6912320510f3df70f151f71b4b8f5bc6d046e8d59"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 399,
+      "sha256": "64f414a0ee1b74edf7cd631e6a6cee6566a9b2ec86f20904e28e637954532470"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "bytes": 2352,
+      "sha256": "43267d9950872fb4fa7edbeeb3557665ceb8b0ff81caa80817ea08476828d688"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "bytes": 1193,
+      "sha256": "7b954c732a2e40ad7bc3c30101ab56de05d18dced3fea8e847d1509fc63ea86f"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 2081,
+      "sha256": "fc32b70fb4eba5c8a639d3f66414e891c0ecd05c51b76660720194f0421ee405"
+    },
+    {
+      "path": ".github/workflows/contracts.yml",
+      "bytes": 4507,
+      "sha256": "b4d7aa149e91f80f6e548bd9d909d1c85d9e3918840495941ebbbf001a18bfbb"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 1344,
+      "sha256": "b544fb7362ec451299896ff720f8652d0d0d7bb049224f518f33fc33d24d35e1"
+    },
+    {
+      "path": ".npmrc",
+      "bytes": 22,
+      "sha256": "a093bb2fed59d699b7f9a62a5203cc196054c624e9c39c6d908c9e7db5dd2464"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 8399,
+      "sha256": "a15af357c9b5f0690243f42fcef716462f49abfcf384592fffac24f032a878d5"
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 11,
+      "sha256": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 6099,
+      "sha256": "3e4e30448809cf818b3527208fc656241b80c83be8a5a495e5b43941d2c99001"
+    },
+    {
+      "path": "INVENTARIO-MIGRACION.md",
+      "bytes": 24793,
+      "sha256": "77d1f75ade61c8325f475957a66893795385cce63ff71bbfded1363c32744633"
+    },
+    {
+      "path": "PROJECT_STATE.md",
+      "bytes": 7411,
+      "sha256": "a3974d97274458933cea93b49199f587602b3ab3577178ca93cf0856069c06d5"
+    },
+    {
+      "path": "PROMPT-RECEPTOR.md",
+      "bytes": 8433,
+      "sha256": "3c2d63964912cdd7857707731f6969dae202db8eabf409cafbfdb44f1fc621dc"
+    },
+    {
+      "path": "README-MIGRACION.md",
+      "bytes": 10672,
+      "sha256": "104b4b99c31289db84312a2fbecf72a8b0c7632e0293d364697a9c514e814fa8"
+    },
+    {
+      "path": "README.md",
+      "bytes": 15908,
+      "sha256": "520f1deb1b6e013c47a52f74ba9ce0b80d045f312bb4b46d5620a8523426f396"
+    },
+    {
+      "path": "SELECCION-MIGRACION.json",
+      "bytes": 10324,
+      "sha256": "dafa823ce0117e8271f8d1dbcd5d384b335724d729f47a9eee10ddf20bf20cfb"
+    },
+    {
+      "path": "archive/contracts-legacy/.gitignore",
+      "bytes": 114,
+      "sha256": "e4de30a568d2fa10de0d6c18b1545de4c2d17888d6828951068e29563154f1ed"
+    },
+    {
+      "path": "archive/contracts-legacy/Cargo.historical.lock",
+      "bytes": 44238,
+      "sha256": "1d22a8fd1da7563891c26830df4cb5fbb43cd5458888924a51410d93c36b8865"
+    },
+    {
+      "path": "archive/contracts-legacy/Cargo.historical.toml",
+      "bytes": 694,
+      "sha256": "8f4fb4d95de09090f436cc453db12100f0a43d2b022817767476ca9a977b741d"
+    },
+    {
+      "path": "archive/contracts-legacy/README.historical.md",
+      "bytes": 3070,
+      "sha256": "44a4bc4511fbe82f9a3ee55fedeb6fe1190f7d0e7efa2fba7f16cd187e089844"
+    },
+    {
+      "path": "archive/contracts-legacy/README.md",
+      "bytes": 1138,
+      "sha256": "d05a5c7d8a0cc0c8e0f5e364a59c1c3df66a5c3f34a87ef1e121c52434e6a631"
+    },
+    {
+      "path": "archive/contracts-legacy/clinical-record/Cargo.toml",
+      "bytes": 676,
+      "sha256": "275701de252ebccd4f8568b9eaba3ebfde0b14b3226b37b8c1c5e5274bdd75c0"
+    },
+    {
+      "path": "archive/contracts-legacy/clinical-record/src/lib.rs",
+      "bytes": 7124,
+      "sha256": "b34f2f76e5f9714577620bd6a8fcae593e2fba80ebe735f5231354c0c7038dc7"
+    },
+    {
+      "path": "archive/contracts-legacy/clinical-record/src/test.rs",
+      "bytes": 3926,
+      "sha256": "aed4146bbbd534a7383bab1ebc28517eed5295c83a7bd1c48e639c161808e787"
+    },
+    {
+      "path": "archive/contracts-legacy/dispensary-registry/Cargo.toml",
+      "bytes": 683,
+      "sha256": "72c4d09292ff94feaa897324e355ee05341b1de72808e3192748f9e61dd7c7d0"
+    },
+    {
+      "path": "archive/contracts-legacy/dispensary-registry/src/lib.rs",
+      "bytes": 4147,
+      "sha256": "1ba9acd5f71548f20cf0c4f062105965f372030f8c6957c133f4a36c38eba139"
+    },
+    {
+      "path": "archive/contracts-legacy/dispense-record/Cargo.toml",
+      "bytes": 676,
+      "sha256": "d2e4b0a6411e520866088259ef5d0c94fd91a75148fbc7c7c189eef5859724e0"
+    },
+    {
+      "path": "archive/contracts-legacy/dispense-record/src/lib.rs",
+      "bytes": 6463,
+      "sha256": "1bd2090660e963f775af4f05196272044dd84674d63a623e19709721f095f9f3"
+    },
+    {
+      "path": "archive/contracts-legacy/doctor-registry/Cargo.toml",
+      "bytes": 669,
+      "sha256": "8d3ea31dc8c006ac792682ab3ec0478922ba1041a8547e0d600b47c0fc7489f7"
+    },
+    {
+      "path": "archive/contracts-legacy/doctor-registry/src/lib.rs",
+      "bytes": 10292,
+      "sha256": "6e861f007c60035bdb6f0932ba8a97810fe3fd7e9f1368eacc97786854f0e4ee"
+    },
+    {
+      "path": "archive/contracts-legacy/doctor-registry/src/test.rs",
+      "bytes": 10382,
+      "sha256": "5e08194e41ba3169774c39bfebea4b95fc5d46b16befaa4a02dcfa958abaafcd"
+    },
+    {
+      "path": "archive/contracts-legacy/doctor-registry/tests/deep_security.rs",
+      "bytes": 4673,
+      "sha256": "5ec7f8254b606a72e1234b058b9eb7d8ae1dd31341876137790fdb981a712452"
+    },
+    {
+      "path": "archive/contracts-legacy/doctor-registry/tests/security_review.rs",
+      "bytes": 2159,
+      "sha256": "a9d5f78e5b741749286290ec7063314530496c05a55b92d22f33403d895d1f7b"
+    },
+    {
+      "path": "archive/contracts-legacy/document-soulbound/Cargo.toml",
+      "bytes": 428,
+      "sha256": "75e5f284bdcd92135d7a04bd5f00b6a5d3d26e82855fb26a2c0ea6968db6c7e8"
+    },
+    {
+      "path": "archive/contracts-legacy/document-soulbound/src/lib.rs",
+      "bytes": 8952,
+      "sha256": "98c0f8e302b6aa2dfa618a7bd7608a25ea4314ab5a74f9c8c30c88b6dbe35d59"
+    },
+    {
+      "path": "archive/contracts-legacy/document-soulbound/src/test.rs",
+      "bytes": 3102,
+      "sha256": "ba1d35929559aa09b64f3e53d7b91fd74f065c28f9d300c7460a9e13812406cc"
+    },
+    {
+      "path": "archive/contracts-legacy/e2e/Cargo.toml",
+      "bytes": 858,
+      "sha256": "e2cd2495da2cc23620d20594888361351101b1f35b73d7f6aed18159b9867760"
+    },
+    {
+      "path": "archive/contracts-legacy/e2e/src/lib.rs",
+      "bytes": 337,
+      "sha256": "6d4bd1b88b9676c06401dae3eb53f15d89896a334571b4534c5b8f96fb0796f6"
+    },
+    {
+      "path": "archive/contracts-legacy/e2e/tests/e2e.rs",
+      "bytes": 6113,
+      "sha256": "a13236d46f756ae2c5c189d5400dbd5e2ddeff5093063f83b14f09523fc60b06"
+    },
+    {
+      "path": "archive/contracts-legacy/e2e/tests/private_registry.rs",
+      "bytes": 1492,
+      "sha256": "1777fa25e6b8d79f7a191c784f5f48828fbd0e1bcef913e6e84b3e0cc9766115"
+    },
+    {
+      "path": "archive/contracts-legacy/prescription-soulbound/Cargo.toml",
+      "bytes": 913,
+      "sha256": "de6c525a9ca6af0f8b85944fd82eefbf2f4441a6a65bba19bd9dab4f9eeff8d3"
+    },
+    {
+      "path": "archive/contracts-legacy/prescription-soulbound/src/lib.rs",
+      "bytes": 19715,
+      "sha256": "bb13c3e01edf8ce0ce94eeaad537cdc751cee8331c7eaa77067bb699c47a3744"
+    },
+    {
+      "path": "archive/contracts-legacy/prescription-soulbound/src/test.rs",
+      "bytes": 18481,
+      "sha256": "c9a0e7dbc851192e4e774c7f251680e386621d7f09ad63a863328e8ef22e6716"
+    },
+    {
+      "path": "archive/contracts-legacy/prescription-soulbound/tests/audit_security.rs",
+      "bytes": 4147,
+      "sha256": "c36f3e0e075c327a004bc2efff073d0f06b36963eedb5036c36eb50f46aca4c2"
+    },
+    {
+      "path": "archive/contracts-legacy/prescription-soulbound/tests/deep_security.rs",
+      "bytes": 10608,
+      "sha256": "2b1a8b0b341a09d0034ece5aa0222aa1d6bd3963b7d6c47581d63d58aa9376ed"
+    },
+    {
+      "path": "config/testnet-config.example.txt",
+      "bytes": 2992,
+      "sha256": "60a8c2a790d4bfd27319ba4758352098647632fb40e408e526d21bb8bdf179fc"
+    },
+    {
+      "path": "contracts/.cargo/config.toml",
+      "bytes": 751,
+      "sha256": "abac41a0e01e6f3002220e2b6ee26a72fa4bb99df64aae0d1139d78914f9c5ad"
+    },
+    {
+      "path": "contracts/Cargo.lock",
+      "bytes": 43622,
+      "sha256": "f75199b09c7024243e1be851b0f338d9a5644231f31074d4410577b96cfe031b"
+    },
+    {
+      "path": "contracts/Cargo.toml",
+      "bytes": 492,
+      "sha256": "fd7f19710c8bd5e7104626d4cf72a21e885609f3abe0fd70e5d397b93f3368af"
+    },
+    {
+      "path": "contracts/README.md",
+      "bytes": 2310,
+      "sha256": "126d9789d3dcc122a22428b3d6716c8c455cfd134237a3d3fc6ca15ff60401c9"
+    },
+    {
+      "path": "contracts/clinical-history-private/Cargo.toml",
+      "bytes": 401,
+      "sha256": "2539177c065cbc4aadbe2b87fcdb59e149130648b7e84ea1ed301e2c0148b84e"
+    },
+    {
+      "path": "contracts/clinical-history-private/src/lib.rs",
+      "bytes": 17067,
+      "sha256": "633ceb28fe66f07790b8616cff8e27bc109d99110a4d0e6aec6f84cdecdd5735"
+    },
+    {
+      "path": "contracts/clinical-history-private/src/test.rs",
+      "bytes": 22273,
+      "sha256": "69eb023ad46848bce2965c8ca4e70d74b77f6387d915edad29e5c7d241da62aa"
+    },
+    {
+      "path": "contracts/doctor-registry-private/Cargo.toml",
+      "bytes": 304,
+      "sha256": "f288b7244dd6a509e8c961e1d75a847df8452dced1a17d45af6ca8c6579ee8fe"
+    },
+    {
+      "path": "contracts/doctor-registry-private/src/lib.rs",
+      "bytes": 5035,
+      "sha256": "7c0f33113eb48db4343595c304a5142b34ac9d4a39d53f3346f93b6de5251622"
+    },
+    {
+      "path": "contracts/doctor-registry-private/src/test.rs",
+      "bytes": 2730,
+      "sha256": "97b828fbdbcc7b10604769bf853e6c89b848338bcf47994658ee9de84a6f3893"
+    },
+    {
+      "path": "contracts/prescription-private/Cargo.toml",
+      "bytes": 393,
+      "sha256": "29949d5cb0a7d055d97f8ade6aa3ca855bc13bb966ca5678fbb8d284e70b1a71"
+    },
+    {
+      "path": "contracts/prescription-private/src/lib.rs",
+      "bytes": 9800,
+      "sha256": "a69467273fe321de1db45f7b97ca62b1d5cb432c82a52f3ec776712f7e79e26c"
+    },
+    {
+      "path": "contracts/prescription-private/src/test.rs",
+      "bytes": 11836,
+      "sha256": "036d6e8df1d7c1fed6c0137f1e924fcb0be82455d802b0faac0fe48abd7fe85a"
+    },
+    {
+      "path": "contracts/rust-toolchain.toml",
+      "bytes": 79,
+      "sha256": "7375a5a39ea8a2f5f9f7b0af7f0df399b68f5afe2fc9abece094d08ae50ca4aa"
+    },
+    {
+      "path": "docs/API.md",
+      "bytes": 13714,
+      "sha256": "42e343e2bfc42564e414996a0119cc3a54bd0cd1583fdffde325f5d8a1d5b513"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "bytes": 19090,
+      "sha256": "07b4333c23d4953a00f2d564c1be9971ed19b3f2cf1edc9a7cef35e43faa6692"
+    },
+    {
+      "path": "docs/CONTRACTS.md",
+      "bytes": 14999,
+      "sha256": "c6789829be95e45ae746f1d6c409bb03f747a6f8df43e02041b72176e45215e0"
+    },
+    {
+      "path": "docs/D3_EVIDENCE.md",
+      "bytes": 5477,
+      "sha256": "15749b87c45b9c04b26a032a732521dfe779b734c5569ab6b797910e3068f31e"
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "bytes": 14847,
+      "sha256": "b2ea3992f26d1c781db18865eb33f85ca096a7524125176bed0f681ca64dbdd7"
+    },
+    {
+      "path": "docs/DEMO.md",
+      "bytes": 8893,
+      "sha256": "48deba58a170445cc4042449d2b747ac3122dc6974c751add3724c2ba297ebe1"
+    },
+    {
+      "path": "docs/DEMO_SCRIPT.md",
+      "bytes": 3217,
+      "sha256": "acaef1887e599a97c196a032da0195e6ab17eca5b0a642ccc88dbde1a279a115"
+    },
+    {
+      "path": "docs/FLUJO_TESTEO.md",
+      "bytes": 6035,
+      "sha256": "a9f5daba4e1730523cb42ec881ca1268244c18cd2dc1d556def32cb059daf1b7"
+    },
+    {
+      "path": "docs/PERFILES_DESIGN.md",
+      "bytes": 4609,
+      "sha256": "40e5bf61f3ab22bf2b5363b7589ce25f93400b2926163b2406a6113d8a60bf00"
+    },
+    {
+      "path": "docs/PITCH.md",
+      "bytes": 2871,
+      "sha256": "6f8c93fdc33a388dbf639ab89f0b55eef2d4aa52ba947d2d2f9f8104f3df1096"
+    },
+    {
+      "path": "docs/PLAN_MIS_DATOS_IA.md",
+      "bytes": 5634,
+      "sha256": "dd5958c4bee12036db39d67b241ae07778e192fe5200b25e6063d9e54aaee44f"
+    },
+    {
+      "path": "docs/README.md",
+      "bytes": 1212,
+      "sha256": "5c06f615792f252b7cc2a74803d4cc941f3e104ea86ba65b1a869ce96a329ac5"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "bytes": 51989,
+      "sha256": "52effab78344b03ae41a212f4b121093ad19ab47c87a48d685f3664d49693663"
+    },
+    {
+      "path": "docs/RUNBOOK.md",
+      "bytes": 6966,
+      "sha256": "88d2af9c424e67a3720f12e8dd3c8c9a28e487fca72baf1ae532dc57b35cdf89"
+    },
+    {
+      "path": "docs/SANDBOX_DEPLOY.md",
+      "bytes": 3743,
+      "sha256": "bfe9190b239cd7a50979e063adfea30f8e6439af48372d143c82356df7c2eac5"
+    },
+    {
+      "path": "docs/SOW_AUDIT_2026-08-22.md",
+      "bytes": 6555,
+      "sha256": "e1bab165f96eac8bc17dee1a372a0e1322918d06c8747fb222b35b0b18c3103b"
+    },
+    {
+      "path": "docs/assets/banner.jpg",
+      "bytes": 792087,
+      "sha256": "29b81fdc3bbb52a5b4da732f574f8fd3b515a0e2c679f9f14646b01b4fec0fa0"
+    },
+    {
+      "path": "docs/contracts-spec.md",
+      "bytes": 35245,
+      "sha256": "c4d143e15a17f82915113aa2c435a3e2befd6be5bcaf62be68fb3dfaad26f008"
+    },
+    {
+      "path": "docs/evidence/security-review-week1/booking-db-9b38716f-e60d-47fd-a260-555a90eb74d2.json",
+      "bytes": 2049,
+      "sha256": "1b48ec2b223d146c616401eaa43c411b987add56a5c55371311ff8dd36096d9d"
+    },
+    {
+      "path": "docs/evidence/security-review-week1/deep-tests.txt",
+      "bytes": 1690,
+      "sha256": "138cf60e793dc5b0db8fb08038400ffa35a7362d23c9de6d4b746b887e6f4bf0"
+    },
+    {
+      "path": "docs/evidence/security-review-week1/integration-tests.txt",
+      "bytes": 221,
+      "sha256": "bcee8cb8f0ce621fb7b2c35e491aa90e3cecf745e37d1d30fd1245ef4ed065c2"
+    },
+    {
+      "path": "docs/evidence/security-review-week1/readonly-code-hashes.json",
+      "bytes": 713,
+      "sha256": "410bee79f0f6ad64ef94b15d9b37c10e397edcbc353441c46cba6941a889ee32"
+    },
+    {
+      "path": "docs/evidence/security-review-week1/tests.txt",
+      "bytes": 5338,
+      "sha256": "e428ebc84dd332b2d6e5820bc6776905cc4e36c2f5c29d4d1cbb76ed7c46775f"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/dependency-tree.txt",
+      "bytes": 1154,
+      "sha256": "e27664734c1b42990d554b20dd5dc407af089071c22fba8cb8d9ee9f82ce7f23"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/git-state.txt",
+      "bytes": 528,
+      "sha256": "3d0544c2586704c27c33058739f3c0fbc89448d7d7367a13fe42b3471c81e981"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/next-js-build.txt",
+      "bytes": 3271,
+      "sha256": "72401ab17fab9b2cf80ddcad708053f6d2e37bc39c2609d2c225396aef0f3e71"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/results.json",
+      "bytes": 1636,
+      "sha256": "2cd46e0ab1c78be69438e16c1c43c114d542a17c0b87463cb91b42c074ac3dee"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/rust-contracts.txt",
+      "bytes": 5863,
+      "sha256": "936c94d4c24e67641655738a54c24b229e47524ed8d96516781120ab325f3de9"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/source-manifest.json",
+      "bytes": 29970,
+      "sha256": "a4788737f70a2e6d56c5478e5815a80efd0a724cae7772b37bf1c43bb0a3857c"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/toolchain.json",
+      "bytes": 400,
+      "sha256": "35a890bc27c3f1e331b045ed98e3411c98c7ee59f931ff3278260a2119b2aa09"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/typecheck.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/unit-tests.txt",
+      "bytes": 270,
+      "sha256": "bc4d4928de63a02cc82cbf7ab5bbeae7b0bf86567c13a1854e282d3b28d911d2"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/wasm-clinical-record.txt",
+      "bytes": 876,
+      "sha256": "d334d6a3a68170c0dbc51be083c253aac401f7f6fda0b87c82b82e8ba8e80ec8"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/wasm-doctor-registry.txt",
+      "bytes": 1066,
+      "sha256": "9d1c3d8101d56ea12a6d8ec2fa74d2dd1f42da985d1cb54c2aa71ee46b79e5d7"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/wasm-document-soulbound.txt",
+      "bytes": 889,
+      "sha256": "7b880cb9803849113bc6dda2ecc05041c0b64eab7bf7ad7e0eb6fb5e3c31a11f"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/wasm-hashes.json",
+      "bytes": 805,
+      "sha256": "8488557258a345ef709214b7458f2445dbd2a7d0c84946d8fd8303479cba810b"
+    },
+    {
+      "path": "docs/evidence/sow-2026-09-05/wasm-prescription-soulbound.txt",
+      "bytes": 1083,
+      "sha256": "05e017f6a5fbff47fda32fec55ba8e817cf1c26cfc1a78f3a7ad63c0804878ad"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/demonstration.json",
+      "bytes": 3206,
+      "sha256": "5afe47f73b4fd93a338279bb2b4c56289b4750b91d03a8ae5705a1b305ebdca5"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/deployment.json",
+      "bytes": 1717,
+      "sha256": "0ac7138f3588aa32b4af75805dc6bcf98aea1ff281540b1835ecc2109fe383a8"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/readback.json",
+      "bytes": 3205,
+      "sha256": "d8f0b904443dbd253b05d02b5e4b609dda61e146effcafe2b2c48161047e9ab1"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/restoration-inspection.json",
+      "bytes": 296,
+      "sha256": "0e281e36ca1c6b771c658f4a0993fa8ee248157fdaeaa391cd9b11c6c6f5af38"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/validation.json",
+      "bytes": 808,
+      "sha256": "13c772486280c25eeea1c748776aa72dd025420f4a11c1fb373fb132f5e36786"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/README.md",
+      "bytes": 1382,
+      "sha256": "e8354b8a0a0559d71e3d63dc6ea923be914b08a7050852dc40136c4609588e65"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/contracts-audit.json",
+      "bytes": 4135,
+      "sha256": "57981cdf6476544631125fcdf11b2f52d60c28e48ff96800d717f83a4eabe319"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/funding-audit.json",
+      "bytes": 936,
+      "sha256": "3cc2ee5f906920c7afdddba8a5e007dfffc581a65db375706b3ea82d1e914a8b"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/integrity-manifest.json",
+      "bytes": 1236,
+      "sha256": "25afd5d8b630307ab1b2326dc2f116eb2a405a22fe8ad4f757d87849edc33234"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/preparation.json",
+      "bytes": 1542,
+      "sha256": "29be891f5ed550b4d4a571292eaeb3564eb17cfc864c8d169203e1504a9deeab"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-pre-recording-2026-10-07/readback.json",
+      "bytes": 6350,
+      "sha256": "51f90e9449a0325fe26cce21c415e72b2e88d689553e53713b0330fe338c440e"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/contracts-audit.json",
+      "bytes": 4091,
+      "sha256": "865f01f3bf794ed89479272023b6f64a01038ca0f10a631690cb0eb9ac80abe8"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/demonstration.json",
+      "bytes": 3486,
+      "sha256": "ab72fa949949e5ec6172c279dda9f78d7380ad72f8bddb4bd1a47107bbbb4cfc"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/funding-audit.json",
+      "bytes": 936,
+      "sha256": "7b01910af1b5f30ed359fe29fb0da4c8119310e73d65ce35c4d283c50842116a"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/index.html",
+      "bytes": 25350,
+      "sha256": "36d99422e160e2c537ac5d5d096f923a20c4d8065ce8a0a113b0eb14b3e2dbff"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/integrity-manifest.json",
+      "bytes": 2840,
+      "sha256": "927e6458bc0f6d8d88f2c341fbe868b472afac2bc718851a0499ad01d48cd06f"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/previous-readback.json",
+      "bytes": 3205,
+      "sha256": "b659572e486afa3b81c2095b25921b0f9e21b539e841db9753a169b7d4c9cf25"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/readback.json",
+      "bytes": 6350,
+      "sha256": "428979a537ec58f8b30f5ee0ce3c65730f1cd4638473a68ddbdd663a0fffa263"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/report.md",
+      "bytes": 7436,
+      "sha256": "0b502d55f9030ef8fa5112fc35c0ee6d1b621800b730c1b2695e11a1012353d4"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/restoration-inspection.json",
+      "bytes": 251,
+      "sha256": "39aecf25e3901a3ecf11c6bc5aa11a2e653c4c3d9cd752d3d1852a065daa1c95"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/ui-review.json",
+      "bytes": 1262,
+      "sha256": "415ef953f5407a494e653aac274f370764c65d8969394cee78b7736ecf0a4c24"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-runs/ed9cf324-b9f1-400c-aae8-3323a66407ad/validation.json",
+      "bytes": 884,
+      "sha256": "8fdfd2798133508851eafc30171500038616562fdb502dbda58073c7e4465f86"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/clinical-web-concurrency.json",
+      "bytes": 4978,
+      "sha256": "383612f884c0703ea66ca5ddf233364b6124473a4948e8ab44e7ce554c04954a"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/clinical-web-flows.json",
+      "bytes": 5057,
+      "sha256": "ae5277f1b0de7447c601acc44b78df86302f353a1161b88b2ced5561b9943f2c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/clinical-web-schema.json",
+      "bytes": 7159,
+      "sha256": "f8455ec43641cc27b41184195525865b05227563107d2e976a120befbe25e791"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-360.jpg",
+      "bytes": 47319,
+      "sha256": "c28d95cead2a32bf28090fa6bba484fe06300689095f4bdc6c0feb40d9ee9d56"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-390.jpg",
+      "bytes": 41125,
+      "sha256": "7a1e350ac32db7132a3f7f1a090402d64bbe526347276ab3ebf183582af78343"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-430.jpg",
+      "bytes": 40611,
+      "sha256": "817315547ad36f8a07870ab9fe68292c01522ab249d2ae5fdd037a686db7cba6"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-correccion-390.jpg",
+      "bytes": 41420,
+      "sha256": "91648defcc5036a9f05ebc377719679cb1ae5fe3cd28ac4caa5b542c43f7f63d"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-desktop.jpg",
+      "bytes": 67800,
+      "sha256": "0ed37a6cb7e78c70d59dd9fc02ae1d1c5f183eaede62afbbc79124e2f127b868"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-error-360.jpg",
+      "bytes": 43106,
+      "sha256": "f5ebc2ff0823f4bfd774cc4d85c7b109265d582426f90d23cd653d2e774dd2e2"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-intento-foco-360.jpg",
+      "bytes": 38182,
+      "sha256": "d1d5acf70eb6daf8e5de27dc5db249118b0c99366bafa799f39e2b8d71717d0c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-permisos-430.jpg",
+      "bytes": 48214,
+      "sha256": "0e8f85ae01c673bb393ce344867f6466646d2fd9efc788708cb79f71d5fbd85a"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-sin-historial-360.jpg",
+      "bytes": 42200,
+      "sha256": "e16475159a52fceed649f32fc5192d2cdba7c9a3772602024d999eef57a1ccd8"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/historial-fixture-versiones-390.jpg",
+      "bytes": 41183,
+      "sha256": "2210a908f58a7ff02d756dce703c15e1df42a8e810cb789ed63835610b61e46b"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/manifest.json",
+      "bytes": 2889,
+      "sha256": "1f7b54bd333f55b76e6b995ce129664249566786c2bd51680eb5aa195c9230a6"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-2026-10-08/verification.json",
+      "bytes": 3821,
+      "sha256": "5ff2234ac286282d21b8d5f008e237a8b4554ec71fa596fa06550d8f49f933fd"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-api-rehearsal-2026-10-08/PREPARATION.md",
+      "bytes": 3257,
+      "sha256": "d851d44a7348d7060fb03f2a05af3dc3b5a4988a3f54dda8dd7374fb8160c4ce"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-api-rehearsal-2026-10-08/preparation.json",
+      "bytes": 2086,
+      "sha256": "b783cc261d4eca5cec0c6b3cb658acae9799362449d79bf2ca889368d090d804"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/INFORME.md",
+      "bytes": 7039,
+      "sha256": "2a599eb8af384c0a33b0bdddb9b2a37cc0116638e41ab5f40c8e12003cfddc1c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/contract-readback.json",
+      "bytes": 4945,
+      "sha256": "da4c111a7634fa99c5863616150524da391e18e4342bc088fb1b0fadc60f341e"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/database-preflight.json",
+      "bytes": 662,
+      "sha256": "b505325a96789a51ed6061bc0e8c8072fa3fed9e99bb015b6079b44ad589b320"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/manifest.json",
+      "bytes": 1225,
+      "sha256": "c2599dffd4a03f8aa2760f7c20d2e77ef9475a022ed54728e08daffb43daeb9c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/manual-validation.json",
+      "bytes": 2621,
+      "sha256": "2bf2dc4758f46406ea1567d448c3f30c57bc1f6e6a139c4f7592e0b2c636f35c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/product-signature-audit.json",
+      "bytes": 1831,
+      "sha256": "637f297415f70ce8f248fca1598eea9dba16b5dcb41cb46a149adf7d61cee55a"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/rpc-payload-scope.json",
+      "bytes": 860,
+      "sha256": "1da3b46ef4d75bda39f53b135ba1d6a98a185de719f4d8ae00679c0d02b9dee7"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-gateway-2026-10-15/verification.json",
+      "bytes": 3265,
+      "sha256": "281e8ca4288ef34860546d06a4908968b6aaa7c822826010012fea783b9e590b"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/INFORME.md",
+      "bytes": 9215,
+      "sha256": "a9c0cfd1ba44696d4bbfab46a0eb5c1d209ed5fd564cf9762b79486805136c4b"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/browser-validation.json",
+      "bytes": 2123,
+      "sha256": "0e2d6471d66c2883ae023d385060de53471c0515e85b963844d4c742f4442aff"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/doctor-record-restoration-result.json",
+      "bytes": 948,
+      "sha256": "40ec858e23514eee198a2389838e1e905d6f2d074c6e421cb2d50cc2768f7bde"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/final-registry-readback.json",
+      "bytes": 1338,
+      "sha256": "5f16e7a89da47ae61dabc2a25091d4454409e98af180d433ba959754b8345830"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/historial-430-permisos.png",
+      "bytes": 53768,
+      "sha256": "b5b533c6f5eec14cff3ff09a8478da257c30c1b3756c77586f61233c6fd6f644"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/manifest.json",
+      "bytes": 3175,
+      "sha256": "4c6bbe138aac55a4d27674f507ee1a1c68daff5293d748f3210bb49d43e301f3"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/persistence-after-maintenance.json",
+      "bytes": 490,
+      "sha256": "834cc76a201ee07896d848ed6c7a6c05cadfc08667796b01232a6d1f0db66db9"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/post-restoration-required-reads.json",
+      "bytes": 5782,
+      "sha256": "2af2a0125765e6de8ef3eb9032ef11d152ca5afeb39234bf372ebb02cd95ab18"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/registry-post-restore-readback.json",
+      "bytes": 1402,
+      "sha256": "4f787716eac095fe3f90b65a6ba9f0dceb8172a1ddbd99138e65544b45cc5dc4"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/registry-restoration-inspection.json",
+      "bytes": 1133,
+      "sha256": "f27e7566c6ea29b82b86be8f1641b0360914fbb29edc295cc33f34ef3bc2686c"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/registry-restoration-result.json",
+      "bytes": 916,
+      "sha256": "796366a16c3491611dcfa3513897b9db2562716228a1d55e0a5eca1f438060a4"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/remaining-state-inspection.json",
+      "bytes": 6093,
+      "sha256": "356a7481e55000638ff76413e9e8e28fc721a8915c1fcf09ec6de94b41cb4a27"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-15/verification.json",
+      "bytes": 1858,
+      "sha256": "08d4403481046dbdfeeb721065d0420048cd7daa0a7cae9cb8186f2eefdc29fb"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/INFORME.md",
+      "bytes": 8588,
+      "sha256": "da955ddf5018effb475b88cadfbd0dc388da8f2e4f26ffdd95d0f95c41adaa63"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/execution.json",
+      "bytes": 8689,
+      "sha256": "33d8164f5ac9089991dfc324cd51aaa1210f0c180f68138d01884fa278528c0e"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/historial-live-360.png",
+      "bytes": 41363,
+      "sha256": "4ce93c4f3c7060955b0233ab544779d8a49ee283d0d00832d7b68d24bb94a610"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/historial-live-390.png",
+      "bytes": 39810,
+      "sha256": "3e5c60617d40b30470ecbbdea1f4790836de30a5003204d17a9a631a738f1922"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/manifest.json",
+      "bytes": 2677,
+      "sha256": "700fe36290e30aee1bc042bf79acccd194958a52534c465e45d97151d94da747"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/permisos-finales-390.png",
+      "bytes": 40626,
+      "sha256": "5f3ecfa61d8b1a71861778b66dd4fdb96a5f6e9116b66bcd1ef83b0185deae69"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/permisos-lectura-360.png",
+      "bytes": 45354,
+      "sha256": "9fb7840085f191ce525c2e9c75c606760d54499b2e4c0e873796b2e06e6cd29b"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-testnet-2026-10-11/persistence.json",
+      "bytes": 8690,
+      "sha256": "809618aebea524995f9a69b548978976dac7b91b92fbf8f27410c98e93003a1d"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/END_TO_END_STATUS.md",
+      "bytes": 10508,
+      "sha256": "c22fc835a4a45bce01ae0debd0b60d8f842417e9b9154acaabec5ad2d893e4e5"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/doctor-registry-preparation.json",
+      "bytes": 1301,
+      "sha256": "7e1f3db67d3c8b5b71944c36af62dd86e5e4008a4c5820f88436590f9ae877d7"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/doctor-registry-source.rs",
+      "bytes": 10292,
+      "sha256": "6e861f007c60035bdb6f0932ba8a97810fe3fd7e9f1368eacc97786854f0e4ee"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/doctor-registry-usage.json",
+      "bytes": 28890,
+      "sha256": "b8359cb0836d31cdc392bb40344fa8b90d02b1b12861cf7d34cdf77449636c1f"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/prescription-booking-deployment.json",
+      "bytes": 906,
+      "sha256": "b66b70c0aa89f5b9a9e903f351f08eec0446c428f4b56cc9a4c490dbd1ecc5c8"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/prescription-booking-verification.json",
+      "bytes": 13305,
+      "sha256": "0e7b1cfdec76e475aa6ee3fe8da6ad4abf2591f6123d2c4b877fb7a6dfc3e1c9"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/prescription-private-interface.json",
+      "bytes": 3468,
+      "sha256": "a46a4da69fa1ec392d69fc5882a597138e198ae482c802e111cdeb0cc9c78352"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/private-dossier-validation.json",
+      "bytes": 33054,
+      "sha256": "11efcf5721ac9f9bb92f82fbfd8faa0a8ad54f5a4583295f335b98d60449d48a"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/private-flow-completion-audit.json",
+      "bytes": 1955,
+      "sha256": "eeca377c222cf07f5119473eb6de45e9f46af819f331e9da6f48eea1b8e397b0"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/private-flow-verification.json",
+      "bytes": 9528,
+      "sha256": "dda2fc11a5fee7e8217bc54c79e1e0fa50c18aadf97b61db298d7365a9178dbd"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/private-registry-source.rs",
+      "bytes": 5035,
+      "sha256": "7c0f33113eb48db4343595c304a5142b34ac9d4a39d53f3346f93b6de5251622"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/private-registry.json",
+      "bytes": 993,
+      "sha256": "556f02eae8b514a6553b8ac0b7a620c4e0461b64691cba98b46fab05670ebcf0"
+    },
+    {
+      "path": "docs/evidence/testnet-generation-2026-09-07/three-test-doctors.json",
+      "bytes": 30505,
+      "sha256": "2f755d082209569716b5cf699a509be0fdccc58edb6f85d0f10a34f77b1127fb"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/build.txt",
+      "bytes": 3271,
+      "sha256": "914c3f6b22a3c5e5f1a05fec81326ac6c339aaef0d2648c01c6e6e1524edd3a0"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/contracts.txt",
+      "bytes": 4052,
+      "sha256": "8fc7183df5d9ab03e2879d8bc95fc493254cdcd7de9252a3625af274df1c00d1"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/deployment.json",
+      "bytes": 822,
+      "sha256": "5df78edb0d384bf00b55ee2cb3513127085e9ac04ec33354d1e7fd3d9a50c2c6"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/local-validation.json",
+      "bytes": 33262,
+      "sha256": "aaf169c6e68a29a67f591f899b99ccd2aad310838202314ee90e28634758272b"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/typecheck.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/verification.json",
+      "bytes": 3409,
+      "sha256": "24792af61e4e7f72169c6c039ea54de5381dde4f3d68d2bed615f523fb6433f3"
+    },
+    {
+      "path": "docs/evidence/week1-2026-09-06/vitest.txt",
+      "bytes": 270,
+      "sha256": "4da9e15dc0554129a46bb5b33cc0438982aca2b5b61ec8f3971b41a111ec742e"
+    },
+    {
+      "path": "docs/evidence/week2-admin-authorization-2026-09-09/authorization-receipt.json",
+      "bytes": 1191,
+      "sha256": "602df2a8af1f6391a3d8c7974cfedbcde0aadf34841703848390b4b05026293b"
+    },
+    {
+      "path": "docs/evidence/week2-admin-authorization-2026-09-09/validation.json",
+      "bytes": 3280,
+      "sha256": "410002abb70d4eaff2c14c9e4c056ff3df209547a2484fdec344d7f468bb64ae"
+    },
+    {
+      "path": "docs/evidence/week2-admin-authorization-2026-09-09/worker-off.json",
+      "bytes": 426,
+      "sha256": "5552abcb5597da3f72be16c174c8056fbb36efad332a8d6ed524730eae8d3514"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/README.md",
+      "bytes": 8844,
+      "sha256": "57883aa57536e0797c0e7dc49fe628cf3ba4d5f14df04ae81492830b65870c17"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/browser-observations.json",
+      "bytes": 1985,
+      "sha256": "10d2cca5bd463e9174aff2d4ccfd3796ca8c89c02ae77ad62284e6f9febfc781"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/manifest.json",
+      "bytes": 1459,
+      "sha256": "e0ab796417113733a710fbe10ed2c28f58daf818f37635311dd38cf4e944db4e"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/validation-results.json",
+      "bytes": 8605,
+      "sha256": "013fc34a8ad2ab53aabd73dc67999c7db5195958b87aba0a481e41660cbb899b"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/week2-booking-receipts.json",
+      "bytes": 2858,
+      "sha256": "4421e7cbc2ffa4e51baa002743ca26c15f948770e379b66a9b44d6e1fa1a7fcd"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/week2-consent-receipts.json",
+      "bytes": 7162,
+      "sha256": "dfb2267ae4d868b74acf6d277ed368363060f592433833728961aeb3fd5fb122"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/week2-prescription-receipts.json",
+      "bytes": 13852,
+      "sha256": "65eb8d84ce738b33dd0377f93f809e63009670b371a32479826a6c3e78ebb4c7"
+    },
+    {
+      "path": "docs/evidence/week2-portals-local-2026-09-09/week2-unauthenticated-access.json",
+      "bytes": 1162,
+      "sha256": "03d51fadfc88d382dc2714fcd6c80b9588787238806499e3945db61f3caa5a00"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/README.md",
+      "bytes": 3489,
+      "sha256": "b5c3203251bae5e260a79927db65fab57887f32c867cbf280f11a00fecbb83ec"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/browser-observations.json",
+      "bytes": 1530,
+      "sha256": "ce02a7faab3d2117efaafa9dfdafecaa0d49e6991d5ae7a0616c59c8a6f7de16"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/manifest.json",
+      "bytes": 748,
+      "sha256": "598f1c7229ec8b4fb0101cf2dac3a3f87dcd7bdd3f7173d33f2e01bd560bcfd0"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/prescription-audit.json",
+      "bytes": 2047,
+      "sha256": "2e0fa6a9b9994a8d80ee1346c145c9fc9c483814881c4f41737e0a75c1830a3e"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/preview-receipts.json",
+      "bytes": 2786,
+      "sha256": "7c8760d1598735f1213f8e80227c8e25996a6d30bf02101c02e499c2a31eb279"
+    },
+    {
+      "path": "docs/evidence/week2-preview-2026-09-10/validation-results.json",
+      "bytes": 1593,
+      "sha256": "4b60228b1460b08d623400848bf4cf87914860c3e757821760eeb644cbc4b5c3"
+    },
+    {
+      "path": "docs/sow-delivery/ARCHITECTURE_PLAN.md",
+      "bytes": 6151,
+      "sha256": "b8858046b9a80e702346f097d8841139bbe0aabbe88949766f287ee352671513"
+    },
+    {
+      "path": "docs/sow-delivery/CHANGELOG-HISTORICO-2026-09-05-06.md",
+      "bytes": 4466,
+      "sha256": "4ef6e3b50c0b5a01e4abe172a0f86dbad3d58a6e4b96af5b951fbe639048520c"
+    },
+    {
+      "path": "docs/sow-delivery/CHANGELOG-SEMANA-2.md",
+      "bytes": 3735,
+      "sha256": "c2d4a0fe3664ee2821c5596dad1222dcbf3383ded338d12695a25d7d34d4c26b"
+    },
+    {
+      "path": "docs/sow-delivery/CHANGELOG.md",
+      "bytes": 4381,
+      "sha256": "fa7e90d01d7f4620f832b96cdb93c6e068321f8aa9c07cb6387c31919a4593ef"
+    },
+    {
+      "path": "docs/sow-delivery/CHILE_HEALTH_PRIVACY.md",
+      "bytes": 5676,
+      "sha256": "1c331afdba24c7e7f0c10f2e9505191acd36dd31ceae589775b2cfaa67687822"
+    },
+    {
+      "path": "docs/sow-delivery/CREATOR_VIEW.html",
+      "bytes": 3505,
+      "sha256": "ef954fcb2184b7cfe97b4da3140b8b917f8195325ae6ad22c292b04e1d2b4439"
+    },
+    {
+      "path": "docs/sow-delivery/DELIVERABLE_1_ACCEPTANCE.md",
+      "bytes": 8165,
+      "sha256": "7f41062f2b87d4f3be87734a9163a249f5fe2096cc7ba6cfd0adad3d81f869c5"
+    },
+    {
+      "path": "docs/sow-delivery/DESIGN_CONTRACT_BOUNDARIES.md",
+      "bytes": 7927,
+      "sha256": "71cfbf7a421280b3fd05bba41e0e5243590254cb9455ee5a5ccad80c05f0c442"
+    },
+    {
+      "path": "docs/sow-delivery/DESIGN_PRIVATE_CUSTODY.md",
+      "bytes": 7149,
+      "sha256": "8cbcd054ea5897513bf6134e17de3cfa82f11f4c10d72926204309272716f68a"
+    },
+    {
+      "path": "docs/sow-delivery/DESIGN_RELAY_OPERATIONS.md",
+      "bytes": 8740,
+      "sha256": "ddc3572dd9d4579be8a315351b0bd9eb0d4243df6b720641262a8513ffd9841b"
+    },
+    {
+      "path": "docs/sow-delivery/FLUJO-GRABACION-TRES-ACTORES.md",
+      "bytes": 3789,
+      "sha256": "2a936ff4f218c4bca281b3fdd791a3e7ec01d7292800f71bb9f6c00ac96e0788"
+    },
+    {
+      "path": "docs/sow-delivery/GOAL-SOW2.md",
+      "bytes": 8074,
+      "sha256": "b3b0512e2a57db48f518021072d4cb8b45031e25612f2c757d586cb4b680fab5"
+    },
+    {
+      "path": "docs/sow-delivery/GRABAR-SEMANA-1.html",
+      "bytes": 5828,
+      "sha256": "75e08d753d4acf63e06f1f512a452f625da5cd110393f34600dc5830ef163d34"
+    },
+    {
+      "path": "docs/sow-delivery/INDEX.md",
+      "bytes": 4010,
+      "sha256": "a6bafc9b4ae5da8f30e54f91b6277e4b354384dc50c7d23458421fffa8a1ae6c"
+    },
+    {
+      "path": "docs/sow-delivery/MEDICAL_DATA_FLOW.md",
+      "bytes": 8164,
+      "sha256": "af4b9ebbb66e3b5d604c67a5dcf3601a718bf0e1d5967b0af04f28bde9401119"
+    },
+    {
+      "path": "docs/sow-delivery/NOTION-HISTORICO-2026-09-06.md",
+      "bytes": 5742,
+      "sha256": "7d244daa039e96fdd48e1b9322cec333236cbc42a7f740b3b4edeca080ac1fa8"
+    },
+    {
+      "path": "docs/sow-delivery/NOTION.md",
+      "bytes": 2762,
+      "sha256": "d474157fe12deac8bf1981fde2c04bf4d6823938132e4d4588c18a103a1c7745"
+    },
+    {
+      "path": "docs/sow-delivery/NOTION_D1_UPDATE_PROPOSAL.md",
+      "bytes": 5605,
+      "sha256": "a2d8c0d86994fb73744c3605b373fa3aa7c12b7738d0ef9c8946bc9f4d6ab73c"
+    },
+    {
+      "path": "docs/sow-delivery/PERMISSIONS_FIX_STATUS.md",
+      "bytes": 2125,
+      "sha256": "a532eeed126a87cd022777e6444e4f32347869d682180c05d09aa855dc810f25"
+    },
+    {
+      "path": "docs/sow-delivery/PRIVY_STELLAR_MIGRATION_STATUS.md",
+      "bytes": 10391,
+      "sha256": "92e90204ba4d687d78749dbc92242aec4da0abdf1069607ca3c162db07ee23e0"
+    },
+    {
+      "path": "docs/sow-delivery/SECURITY_REVIEW_WEEK_1.md",
+      "bytes": 7975,
+      "sha256": "3ba795730c70cd82f249913d8c365ad37e7c9e581f0bc047a46ea88d86c49063"
+    },
+    {
+      "path": "docs/sow-delivery/SOCIAL.md",
+      "bytes": 4564,
+      "sha256": "a916ea7a63c7abc03b7ed1296944561ece517be9d20d1de894a032dfd6b69bd3"
+    },
+    {
+      "path": "docs/sow-delivery/SOW_PHASE_1_SCOPE.md",
+      "bytes": 3370,
+      "sha256": "85215f19474935bcfd55a67c31a54c4d3aa6542d1cb7597da5e1fbe88534ad83"
+    },
+    {
+      "path": "docs/sow-delivery/SOW_WEEK_1_RECONCILIATION.md",
+      "bytes": 7180,
+      "sha256": "54b47ebe9e66ac01f5e76b4b72762156548769d584b569dd52d0a26aa318fbe5"
+    },
+    {
+      "path": "docs/sow-delivery/SOW_WEEK_1_SOURCE.md",
+      "bytes": 2641,
+      "sha256": "c57b6d8bfd3e8c2e0c989805b4ae8ef5c4062693553698d7f22be25ce7b7f807"
+    },
+    {
+      "path": "docs/sow-delivery/TrustLeaf-Semana-1-Entrega-2026-09-07.zip",
+      "bytes": 362169,
+      "sha256": "edbc064a84a2e4ba580ea68bd7a9f19a88b4e26c44f9743ceec711e90eb9eabf"
+    },
+    {
+      "path": "docs/sow-delivery/TrustLeaf-Semana-1-Entrega-2026-09-08.zip",
+      "bytes": 396263,
+      "sha256": "361722b7f79db9a5fb0d63a53c36e757552c039f69657396e3f439de8753e4de"
+    },
+    {
+      "path": "docs/sow-delivery/TrustLeaf-Semana-1-Entrega-2026-09-08.zip.sha256",
+      "bytes": 108,
+      "sha256": "d30bc8dfe01f4ed86f301830b8c784f93121956c35663d2c5c6acf7df1d05fcc"
+    },
+    {
+      "path": "docs/sow-delivery/TrustLeaf-guia-video-semana-2.html",
+      "bytes": 6464,
+      "sha256": "888b3e7852f5962fd6b66ce3f3253c8e4ffe2dc741d2785de542f2fb7fbffd77"
+    },
+    {
+      "path": "docs/sow-delivery/VIDEO.md",
+      "bytes": 5752,
+      "sha256": "ead449f199ce783424e9c4eab5b6c6c40fedda8b6e8545d840edd3b18f982905"
+    },
+    {
+      "path": "docs/sow-delivery/WEEK_1.md",
+      "bytes": 7432,
+      "sha256": "ba475ded84f1cebbb3c2856d077a77ee791e7a2b20c6c425f486485508048a5b"
+    },
+    {
+      "path": "docs/sow-delivery/WEEK_2_ADMIN_AUTHORIZATION.md",
+      "bytes": 6991,
+      "sha256": "4549b2905541c4d174daad0c31abd21c82e2d30492754fd85378e4592370902d"
+    },
+    {
+      "path": "docs/sow-delivery/WEEK_2_PORTALS.md",
+      "bytes": 16090,
+      "sha256": "4910018aa0e16ea52e940105dda5261a1313cacb92425e3e1d57f0c377526317"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/CHANGELOG-SEMANA-1.md",
+      "bytes": 9690,
+      "sha256": "1912013aca936dedf7eb910af067013b3d8efb2b96837a7a38f9cdd1328d0518"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/LEER-PRIMERO.md",
+      "bytes": 6061,
+      "sha256": "2e23a9507fa129ee7ed4dbe0938a28f86486480859c67938351453edcbfe541d"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/MANIFEST-SHA256.json",
+      "bytes": 9158,
+      "sha256": "dcab0c4cec5514beeaa04fce9a15772559ab1d234aff4653412436637f2ee877"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/NOTION-ENTREGA-SEMANA-1.md",
+      "bytes": 12186,
+      "sha256": "fd37d6bd49258bbc2fd50a96e47940401df25730601662bd8bcf88106ac168bb"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/RESUMEN-PRESENTACION.md",
+      "bytes": 2102,
+      "sha256": "25b1f33350afb6b86d95aae4d2d50f2328a75857ddb5f67d907d66a7c7258e52"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/SOW_WEEK_1_SOURCE.md",
+      "bytes": 2641,
+      "sha256": "c57b6d8bfd3e8c2e0c989805b4ae8ef5c4062693553698d7f22be25ce7b7f807"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-dos-contratos.html",
+      "bytes": 458782,
+      "sha256": "6a9c33b97fb16812b1db03855842b2d18fbd2c64ac6f9a2e1fcf7793eea990a1"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-flujo.html",
+      "bytes": 4054,
+      "sha256": "f1ece3aa381d4efb7612cd05439cd6073da44e4332eb0ec458a5b26f3f510718"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-guia-presentador.html",
+      "bytes": 24301,
+      "sha256": "7951a17c8accd625973fd5dac0e23b39e72c523a0522a16ec463965230cd0011"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-mini-guion.md",
+      "bytes": 1540,
+      "sha256": "ad9ff7d73cd21bf066682bea9ea4d41f1e3752ae2104cd1d23fd3a9984173e7b"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-preguntas.html",
+      "bytes": 6969,
+      "sha256": "e152cd5402a0792b13ac0045cc5a2ef1c7497cdea070158297381a2a397d6206"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/TrustLeaf-transacciones-de-prueba.html",
+      "bytes": 48460,
+      "sha256": "25d3f23f076eafd6472190efb6297bece17051d5d6e647b94421c17390726548"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/doctor-registry-private-codigo.html",
+      "bytes": 15075,
+      "sha256": "0d64262f6b7446c32866a85e3437ef136c4874863f508f2508ced32e3f314df5"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/TrustLeaf-evidencia-validaciones.json",
+      "bytes": 4470,
+      "sha256": "435ba2783686e9f1d2d407d057ca396a419f57b53640006b0d8ed6cbea675889"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/app-tests.txt",
+      "bytes": 738,
+      "sha256": "b36f54564be9ab1abf147e54b5d29da17c33847113883ec13da37edf459b6e6a"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/closure-contract-tests.txt",
+      "bytes": 1507,
+      "sha256": "36c275d4b0388980d71993946dc134c76bd9edcc417e5433010fdac1acb22f7c"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/closure-live-verification.json",
+      "bytes": 2380,
+      "sha256": "62d3eaf4fe7ef87e320b883a3f93d742e612b154e9f7c55d7e52b4deb548b21b"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/closure-prescription-build.txt",
+      "bytes": 1064,
+      "sha256": "d3c17f894fa70e5c101ebafd3a3a742f2cd23ee9c6adb5c3e83d40076285f386"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/closure-registry-build.txt",
+      "bytes": 1000,
+      "sha256": "fc6e3de649e1f9ecfd6cb7462af3cc444e7e57a3bd0790f85d760e0f05ae969d"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/test-case-inventory.json",
+      "bytes": 20630,
+      "sha256": "06551db42ce79048bee6f08ca8b4f24fa3e79f8ce6aefbcb5b4b7927ab90bfcb"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/evidence/typecheck.json",
+      "bytes": 156,
+      "sha256": "7145fd93ce666704ab4752d8c7bb8e0e4de14add804109e5ca17b60fac017e93"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/prescription-private-codigo.html",
+      "bytes": 24395,
+      "sha256": "391950124366696fb37084ab10d59a4601b01a1d2612538aa762abd349eb6357"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source-manifest.json",
+      "bytes": 5076,
+      "sha256": "f119ba6308d637685b8ccdb452ad4b02ca96ba4db073064541e5cc8a38865f9e"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/Cargo.lock",
+      "bytes": 44238,
+      "sha256": "1d22a8fd1da7563891c26830df4cb5fbb43cd5458888924a51410d93c36b8865"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/Cargo.toml",
+      "bytes": 694,
+      "sha256": "8f4fb4d95de09090f436cc453db12100f0a43d2b022817767476ca9a977b741d"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/clinical-record/Cargo.toml",
+      "bytes": 676,
+      "sha256": "275701de252ebccd4f8568b9eaba3ebfde0b14b3226b37b8c1c5e5274bdd75c0"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/clinical-record/src/lib.rs",
+      "bytes": 7124,
+      "sha256": "b34f2f76e5f9714577620bd6a8fcae593e2fba80ebe735f5231354c0c7038dc7"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/clinical-record/src/test.rs",
+      "bytes": 3926,
+      "sha256": "aed4146bbbd534a7383bab1ebc28517eed5295c83a7bd1c48e639c161808e787"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/dispensary-registry/Cargo.toml",
+      "bytes": 683,
+      "sha256": "72c4d09292ff94feaa897324e355ee05341b1de72808e3192748f9e61dd7c7d0"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/dispensary-registry/src/lib.rs",
+      "bytes": 4147,
+      "sha256": "1ba9acd5f71548f20cf0c4f062105965f372030f8c6957c133f4a36c38eba139"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/dispense-record/Cargo.toml",
+      "bytes": 676,
+      "sha256": "d2e4b0a6411e520866088259ef5d0c94fd91a75148fbc7c7c189eef5859724e0"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/dispense-record/src/lib.rs",
+      "bytes": 6463,
+      "sha256": "1bd2090660e963f775af4f05196272044dd84674d63a623e19709721f095f9f3"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry-private/Cargo.toml",
+      "bytes": 304,
+      "sha256": "f288b7244dd6a509e8c961e1d75a847df8452dced1a17d45af6ca8c6579ee8fe"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry-private/src/lib.rs",
+      "bytes": 5035,
+      "sha256": "7c0f33113eb48db4343595c304a5142b34ac9d4a39d53f3346f93b6de5251622"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry-private/src/test.rs",
+      "bytes": 2730,
+      "sha256": "97b828fbdbcc7b10604769bf853e6c89b848338bcf47994658ee9de84a6f3893"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry/Cargo.toml",
+      "bytes": 669,
+      "sha256": "8d3ea31dc8c006ac792682ab3ec0478922ba1041a8547e0d600b47c0fc7489f7"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry/src/lib.rs",
+      "bytes": 10292,
+      "sha256": "6e861f007c60035bdb6f0932ba8a97810fe3fd7e9f1368eacc97786854f0e4ee"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry/src/test.rs",
+      "bytes": 10382,
+      "sha256": "5e08194e41ba3169774c39bfebea4b95fc5d46b16befaa4a02dcfa958abaafcd"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry/tests/deep_security.rs",
+      "bytes": 4673,
+      "sha256": "5ec7f8254b606a72e1234b058b9eb7d8ae1dd31341876137790fdb981a712452"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/doctor-registry/tests/security_review.rs",
+      "bytes": 2159,
+      "sha256": "a9d5f78e5b741749286290ec7063314530496c05a55b92d22f33403d895d1f7b"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/document-soulbound/Cargo.toml",
+      "bytes": 428,
+      "sha256": "75e5f284bdcd92135d7a04bd5f00b6a5d3d26e82855fb26a2c0ea6968db6c7e8"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/document-soulbound/src/lib.rs",
+      "bytes": 8952,
+      "sha256": "98c0f8e302b6aa2dfa618a7bd7608a25ea4314ab5a74f9c8c30c88b6dbe35d59"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/document-soulbound/src/test.rs",
+      "bytes": 3102,
+      "sha256": "ba1d35929559aa09b64f3e53d7b91fd74f065c28f9d300c7460a9e13812406cc"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/e2e/Cargo.toml",
+      "bytes": 858,
+      "sha256": "e2cd2495da2cc23620d20594888361351101b1f35b73d7f6aed18159b9867760"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/e2e/src/lib.rs",
+      "bytes": 337,
+      "sha256": "6d4bd1b88b9676c06401dae3eb53f15d89896a334571b4534c5b8f96fb0796f6"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/e2e/tests/e2e.rs",
+      "bytes": 6113,
+      "sha256": "a13236d46f756ae2c5c189d5400dbd5e2ddeff5093063f83b14f09523fc60b06"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/e2e/tests/private_registry.rs",
+      "bytes": 1492,
+      "sha256": "1777fa25e6b8d79f7a191c784f5f48828fbd0e1bcef913e6e84b3e0cc9766115"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-private/Cargo.toml",
+      "bytes": 393,
+      "sha256": "29949d5cb0a7d055d97f8ade6aa3ca855bc13bb966ca5678fbb8d284e70b1a71"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-private/src/lib.rs",
+      "bytes": 9800,
+      "sha256": "a69467273fe321de1db45f7b97ca62b1d5cb432c82a52f3ec776712f7e79e26c"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-private/src/test.rs",
+      "bytes": 11836,
+      "sha256": "036d6e8df1d7c1fed6c0137f1e924fcb0be82455d802b0faac0fe48abd7fe85a"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-soulbound/Cargo.toml",
+      "bytes": 913,
+      "sha256": "de6c525a9ca6af0f8b85944fd82eefbf2f4441a6a65bba19bd9dab4f9eeff8d3"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-soulbound/src/lib.rs",
+      "bytes": 19715,
+      "sha256": "bb13c3e01edf8ce0ce94eeaad537cdc751cee8331c7eaa77067bb699c47a3744"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-soulbound/src/test.rs",
+      "bytes": 18481,
+      "sha256": "c9a0e7dbc851192e4e774c7f251680e386621d7f09ad63a863328e8ef22e6716"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-soulbound/tests/audit_security.rs",
+      "bytes": 4147,
+      "sha256": "c36f3e0e075c327a004bc2efff073d0f06b36963eedb5036c36eb50f46aca4c2"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/source/contracts/prescription-soulbound/tests/deep_security.rs",
+      "bytes": 10608,
+      "sha256": "2b1a8b0b341a09d0034ece5aa0222aa1d6bd3963b7d6c47581d63d58aa9376ed"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/wasm/doctor_registry_private.wasm",
+      "bytes": 5134,
+      "sha256": "b31de89cfd704aa917afd2b9056b97a38242d91f2452846a208962f7de358e02"
+    },
+    {
+      "path": "docs/sow-delivery/d1-private-2026-09-07/wasm/prescription_private.wasm",
+      "bytes": 11358,
+      "sha256": "4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/ALCANCE_DEMO_Y_FIRMA_CLINICA.md",
+      "bytes": 3913,
+      "sha256": "543129b9aab3bdd884c751ab1e2e287532c88751783920584fa07fc5b2882200"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/ARQUITECTURA_ATESTACION_RESERVA.md",
+      "bytes": 5571,
+      "sha256": "8c20864a48490e00a479dd070b80f0ab802f75c86ff7deb4dd4480c9da6444c2"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/ARQUITECTURA_REGISTRY_PRIVADO.md",
+      "bytes": 8104,
+      "sha256": "110cef5b8354633d8fb0c33f19bb49d587d8a7b322dd66cf372e7d89067bb54f"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/DOCTOR_REGISTRY_DESPLIEGUE_Y_VALIDACION.md",
+      "bytes": 9757,
+      "sha256": "d4168d90ad1eb9e52a635cc5da0d9259d8258f01af23a1f97ef315150dc66a5c"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/ENTREGA_COORDINACION_RESERVA.md",
+      "bytes": 6627,
+      "sha256": "357739b6b4924db412f1b2d341e640d050731260d6d532da4132f8326415e1e4"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/FIRMA_RECETA_CHILE_OPCIONES.md",
+      "bytes": 5113,
+      "sha256": "37cb5ca16ac04ff79ab8e1d3a4c21ceddcfc487abca555075608cf2991e18a94"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/MATRIZ_D1.md",
+      "bytes": 8655,
+      "sha256": "e7fe96b3cbcf264ef68cbe9db20be481ef65d0bcc1c8be6f9f0c756dd2b4afc6"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/NOTION_REORGANIZACION.md",
+      "bytes": 3516,
+      "sha256": "6e6d6451db5c21a89fa6c308a8452ebe560366346123aab47842bcb94bee6838"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/PLAN_CONSULTA_CONSENTIMIENTO_RECETA.md",
+      "bytes": 6566,
+      "sha256": "9ba4b9ee2a276e7249f581663ec68e5b1e30136c71522ad321ad8c06d4e1caee"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/PLAN_CUATRO_CONTRATOS_TESTNET.md",
+      "bytes": 9494,
+      "sha256": "5607176bafaed3d14aff5b8d7980065b96f7cd099fe6b7e20cf077e1fc678b54"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/PRESCRIPCION_CHILE_INVESTIGACION.md",
+      "bytes": 5939,
+      "sha256": "4a5fbd2c9a0c99fddbf473e440b11faddd515cab9bb3803e94c4164cb72ae9c8"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/PRESCRIPTION_PRIVACIDAD.md",
+      "bytes": 5178,
+      "sha256": "6d832f3ce8a3205b10eb0d7b39a14b7ca82aadb01c17d95da15016268e745322"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/README.md",
+      "bytes": 6171,
+      "sha256": "d399aa58270779524af48d4acb2ab53278742592d9a60259449978958e61af5a"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/REGISTRY_PRIVADO_RESULTADOS.md",
+      "bytes": 5753,
+      "sha256": "b491ec00d0db5ecb45ce8089f7912712d95c4fb1ec735d22c6bfcbf2e7a0f5bd"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/SOW_TRES_MEDICOS_TESTNET.md",
+      "bytes": 2489,
+      "sha256": "91d5fc1be96537e4ded4f86d5df6e6d70f1dc9e5f3af904fd730a6dfab3f16aa"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/TESTNET_ADMIN_ACCOUNT.json",
+      "bytes": 1619,
+      "sha256": "05eb54216712b1efdc71980080f05171d422ae0178ee0f718abe655c4adbcef8"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/VALIDACION_RESERVA_EMISION.md",
+      "bytes": 2484,
+      "sha256": "87d051a1b898f4fc66911b3474c670c5c1d828386a483bba75944f91b88583ff"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/certificado-demo.html",
+      "bytes": 5697,
+      "sha256": "5011266a3a143a305c735a42a973bec35c83161a1878c182e72c989b417943c7"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/recuperados/TrustLeaf-D1-certificado-demo.html",
+      "bytes": 5697,
+      "sha256": "5011266a3a143a305c735a42a973bec35c83161a1878c182e72c989b417943c7"
+    },
+    {
+      "path": "docs/sow-delivery/d1-review-package/recuperados/TrustLeaf-D1-plan-y-matriz.md",
+      "bytes": 10251,
+      "sha256": "2dcbdb74ade057347e399abbb810a42d76e119cc12e91d9001828380c09aef11"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/EXECUTION.md",
+      "bytes": 3963,
+      "sha256": "cbad05977833390b090c78058031e33df8b4235475595fca292d698a71e2c838"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/REVIEW.md",
+      "bytes": 9519,
+      "sha256": "ecfd6f82322751932c760b6146a474314f0790ae4a7f0614a784dcc2850a7c64"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/SHA256SUMS.txt",
+      "bytes": 485,
+      "sha256": "cf56cf08520fe41bc8f5293bf186c346362675048b8332ebb9a76206dbdf733d"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/TIMESTAMPS.md",
+      "bytes": 1609,
+      "sha256": "0527fe3a46479febb6826348088365334cde924c4c513abf5cc254d81ce05610"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/VALIDATION.md",
+      "bytes": 2782,
+      "sha256": "a0806cee36b665454d014a0ef303ee060c088f829868097bfad3bd591f4b2acd"
+    },
+    {
+      "path": "docs/sow-delivery/sow-video-qa/rx12-chain-audit.json",
+      "bytes": 3800,
+      "sha256": "c8767334d1f89b3e38990969b37a0083163a43e71807f99169d8ffa5bf81ac21"
+    },
+    {
+      "path": "docs/sow-delivery/week2-review/CERRAR-SOW2-EN-MAIN.md",
+      "bytes": 2317,
+      "sha256": "deab48843fa971776d34de32c1041dd7bf3d7de1cfb86a43663d557584f39309"
+    },
+    {
+      "path": "docs/sow-delivery/week2-review/README.md",
+      "bytes": 4549,
+      "sha256": "fa37577bca60d3f44c9cb45813920e34e953d349ac30f3516fcbf5a338d1c95a"
+    },
+    {
+      "path": "docs/sow-delivery/week2-review/TrustLeaf-Entrega-semana-2.html",
+      "bytes": 15156,
+      "sha256": "911d364894b92b47ec0d4c3781a38a6af00f8c6d66ed13db79fb08e4247dc0fd"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/README.md",
+      "bytes": 2044,
+      "sha256": "e6e1643f6d88632bd4be4b1a73652ea3c920082f01fd1394d639157a2275f3f1"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/RECORDING-PREPARATION.md",
+      "bytes": 6743,
+      "sha256": "10a9a7c21f035f12a47d38d9842c2a078cbd3dcc53457c1fa7e828667af14ef1"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/RUNBOOK.md",
+      "bytes": 3046,
+      "sha256": "06533e19820af3f5ab959871a635e107043fd0090691552a3d47083e51082ab8"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/TIMESTAMPS.md",
+      "bytes": 1829,
+      "sha256": "f55238defed5417017914a700c33376f77aa60faba309433bbeb86a486be99b2"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/VALIDATION.md",
+      "bytes": 16598,
+      "sha256": "5b77246dbd30950927e19659047c86bbc156010c144f10ca8d778d25ff084c19"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/ADDITIONAL-QA.md",
+      "bytes": 4421,
+      "sha256": "fa6cdffac9850176eac915df0595b7c99e9bb31c74438843aab88836426e7d10"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/INTENSIVE-AUDIT.md",
+      "bytes": 10611,
+      "sha256": "8a1e9a4c33cd9869b3d319a4e65318d56950ceed68bf8c44f70e58e9798c5314"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/PRE-RECORDING.md",
+      "bytes": 6936,
+      "sha256": "be4a339721f76f97f26f6e00ccb01faa06a5a4f4c344ce2b571052b87d366d09"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/README.md",
+      "bytes": 8433,
+      "sha256": "f6382731faa2e71f22d1ad42412a49ce280f9e35bd4398a3ced6d2ccad8462af"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/WAITLIST.md",
+      "bytes": 6275,
+      "sha256": "8099a4ca9d974a4c717ee8f6026216614777aea7e8aeef889198fe3e88cf0cb7"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/preparation-manifest.json",
+      "bytes": 1142,
+      "sha256": "82bbf3b3eec4ab41ab9fe9f340e8194a78bd5d6cbe139c27a7a64765ed4359a6"
+    },
+    {
+      "path": "docs/sow-delivery/week4/BUGS.md",
+      "bytes": 9192,
+      "sha256": "04d7abffb3797c187719cadd5376ef78a814688860f25359f090c255eed2d7d1"
+    },
+    {
+      "path": "docs/sow2/CIERRE-Y-PROXIMO-CICLO.md",
+      "bytes": 4015,
+      "sha256": "deb72e7f46d30a7860cc86e794560916798ddb7a5b5e9de0e4ff51d4ded06177"
+    },
+    {
+      "path": "docs/sow2/CREACION-UNICA-LOCAL.md",
+      "bytes": 4112,
+      "sha256": "18a9b222ff9bc67c35216ede5667a7e560a90be514715d82fe645dd1592f3990"
+    },
+    {
+      "path": "docs/sow2/ENSAYO-API-TESTNET-SEMANA-2.md",
+      "bytes": 8805,
+      "sha256": "fa283d9d862260844f35e78756614174c7068f4ed0ce987597b6393e1f384d8f"
+    },
+    {
+      "path": "docs/sow2/GRABACION-PACIENTE-CONTINUA.md",
+      "bytes": 4223,
+      "sha256": "ba43c50f167ff4a48e56b8e9c3abc0b52b9939824fdb460a7f05ee7b0905a6cb"
+    },
+    {
+      "path": "docs/sow2/GRABACION-SEMANA-1.md",
+      "bytes": 12734,
+      "sha256": "98ceff758d21591320f9f8b7c8d4f8f8e89e0c0a6c61699658388bba73986b36"
+    },
+    {
+      "path": "docs/sow2/GRABACION-SEMANA-2.md",
+      "bytes": 3920,
+      "sha256": "36a46e7c41a4bed42ba063439e2172a7bc7d69fa8d21cb0c4a945a932db87551"
+    },
+    {
+      "path": "docs/sow2/GUIA-VALIDACION-SEMANA-2.md",
+      "bytes": 16947,
+      "sha256": "f2409f8f046dd03ce803454dd94069d184e508fa60d49dd0252eb1995187963b"
+    },
+    {
+      "path": "docs/sow2/GUION-NARRADO-SEMANA-1.html",
+      "bytes": 14820,
+      "sha256": "63f0519c6f5f4afff984bc94024289b6ec86ba21a41668fba357bcdd713aa95b"
+    },
+    {
+      "path": "docs/sow2/GUION-NARRADO-SEMANA-1.md",
+      "bytes": 7885,
+      "sha256": "bc8a36a7c31410b131255fe35213552ca52a1dfbdf650b5588e3f19cf3d39fd8"
+    },
+    {
+      "path": "docs/sow2/INFORME-SEMANA-1.md",
+      "bytes": 14964,
+      "sha256": "7ab789d170a18cfae223522a95765fe7f5d79b75ebe87a32ffb1abb1bc48b9fe"
+    },
+    {
+      "path": "docs/sow2/LECTURAS-PRIVADAS-RENDIMIENTO.md",
+      "bytes": 3675,
+      "sha256": "0b9bce031ce7e76f27c5319fd47b5720319a1ab5cc0340c4aabef3e1cbe8d060"
+    },
+    {
+      "path": "docs/sow2/MATRIZ-ACEPTACION-SEMANA-1.md",
+      "bytes": 6076,
+      "sha256": "56ba4fba7cf174e8abb759c0f2ab344d6945aa56c8fb17d2a4e28b40cc0ff012"
+    },
+    {
+      "path": "docs/sow2/OBJETIVO-SEMANA-1.md",
+      "bytes": 4146,
+      "sha256": "6e931a9da27933333b043a49be5829be24542bcd81863f66fcbb891320cc5567"
+    },
+    {
+      "path": "docs/sow2/OPERACION-SEMANA-1.md",
+      "bytes": 6459,
+      "sha256": "f4cbdecacdecc9da730e9150f0d273527ca56fe0b0b854c74096fc729a0e88e9"
+    },
+    {
+      "path": "docs/sow2/PLAN-APORTES-Y-ADJUNTOS.md",
+      "bytes": 3856,
+      "sha256": "0ec0b2317fc4cfa4b196a07ee7e5d9b04b6e683035fb21c945040ada2a1a6e03"
+    },
+    {
+      "path": "docs/sow2/PUBLICACION-SEMANA-2-LECTURA.md",
+      "bytes": 4429,
+      "sha256": "f7e2a8f3a1acd513d478745d43805efb38975a8d4e09fe7b2e9c7fa8ee19b53a"
+    },
+    {
+      "path": "docs/sow2/QA-SEMANA-2.md",
+      "bytes": 19547,
+      "sha256": "0acb47b43dfb6586e462f35ef013425447694ce2d41be3f00c5881daadf86322"
+    },
+    {
+      "path": "docs/sow2/RPC-CLINICO-TESTNET.md",
+      "bytes": 2167,
+      "sha256": "f7a6e695a45beec19c5252cb0ee4fea701a30f8b7e4c2d90d99119b97fb31508"
+    },
+    {
+      "path": "docs/sow2/SEMANA-1-DISENO.md",
+      "bytes": 14847,
+      "sha256": "d905789fd38bd5d9f630610b9771f72b4f19391faa840ff7ba442dcb35b2a383"
+    },
+    {
+      "path": "docs/sow2/SEMANA-2-ESTADO.md",
+      "bytes": 12750,
+      "sha256": "46cd2c0f341e2b4c657b9a130021bff5974527ee39603087405cc04bb96cc28c"
+    },
+    {
+      "path": "docs/sow2/SPRINT-2.md",
+      "bytes": 2746,
+      "sha256": "07100604f02f67164bc006ddca628a7c6ec07084e19d14812c2c5c0eed40aa33"
+    },
+    {
+      "path": "docs/sow2/THREAT-MODEL.md",
+      "bytes": 10707,
+      "sha256": "1bad4c02437cb9dadba46a61e4cf92d7a0092edca24fde9b7b4f2733cf69bc75"
+    },
+    {
+      "path": "docs/sow2/VALIDACION-2026-10-05.md",
+      "bytes": 3722,
+      "sha256": "76fcf2d852699874c8ddbc569c81959a4b88e787e62124c72008e52078dedda6"
+    },
+    {
+      "path": "e2e/clinical-auth/index.html",
+      "bytes": 361,
+      "sha256": "27ebf64652482e0a131baf166fb4339368397e8b78efe03ea2e41c7c8fc27bb8"
+    },
+    {
+      "path": "e2e/clinical-auth/main.tsx",
+      "bytes": 12082,
+      "sha256": "73736f58c25ed5dba94eae27b5a73813c9bdb38713bf6e4b2d36fde069bb3ab1"
+    },
+    {
+      "path": "e2e/clinical-auth/style.css",
+      "bytes": 2178,
+      "sha256": "80d0b05835da697e18ae47d2e26c2e18a7691855cacd58dce3e466930944858e"
+    },
+    {
+      "path": "e2e/demo-doctor.spec.ts",
+      "bytes": 7522,
+      "sha256": "57810228fc73146fbf444d25794d3d32bb112fa740781e969a9071049f7d35b6"
+    },
+    {
+      "path": "e2e/demo-patient.spec.ts",
+      "bytes": 8462,
+      "sha256": "f99c77f8acb0ddbbb32db7e6d06fa7dd0d5d722eeb35fe1c31e189690bbcc032"
+    },
+    {
+      "path": "e2e/landing.spec.ts",
+      "bytes": 3406,
+      "sha256": "93c422a2db6a69a987bf9102614848d952ea215bdc5c546ed29f3eb214c164c0"
+    },
+    {
+      "path": "e2e/verify.spec.ts",
+      "bytes": 5237,
+      "sha256": "79372fb9610b0ad0a7f3295299ce9bf871e84aed86c57e60df3763cbbac855cc"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "bytes": 465,
+      "sha256": "870f1adccecf3051cbcd9fd307cef51d7633cf510979c181a81f4b1797273493"
+    },
+    {
+      "path": "next.config.ts",
+      "bytes": 122,
+      "sha256": "544f36428038db8151f3b589c085f4081751141d78f82559ef04028abd880aaa"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 741997,
+      "sha256": "71f0d193faf7daf79c451f75fe2c70f59106c4a51a6720624bf4a418eeedd112"
+    },
+    {
+      "path": "package.json",
+      "bytes": 2833,
+      "sha256": "7324eb437ff1968433ef941218bb1aa6bf17fcdf037a588e0f6d67c8991d87c5"
+    },
+    {
+      "path": "playwright.config.ts",
+      "bytes": 2074,
+      "sha256": "05e172d8ad8a3e70258e42b8b18578347176c9a1829552d3b2dd06fef33574da"
+    },
+    {
+      "path": "postcss.config.js",
+      "bytes": 72,
+      "sha256": "8fa4b01f6633f478ec8ea70633058c85858e2298649cf0aee711362e5bce7b7a"
+    },
+    {
+      "path": "postcss.config.mjs",
+      "bytes": 94,
+      "sha256": "dfac7ac2d86d326a0e5adb024e7943c181393ed17a5fcb8f0315b24c7da6ddde"
+    },
+    {
+      "path": "public/banner.jpg",
+      "bytes": 792087,
+      "sha256": "29b81fdc3bbb52a5b4da732f574f8fd3b515a0e2c679f9f14646b01b4fec0fa0"
+    },
+    {
+      "path": "public/models/body_1k.glb",
+      "bytes": 4903236,
+      "sha256": "18bcbaff23e17ddbe042e790a79af1671fa1948e7db9fc95666145bec6476f45"
+    },
+    {
+      "path": "scripts/audit-clinical-contracts.mjs",
+      "bytes": 6780,
+      "sha256": "f019c14e5e683c916a54b0fd402882400d6612af344ee576e192d312520c0c7a"
+    },
+    {
+      "path": "scripts/audit-clinical-funding.mjs",
+      "bytes": 2771,
+      "sha256": "acade0fc89b032d4a01d0b55033bc58f254c4e92a56383d6c14d943431c09989"
+    },
+    {
+      "path": "scripts/audit-private-flow-testnet.mjs",
+      "bytes": 6982,
+      "sha256": "bd8964ffe4450fa0ce8c3cc3507aa06554c701a6b3db37b8f3e5a0ddfd71eef6"
+    },
+    {
+      "path": "scripts/audit-sow.mjs",
+      "bytes": 5271,
+      "sha256": "07d7eaf8176195dae948828a186cdb4dcf9a41637ed87dd26766aac78df76610"
+    },
+    {
+      "path": "scripts/build-clinical-report.mjs",
+      "bytes": 40929,
+      "sha256": "ae6f53e83e284246e5e69fdfe73361e8ff3eaff95cb3a0fe7c39f81020ec8021"
+    },
+    {
+      "path": "scripts/build-clinical-report.test.mjs",
+      "bytes": 12310,
+      "sha256": "dc488f2cdcca0f87e2f3c1a6ae17a9f731adbf312baad2d765fb7f242e08c0c9"
+    },
+    {
+      "path": "scripts/build-sow-local.mjs",
+      "bytes": 2676,
+      "sha256": "31a0aa15332e33a16838b5a9310db4872ab35278167bd3c86ff8839b3dc05651"
+    },
+    {
+      "path": "scripts/check-clinical-recording.mjs",
+      "bytes": 2313,
+      "sha256": "6c48416d1b9d0edee4893847f1c593896ce1dbabe4955210bacc7c8224857f18"
+    },
+    {
+      "path": "scripts/clinical-lock-smoke.mjs",
+      "bytes": 1994,
+      "sha256": "9d062cd73ec015b736c6d9d18d14ab2aec53725e24203ce4a743c93aebd7b99f"
+    },
+    {
+      "path": "scripts/clinical-neon-smoke.mjs",
+      "bytes": 7167,
+      "sha256": "82000ad2ddc432ece451c275a0e311eafd3cfaafd3e90de024b528e30cdc449b"
+    },
+    {
+      "path": "scripts/db-snapshot.mjs",
+      "bytes": 1343,
+      "sha256": "a7e41ae55bf4c036d7df0a99121abacf2654ad814020fafcdf7f8dd04f2215d1"
+    },
+    {
+      "path": "scripts/deploy-clinical-testnet.mjs",
+      "bytes": 9960,
+      "sha256": "4b4af277e9b442d17e6d2ceff37892f32aded6706d08d4ce1ce6885c2f133253"
+    },
+    {
+      "path": "scripts/deploy-sandbox-record.sh",
+      "bytes": 2070,
+      "sha256": "1577526ff5053b0ef600c520d80523a7d6f50b7640aac9294150a85d7dd38cc9"
+    },
+    {
+      "path": "scripts/deploy-week1-testnet.mjs",
+      "bytes": 4834,
+      "sha256": "8aacd739ec338dae261e766c178d5a22c7679ff7da38ff9122de5aa4316eb92e"
+    },
+    {
+      "path": "scripts/lib/clinical-attempt-store.mjs",
+      "bytes": 3805,
+      "sha256": "dcdff9104d59678a37d45070962a70477f247344156c56b9ce92c69fa8a40754"
+    },
+    {
+      "path": "scripts/lib/clinical-attempt-store.test.mjs",
+      "bytes": 3945,
+      "sha256": "4a591b267ea9cbaa8039b88e6c10096bf3ed3a9e34a03f9a0eea9f0e525e2742"
+    },
+    {
+      "path": "scripts/lib/clinical-chain-read.mjs",
+      "bytes": 10946,
+      "sha256": "70afd566cef706e19065df001d58279c3bf3a176e4306a3c887ddb9080669ad1"
+    },
+    {
+      "path": "scripts/lib/clinical-chain-read.test.mjs",
+      "bytes": 11983,
+      "sha256": "cbb35377288e74da06d507e3be75b0a114ddf44b7be7d70156877906f8b79cc3"
+    },
+    {
+      "path": "scripts/lib/clinical-chain-write.mjs",
+      "bytes": 7486,
+      "sha256": "7c8bcc483a3d2f2a374d311fbcc79d3d4803863e993fe5436009a4cbab83e4aa"
+    },
+    {
+      "path": "scripts/lib/clinical-chain-write.test.mjs",
+      "bytes": 9927,
+      "sha256": "113aeaf542e1825e4ed31b151d7e187a9cf5a0f65fe7e75d3260a9ec1d517fd4"
+    },
+    {
+      "path": "scripts/lib/clinical-contract-audit.mjs",
+      "bytes": 9883,
+      "sha256": "04c0c9c98270043e0276752bffaeb27c43f6b3d6b0dbdc834455af249ac872af"
+    },
+    {
+      "path": "scripts/lib/clinical-contract-audit.test.mjs",
+      "bytes": 7923,
+      "sha256": "db0239d52aca5f943fd3f4dbf188a5c8b25593bda292f6b240eba418ab26774e"
+    },
+    {
+      "path": "scripts/lib/clinical-crypto.mjs",
+      "bytes": 10724,
+      "sha256": "3b73fe21e0b3c2d50077def4eca7521b07771409e845ee74abb1855276fc2cc0"
+    },
+    {
+      "path": "scripts/lib/clinical-crypto.test.mjs",
+      "bytes": 11559,
+      "sha256": "4248df3f7890e4874c3b0485d62ca1c6bb7a65367ed08cd3895a453cbe5825b3"
+    },
+    {
+      "path": "scripts/lib/clinical-demo-policy.mjs",
+      "bytes": 1109,
+      "sha256": "8e77e5ab5604851d729eef983c447bb84887a0100ce631860cb853b7333561ab"
+    },
+    {
+      "path": "scripts/lib/clinical-demo-policy.test.mjs",
+      "bytes": 2950,
+      "sha256": "f183bf8eab99506d37f9663955957df11e08ad5cf2f57297a472c627e6d3d7c4"
+    },
+    {
+      "path": "scripts/lib/clinical-fixtures.mjs",
+      "bytes": 4186,
+      "sha256": "5c379fd5e4745216077807fe6692d2942c4a1f8f320a7dc80146135a0f5c2ad6"
+    },
+    {
+      "path": "scripts/lib/clinical-funding-audit.mjs",
+      "bytes": 2919,
+      "sha256": "cfb36340007067521e4e04277f2fca6855917038f051d82353554cbc6714fe83"
+    },
+    {
+      "path": "scripts/lib/clinical-funding-audit.test.mjs",
+      "bytes": 2681,
+      "sha256": "372fe71843888e2cfbaf2d4c25dd999803ef84c04831c4f6640caf3bb2957819"
+    },
+    {
+      "path": "scripts/lib/clinical-live-read.mjs",
+      "bytes": 1246,
+      "sha256": "0dc16f40296bd468d250c41943aced4d4b8432d629ddfb347d2dd26dc74a04e6"
+    },
+    {
+      "path": "scripts/lib/clinical-local-auth.mjs",
+      "bytes": 15042,
+      "sha256": "ccd36226c8cc1d5d7db16b5f1380cdff7566f48eb202656d7e58d179a762ab15"
+    },
+    {
+      "path": "scripts/lib/clinical-local-auth.test.mjs",
+      "bytes": 13573,
+      "sha256": "552de8877faba85ef2251d2470a1a731155d4e23a5ded3e0108dd50dd6ba301e"
+    },
+    {
+      "path": "scripts/lib/clinical-local-secrets.mjs",
+      "bytes": 3324,
+      "sha256": "eb6779ce2a8a857a143dbc4ec25c6d51af51dc4d6ffcc85f7eaa9b6c5ea7f9df"
+    },
+    {
+      "path": "scripts/lib/clinical-local-signatures.mjs",
+      "bytes": 4178,
+      "sha256": "5fa48fba60af28294ffb2ee8b0bed0ca65436db91d2e2a88656e4bfd27a92909"
+    },
+    {
+      "path": "scripts/lib/clinical-local-signatures.test.mjs",
+      "bytes": 3547,
+      "sha256": "0105a3b5f68b64ba777a0bd2dae4531ae3d1b471da351c696d2c55d4ab093227"
+    },
+    {
+      "path": "scripts/lib/clinical-migration-policy.mjs",
+      "bytes": 2146,
+      "sha256": "9b3741cdea186dcdcc6e5862a63c5957cea01102a0fff0a652cb71220af0b59b"
+    },
+    {
+      "path": "scripts/lib/clinical-neon-store.mjs",
+      "bytes": 5947,
+      "sha256": "f28f775f4a4b37be61ae7640050752919ced6482e9090846f476b00ec16ac3c1"
+    },
+    {
+      "path": "scripts/lib/clinical-neon-store.test.mjs",
+      "bytes": 6234,
+      "sha256": "5e83fad52a9424a6278aea2e0aff9c9a329b738559060a240ef06c4383c37dbf"
+    },
+    {
+      "path": "scripts/lib/clinical-read.mjs",
+      "bytes": 5779,
+      "sha256": "8a82798f9619378acaa3afe090bcae7a6a529bae08c289bcb938f1c51619a893"
+    },
+    {
+      "path": "scripts/lib/clinical-read.test.mjs",
+      "bytes": 11386,
+      "sha256": "4b2d65a96cbacb55a4c505544360ae81418fd3677d3f8a765287011a2407f6aa"
+    },
+    {
+      "path": "scripts/lib/clinical-receipt-audit.mjs",
+      "bytes": 8749,
+      "sha256": "6e8f4ac2c852c716e7bad3ec88b3836004f79d2623f261ee25bdb933693926f8"
+    },
+    {
+      "path": "scripts/lib/clinical-receipt-audit.test.mjs",
+      "bytes": 9414,
+      "sha256": "58c1986b35e3e9c95655a4d0e840f123580c9ecc48b8120390aec775eaa2f794"
+    },
+    {
+      "path": "scripts/lib/clinical-restoration-plan.mjs",
+      "bytes": 3185,
+      "sha256": "6000dea63b24e6225fd011a0961b0856bf8b763411b5865182c28153b94acc78"
+    },
+    {
+      "path": "scripts/lib/clinical-restoration-plan.test.mjs",
+      "bytes": 3377,
+      "sha256": "88a3330114e5ef228ebc6f04b99020bf39fcbe04c69c9fd9952f4d6416542949"
+    },
+    {
+      "path": "scripts/lib/clinical-rpc.mjs",
+      "bytes": 600,
+      "sha256": "3c80ab12c0c9b1a02459e32e52c782318e382cd3530dd45661d92bfc10eeba59"
+    },
+    {
+      "path": "scripts/lib/clinical-run-config.mjs",
+      "bytes": 1961,
+      "sha256": "9537486f7c0e5a9624a264a5fbaa08ae21b8eee0aaf4614dcb08cb1c5b2bea80"
+    },
+    {
+      "path": "scripts/lib/clinical-run-config.test.mjs",
+      "bytes": 4108,
+      "sha256": "da00a6e7414add292896a716a1ff0ab4304793bd593f70988c43c4806512c6d2"
+    },
+    {
+      "path": "scripts/lib/clinical-source-lock.mjs",
+      "bytes": 2126,
+      "sha256": "34e6bd1a9c17008c407e845be3331384b6d3d861eba8cd3551d8db1c7e27ca88"
+    },
+    {
+      "path": "scripts/lib/clinical-source-lock.test.mjs",
+      "bytes": 2083,
+      "sha256": "6fbf227c8e3abdcfe4a964b0d181739bcd340cb7c303fdc572bd6d6c7bcf05c4"
+    },
+    {
+      "path": "scripts/lib/clinical-web-fee-policy.mjs",
+      "bytes": 4314,
+      "sha256": "de15faec973358a25bd6e73ff965c7b4256223b378c85a951142652ae395c7e9"
+    },
+    {
+      "path": "scripts/lib/clinical-web-fee-policy.test.mjs",
+      "bytes": 6017,
+      "sha256": "d33b5a192050d1572b4d29c59d8264f867a4cad81407d606c15cfc3f7f28e43c"
+    },
+    {
+      "path": "scripts/lib/clinical-web-receipt-audit.mjs",
+      "bytes": 14694,
+      "sha256": "127420bc4bac256f62de64a3842bd043d58991b51aa6459b934dbdd26befb1b6"
+    },
+    {
+      "path": "scripts/lib/clinical-web-receipt-audit.test.mjs",
+      "bytes": 24987,
+      "sha256": "4e5d31c69417e8db56aad1dabd06b55c6f499fbc10ee220dedf20b35f3960a6b"
+    },
+    {
+      "path": "scripts/lib/clinical-web-rehearsal.mjs",
+      "bytes": 23370,
+      "sha256": "d49a770b4c2601695b37950eec09d22b5f5a3d8ceb57cf94de24ce366adef770"
+    },
+    {
+      "path": "scripts/lib/clinical-web-rehearsal.test.mjs",
+      "bytes": 25095,
+      "sha256": "881b9371b3dc35ab1baad1062b4d4d0bde66b9ec11d127bf5b2254c1335d4ea4"
+    },
+    {
+      "path": "scripts/lib/clinical-web-transport.mjs",
+      "bytes": 6849,
+      "sha256": "f361cdf918d1013cb31bdbb3f21f24f960a96f97b47f7c276cb1729c7ca01186"
+    },
+    {
+      "path": "scripts/lib/clinical-web-transport.test.mjs",
+      "bytes": 4582,
+      "sha256": "8ed837381cf6b7367eb72fa53c27239c08d0b09773094bb032d45bfd6ce73a60"
+    },
+    {
+      "path": "scripts/lib/database-connection.mjs",
+      "bytes": 310,
+      "sha256": "0a31afd64fbbef3f5d8708641d36b6498ff34052656445234e2fe0ff1fcf8fa4"
+    },
+    {
+      "path": "scripts/lib/private-doctor-dossier.d.mts",
+      "bytes": 558,
+      "sha256": "e4f3f468f5aca4a607c9d430c60203aab18001ee045d13ab90e7fd74e70863f3"
+    },
+    {
+      "path": "scripts/lib/private-doctor-dossier.mjs",
+      "bytes": 2430,
+      "sha256": "03229979ce8659de51f5432b417fdd705601b9dba3b8fc9e6815518a92119265"
+    },
+    {
+      "path": "scripts/lib/private-doctor-dossier.test.mjs",
+      "bytes": 1412,
+      "sha256": "7c701ef157c7bff4c0ef36352fd0afcb6a3fb796d0cb14cb4af464298f9ba8ba"
+    },
+    {
+      "path": "scripts/lib/private-prescription-store.mjs",
+      "bytes": 3991,
+      "sha256": "09fdac9a3117656cb4cefe78aadf2b859ba4a7aed18a598703cbc3b061236417"
+    },
+    {
+      "path": "scripts/lib/private-prescription.d.mts",
+      "bytes": 483,
+      "sha256": "979852aeb8967fabf4917f9749db80b59b79d743f1a37e2961c2afdf581ee642"
+    },
+    {
+      "path": "scripts/lib/private-prescription.mjs",
+      "bytes": 1620,
+      "sha256": "8a5de159c9494f434609f4531ddc9d225140306e77f9350dece35b71473bf8f6"
+    },
+    {
+      "path": "scripts/lib/private-prescription.test.mjs",
+      "bytes": 1106,
+      "sha256": "9a6cc7e1292daaadd5def72121a3161c105ecac4546c1b6b429bd9c87e6582a5"
+    },
+    {
+      "path": "scripts/lib/private-registry.d.mts",
+      "bytes": 501,
+      "sha256": "2cff7cce6a85f928005f136bebd50651b251720f984b13f6124e47f581c582ae"
+    },
+    {
+      "path": "scripts/lib/private-registry.mjs",
+      "bytes": 2707,
+      "sha256": "8c7b97f67cafe7a8e8f4250d7928b974f94ac79b0a19042901b1137f1b25f847"
+    },
+    {
+      "path": "scripts/lib/private-worker-runtime.mjs",
+      "bytes": 5411,
+      "sha256": "7537b9b1092be811306fd41dac14bf267d51634b2188f88d4868b2726d5fda13"
+    },
+    {
+      "path": "scripts/lib/read-private-prescription.mjs",
+      "bytes": 2551,
+      "sha256": "74686e580a6da78e0adfa091da24ea980d2bbad1728ca6f6b7afa09c373a34ae"
+    },
+    {
+      "path": "scripts/lib/read-private-prescription.test.mjs",
+      "bytes": 3087,
+      "sha256": "7d31fe9d278acafca1b8b17ad61d32f0919abee8a053203f8c802df19fff1a7f"
+    },
+    {
+      "path": "scripts/lib/testnet-evidence-chain.mjs",
+      "bytes": 2974,
+      "sha256": "3d31768c884f187feab024ab3739bf67579e35e8ac3e106b5308498de0b599d0"
+    },
+    {
+      "path": "scripts/migrate.mjs",
+      "bytes": 62177,
+      "sha256": "3dbef3b897659863448ce4e5625743194f35cba63e0f7d55fd71b6d796d02aa1"
+    },
+    {
+      "path": "scripts/mint-realistic.mjs",
+      "bytes": 5203,
+      "sha256": "ef8045128843bc0c4344ad9fe8a2139e75e917b404fff66eb7712cdf233b7ce9"
+    },
+    {
+      "path": "scripts/phases/lib.mjs",
+      "bytes": 3959,
+      "sha256": "98af856bd4070499d61e9361b993e0ee92d1a5722024e5bcaf9ec28070f6403f"
+    },
+    {
+      "path": "scripts/phases/p1-medico.mjs",
+      "bytes": 889,
+      "sha256": "61eb4bf63afd6f3558a92cc3a1aff24344c60106ca0e946ad1a06d2685295ec1"
+    },
+    {
+      "path": "scripts/phases/p2-disponibilidad.mjs",
+      "bytes": 1002,
+      "sha256": "7141e485ed9b2ec840a92075cd752f5db678f27332d747cc0d31fe9659318ca1"
+    },
+    {
+      "path": "scripts/phases/p3-reserva.mjs",
+      "bytes": 1646,
+      "sha256": "c668a57b36a3ed4d6043f3fa1d51595882b890e2665bb955e4f6c600d84e2060"
+    },
+    {
+      "path": "scripts/phases/p4-consulta.mjs",
+      "bytes": 1150,
+      "sha256": "ac1ddcb89db7deb6e896c05f4f07e17e4a5e4f29bced3083f36245d583c18cf2"
+    },
+    {
+      "path": "scripts/phases/p5-consentimiento.mjs",
+      "bytes": 1740,
+      "sha256": "9ce4fd3daf1451dec3984fd29033e50de2de3eb3acc10e2a827d6cfa09284022"
+    },
+    {
+      "path": "scripts/phases/p6-receta.mjs",
+      "bytes": 1878,
+      "sha256": "0e501550de7956fcf9b3639a22fb010d8fff4b1f1f9d58143a92b14651cf3f5c"
+    },
+    {
+      "path": "scripts/phases/p7-ficha.mjs",
+      "bytes": 1302,
+      "sha256": "4a07ac249b13b10691fbccb25807029563999fe7498365cc42b3fd5cb58e8a51"
+    },
+    {
+      "path": "scripts/phases/p8-documentos.mjs",
+      "bytes": 1205,
+      "sha256": "ec141455809ef9d3d8f3d9376433c0d69339dbbdfdb8b72eed172bd5ea06fc84"
+    },
+    {
+      "path": "scripts/phases/run.mjs",
+      "bytes": 1932,
+      "sha256": "e32cbaf362bbfb67fff29ae7fcc07318e9489be6bde89f64d3679c385544a9df"
+    },
+    {
+      "path": "scripts/present-clinical-evidence.mjs",
+      "bytes": 2886,
+      "sha256": "b575df53aa4e25a5e9bc3114ac0a460afcfb140f9f3cd070971081ab6f2f79cf"
+    },
+    {
+      "path": "scripts/restore-clinical-testnet.mjs",
+      "bytes": 11455,
+      "sha256": "22d826cd4ad4be3e45bc6adb47e0e9903aed12d1c155e4612c9c5eff704516ff"
+    },
+    {
+      "path": "scripts/restore-clinical-testnet.test.mjs",
+      "bytes": 3238,
+      "sha256": "4cb9a5efdc7a94d95ebc0cb59209d3564cfb26a62549dbef64acf046d59cd5d0"
+    },
+    {
+      "path": "scripts/seed-demo-journey.mjs",
+      "bytes": 8091,
+      "sha256": "201d49dc4cf977c04e60ff93017824dcae121817b97d5b14b3e878fc8d64cbc9"
+    },
+    {
+      "path": "scripts/seed-pain-journey.mjs",
+      "bytes": 6603,
+      "sha256": "553dde9fc7a99ff5ad17681538893855e697040d2c6787b642e83f376a0a7d38"
+    },
+    {
+      "path": "scripts/serve-clinical-report.mjs",
+      "bytes": 2793,
+      "sha256": "7c9676dba85dc78dd0608458599c99e613b0a9162118c2502d88b2b69589ef70"
+    },
+    {
+      "path": "scripts/smoke-sandbox-isolation.mjs",
+      "bytes": 6423,
+      "sha256": "1f5c0cdec05be68700c7d5b4987302313f23dfe4b8685324738d3a9723f502be"
+    },
+    {
+      "path": "scripts/test-flow.mjs",
+      "bytes": 10814,
+      "sha256": "3ae5041fd01f07317adb601a20ad5f2c2a65f46612384a1674cdacd57e1bcf8d"
+    },
+    {
+      "path": "scripts/test-onchain.mjs",
+      "bytes": 6141,
+      "sha256": "779221cb96dc948054181afff4769b87d101a72ec13ecd3015785916741dbf9d"
+    },
+    {
+      "path": "scripts/validate-booking-contract-testnet.mjs",
+      "bytes": 6886,
+      "sha256": "c3e0ff0b062af404ea034cc1ad0da43a850a429038302646b33e2e4dc5987188"
+    },
+    {
+      "path": "scripts/validate-clinical-testnet.mjs",
+      "bytes": 23264,
+      "sha256": "9e65d51a7500376b126d5d0fc71b297792ef7e18c3ef5d12914a5334a851ff4c"
+    },
+    {
+      "path": "scripts/validate-clinical-web-flows.mjs",
+      "bytes": 8811,
+      "sha256": "5dd0d025f0b8b336a11b6d6cbaab3970443dc86a512cd5f9aa82868238a0e025"
+    },
+    {
+      "path": "scripts/validate-clinical-web-schema.mjs",
+      "bytes": 30972,
+      "sha256": "6bac67abaffacaba376063b55dcf7e80f1bd3bc4fab6edf17187c2c0cca9ebaa"
+    },
+    {
+      "path": "scripts/validate-clinical-web-schema.test.mjs",
+      "bytes": 12452,
+      "sha256": "9c2615445b107f0006e9d992c78d38fc3442a5213696383165fc67c07eeba388"
+    },
+    {
+      "path": "scripts/validate-clinical-web-testnet.mjs",
+      "bytes": 6312,
+      "sha256": "6629ed8a1db4e276d78b95237f78fb939838249956f27568b7711728ee33370a"
+    },
+    {
+      "path": "scripts/validate-clinical-web-testnet.test.mjs",
+      "bytes": 2185,
+      "sha256": "87ba43a4d7b38c04914c7132d6f4108af9fe79249b5e649c2b24dd3ed99a8f09"
+    },
+    {
+      "path": "scripts/validate-prescription-bookings-db.mjs",
+      "bytes": 9102,
+      "sha256": "03e0545d362bcd638eb44b7b4e322a47b03c92ec20b4d4a8a40e8b6475fc9813"
+    },
+    {
+      "path": "scripts/validate-private-flow-testnet.mjs",
+      "bytes": 13615,
+      "sha256": "787517fe458a18d2b4976f4575f0a434c1ee91b48762a3e2bacd9182f6bab717"
+    },
+    {
+      "path": "scripts/validate-private-registry-testnet.mjs",
+      "bytes": 6779,
+      "sha256": "0a2f9f2c688f5b47eba7bba636acf6f4461364988f507b72b9663b3e499534cc"
+    },
+    {
+      "path": "scripts/validate-week1-local.mjs",
+      "bytes": 2272,
+      "sha256": "f71a1065a3665a7f7214ae2a514e9cb80483c2b3af0b3efa7961965426626a59"
+    },
+    {
+      "path": "scripts/verify-week1-testnet.mjs",
+      "bytes": 7508,
+      "sha256": "34bf03167de46ed4f8c131f353c15cb7af77e041d1590d81d6919a18f3474b87"
+    },
+    {
+      "path": "scripts/worker-doctor-authorizations.mjs",
+      "bytes": 16970,
+      "sha256": "d211f9402e3a8702b732e2769b971a2b6f3fc004d2475e40fe914fe08d30cdaa"
+    },
+    {
+      "path": "scripts/worker-doctor-authorizations.test.mjs",
+      "bytes": 19766,
+      "sha256": "6d80f70cc7ede8e629104118b386bd62f348e30e1e0c560774b8288fff34c890"
+    },
+    {
+      "path": "scripts/worker-prescription-bookings.mjs",
+      "bytes": 16560,
+      "sha256": "0d5a60828d6ecb688d2204b65c5203443615ed2f169ab34239dd3cc3d49e1cb7"
+    },
+    {
+      "path": "scripts/worker-prescription-bookings.test.mjs",
+      "bytes": 12016,
+      "sha256": "c75583bafb05b3a52b5e123e1359d8f19c80df26a64cc2107df5f52ccf1af3bf"
+    },
+    {
+      "path": "scripts/worker-private-portal.mjs",
+      "bytes": 4458,
+      "sha256": "06cdda62c86fc7e2aea327e07fd0e5dffc2ad2b68ab6c3bd80a4665fb9dad0ce"
+    },
+    {
+      "path": "scripts/worker-private-portal.test.mjs",
+      "bytes": 3683,
+      "sha256": "bdf0ba4d0626c7a5e82fee0faaf03cb64c57b7a6d5e5be9c384067953987db02"
+    },
+    {
+      "path": "src/__tests__/access-gates-component.test.ts",
+      "bytes": 8720,
+      "sha256": "1e8c23fd47c65bdd97a68cc795eed03522b7d7f8ce71993a4c2aff046e7e3a83"
+    },
+    {
+      "path": "src/__tests__/access-probe.test.ts",
+      "bytes": 2840,
+      "sha256": "e0085af2b01847afad3b042945fd530cfc97cd01828810097daa067909024dce"
+    },
+    {
+      "path": "src/__tests__/admin-private-routes.test.ts",
+      "bytes": 22308,
+      "sha256": "b2f9d29d1c492b37da0b274382a103f6482bcebb8d44b2afba5f45e2b5d9a096"
+    },
+    {
+      "path": "src/__tests__/admin-waitlist.test.ts",
+      "bytes": 4157,
+      "sha256": "b6ae2cf0840bcbbc09d06294b748784e23ce8a57fefa7f314b6fda44e777a406"
+    },
+    {
+      "path": "src/__tests__/agenda-component.test.ts",
+      "bytes": 8306,
+      "sha256": "2402808682f4cefd132a3a0a451f8713e972a7bd06130eeeb91f761d656c7fbe"
+    },
+    {
+      "path": "src/__tests__/ai-chat-rag.test.ts",
+      "bytes": 2827,
+      "sha256": "ac202b2626838d6bf5757a2d4ec09918b68e0faa2d926022bfb10bd4e92021fb"
+    },
+    {
+      "path": "src/__tests__/ai-explain-and-timeline.test.ts",
+      "bytes": 1851,
+      "sha256": "d20fe3846055011e5baf1d527fd8c48c7c4530e7cfdf96cfb89f16c2a2963c0b"
+    },
+    {
+      "path": "src/__tests__/ai-extract.test.ts",
+      "bytes": 3011,
+      "sha256": "72639826a8cfe12c40d609dc1c7a9bc545ac9041f6eec2d2e1395a175f115b15"
+    },
+    {
+      "path": "src/__tests__/anchor-contract.test.ts",
+      "bytes": 4854,
+      "sha256": "8dd2279e6a8257014187f6fece5640a6e3b3612958231dbe90b71bb50932e725"
+    },
+    {
+      "path": "src/__tests__/api-key.test.ts",
+      "bytes": 2497,
+      "sha256": "482b82514a2c42563f06baeaf6149ef45cb5d32c4bfe02de961448286f85d226"
+    },
+    {
+      "path": "src/__tests__/at-rest-crypto.test.ts",
+      "bytes": 2661,
+      "sha256": "d0a39dcc4c62908ef4714a6b06806e98d515616fa86602898747b648a3a90fa6"
+    },
+    {
+      "path": "src/__tests__/authed-fetch.test.ts",
+      "bytes": 1202,
+      "sha256": "ee29c92234a915b947262541f8b8b3449d21e2a56129243d2e05e48c92609d74"
+    },
+    {
+      "path": "src/__tests__/clinical-api.test.ts",
+      "bytes": 2723,
+      "sha256": "546aa0ce9316535df60b201557d7ed995758c3eabcbcf0914d6205f895910960"
+    },
+    {
+      "path": "src/__tests__/clinical-chain.test.ts",
+      "bytes": 28023,
+      "sha256": "a504d12062d0e3db948512d9454a052faae80e7c3043b8be7c327c4449c207c0"
+    },
+    {
+      "path": "src/__tests__/clinical-client.test.ts",
+      "bytes": 49519,
+      "sha256": "5888cc766884c5098df77772e2d2b5b9acf0a541d72717ac9d6ed1f36cf65f5f"
+    },
+    {
+      "path": "src/__tests__/clinical-create-once.test.ts",
+      "bytes": 15977,
+      "sha256": "e82bdf4c6edb9519db9d1cdb05bba6f2aca203a053e94795ed368313f6754a51"
+    },
+    {
+      "path": "src/__tests__/clinical-document-route.test.ts",
+      "bytes": 3020,
+      "sha256": "53f66e544a61c60395553d7537af92504bb4efdefcc12ce38f4775ae0ad15270"
+    },
+    {
+      "path": "src/__tests__/clinical-flow-integration.test.ts",
+      "bytes": 26253,
+      "sha256": "1fe2ca59438748ddcae5e2bde57e5a2f897bcc00642320653a6fadeb10e61e1e"
+    },
+    {
+      "path": "src/__tests__/clinical-history.test.ts",
+      "bytes": 26161,
+      "sha256": "53637eaf91f660572d48e42ec5e61e186e493a57f7ff3f1799ebe3b2ac3a9659"
+    },
+    {
+      "path": "src/__tests__/clinical-identity.test.ts",
+      "bytes": 4068,
+      "sha256": "19b06f07d63e80897db935b4ce60b4643b45291f73a39c4383867d7445ca72aa"
+    },
+    {
+      "path": "src/__tests__/clinical-input.test.ts",
+      "bytes": 2561,
+      "sha256": "02576ea64723427f6777e56abf13c92f1cb1b549b148c5b97f3e43b75187e108"
+    },
+    {
+      "path": "src/__tests__/clinical-keys.test.ts",
+      "bytes": 5631,
+      "sha256": "81bafb909cf41be865f2e94bf3db3e91ae33915be42531138ae4240130988ea8"
+    },
+    {
+      "path": "src/__tests__/clinical-migration-policy.test.ts",
+      "bytes": 2961,
+      "sha256": "c1394ced0c0ad9c4740c7675ef5caa9ef012e8cc9d0e5b9eb9c89a0b264dba7f"
+    },
+    {
+      "path": "src/__tests__/clinical-operations.test.ts",
+      "bytes": 50193,
+      "sha256": "7a245939866d737324f288b60ae40915784abc207cb851c9da5f8a9a07675a3e"
+    },
+    {
+      "path": "src/__tests__/clinical-permissions.test.ts",
+      "bytes": 7086,
+      "sha256": "eeaae509783d4c88dc6cab8fcaf4958fa1f89999ae87e0c907410baa0aafca33"
+    },
+    {
+      "path": "src/__tests__/clinical-rpc.test.ts",
+      "bytes": 3300,
+      "sha256": "b72ecd554e1a522790a70649dbeb7ad8c35ed85782674fb07bd7f18786468b3d"
+    },
+    {
+      "path": "src/__tests__/clinical-schema.test.ts",
+      "bytes": 921,
+      "sha256": "b29003633cfc8af08cd961f3d8f772ef7c72c68dcc67c51ca8e16841bf4a34dc"
+    },
+    {
+      "path": "src/__tests__/clinical-scoped-api.test.ts",
+      "bytes": 6028,
+      "sha256": "a2b5d8062ea04d22f633dbe34b263cfeba7ae5b4b75116146de4656c851c01d5"
+    },
+    {
+      "path": "src/__tests__/clinical-store.test.ts",
+      "bytes": 20005,
+      "sha256": "47c72be3ceb16508a2ab4073529d2342b22f8522e84f1abfb65d7f64716647e8"
+    },
+    {
+      "path": "src/__tests__/clinical-web-schema.test.ts",
+      "bytes": 1237,
+      "sha256": "1dc7493f465ded4af64b0de2323128e2c59acd9ac1ea2e192a7666a0dfe8ccb9"
+    },
+    {
+      "path": "src/__tests__/consultation-notices.test.ts",
+      "bytes": 2953,
+      "sha256": "11ccc28dca214b94bda7ba40d64a9d001384a17c1e53667a290cdc89be68270f"
+    },
+    {
+      "path": "src/__tests__/database-config.test.ts",
+      "bytes": 2005,
+      "sha256": "fe2a629299b235f0992f2fd668a52db747cd889a9018e9060ca5e47997834262"
+    },
+    {
+      "path": "src/__tests__/db-guard.test.ts",
+      "bytes": 2145,
+      "sha256": "fd1826c0fea5db7d48175b6b44633db4d6dbc6d13d0fe4b3eba709cd9ec5c367"
+    },
+    {
+      "path": "src/__tests__/demo-notice-banner.test.ts",
+      "bytes": 735,
+      "sha256": "5a19c94fc378ea52200e778f5cd8a89afa38f526d47a9f66dfa7fba0e6b2fdb2"
+    },
+    {
+      "path": "src/__tests__/dias-habiles.test.ts",
+      "bytes": 2740,
+      "sha256": "211ffe5b1b53dac0e02cb03d1f03e42fc3f4b0180e2abd75ff29240f005f715d"
+    },
+    {
+      "path": "src/__tests__/doctor-access.test.ts",
+      "bytes": 1746,
+      "sha256": "8f689b91d902525b730567cb150e398466813b1bb8239675eb379a375af74139"
+    },
+    {
+      "path": "src/__tests__/doctor-authorizations.test.ts",
+      "bytes": 20058,
+      "sha256": "b2b359009ea687b38be3c40770e199300b9d923c4dbd661578aadfb717094c60"
+    },
+    {
+      "path": "src/__tests__/doctor-onboarding-recovery.test.ts",
+      "bytes": 8723,
+      "sha256": "17d1cd08d7c3ea9fc5f327b29689ac9a2832394c5cf675fa8135fffeea58ecbd"
+    },
+    {
+      "path": "src/__tests__/doctor-onboarding-schema.test.ts",
+      "bytes": 1040,
+      "sha256": "7aff39f22adf4847ca9ab1778e15fe6d0332892bf33ccdcca820fa8b54620741"
+    },
+    {
+      "path": "src/__tests__/fhir.test.ts",
+      "bytes": 2892,
+      "sha256": "a51c0d020d2b1d9ec68d72b97793d0facb37e31615cbed631069818d7ebddeef"
+    },
+    {
+      "path": "src/__tests__/footer-links.test.ts",
+      "bytes": 1242,
+      "sha256": "9a13afa51dd673e1ec8a7a84109ec69ce4fde7d6706ea8d1940291bff433cd65"
+    },
+    {
+      "path": "src/__tests__/health-alerts-and-notifications.test.ts",
+      "bytes": 3750,
+      "sha256": "b8d964312c3ead61ace881a74a3710e46d50cff9767261728a0796a44dce7752"
+    },
+    {
+      "path": "src/__tests__/login-routes.test.ts",
+      "bytes": 1020,
+      "sha256": "fcca557bf32eddcba074a48b947686fb501587f9321d6184972abe5944847812"
+    },
+    {
+      "path": "src/__tests__/mcp-tools.test.ts",
+      "bytes": 5191,
+      "sha256": "622efaec2a291917fa607b89734d267ede5c87cf123a679c809cc1f901a75dcf"
+    },
+    {
+      "path": "src/__tests__/mint-idempotency.test.ts",
+      "bytes": 7707,
+      "sha256": "7522346f9b9b7849712d105f229791347f57047a5bd0194e56150763c7edc1bf"
+    },
+    {
+      "path": "src/__tests__/nav-links.test.ts",
+      "bytes": 3038,
+      "sha256": "94b3b4dad700bb292861e7ab191e86145c1482a19f59ed86d024b5804d5ac8c4"
+    },
+    {
+      "path": "src/__tests__/page-title.test.ts",
+      "bytes": 1111,
+      "sha256": "90d4440d8af3d4b86418ccb3f5caeef353b48b5f7fb100c7e332c366d837a6f2"
+    },
+    {
+      "path": "src/__tests__/patient-direct-login.test.ts",
+      "bytes": 6878,
+      "sha256": "e77ea658ee118898f6049c8eba7bfc1a4fad9ed58ee5a8ed355c9ce9f681ae11"
+    },
+    {
+      "path": "src/__tests__/patient-onboarding.test.ts",
+      "bytes": 979,
+      "sha256": "6e825a3b86f2b6a7f7887625283d5daaa7a2d7ad748900d1882629c18d46ec62"
+    },
+    {
+      "path": "src/__tests__/prescription-bookings.test.ts",
+      "bytes": 18550,
+      "sha256": "7d5ca1d678f6c024b4501b594848c8fae439844dcd1de1fda82741c794162719"
+    },
+    {
+      "path": "src/__tests__/prescription-document-view.test.ts",
+      "bytes": 4280,
+      "sha256": "0c3b1549cdb91cb723e2a44fb81ed121b8fae976100b65c1f781e7ef5306795a"
+    },
+    {
+      "path": "src/__tests__/prescription-hash.test.ts",
+      "bytes": 2954,
+      "sha256": "c6cecb4c1511568934e3c10a92b160618acc0c481f6a83cf143ef4c9f5dd0cdd"
+    },
+    {
+      "path": "src/__tests__/prescription-list.test.ts",
+      "bytes": 6865,
+      "sha256": "a1141c0a818ae06caaa57b2dca6cea07e8b5294e3757d1eaad34ca83a956b73c"
+    },
+    {
+      "path": "src/__tests__/prescription-verification.test.ts",
+      "bytes": 1935,
+      "sha256": "a3aaab4ba52337c76ef61f091d4d9a34cbc147151c5812a58743b818304a4d30"
+    },
+    {
+      "path": "src/__tests__/private-access-recovery.test.ts",
+      "bytes": 9139,
+      "sha256": "99b6f7c0e6f400fc4677e7fe9697bc9f0bc11d6a997dad9e517e5b669767c515"
+    },
+    {
+      "path": "src/__tests__/private-agenda.test.ts",
+      "bytes": 6856,
+      "sha256": "9dbf9252798236ec5d7c29bc5d8cc3b3187d58222042d34461e91674f878e18f"
+    },
+    {
+      "path": "src/__tests__/private-config.test.ts",
+      "bytes": 6294,
+      "sha256": "988f7adce3a00b0bb740f845ff5dbaaafe4ac9846b6109e1b2008190b92d3f1f"
+    },
+    {
+      "path": "src/__tests__/private-doctor-profile.test.ts",
+      "bytes": 6370,
+      "sha256": "c6c62e8454be0b6bfc31fdce0a54004ee4cd4b04d45ce682c1024b5b833deb17"
+    },
+    {
+      "path": "src/__tests__/private-document-loading.test.ts",
+      "bytes": 1504,
+      "sha256": "247b305d733e22c122bf977933c90f424cda410be49aadb783017f9d36233746"
+    },
+    {
+      "path": "src/__tests__/private-environment-diagnostics.test.ts",
+      "bytes": 1271,
+      "sha256": "c36a70a50eafb3253a17ea1016fb220b86f941568252bd7a06621f04c38faf44"
+    },
+    {
+      "path": "src/__tests__/private-operation-recovery.test.ts",
+      "bytes": 11046,
+      "sha256": "b20f79b8cecdd930398bbb8e2d268e35ce9660555bec8187158ca26339b2ae58"
+    },
+    {
+      "path": "src/__tests__/private-operations-security.test.ts",
+      "bytes": 30399,
+      "sha256": "912ea2031992772085f68b603bdf898b4c68056766c8f6ebc14f54616cabff2c"
+    },
+    {
+      "path": "src/__tests__/private-portal-state.test.ts",
+      "bytes": 4324,
+      "sha256": "a859ae1e37db319fe94a2bd9570b8ba83ccb2c4a9abef4b619f98c5add523c1e"
+    },
+    {
+      "path": "src/__tests__/private-prescription-read-performance.test.ts",
+      "bytes": 10135,
+      "sha256": "04981f29c95a1cb531436cf3456775fa9e20aa44218d3ee0b8829e2e056f4ef5"
+    },
+    {
+      "path": "src/__tests__/private-route-retirement.test.ts",
+      "bytes": 3008,
+      "sha256": "3e3d3c0287d7209752d960d1f666ad1000c425d82c49a2570f004dfc848c0f61"
+    },
+    {
+      "path": "src/__tests__/private-signing-component.test.ts",
+      "bytes": 17177,
+      "sha256": "1e57c00868b2176ff1e384f46281099bdca5c4c728ba7c8e72845177c3b84fe2"
+    },
+    {
+      "path": "src/__tests__/private-wallet-bootstrap.test.ts",
+      "bytes": 3557,
+      "sha256": "1220c1b30029c38b0d50b4b3f52c45093e8f302e7cf988fd519aaf2d00d2ec35"
+    },
+    {
+      "path": "src/__tests__/privy-email.test.ts",
+      "bytes": 1910,
+      "sha256": "b410e0e4028d741c539f8ffc03beab960c0d73c616c37e3e20aac2c4f101ff5a"
+    },
+    {
+      "path": "src/__tests__/privy-owner-signing.test.ts",
+      "bytes": 4546,
+      "sha256": "5bf09adfc67df3b08233d117dfe774f50ae3b9dc23200179b122dc11646fab80"
+    },
+    {
+      "path": "src/__tests__/privy-wallet-binding.test.ts",
+      "bytes": 3523,
+      "sha256": "99bf73e61456e622d0bacb35372a21d66d2dd5187c8276a94cb24d27166d8420"
+    },
+    {
+      "path": "src/__tests__/public-language.test.ts",
+      "bytes": 1818,
+      "sha256": "4deb792fd2a28b6e5b61958e8a820d35ab75f16e00ca0c64114ac5038e2d8dac"
+    },
+    {
+      "path": "src/__tests__/reviewed-doctor-authorization.test.ts",
+      "bytes": 3336,
+      "sha256": "7fbcd592c46299154385a4a2a010606ba27354a6bc42fa9e525d6df13e08d9c6"
+    },
+    {
+      "path": "src/__tests__/rut-hash.test.ts",
+      "bytes": 2554,
+      "sha256": "e0b4919345187a34b40853dfb1bbfa1d59009844376040fa5bc07bc12af30f56"
+    },
+    {
+      "path": "src/__tests__/same-origin.test.ts",
+      "bytes": 517,
+      "sha256": "14dac81d920eaa76be27949f613d5647a8933357534ce6a4df7fb80ea0635ee8"
+    },
+    {
+      "path": "src/__tests__/schema-parity.test.ts",
+      "bytes": 5073,
+      "sha256": "75b3f2e76259aba39a52917c9403110123cbb58f1c621e252af0622646d5a559"
+    },
+    {
+      "path": "src/__tests__/serialize.test.ts",
+      "bytes": 2158,
+      "sha256": "0ff802e0d5b12e3367e4471fa143dc674fd911997397ecb029c7781357607650"
+    },
+    {
+      "path": "src/__tests__/verify-url.test.ts",
+      "bytes": 2024,
+      "sha256": "c7ed19bef9e6bdf26ed4dfe2d8741bc0a727324479a30b217178586e05a32bf1"
+    },
+    {
+      "path": "src/__tests__/waitlist-form.test.ts",
+      "bytes": 4072,
+      "sha256": "17fc63d34bf3dff3876ae449abcea2355aa4700f9ef733e5c9e103b6faaa38aa"
+    },
+    {
+      "path": "src/__tests__/waitlist-route.test.ts",
+      "bytes": 4770,
+      "sha256": "5812e71a1de2a1572795e72a789ae99c31c13dea2a198f3d619da762f4a03d42"
+    },
+    {
+      "path": "src/__tests__/week1-security-integration.test.ts",
+      "bytes": 5107,
+      "sha256": "75fa397baee630de68b639e0ee7375b91d63292a7567c6efeab8da9ae4a27f4f"
+    },
+    {
+      "path": "src/app/(dashboard)/layout.tsx",
+      "bytes": 352,
+      "sha256": "0bff058aeab9ef970d3065f4395a601c1d82ab3ad39859f869ae2bad0c9ac88e"
+    },
+    {
+      "path": "src/app/(dashboard)/licenses/new/page.tsx",
+      "bytes": 46093,
+      "sha256": "1fcc962ced2c89ed8afe21217be65493d911353fd7bf85529dbf3fb8776cfb03"
+    },
+    {
+      "path": "src/app/(dashboard)/licenses/page.tsx",
+      "bytes": 9757,
+      "sha256": "484e64f3b51e8a97aa3c2f274dd3dbec289f0d5e15249a4f621e11a7a689fc0d"
+    },
+    {
+      "path": "src/app/admin/doctors/page.tsx",
+      "bytes": 21152,
+      "sha256": "de6db39f1014436fd3ad0d65df8ae26aa89a261fb1e81c80b6e7a250e6350ca7"
+    },
+    {
+      "path": "src/app/admin/flujo/page.tsx",
+      "bytes": 18090,
+      "sha256": "f0b62e1146bb23690b9dc846b52d0a8f218b125f03d6935542d235541a37fa84"
+    },
+    {
+      "path": "src/app/admin/historial/page.tsx",
+      "bytes": 8517,
+      "sha256": "3f343deb4c62ce9b9dfa2936c8df4aa425783b01aed716acbb8759ec5aefb490"
+    },
+    {
+      "path": "src/app/admin/layout.tsx",
+      "bytes": 12542,
+      "sha256": "d66953a9cba8d4ae442b83a4bb2675cd0dfcb0e6f4a7bda94d8ea881e5cc8df4"
+    },
+    {
+      "path": "src/app/admin/page.tsx",
+      "bytes": 112,
+      "sha256": "815cb56016203d5e3fa1894003c4f1aa23ab57dc535ce332bd183c1de1956101"
+    },
+    {
+      "path": "src/app/admin/users/page.tsx",
+      "bytes": 17914,
+      "sha256": "ffe208b39335b2189f81c907bda33bab8e1ac1e59952c5f76c3a6fd8faa09ed9"
+    },
+    {
+      "path": "src/app/admin/waitlist/page.tsx",
+      "bytes": 3867,
+      "sha256": "523ac4a89cdc7e632eedb239d2d79f2e840bd8e7a8c241f74022f8bc3171f8aa"
+    },
+    {
+      "path": "src/app/api/admin/activity/route.ts",
+      "bytes": 10951,
+      "sha256": "edfc33eeb12eef5b4570653edb0ff545e77f0928106552b72b3ce30827dae8fd"
+    },
+    {
+      "path": "src/app/api/admin/api-keys/route.ts",
+      "bytes": 6870,
+      "sha256": "dc38aa7491564420419c8602c59b6020f867bfa84d463862a48a4cb554028339"
+    },
+    {
+      "path": "src/app/api/admin/doctor-authorizations/route.ts",
+      "bytes": 2850,
+      "sha256": "f77631546c5743b9f9fb9c880223a7402313c50c4a122952dac3f3eb1ee97ecc"
+    },
+    {
+      "path": "src/app/api/admin/doctor-onboarding/route.ts",
+      "bytes": 1850,
+      "sha256": "8ebda06b694ad02d590dca67f1bb7fade59901690b5acd38a8022c9fef914acf"
+    },
+    {
+      "path": "src/app/api/admin/doctors/route.ts",
+      "bytes": 2277,
+      "sha256": "46112bfa24125ae2d1b97a5317ccb0c0af51dbce8e5c8ff8294bfa6620018e80"
+    },
+    {
+      "path": "src/app/api/admin/encrypt/route.ts",
+      "bytes": 2696,
+      "sha256": "9cbda0988e084078b3a95eb22b46336b774bdf40d9b68998c1034ca059c50570"
+    },
+    {
+      "path": "src/app/api/admin/migrate/route.ts",
+      "bytes": 54980,
+      "sha256": "1946ee5ced3c3992c269aac2d6717593f55e1d81fe078e792b5a96fe0135169e"
+    },
+    {
+      "path": "src/app/api/admin/overview/route.ts",
+      "bytes": 4016,
+      "sha256": "20dfce7f19f731007f182e992313ab190769aca29509fa1f7e0f18ab20b1f157"
+    },
+    {
+      "path": "src/app/api/admin/reset/route.ts",
+      "bytes": 3098,
+      "sha256": "017361342fa28f28e4fc2ed3dab1ca27b63c818e2bf55493e9135f8494c727a4"
+    },
+    {
+      "path": "src/app/api/admin/stats/route.ts",
+      "bytes": 1881,
+      "sha256": "69bda0bf891e9e9bfa30aa7a105f9f0af026516d0ab6e51bd4318c498b66fda8"
+    },
+    {
+      "path": "src/app/api/admin/users/route.ts",
+      "bytes": 4047,
+      "sha256": "1c0be83e419a73f0f415a2014df4f637f54b36cdedca2d26dbaefa8a42a4788b"
+    },
+    {
+      "path": "src/app/api/admin/whoami/route.ts",
+      "bytes": 1612,
+      "sha256": "182ef27b1031891ced041ead06f4c305302d80dc5d2202b87607feb52d611a67"
+    },
+    {
+      "path": "src/app/api/appointments/route.ts",
+      "bytes": 3335,
+      "sha256": "c7cdccf3acbac575c746f67e0d2a6380a7bf34d7c1b01ce22e1d50a289adf8eb"
+    },
+    {
+      "path": "src/app/api/auth/google/callback/route.ts",
+      "bytes": 2141,
+      "sha256": "de2229987e2abad590c80e9f8ea1237a5469d4e603a15d40914d75eb6fa8e7dc"
+    },
+    {
+      "path": "src/app/api/auth/google/route.ts",
+      "bytes": 1194,
+      "sha256": "3e114502c7919f5e0fed7f391376ddc9ee509e5d16500f654974721eb0e34127"
+    },
+    {
+      "path": "src/app/api/consultations/[id]/route.ts",
+      "bytes": 1014,
+      "sha256": "f6ef794f668f0634d1402ed72cd915a3ff6bc59368a69299ec1f1a475e7fd940"
+    },
+    {
+      "path": "src/app/api/consultations/route.ts",
+      "bytes": 4261,
+      "sha256": "560ddce306e9eaa95dcea428d77b8a9e55f54a19f5b2d748a1c6376eb07808eb"
+    },
+    {
+      "path": "src/app/api/doctor-status/route.ts",
+      "bytes": 1610,
+      "sha256": "d1923127307c082fb36e6327fa5087f4548b819734c3ef51f6ac533953bbad07"
+    },
+    {
+      "path": "src/app/api/doctor/availability/route.ts",
+      "bytes": 7195,
+      "sha256": "14bf3499a799492fab308b13d489c1e9458f99b6309ac70f33d50de3ebc8ba94"
+    },
+    {
+      "path": "src/app/api/doctor/onboarding/route.ts",
+      "bytes": 1056,
+      "sha256": "c29901e93efae7c20c909fc38f8ef81fcecc9222f3ad0a7abe1aec1babf7f8c8"
+    },
+    {
+      "path": "src/app/api/doctor/patient-record/route.ts",
+      "bytes": 8259,
+      "sha256": "c14cd20c24c4ecf17e1f8bdefa449e0aca821c692da8590520153f5c8edb1379"
+    },
+    {
+      "path": "src/app/api/doctor/patients/route.ts",
+      "bytes": 4209,
+      "sha256": "f2c1e40c8427166c453fa0469f1e5d543f6f411301f8e81c2911b1c7216333a5"
+    },
+    {
+      "path": "src/app/api/doctor/prescriptions/route.ts",
+      "bytes": 2865,
+      "sha256": "bc13c849967acaceb84e49b13994d781fcf9cb4cbdb9545c0081912aae0013ff"
+    },
+    {
+      "path": "src/app/api/doctor/profile/route.ts",
+      "bytes": 3726,
+      "sha256": "e1ba9b3e3003bd83a5b5ef788fdaeb1d61ffa8b22e773a0d0bafabfdddd71343"
+    },
+    {
+      "path": "src/app/api/doctor/slots/route.ts",
+      "bytes": 1909,
+      "sha256": "d11def948607c32c0a5d991ea17beaf3771a46b08cb3768211669d209dd2acf5"
+    },
+    {
+      "path": "src/app/api/doctors/route.ts",
+      "bytes": 2286,
+      "sha256": "3ca310cace4cd643a0e6cc0729f2b6cf558904f002b2b35bdc9288cd29f75227"
+    },
+    {
+      "path": "src/app/api/documents/mint/route.ts",
+      "bytes": 7457,
+      "sha256": "172682ef8af149ba328bb2ae84cf7331b3cca4cae865a1296db33909674e83bc"
+    },
+    {
+      "path": "src/app/api/documents/revoke/route.ts",
+      "bytes": 3861,
+      "sha256": "b7fdc019eff2cbed88edad0401fad470f68bee033b29ef50538e7dc8d7afd266"
+    },
+    {
+      "path": "src/app/api/documents/route.ts",
+      "bytes": 1650,
+      "sha256": "2828d58c3bcbdef0bc907da8b7008f5fcbb6c0b3a8cc746cb2664cf09624e915"
+    },
+    {
+      "path": "src/app/api/documents/share/route.ts",
+      "bytes": 2661,
+      "sha256": "41780be7d1a5a3dc113104d92c17c71475f0bdd28d73825e5ff8e86c820cafdc"
+    },
+    {
+      "path": "src/app/api/ficha/document/[id]/route.ts",
+      "bytes": 2674,
+      "sha256": "995b5a2460ca924fc4b60c66903e0cde00cf7b751a595bdab8924136b0d2b67b"
+    },
+    {
+      "path": "src/app/api/ficha/document/route.ts",
+      "bytes": 6804,
+      "sha256": "16c496a4148a568c0126cfdee3ece4dd7c07471876012970535953a47f8bcf1d"
+    },
+    {
+      "path": "src/app/api/ficha/entries/route.ts",
+      "bytes": 2624,
+      "sha256": "d710f673948c6ae4ea5a99960ffa7411e085223d936d064eea973ff516ec77f5"
+    },
+    {
+      "path": "src/app/api/ficha/entry/route.ts",
+      "bytes": 5427,
+      "sha256": "c0bc9b1e391fda0f8a429bcafd346dfe13fa4d2dfe0b4d0ad644762056003814"
+    },
+    {
+      "path": "src/app/api/ficha/grant/route.ts",
+      "bytes": 5757,
+      "sha256": "231f2b3892b22d2d5499d9db2b28e31c71efa6b35c974f19cda195fbd66b646b"
+    },
+    {
+      "path": "src/app/api/licenses/route.ts",
+      "bytes": 7305,
+      "sha256": "23f6ab94643a7db6b9285f6e27bbc681b7a4939f1b388d113661fdf87ba04fa2"
+    },
+    {
+      "path": "src/app/api/mcp/route.ts",
+      "bytes": 25428,
+      "sha256": "b81ed5987960e00b5f9b896e272f9733add1d5a9c1cb406605d1d3511d4ad8a1"
+    },
+    {
+      "path": "src/app/api/mint/route.ts",
+      "bytes": 16017,
+      "sha256": "4d9096150c555fb9fadb742357c3a2a8e1ddf51df4616c5ea25ddb4bb3e354dc"
+    },
+    {
+      "path": "src/app/api/notify/license/route.ts",
+      "bytes": 10990,
+      "sha256": "77911795c288ae4560d3c23131d5f251cbff08a11fd0f92a1f0c8f829536dbc9"
+    },
+    {
+      "path": "src/app/api/notify/prescription/route.ts",
+      "bytes": 10343,
+      "sha256": "7302d85e70a0b918fe4a84796bfea1f228301da0c95e14d05618c0ce5770047c"
+    },
+    {
+      "path": "src/app/api/pain-diary/route.ts",
+      "bytes": 3481,
+      "sha256": "7ca8f10e67568a2fbfa635144523a1a0dcbc11e04094e5cbb2ba6506eb1198fa"
+    },
+    {
+      "path": "src/app/api/patient-wallet/route.ts",
+      "bytes": 1902,
+      "sha256": "4be0a9ba3f96d85be8927f39748ec842bf44f800cc38c7363c43788d651afe76"
+    },
+    {
+      "path": "src/app/api/patient/access-log/route.ts",
+      "bytes": 2330,
+      "sha256": "4973031ef3cae9a2547b23b5433e57c8e1abce0c66b7799adb447dec177531c6"
+    },
+    {
+      "path": "src/app/api/patient/ai-chat/route.ts",
+      "bytes": 2092,
+      "sha256": "5064843babf988f5446b82ebe198600a6f7ee3f6daa1fb87e4f613fde2bbf6b1"
+    },
+    {
+      "path": "src/app/api/patient/ai-explain/route.ts",
+      "bytes": 2123,
+      "sha256": "ad62b5ffed28e3400e1ac5788d215e07c5316f3f750f42bb5b1f4597762a87e2"
+    },
+    {
+      "path": "src/app/api/patient/ai-extract/route.ts",
+      "bytes": 3043,
+      "sha256": "94945fdfcdfa8355f4e128737fc43f02647b562c1eedd2e55233dab56702302e"
+    },
+    {
+      "path": "src/app/api/patient/ficha/route.ts",
+      "bytes": 5495,
+      "sha256": "97f160bf352c67dace2f1cb2cb52860c9653b3de5da095951e0666b786e440d6"
+    },
+    {
+      "path": "src/app/api/patient/grants/route.ts",
+      "bytes": 8300,
+      "sha256": "e813909ed7fb31ae4731efe0488a3d97149d54e2f292ed6fb224283b7b685347"
+    },
+    {
+      "path": "src/app/api/patient/health-timeline/route.ts",
+      "bytes": 6468,
+      "sha256": "513a35b03a542653a438316bc0742f2fd92a1b88c50574a668dccf2d21a13297"
+    },
+    {
+      "path": "src/app/api/patient/notifications/route.ts",
+      "bytes": 3370,
+      "sha256": "9f7b8df1de392c3b453cc9efd9443fa90f2fd43826d6dd99681d42d5d385d68e"
+    },
+    {
+      "path": "src/app/api/patient/record-requests/route.ts",
+      "bytes": 7997,
+      "sha256": "03eb414742dbc0959b262450670c84622c7d17a4e2f4368c8496534fb200a176"
+    },
+    {
+      "path": "src/app/api/pharmacy/lookup/route.ts",
+      "bytes": 3872,
+      "sha256": "785cab2406a519cf88c96b720609c347d465674b26614330fd8792b53a640e24"
+    },
+    {
+      "path": "src/app/api/pharmacy/verify-pin/route.ts",
+      "bytes": 2521,
+      "sha256": "38494912dcfcdd0efd8ee125c2b7090a8109ff6553affa41478e012ed1842f45"
+    },
+    {
+      "path": "src/app/api/prescription-bookings/route.ts",
+      "bytes": 2258,
+      "sha256": "fcbccc0fa43d64d0bc3cefafbb2afba9d838d27759bcb67e0fda9a203095d022"
+    },
+    {
+      "path": "src/app/api/prescriptions/activate/route.ts",
+      "bytes": 4065,
+      "sha256": "6a209001c311b756e110b6d9a369278ac4070e1adc0bc11a88d68129056e991d"
+    },
+    {
+      "path": "src/app/api/prescriptions/route.ts",
+      "bytes": 2961,
+      "sha256": "477f521295e5c44cec79a8fd7b30d472b677651eec1ba10f170f5dd4d27b69c2"
+    },
+    {
+      "path": "src/app/api/private-clinical-history/document/route.ts",
+      "bytes": 1784,
+      "sha256": "4964e27cbd83c63defa42d7f797af37eace2265f9188d9195e8050f90d832e3a"
+    },
+    {
+      "path": "src/app/api/private-clinical-history/route.ts",
+      "bytes": 310,
+      "sha256": "5a35fcf5cba59cfab7a0626f152a001e649685d271fdeb02433e8f0ef2ea0b66"
+    },
+    {
+      "path": "src/app/api/private-clinical-operations/[id]/cancel/route.ts",
+      "bytes": 693,
+      "sha256": "4211cd6ed9afd944becf6ac93b2e82699098aecdf33d69589bb34855572b49d3"
+    },
+    {
+      "path": "src/app/api/private-clinical-operations/[id]/retry/route.ts",
+      "bytes": 705,
+      "sha256": "799a95cc63bde32316bee0d4db9c60ec60be093bf2d947124da0563d7af6f6fd"
+    },
+    {
+      "path": "src/app/api/private-clinical-operations/[id]/route.ts",
+      "bytes": 575,
+      "sha256": "c084bcfe9a5e328005eccdfaabd1343751b8073be394bc3dbaf0059b8fd0b2ff"
+    },
+    {
+      "path": "src/app/api/private-clinical-operations/[id]/sign/route.ts",
+      "bytes": 812,
+      "sha256": "489df17036ab221cf971ce1293304e932a60c8054c1aaa1f284e31e3088b9008"
+    },
+    {
+      "path": "src/app/api/private-clinical-operations/route.ts",
+      "bytes": 396,
+      "sha256": "7bb4396b89c73d4cdb3859190f34b801e1a8182822930d54c505e8c45904feb4"
+    },
+    {
+      "path": "src/app/api/private-consultations/[id]/route.ts",
+      "bytes": 596,
+      "sha256": "d4ced44a9350e38b3cf15d4c61b597599ef74ec94baad5abbfa424b1b5fc1f56"
+    },
+    {
+      "path": "src/app/api/private-operations/[id]/confirm/route.ts",
+      "bytes": 701,
+      "sha256": "908297957e9a0d9d0c69f384eff8f25be62c23809a0f2dbbb79c1e177a52c785"
+    },
+    {
+      "path": "src/app/api/private-operations/[id]/route.ts",
+      "bytes": 543,
+      "sha256": "8259b860e76837150ca005ff656643d199b309e04712f66e2bcb84e1d87edc71"
+    },
+    {
+      "path": "src/app/api/private-operations/route.ts",
+      "bytes": 1216,
+      "sha256": "232b01490624465f83fe7251a25d03ef68a4ce0436706268b030b40fb4872dd7"
+    },
+    {
+      "path": "src/app/api/private-prescriptions/[id]/document/route.ts",
+      "bytes": 534,
+      "sha256": "2111b5d984a877c3940625020dbdef6b8fe94f9ea2a3d0b9630825f46e8851d1"
+    },
+    {
+      "path": "src/app/api/private-prescriptions/route.ts",
+      "bytes": 1024,
+      "sha256": "25d02391b5f8e0bb2f847d355d1dca4c803cb59923e40f0bc2ec971cd81be384"
+    },
+    {
+      "path": "src/app/api/privy/signing-check/route.ts",
+      "bytes": 7911,
+      "sha256": "b6ddd08763aed6b6728d7deeb95a2fff9616cf562d2b758b5e4ee46f0b1b063e"
+    },
+    {
+      "path": "src/app/api/privy/stellar-wallet/route.ts",
+      "bytes": 3569,
+      "sha256": "f76aac85e870b1b7e3a19810161fdc3344b1bc0cdfdc1782bbf62e4f3b4b55ee"
+    },
+    {
+      "path": "src/app/api/public/document/[id]/route.ts",
+      "bytes": 1439,
+      "sha256": "56d2e235a5c0e02f51f81804390b2ceaeb5e3cdde4fc8d288d1e34afe91a5467"
+    },
+    {
+      "path": "src/app/api/public/pharmacy/verify/route.ts",
+      "bytes": 1947,
+      "sha256": "58ed1dd7f499a1bbc53dab3da57904e0ce62b7ae5cc6e200df1abb7322f2d52d"
+    },
+    {
+      "path": "src/app/api/public/prescription/[id]/dispense/route.ts",
+      "bytes": 7765,
+      "sha256": "89191d99263654c5bce1bb44ed2bb13b126a3953a63695b2c29b1ea22dd1de15"
+    },
+    {
+      "path": "src/app/api/public/prescription/[id]/route.ts",
+      "bytes": 2828,
+      "sha256": "136ba7cf521dd8d1eb6e4f4e283a6d5cf5356a985389307c38b2ff7363f2b335"
+    },
+    {
+      "path": "src/app/api/relay/route.ts",
+      "bytes": 2332,
+      "sha256": "d18a0db6d7e11d6fb86f8df87450a744706e393e01441db623b3de5ac6c10eca"
+    },
+    {
+      "path": "src/app/api/revoke/route.ts",
+      "bytes": 2820,
+      "sha256": "5b5b0bb00a58d54591508d7a4626f11947db12148867af6c5425439e1000904e"
+    },
+    {
+      "path": "src/app/api/share/route.ts",
+      "bytes": 1468,
+      "sha256": "546611826828446e10cc7ef175e2fd0a896d5b3892d95ae2a735e53d8bee8f88"
+    },
+    {
+      "path": "src/app/api/stellar-wallet-binding/route.ts",
+      "bytes": 1796,
+      "sha256": "dcaaca6ee2edd642243ee6796421c30ea5667e7143ce2e1c2147d4ef44bacb06"
+    },
+    {
+      "path": "src/app/api/waitlist/route.ts",
+      "bytes": 2568,
+      "sha256": "1d358ee3c6c4101ae4e03acccdb51bc3169570bcad62997787f0f759af5ba83c"
+    },
+    {
+      "path": "src/app/caregiver/diary/page.tsx",
+      "bytes": 21364,
+      "sha256": "fdecb80e2d9f042b8154d4b1efa4a3c563feecf12f097bde56d794d1441c006d"
+    },
+    {
+      "path": "src/app/caregiver/emergency/[rut]/page.tsx",
+      "bytes": 10296,
+      "sha256": "26a9c57b0bbc2818a226502e30fb6c4313a6689c8989789e123d12172f91dafd"
+    },
+    {
+      "path": "src/app/caregiver/medications/page.tsx",
+      "bytes": 11642,
+      "sha256": "f65f65346e8612733dfacbbe82609a974c3f6350bef83df762573b4da275278e"
+    },
+    {
+      "path": "src/app/caregiver/onboarding/page.tsx",
+      "bytes": 20622,
+      "sha256": "77017c49322ba297c3362a9d7ad4209a25d2c48395c4cc35b9dccc55e836f8cf"
+    },
+    {
+      "path": "src/app/caregiver/page.tsx",
+      "bytes": 13958,
+      "sha256": "6eaa128389a8496430465763b5c7f965e7e435a02a593162a214dd2d48ad06ae"
+    },
+    {
+      "path": "src/app/caregiver/types/page.tsx",
+      "bytes": 16474,
+      "sha256": "9c4a3f1d6a084ccb78b1fb7760749d60bef47996178a26f5fe7eb80a3cf5d547"
+    },
+    {
+      "path": "src/app/doctor/layout.tsx",
+      "bytes": 26055,
+      "sha256": "68368213beb99638a3c09b1329fd81d1af72a0aa23f31cac715e7c94e89d3f1d"
+    },
+    {
+      "path": "src/app/doctor/page.tsx",
+      "bytes": 1167,
+      "sha256": "0f4c3e8ca085228e5fd20d13badf4db68f421de3b23e2502ce9f41aa779a119e"
+    },
+    {
+      "path": "src/app/doctor/patient-pain/[patientRut]/page.tsx",
+      "bytes": 8968,
+      "sha256": "3d085cd3791b50aa915b82c4e1609450b0d28fbfbe50952c93cebec223e7d68d"
+    },
+    {
+      "path": "src/app/favicon.ico",
+      "bytes": 25931,
+      "sha256": "2b8ad2d33455a8f736fc3a8ebf8f0bdea8848ad4c0db48a2833bd0f9cd775932"
+    },
+    {
+      "path": "src/app/globals.css",
+      "bytes": 1903,
+      "sha256": "9b5504acf73f963494013b6d9ebd6daa00f0615c91579db325695eed95364ce2"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "bytes": 1951,
+      "sha256": "1be4e859388d0eb36e604e242f6535b899940b0bd25808b6a4640d44518b265e"
+    },
+    {
+      "path": "src/app/legal/page.tsx",
+      "bytes": 5565,
+      "sha256": "b28f51288400017944090f8fd1954de7c3e268707656dba800e2f8828485f5e4"
+    },
+    {
+      "path": "src/app/login/[role]/page.tsx",
+      "bytes": 606,
+      "sha256": "8f2c260b6a52f8a2e190dee3d0f45bd075de998d43a6441662adb9cc00ae2778"
+    },
+    {
+      "path": "src/app/login/page.tsx",
+      "bytes": 304,
+      "sha256": "51b18334290fcf569716b98f5ce26a688a2f2b90ab77f84db4862075fbfc4dfe"
+    },
+    {
+      "path": "src/app/mcp/page.tsx",
+      "bytes": 42100,
+      "sha256": "9ad1504868c2207cda614372d1eb2f3ad3c5b2392f908d578780b4e18ce9e0e8"
+    },
+    {
+      "path": "src/app/page.tsx",
+      "bytes": 952,
+      "sha256": "c403ad09fea7a0a330b1a91c913ae894ad7628551e5ae6acf679228994c41986"
+    },
+    {
+      "path": "src/app/patient/dental/page.tsx",
+      "bytes": 22817,
+      "sha256": "6bf5c7b517d576e60201d7def2fa95b31e7fcca21fa163c6a36dd4c29906a4a9"
+    },
+    {
+      "path": "src/app/patient/ficha/page.tsx",
+      "bytes": 23828,
+      "sha256": "c2cf610a55da2ff49c155e3095767fd37decc2aee034bb57b2c401d8bb10a200"
+    },
+    {
+      "path": "src/app/patient/layout.tsx",
+      "bytes": 5351,
+      "sha256": "02a383a48ad78edd317e8a4b0790fddfaf29f5b8152d3f8b1714a8bac42d30ad"
+    },
+    {
+      "path": "src/app/patient/onboarding/page.tsx",
+      "bytes": 5983,
+      "sha256": "cb9f609779cd39ae1bc9474f57432239afa7ec367a39dda7de6dc47c9261c10b"
+    },
+    {
+      "path": "src/app/patient/optical/page.tsx",
+      "bytes": 17677,
+      "sha256": "314ff8dba2460cfdc0724e5ee9fbef27db21cb53e9976ce9b419d59c1a59b772"
+    },
+    {
+      "path": "src/app/patient/page.tsx",
+      "bytes": 1298,
+      "sha256": "4f33a26354401267e057eb26921efbfd7c37577c0d781fc02467599684b72995"
+    },
+    {
+      "path": "src/app/patient/pain-diary/history/page.tsx",
+      "bytes": 12560,
+      "sha256": "716f4d2b5cb9fbda337bc1072cfeb371506da0ca7d24c6fa324e47a96fa57de0"
+    },
+    {
+      "path": "src/app/patient/pain-diary/page.tsx",
+      "bytes": 18912,
+      "sha256": "4b51d97e2b62e2dee43bf309e35a3af96c5dcf9534bce434c4adc3c968159281"
+    },
+    {
+      "path": "src/app/patient/requests/page.tsx",
+      "bytes": 13397,
+      "sha256": "84cb4b570d236281dded1d280bf3ddcdef1786457cfacb89a7fba6a70d123373"
+    },
+    {
+      "path": "src/app/pharmacy/page.tsx",
+      "bytes": 18318,
+      "sha256": "ad58f49b4d7e5f18f63dd0ec81d22f3f0d72af3e47658c00d96840b632683027"
+    },
+    {
+      "path": "src/app/privy-check/page.tsx",
+      "bytes": 7828,
+      "sha256": "58b5a410dfc5fd94380a9a913e31b65e93447c102015a7d38209fb82d1a145bd"
+    },
+    {
+      "path": "src/app/traction/page.tsx",
+      "bytes": 8519,
+      "sha256": "cbe56e5191cd026a6bbad22ba24fcff2a5be0ca8747596d3df6e41c9f155a138"
+    },
+    {
+      "path": "src/app/verify/license/[id]/page.tsx",
+      "bytes": 9285,
+      "sha256": "5ea8e027a2852950227a5fed07e1a1e9845cb0a3465c0a2a7b26ea64284c6d6c"
+    },
+    {
+      "path": "src/app/verify/page.tsx",
+      "bytes": 11305,
+      "sha256": "decf2d371e8f55c10a7c54087032b21b65fc959b0bb19b3b0ed7919c027dcbd4"
+    },
+    {
+      "path": "src/components/3d/PatientCard3D.tsx",
+      "bytes": 5184,
+      "sha256": "3062b6e9e33c7840222fd7bd7620f0c5dff5325f8378413201d7d79dc19f1cce"
+    },
+    {
+      "path": "src/components/Navbar.tsx",
+      "bytes": 13461,
+      "sha256": "5400ff5e3af339475502bcc89d5c347379c45467326777d6410532e0fcfba0a8"
+    },
+    {
+      "path": "src/components/PageTitle.tsx",
+      "bytes": 182,
+      "sha256": "190ba6d31c52d3628f94650202d0fb371bab458727c263879e7914b2d6d0bdfc"
+    },
+    {
+      "path": "src/components/auth/PrivyLoginButton.tsx",
+      "bytes": 3403,
+      "sha256": "185dab4a1ad36257360a603513c4a8d1e41785c96921aee9cda6cf74620f30fd"
+    },
+    {
+      "path": "src/components/auth/RoleLogin.tsx",
+      "bytes": 20819,
+      "sha256": "f18a72e42bfd4e652966605a0aa07dbb6e91e6cb869e4e3acc58cf2f2e414378"
+    },
+    {
+      "path": "src/components/doctor/ConsultasTab.tsx",
+      "bytes": 17943,
+      "sha256": "6f213b9a0ee91492f08688c385d6cb2138676d7a945c033ed57dfaeeebd41ce6"
+    },
+    {
+      "path": "src/components/doctor/DisponibilidadTab.tsx",
+      "bytes": 15125,
+      "sha256": "ddefb9db55785f1df152d00ceabe79aa4be13ef3e28c6368fa7a9ff6ee5461cf"
+    },
+    {
+      "path": "src/components/doctor/InicioTab.tsx",
+      "bytes": 10032,
+      "sha256": "34b7d90c33c0182c43814e705197d58800a30f8d3f870c2be643144118ee061b"
+    },
+    {
+      "path": "src/components/doctor/LicenciasTab.tsx",
+      "bytes": 30473,
+      "sha256": "df07be7559c3ef03da7ad56497c77302f456690c82e86aaa49be64fa7686266f"
+    },
+    {
+      "path": "src/components/doctor/Modal.tsx",
+      "bytes": 2506,
+      "sha256": "928afb9e717455ae0ac3c36d914c4b4c7e385ee05cada12a388584d31e485b77"
+    },
+    {
+      "path": "src/components/doctor/PacientesTab.tsx",
+      "bytes": 37863,
+      "sha256": "ab50d28e6614967ca7a3c9051b3bca50578da486f3333d6b8e77e164fa118cc1"
+    },
+    {
+      "path": "src/components/doctor/PerfilTab.tsx",
+      "bytes": 10664,
+      "sha256": "a40c69b6bd43e4bc18ae0f002c026e0da67faa8c2d2480166f184a90c25fd0cb"
+    },
+    {
+      "path": "src/components/doctor/RecetasTab.tsx",
+      "bytes": 30700,
+      "sha256": "a668dd4bf25734fa2898439827d43ac4414e6b6c4df8de97936b76fe69e8cc03"
+    },
+    {
+      "path": "src/components/doctor/types.ts",
+      "bytes": 4952,
+      "sha256": "1a43e143eb03bca4fb3464bb5e82b7cf039df580c740e40dc180ab87d2467817"
+    },
+    {
+      "path": "src/components/icons/HealthIcons.tsx",
+      "bytes": 8672,
+      "sha256": "956539233a04cb3d714efa8c7d16ece8969a353c9f0f2884d14b679b05f118e5"
+    },
+    {
+      "path": "src/components/icons/PatientIcons.tsx",
+      "bytes": 8672,
+      "sha256": "956539233a04cb3d714efa8c7d16ece8969a353c9f0f2884d14b679b05f118e5"
+    },
+    {
+      "path": "src/components/landing/AudienceSection.tsx",
+      "bytes": 2037,
+      "sha256": "05082ddb899deae088bfa06ae7349ef3457952256eb7883d3f4487d86cd88967"
+    },
+    {
+      "path": "src/components/landing/Footer.tsx",
+      "bytes": 2434,
+      "sha256": "4ae06946a12b9d23a90879ae25b7a667b930cc17b3ce1fa1e071e370f62d8f26"
+    },
+    {
+      "path": "src/components/landing/HeroSection.tsx",
+      "bytes": 5217,
+      "sha256": "4d8ce85822b8f8afd750132b3dead5c3adb6a157038d7bd8a513b135107c06c3"
+    },
+    {
+      "path": "src/components/landing/HowItWorksSection.tsx",
+      "bytes": 1517,
+      "sha256": "88c91c2b1514b9a0e53005d680998c313f29a49af9fe2087bcf7126c4c53c4d7"
+    },
+    {
+      "path": "src/components/landing/LandingBackdrop.tsx",
+      "bytes": 433,
+      "sha256": "c86aad2e1b51caaf700ce7591590bb99973812cbd159e0e782f5e6e0c25125f3"
+    },
+    {
+      "path": "src/components/landing/Navbar.tsx",
+      "bytes": 5441,
+      "sha256": "6e351fbf88ace36e13d4e52720c019b9ee642c808d8c15a953c683245ebc1e7d"
+    },
+    {
+      "path": "src/components/landing/ProblemSection.tsx",
+      "bytes": 1269,
+      "sha256": "4945b204296a846a30811d335a54368d5d81e59ff6c3752f0db456b4445b9450"
+    },
+    {
+      "path": "src/components/landing/RoadmapSection.tsx",
+      "bytes": 1497,
+      "sha256": "eefb1535bc8b1c2874ccd0201f2a9547251e624bd5ae6251ed298820b26dfcb1"
+    },
+    {
+      "path": "src/components/landing/SectionHeading.tsx",
+      "bytes": 750,
+      "sha256": "d1cab146e73b3353b1b059e08c8b083010d9883e09104ea6a0a008293d6d9867"
+    },
+    {
+      "path": "src/components/landing/SolutionSection.tsx",
+      "bytes": 2483,
+      "sha256": "cf1aca7270af60d9b64c9bb8b52d7dd6aa873fb791b2774843d333fa9286f89e"
+    },
+    {
+      "path": "src/components/landing/WaitlistForm.tsx",
+      "bytes": 4048,
+      "sha256": "46e795dc7bdedeecdca5ede3b475b6d3a25ae2c05f49c0587982ceb7ee897803"
+    },
+    {
+      "path": "src/components/landing/WaitlistModal.tsx",
+      "bytes": 4779,
+      "sha256": "7711e95de01c98260da01d61dcb8460d2f43fc00367a322ca5186c4c3e7694b8"
+    },
+    {
+      "path": "src/components/landing/WaitlistSection.tsx",
+      "bytes": 1109,
+      "sha256": "dfecc38c6f9829f433fd567e2211e8ab3a066efa5091d9736c4465f43a1e167b"
+    },
+    {
+      "path": "src/components/legal/LegalIcons.tsx",
+      "bytes": 2695,
+      "sha256": "834f995861cab9329aa29cfbf53aa44efc882cc847b50a6e6405b2b28a4c084f"
+    },
+    {
+      "path": "src/components/pain/BodyMap.tsx",
+      "bytes": 15682,
+      "sha256": "4dd0490ac32db1d64a76b7b2c5f7e8bda5157259319a000ac71705279d82f55b"
+    },
+    {
+      "path": "src/components/pain/BodyMap3D.tsx",
+      "bytes": 60283,
+      "sha256": "a9edce76926454c46fe94e54c880fadbc8d9a699ace5098d01d1767095d276e5"
+    },
+    {
+      "path": "src/components/pain/PainHeatmap.tsx",
+      "bytes": 6511,
+      "sha256": "14d98be62b91a659df27f39bd12ca8f4a9b1a978c90c288be61ce09f4070a450"
+    },
+    {
+      "path": "src/components/pain/PainLogger.tsx",
+      "bytes": 7060,
+      "sha256": "5936db0348c4144fb6192416dcbef8a34a2891025f568e37a79c890bf994ef79"
+    },
+    {
+      "path": "src/components/patient/AiExtractionModal.tsx",
+      "bytes": 14788,
+      "sha256": "334703a24355fddc19ecf9aed4e72103f439e18eee5396125e3cd2d324a64365"
+    },
+    {
+      "path": "src/components/patient/AppointmentCard.tsx",
+      "bytes": 4894,
+      "sha256": "10761fb538c08497304df963e4e78d8b73351df1cf983bffd4a39ef0c51b0f9d"
+    },
+    {
+      "path": "src/components/patient/AppointmentStatusBadge.tsx",
+      "bytes": 795,
+      "sha256": "a1f6b0c3a4f16855a74458cd4592564fd7dc7d28f862239ac7a2061e7b06e28c"
+    },
+    {
+      "path": "src/components/patient/EditFichaModal.tsx",
+      "bytes": 10213,
+      "sha256": "131d7eb531f6edbfb40b252b3655a499b48ca0dd6ee1833527194dc445b0239c"
+    },
+    {
+      "path": "src/components/patient/EmptyRxState.tsx",
+      "bytes": 920,
+      "sha256": "9dc127dd4efc7c5c4baf05f92f2ed927175603a7bdf2c7bd3adabea853fdd9a9"
+    },
+    {
+      "path": "src/components/patient/ExpiryAlerts.tsx",
+      "bytes": 2033,
+      "sha256": "2c518012a024071cb454d09caf8eac52636d36d6e1a861d556bcf3289842176f"
+    },
+    {
+      "path": "src/components/patient/FichaChatWidget.tsx",
+      "bytes": 9024,
+      "sha256": "e6e34c48cc60fe77493d40b4e13e003d032c93b78158cceb566576910813acc5"
+    },
+    {
+      "path": "src/components/patient/HealthTimelineView.tsx",
+      "bytes": 10053,
+      "sha256": "3b9e82838b76056b1338d60d207eaa9d88ef0397aaf628cbfa631d004955c0b5"
+    },
+    {
+      "path": "src/components/patient/LicenseCard.tsx",
+      "bytes": 5016,
+      "sha256": "eb8aad11275be2885b9805feef187e634d6f8964beb21b6bd49fa9a74da35129"
+    },
+    {
+      "path": "src/components/patient/LoadingList.tsx",
+      "bytes": 318,
+      "sha256": "947c5bfb52674f3e4cbad799f550e1eba3e5e08cccde1392668587a513beaadd"
+    },
+    {
+      "path": "src/components/patient/NotificationBell.tsx",
+      "bytes": 9533,
+      "sha256": "3d9b0a67614582f89ee4e5fed62be1e48114e61d2308008ea38dcb358279de61"
+    },
+    {
+      "path": "src/components/patient/PatientLicCard.tsx",
+      "bytes": 4337,
+      "sha256": "b3e182d9c0c3e9424dbe59d4e932bc358862e5ccc4722cd266ffd3965d4ed55c"
+    },
+    {
+      "path": "src/components/patient/PlainLanguageModal.tsx",
+      "bytes": 6219,
+      "sha256": "0416892de4e90203304f0d70b71a6dc04e6c31249f4a54b53bb0a34ab05fe25d"
+    },
+    {
+      "path": "src/components/patient/ProgressBar.tsx",
+      "bytes": 1218,
+      "sha256": "67ef8ab45c81a5e6d6775744923811d7d0287289b947a2d26d6a2d91527d9de9"
+    },
+    {
+      "path": "src/components/patient/QrCodeDisplay.tsx",
+      "bytes": 2340,
+      "sha256": "bc410a0ce730e91957ce9f7c82efd64d8b0d0bd24ea7b1c4aeea9c6fd9eef6ed"
+    },
+    {
+      "path": "src/components/patient/RequestAppointmentForm.tsx",
+      "bytes": 7794,
+      "sha256": "a5e0bc62cc0d78e71c64526510d931f72c93953cb72a15025ceaffecb541a419"
+    },
+    {
+      "path": "src/components/patient/RxCard.tsx",
+      "bytes": 25000,
+      "sha256": "204aadf48da960d4a1f8b09f278b755bfe0de98f999e456129e774be9deb5e88"
+    },
+    {
+      "path": "src/components/patient/RxPharmacyModal.tsx",
+      "bytes": 6768,
+      "sha256": "c3d95dd1d4759962a278ac345bdf7c5b95d620ba6619126c71e0fb47a4df99aa"
+    },
+    {
+      "path": "src/components/patient/SectionHeader.tsx",
+      "bytes": 414,
+      "sha256": "a2c974d80a11a4dabb9ab6994455b41bf84605af25f094f3c420ffe3656386c5"
+    },
+    {
+      "path": "src/components/patient/SelfUploadCard.tsx",
+      "bytes": 9489,
+      "sha256": "6cadd803ec900927f91205db4e943890a2c4f532db8738634902d8fcec2ff359"
+    },
+    {
+      "path": "src/components/patient/StatusBadge.tsx",
+      "bytes": 742,
+      "sha256": "17efc0fca031c718f1e6bfa103067b73c335efd5129881c70c9ba623fd439af4"
+    },
+    {
+      "path": "src/components/patient/Teleconsultas.tsx",
+      "bytes": 2552,
+      "sha256": "024ccdc41969d874a0491cb3ec9caf1c775173ba939b95baec16fdd07218a113"
+    },
+    {
+      "path": "src/components/patient/dates.ts",
+      "bytes": 637,
+      "sha256": "b7ac313674a375c866e96384b556551024ebce3490f2098fe169cf0d172885fa"
+    },
+    {
+      "path": "src/components/patient/shared.ts",
+      "bytes": 737,
+      "sha256": "1c4bd43f77286dce0e5501cc65b30d6d120462b6662736ff132c1384674978f4"
+    },
+    {
+      "path": "src/components/patient/tabs/AccesosTab.tsx",
+      "bytes": 12585,
+      "sha256": "e2408a49847e30535c4bb4b872a88aa9e42695d449357a7505e129d7b4f8d608"
+    },
+    {
+      "path": "src/components/patient/tabs/ConsultasTab.tsx",
+      "bytes": 5561,
+      "sha256": "2db0c7c376b9c69c045ac015b0deb137b151386b98ee7976bf6e5e3e7d797080"
+    },
+    {
+      "path": "src/components/patient/tabs/FichaTab.tsx",
+      "bytes": 19992,
+      "sha256": "d014237d527f7f7d58410aee70da1b6bbd7e6da1cfb0af1a29cb9e3909e7b67e"
+    },
+    {
+      "path": "src/components/patient/tabs/InicioTab.tsx",
+      "bytes": 7065,
+      "sha256": "c304aa3c20b55cefc54c08d998b548bf9441979f9decb020e1b57e8a5003ba10"
+    },
+    {
+      "path": "src/components/patient/tabs/LicenciasTab.tsx",
+      "bytes": 3698,
+      "sha256": "6cdd85bbc47e8aaf425443ccf8c3c21b4ae4db370a79f99de1cf29e52f31cd86"
+    },
+    {
+      "path": "src/components/patient/tabs/RecetasTab.tsx",
+      "bytes": 15158,
+      "sha256": "f04deccbc8806471b000f80805dd5031fd1843b8aafc2d78e6e854138c5a97b1"
+    },
+    {
+      "path": "src/components/patient/types.ts",
+      "bytes": 3726,
+      "sha256": "d81fdec73cfad54d3681a262a78129448313923958543368b88e3196830dc4d1"
+    },
+    {
+      "path": "src/components/portal/AccessScreen.tsx",
+      "bytes": 5538,
+      "sha256": "751144dfe6738426c02f17ecdcb59b3b41d2369fc8c2bd93ec1be3a2e766a3a9"
+    },
+    {
+      "path": "src/components/portal/LicenseCard.tsx",
+      "bytes": 9169,
+      "sha256": "41339f51b5ae4cdb07e0baca71e3d7a952ab27d556541f97e0e1da200735d11d"
+    },
+    {
+      "path": "src/components/portal/ShareModal.tsx",
+      "bytes": 6173,
+      "sha256": "9fc62131ef213cf979f85e948bc72697b1606cab4943a0c3452a03e8753a643d"
+    },
+    {
+      "path": "src/components/prescriptions/RxStatusBadge.tsx",
+      "bytes": 1529,
+      "sha256": "d908ff82bbb0c0236b6a68e9a84baabf2c9fdd9420749c84de9674194b85fa52"
+    },
+    {
+      "path": "src/components/private-portal/ClinicalEntryForm.tsx",
+      "bytes": 11650,
+      "sha256": "2578bda84c9cfdd46929cfbb351b8b3359c984655841c9639b3c8570f6de3db1"
+    },
+    {
+      "path": "src/components/private-portal/ClinicalHistory.tsx",
+      "bytes": 21766,
+      "sha256": "b4a03fbfe75ff7274b057cb2d8ff977375764c6fb63dd72a3d5fcdd1d822bbed"
+    },
+    {
+      "path": "src/components/private-portal/ClinicalPermissions.tsx",
+      "bytes": 8099,
+      "sha256": "1d74ecc3fbe94cf665fd6c098fff49227fb8f13a90d67709d62e586911324268"
+    },
+    {
+      "path": "src/components/private-portal/ConsultationDetail.tsx",
+      "bytes": 13880,
+      "sha256": "43098928d1e5e4bbccf950917df489688dc5cd1112a1581c6dcf5ae75701d1b6"
+    },
+    {
+      "path": "src/components/private-portal/Consultations.tsx",
+      "bytes": 10054,
+      "sha256": "dcacd6d130fa3ec30f7250d74e26e47677ea0c2b4215b852d934ce68a2784915"
+    },
+    {
+      "path": "src/components/private-portal/DocumentView.tsx",
+      "bytes": 6784,
+      "sha256": "047700b5572a77e77e2a965e121decc8eee309ecac3c2443db2fac1d04c4eb89"
+    },
+    {
+      "path": "src/components/private-portal/Home.tsx",
+      "bytes": 4213,
+      "sha256": "b2b2bbda125f55ba7688f6a9b16ccca302d3093c7d2a6d29f37db5a145f7ccf6"
+    },
+    {
+      "path": "src/components/private-portal/Operation.tsx",
+      "bytes": 8353,
+      "sha256": "0e6bf1ac7f27eb66995074e13419b27ec71da1a8cfd06d36fae046d637aa0a7c"
+    },
+    {
+      "path": "src/components/private-portal/PatientIcon.tsx",
+      "bytes": 840,
+      "sha256": "033052f593028b305c2deb9c0bf4c268c3ea51591570dfa577bc1ff462d6e89b"
+    },
+    {
+      "path": "src/components/private-portal/PrescriptionSheet.tsx",
+      "bytes": 5987,
+      "sha256": "8ef63049dbcd394ac0eac22ad200b437fc15c385e90d49eaf84eae2cd56a7538"
+    },
+    {
+      "path": "src/components/private-portal/PrescriptionVerification.tsx",
+      "bytes": 1774,
+      "sha256": "02f77194aac6e3a8572604589fa87b141ce0ba706c23380e8be95ca1ed18f990"
+    },
+    {
+      "path": "src/components/private-portal/Prescriptions.tsx",
+      "bytes": 6782,
+      "sha256": "ce9af4589764bf88ad50cf2944023aae045be43657a299365707e259245baa3b"
+    },
+    {
+      "path": "src/components/private-portal/WalletBoundary.tsx",
+      "bytes": 3772,
+      "sha256": "3acbed8f00985a8176f156555e652f8e39fe8b936f0c8932eff2e282d90935ac"
+    },
+    {
+      "path": "src/components/private-portal/access-client.ts",
+      "bytes": 1694,
+      "sha256": "54f350ff950f7a1ed2ae42a98132e4dc3c2ef72bb39a08ff72b23e18240cd0c7"
+    },
+    {
+      "path": "src/components/private-portal/access-probe.ts",
+      "bytes": 1967,
+      "sha256": "fafe81b9e9ec158cbb07efc0d25527815d9016de936eca03da5aa4042579e4b6"
+    },
+    {
+      "path": "src/components/private-portal/client.ts",
+      "bytes": 3092,
+      "sha256": "785b1ad2749ed87ecc6c5afb4c226b27a73a956df0f2ee5f7b183ba6399a7ac2"
+    },
+    {
+      "path": "src/components/private-portal/clinical-client.ts",
+      "bytes": 21292,
+      "sha256": "7c8e62237c303a4cf67acbf79ad3d2f4c3fac63dfc909649e0dc5b5aca5b05f0"
+    },
+    {
+      "path": "src/components/private-portal/clinical-permission-state.ts",
+      "bytes": 2811,
+      "sha256": "7ab9b271de886764594ca0b52f7ace0532b0a1ed64fd5ccdee38a9e843f28022"
+    },
+    {
+      "path": "src/components/private-portal/errors.ts",
+      "bytes": 5742,
+      "sha256": "7c600774a98eaa3db3be3d21907f3ba1a6b2bd7cfc03c5325024e49532b808f7"
+    },
+    {
+      "path": "src/components/private-portal/operation-recovery.ts",
+      "bytes": 2678,
+      "sha256": "83c7787fc8a05a2b676950812d9464c94bf6c75eeb4523c31349536ad609fa4e"
+    },
+    {
+      "path": "src/components/private-portal/patient-mobile.module.css",
+      "bytes": 5323,
+      "sha256": "8e5b4a3c8a94bae749c861a666ec481ac76b213dabca25d6bce95b01c44e9a8d"
+    },
+    {
+      "path": "src/components/private-portal/state.ts",
+      "bytes": 1733,
+      "sha256": "f31da77b3160330594c13efb898a3783b8d1122ebca25b5aec1563f545195787"
+    },
+    {
+      "path": "src/components/private-portal/types.ts",
+      "bytes": 2026,
+      "sha256": "f1b71a148299c4decb7247f08b8313abedc7960e86126a71608d7290edc12e93"
+    },
+    {
+      "path": "src/components/private-portal/wallet-bootstrap.ts",
+      "bytes": 2002,
+      "sha256": "7d0217a836d39d727c4d7480b1478fe620b30926857cf8e6a9e3cee669b5df7d"
+    },
+    {
+      "path": "src/components/ui/Badge.tsx",
+      "bytes": 767,
+      "sha256": "fdbb594606224ae3bfbff7b3d29a000f8f70e4de722c274ae0a2056a875dc4b3"
+    },
+    {
+      "path": "src/components/ui/Button.tsx",
+      "bytes": 1605,
+      "sha256": "2205e7b8e1a4bdd349c5650e5d5bf55bcfab9de81d61ce7cb777b02ebaa523be"
+    },
+    {
+      "path": "src/components/ui/Card.tsx",
+      "bytes": 675,
+      "sha256": "b7bb5c218c6e2249bfbfd09965262aedbfe219bb055440f62d0b140c36b7cab5"
+    },
+    {
+      "path": "src/components/ui/DemoNoticeBanner.tsx",
+      "bytes": 2256,
+      "sha256": "129f3023ea393bd28f467fc336b1a2dc01492028330af376417fcca419130ad2"
+    },
+    {
+      "path": "src/components/ui/Reveal.tsx",
+      "bytes": 629,
+      "sha256": "6fea8de2ad615faa4ca2c155bfc3bb8daa390a14f4e4d3f64bfb33bd459bcd2e"
+    },
+    {
+      "path": "src/hooks/useLanguage.ts",
+      "bytes": 2786,
+      "sha256": "ad2c7595a962ea512b36747f7e42266d6d31db652cb6721a12b3264a65327a31"
+    },
+    {
+      "path": "src/hooks/usePrivyEmail.ts",
+      "bytes": 485,
+      "sha256": "d46206fdf15682db69ef898dd437185c0661b8ea769e97eee7c1c1884c461829"
+    },
+    {
+      "path": "src/hooks/useTrackUser.ts",
+      "bytes": 1753,
+      "sha256": "c30de63cb8b60bbf323215cf32889f58b3fdbe71051ba30b0c0f2cc064bb2e34"
+    },
+    {
+      "path": "src/lib/access-log.ts",
+      "bytes": 1932,
+      "sha256": "64fe6a1d7528fd0124ac238cb8aad4888d494b46218339d7d913bf560bb1c352"
+    },
+    {
+      "path": "src/lib/ai/claude-client.ts",
+      "bytes": 2304,
+      "sha256": "38962af139dce2a2a835703177a92f7ebf98e88977145ac101f6a61997e5b1d3"
+    },
+    {
+      "path": "src/lib/ai/document-extractor.ts",
+      "bytes": 10243,
+      "sha256": "72f19fa763fb9c7d02d61f9f036661b23f1bd350916c182b9e7452a5ee3cd438"
+    },
+    {
+      "path": "src/lib/ai/health-alerts.ts",
+      "bytes": 6720,
+      "sha256": "93930201c306280f8c47b1fb0da49b8af9e4bf00d30b2736ca4acf761ba15822"
+    },
+    {
+      "path": "src/lib/ai/patient-explainer.ts",
+      "bytes": 7535,
+      "sha256": "7a112c2e22d3a3aa82edfa70bdf7616a7ede8f6a29bb8ea043162b9580f28b7d"
+    },
+    {
+      "path": "src/lib/ai/record-rag.ts",
+      "bytes": 7786,
+      "sha256": "6b8a579b1c068e80cf494c2e00d8f82d35477cf5812a8f5adb1cdc5d9c1398c5"
+    },
+    {
+      "path": "src/lib/api/errors.ts",
+      "bytes": 1029,
+      "sha256": "8a807e19d5d1b0a0f8588679fbaf39191cb6478732eb70d433bf3dd6d7ef29eb"
+    },
+    {
+      "path": "src/lib/auth/access-error.ts",
+      "bytes": 1467,
+      "sha256": "3a80fc3d5fd835013831389cf02c93f45e140c040530cd51dc4d474fe3ee8ac8"
+    },
+    {
+      "path": "src/lib/auth/admin.ts",
+      "bytes": 3073,
+      "sha256": "af3f654bf99f9468c3120f270999ee4f2a63ff11c94e90ae9a800141091bcb89"
+    },
+    {
+      "path": "src/lib/auth/api-key.ts",
+      "bytes": 4855,
+      "sha256": "702b461b97be025e8734cb01d215573f00c81fa3e3aad7141bb5e87d83ca9221"
+    },
+    {
+      "path": "src/lib/auth/authed-fetch.ts",
+      "bytes": 1283,
+      "sha256": "0de02fbfa4e170d7c6b946fce877441d8ff93023844ba9f879b4bbd202e8216a"
+    },
+    {
+      "path": "src/lib/auth/login-route.ts",
+      "bytes": 454,
+      "sha256": "f08fcb9ff4d27d6cc79b98e3a7002a49e3cd47f0da68b652ebbe468fae50914e"
+    },
+    {
+      "path": "src/lib/auth/privy-auth.ts",
+      "bytes": 9454,
+      "sha256": "7cc8386d467fa266b73b582bc4bae133318e627ea80521f9592d16dfb8913b7f"
+    },
+    {
+      "path": "src/lib/auth/privy-email.ts",
+      "bytes": 1524,
+      "sha256": "d008ae42545a275dbbace0e10de144e676aca0dd8a27666c8875c39a99d2f9ff"
+    },
+    {
+      "path": "src/lib/auth/rate-limit.ts",
+      "bytes": 3181,
+      "sha256": "ada7a1cc76950cf5185d036bd8cc4fff7e4274fc46e288ef9a3111c8655ec981"
+    },
+    {
+      "path": "src/lib/auth/same-origin.ts",
+      "bytes": 397,
+      "sha256": "b54a8246888edd9fe89b7b7b3fc28ab7c883b563c4124ff7036a095ce7f86d05"
+    },
+    {
+      "path": "src/lib/auth/treating.ts",
+      "bytes": 2660,
+      "sha256": "6aab24592f8f6fe873fb815ef843bff5dfde7a6c8c2e706fbbff380190cfe074"
+    },
+    {
+      "path": "src/lib/clinical/api.ts",
+      "bytes": 2399,
+      "sha256": "c8ec07fc2ea4e0cbc45ddf34838697d3f6bf392f428a144a41b78b5cc28f7d3d"
+    },
+    {
+      "path": "src/lib/clinical/chain.ts",
+      "bytes": 24090,
+      "sha256": "8087b83f864473ba9455deb9ddba95c0e1c3dbe54b4ac3f2cd5678a0c642f867"
+    },
+    {
+      "path": "src/lib/clinical/config.ts",
+      "bytes": 809,
+      "sha256": "95bf6f64968806f5639c126502483b88d83d1a092c2d406ac89dfae8cbf11a26"
+    },
+    {
+      "path": "src/lib/clinical/create-once.ts",
+      "bytes": 7247,
+      "sha256": "a29a1df43d040a98b024c54050ad1f3263f515c75b71a0873d653a87177b0429"
+    },
+    {
+      "path": "src/lib/clinical/history.ts",
+      "bytes": 11564,
+      "sha256": "4c1c9ea64a28729974d7a73a589703c65d1b0ce0f4552f324c5b5fc2a3f0d09a"
+    },
+    {
+      "path": "src/lib/clinical/identity.ts",
+      "bytes": 1385,
+      "sha256": "9d59886eb7951bf821ccf4abc8e85fd5a113cab6106a831d8500f7eb38ea9680"
+    },
+    {
+      "path": "src/lib/clinical/input.ts",
+      "bytes": 4155,
+      "sha256": "c1b81e227fcc5bc449aefa2476233310128b82799c036d71f684e95840bd8c4e"
+    },
+    {
+      "path": "src/lib/clinical/keys.ts",
+      "bytes": 1401,
+      "sha256": "c555770182c918c0a770a404134418a1ed43230d4fa47579e4f27bfc6e614b53"
+    },
+    {
+      "path": "src/lib/clinical/operations.ts",
+      "bytes": 19959,
+      "sha256": "6ff1ca1a7eb4bfcdae1e350df03e42f56a65179883649976f7c02bc3304b346e"
+    },
+    {
+      "path": "src/lib/clinical/store.ts",
+      "bytes": 21080,
+      "sha256": "a4246f8ce50a6cd7e28e603cdc6d0d3772df7272c13c849081c192886f948d1f"
+    },
+    {
+      "path": "src/lib/consultations/store.ts",
+      "bytes": 2549,
+      "sha256": "c594c66d7e820fbd47b154837d26ab790caf61b0931624c19e1ea84385984564"
+    },
+    {
+      "path": "src/lib/crypto/at-rest.ts",
+      "bytes": 4287,
+      "sha256": "303b00f97bea0c6817f179136a8c390d81358a2bce86f436ae24910439c41318"
+    },
+    {
+      "path": "src/lib/database-config.ts",
+      "bytes": 338,
+      "sha256": "488482bc858baa9c31ab6a7fa1e8785a3776ac808a0e6e43b33aff2ac8532d74"
+    },
+    {
+      "path": "src/lib/db.ts",
+      "bytes": 5268,
+      "sha256": "7ee3b0ecc4df637f5e527be2e3b4e1d0ef56c1eaad1e320f202b7440029b7bca"
+    },
+    {
+      "path": "src/lib/decreto41.ts",
+      "bytes": 7316,
+      "sha256": "f55b0c1ef45b6e2b376731ad600b7696213ebbb202b8bb4c963fac33b386e985"
+    },
+    {
+      "path": "src/lib/dias-habiles.ts",
+      "bytes": 1802,
+      "sha256": "77a05846d2908ad1f9c52d849275ff77ba17e8501326a370c05276741140e1e2"
+    },
+    {
+      "path": "src/lib/doctor-access.ts",
+      "bytes": 591,
+      "sha256": "7e40e611d21c0e7a7c361d0ef5921cda9c1df547c6e15381c8f5bab23b8b597c"
+    },
+    {
+      "path": "src/lib/doctor-authorizations.ts",
+      "bytes": 14102,
+      "sha256": "9c30d00ed5401ae53af1794974715c21064284dde148a2f820220e694d92e20b"
+    },
+    {
+      "path": "src/lib/doctor-onboarding.ts",
+      "bytes": 22174,
+      "sha256": "96ad67a4eb995ff250b923bd1638e486832c391df3cf2bc026c89bfd9a551c2e"
+    },
+    {
+      "path": "src/lib/fhir/documents.ts",
+      "bytes": 10362,
+      "sha256": "b5433a551e3040cfd2fca6e3626e4a92b8d38d9012c2362ab93478d4c74b2af6"
+    },
+    {
+      "path": "src/lib/fhir/index.ts",
+      "bytes": 6537,
+      "sha256": "4c81407f8df350933157ba4fad0f78f08863b974ecad08c83987f2198e9873a7"
+    },
+    {
+      "path": "src/lib/google/auth.ts",
+      "bytes": 2334,
+      "sha256": "a1d6bb4750ecc8669f447c88bcea3d9c6c7c6204439325215d7d2a60d3915721"
+    },
+    {
+      "path": "src/lib/google/meet.ts",
+      "bytes": 1657,
+      "sha256": "9ee52cf1292642de2cbf5ca03ad12e0d3bcbaad7b15ddf1e2f544228beb82033"
+    },
+    {
+      "path": "src/lib/i18n-pt.ts",
+      "bytes": 7006,
+      "sha256": "0457666a8664ad0b39ab2f222ad70358619361e2112c5e14424e0615d6299709"
+    },
+    {
+      "path": "src/lib/i18n.ts",
+      "bytes": 24223,
+      "sha256": "18a862125147ea060124db19d22538fc98bd4fde8f2913f5b094e460d803d032"
+    },
+    {
+      "path": "src/lib/identity/anchor-contract.ts",
+      "bytes": 4564,
+      "sha256": "e26ea17b9a0466959166c1904a59bc6725459f529c125c4e68da9d4814719889"
+    },
+    {
+      "path": "src/lib/identity/anchor.ts",
+      "bytes": 10293,
+      "sha256": "f09b9a9e4e513fd08e19a2542c247788459c39a31d795f74deb83448e820a211"
+    },
+    {
+      "path": "src/lib/identity/center-grants.ts",
+      "bytes": 13547,
+      "sha256": "86acebad025dffe33712cd649a80c12cc5731cd35148200194a65d879f36f714"
+    },
+    {
+      "path": "src/lib/identity/patient-records.ts",
+      "bytes": 6177,
+      "sha256": "e423e814334368250fd2ae269040167d74dfcffb64a2b447b5056322306220a8"
+    },
+    {
+      "path": "src/lib/identity/rut.ts",
+      "bytes": 3081,
+      "sha256": "5655a53a9e557083847be90867643ecad12854278f02b01abba52d071681ef12"
+    },
+    {
+      "path": "src/lib/metrics.ts",
+      "bytes": 558,
+      "sha256": "dc572a3c0f114e77c658b6057ddb5c30d2765db8bb86dc1150773ec4154b7912"
+    },
+    {
+      "path": "src/lib/passkey/index.ts",
+      "bytes": 4426,
+      "sha256": "90fc18aaabc3f3e8462cfa2ffceb29bbb1aaeb44be4f3d270016547a309eb283"
+    },
+    {
+      "path": "src/lib/pharmacy/unlock.ts",
+      "bytes": 1539,
+      "sha256": "1863b64eb53c28acebcf64a8755481504dfe70d811bc31321353f229db0784ab"
+    },
+    {
+      "path": "src/lib/prescription-booking.ts",
+      "bytes": 17067,
+      "sha256": "a0d0bb4a8850dc087084310bcdb3addf82d127b22db54bd9a975642c82e8063c"
+    },
+    {
+      "path": "src/lib/prescription-issuance.ts",
+      "bytes": 1367,
+      "sha256": "88d60790d2fb0ec4932a83807deb01e1e33719444dd12f6a2be1a5cb2ef67383"
+    },
+    {
+      "path": "src/lib/private-api.ts",
+      "bytes": 1726,
+      "sha256": "3043eea1274cc0ec96b5d3251b4fda315dfd145bd30c607ee4c622609833351b"
+    },
+    {
+      "path": "src/lib/private-config.ts",
+      "bytes": 3529,
+      "sha256": "b6ed733efca91a5a8a268b921a98ff96794a845c447c230aaa032e609b4c136f"
+    },
+    {
+      "path": "src/lib/private-operations.ts",
+      "bytes": 16804,
+      "sha256": "e47061785e09d13751dcbceb225f5514c6da1517d94f065174f80acb1b6b20b0"
+    },
+    {
+      "path": "src/lib/private-prescriptions.ts",
+      "bytes": 15174,
+      "sha256": "73e056ef83f2ea44d79f6a50fd5c21b5657484c33b9ba877e56a3735b5bacbe2"
+    },
+    {
+      "path": "src/lib/private-routes.ts",
+      "bytes": 1614,
+      "sha256": "14d990be4635e1f5bbd7c3f4019d4b0a4c4bc7897c0d8ee57afe46d02d54f99b"
+    },
+    {
+      "path": "src/lib/privy/index.ts",
+      "bytes": 1037,
+      "sha256": "cd2a9d3d57762cef43a4d3cb1c8370da64983dd0d395d44f2d9d0aad111ffe76"
+    },
+    {
+      "path": "src/lib/reviewed-doctor-authorization.ts",
+      "bytes": 2577,
+      "sha256": "1850810ed37ad1d0067aeff5ef1cb1b7359e3b76fb49422283bb591cd4310ca0"
+    },
+    {
+      "path": "src/lib/share/token.ts",
+      "bytes": 2537,
+      "sha256": "0eb3aaa535ac4dd61320268bab916cec6aefdebba86eb7c8192bcb4cdc2fc3db"
+    },
+    {
+      "path": "src/lib/share/url.ts",
+      "bytes": 2341,
+      "sha256": "ff39e6f2230488e31e67fde8a9fd431a200df1313cdc17d531cc6f9a6ddfdeb8"
+    },
+    {
+      "path": "src/lib/stellar-wallet-binding.ts",
+      "bytes": 3783,
+      "sha256": "b342351fa4a129e362b2a002a45e463286a8a3872fb07d84e6614dbe9e5af1e5"
+    },
+    {
+      "path": "src/lib/stellar/client.ts",
+      "bytes": 12290,
+      "sha256": "df1980afd4baf8106d1758796a419ff8368128e6ccaa6b2f34ad483c0cb5ed70"
+    },
+    {
+      "path": "src/lib/stellar/config.ts",
+      "bytes": 3338,
+      "sha256": "c2ed09f156541b453bd5fcfe56fcc33b3710465e117cdf75524fc1202e887843"
+    },
+    {
+      "path": "src/lib/stellar/documents.ts",
+      "bytes": 7975,
+      "sha256": "83828b0a5683a3b0ef215f484a0787105f83f5ab27066a1c1c1571ae8de03e71"
+    },
+    {
+      "path": "src/lib/stellar/expiry.ts",
+      "bytes": 3202,
+      "sha256": "f40335db711715fc2935b944257166d7fad0ebfe73d9b09664deb2cb59d7f98b"
+    },
+    {
+      "path": "src/lib/stellar/index.ts",
+      "bytes": 617,
+      "sha256": "94fb814677fee8decd63787d432bac8d890d54bcccb4a1baf701b1a3fda8528b"
+    },
+    {
+      "path": "src/lib/stellar/pharmacy.ts",
+      "bytes": 5317,
+      "sha256": "0a0af94d5a1468e11ece0d41e0a366dad191a8583b702090f6878f4a13a5db7d"
+    },
+    {
+      "path": "src/lib/stellar/private-chain.ts",
+      "bytes": 8266,
+      "sha256": "18ff45927807a64e717c3a4e7616ee93a01c7c512f4caae33e4873e880863ed4"
+    },
+    {
+      "path": "src/lib/stellar/privy-owner-signing.ts",
+      "bytes": 4676,
+      "sha256": "c397c8b1ec0c94864b830ef1de7b14d51645b9c3e30bb707f45e754ba914c09a"
+    },
+    {
+      "path": "src/lib/stellar/privy-wallet-binding.ts",
+      "bytes": 3176,
+      "sha256": "b5f16b77fdddcfa6db9268ec8d43a92f77d4e60990716763e4aa1163a7622d69"
+    },
+    {
+      "path": "src/lib/stellar/serialize.ts",
+      "bytes": 2342,
+      "sha256": "5c93370debe1ed206eab60700a097e8bbd29e1e8fa34ea6d5176c2b3ecfe29db"
+    },
+    {
+      "path": "src/lib/stellar/server.ts",
+      "bytes": 12417,
+      "sha256": "a179dd0fdc3e19ec4a3b13357a67cc192fd4fb89ced5fa8a1d15d84f0c2887c1"
+    },
+    {
+      "path": "src/lib/stellar/status.ts",
+      "bytes": 1202,
+      "sha256": "8a525b4ebe00d88e37375f7bbcf073d07943040a1c6c2b43538686889f0740df"
+    },
+    {
+      "path": "src/lib/user-role.ts",
+      "bytes": 561,
+      "sha256": "6c4bcbff362e779222495263e1210ddd4092f46e41dd432cd783f1eeb4871c80"
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "bytes": 186,
+      "sha256": "0def125315984d08d5197b5b5167761170d96e0e7b951ba6f9412762385881bc"
+    },
+    {
+      "path": "src/lib/waitlist-copy.ts",
+      "bytes": 2904,
+      "sha256": "98a8aa0db8b989ece335332ed50686c5f24c29c6f88f47cbcee6113dd702c34d"
+    },
+    {
+      "path": "src/lib/waitlist.ts",
+      "bytes": 1259,
+      "sha256": "4de397b681ec5af5baf5f3c69f4e05a45373446a40fd4aca2548b1cc07744777"
+    },
+    {
+      "path": "src/providers/PrivyProvider.tsx",
+      "bytes": 553,
+      "sha256": "9d71b29b16beabc5a4f5d58644e55360cd9129dd1eecab10cf5b62e39fe8cdcd"
+    },
+    {
+      "path": "src/proxy.ts",
+      "bytes": 568,
+      "sha256": "d6f017d59f5a2cfa414fca37f64f79ce19e7780ecf6f2e46fc071357d23369ca"
+    },
+    {
+      "path": "src/types/clinical.ts",
+      "bytes": 2497,
+      "sha256": "d04d7adb9c345543a4d9cea25d9491bb46f537d734cf8bd90703a6a8aa804287"
+    },
+    {
+      "path": "src/types/health.ts",
+      "bytes": 4196,
+      "sha256": "7c5dd8a2327927467660ed3650ed975e33bf9cca44ad4b855dc3a7197dabdb3b"
+    },
+    {
+      "path": "src/types/index.ts",
+      "bytes": 13355,
+      "sha256": "5aa35ff8661d23972d20faf163ddfc303e7bc7011ad65fd680fa8e4a432c9aed"
+    },
+    {
+      "path": "src/types/qrcode.d.ts",
+      "bytes": 917,
+      "sha256": "8a708b0da241a94316c47a93a700ff44f322c1346c01c5e4b0f58218dfc18b2a"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 738,
+      "sha256": "3ecd562dc210036d0b6ee1ebbff2ccaf89e24d49145b6e679378201b0593d8bf"
+    },
+    {
+      "path": "vitest.config.ts",
+      "bytes": 467,
+      "sha256": "b4313bfca7d3e0ce34f45ae8129cb56aac7fe9c3e47634591938b054983cc203"
+    }
+  ]
+}

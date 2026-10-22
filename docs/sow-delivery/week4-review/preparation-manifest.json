@@ -1,0 +1,31 @@
+{
+  "scope": "Preparation and audit documentation; not final video delivery",
+  "version": "6e8dfb450f0a4451544ea01c87e368d84814ff8e",
+  "generatedAt": "2026-09-23T04:47:09.4954132Z",
+  "files": [
+    {
+      "path": "docs/sow-delivery/week4-review/README.md",
+      "sha256": "9793138e8b4f40bad16c6a421abae1c6618329a9e105c25dcb729f1b837781e5"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/WAITLIST.md",
+      "sha256": "893ba63bdb12ff3cc2e854077b33ed8c568248bec5d59ef19229f12b9ccc7c3b"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/PRE-RECORDING.md",
+      "sha256": "c1e7233cd2f38e232bf5578897bee26d3ea070bdfa063554e648a952d6606edb"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/ADDITIONAL-QA.md",
+      "sha256": "fa6cdffac9850176eac915df0595b7c99e9bb31c74438843aab88836426e7d10"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/INTENSIVE-AUDIT.md",
+      "sha256": "cc6880564446bb302cdb4b0331475df731cf290466f37e1915f42d41329f9b30"
+    },
+    {
+      "path": "docs/sow-delivery/week4/BUGS.md",
+      "sha256": "a2bc7f8b75f41a47fecb8ad1a2e167db480d8f4fd2ec90a989a8fa73208e21a5"
+    }
+  ]
+}

@@ -1,13 +1,17 @@
 # SOW 2 · Semana 2 · Grabación local
 
+> Nota de copia pública · 22-10-2026: Las referencias a evidencias nuevas o propuestas excluidas conservan la procedencia histórica; esos archivos no están incluidos en esta copia y sus comprobaciones no se repitieron.
+
 Recorrido de revisión de ejecuciones ya realizadas con datos sintéticos. No repetir las ocho operaciones del 11 de octubre ni presentar una consulta de recibos como una firma nueva en vivo. Código comprobado: `f98f0e7`; build `w84CZMnfdwQQlIQaThwRX`. La PR #143 continúa en borrador y no está publicada en main.
+
+**Lectura recuperada el 19 de octubre:** una restauración de mantenimiento autorizada recuperó 18 entradas archivadas del historial web; se comprobaron cuatro entradas, cinco versiones y sus recibos. Es una operación adicional separada de las ocho originales y la nota del 15 de octubre. Ver [informe de recuperación](../evidence/sow2-week2-read-recovery-2026-10-19/INFORME.md). Esperar a que aparezca la fecha de contenido comprobado antes de empezar a grabar; la consulta puede tardar.
 
 ## Antes de grabar
 
 - Abrir [el historial local](http://127.0.0.1:3016/patient?tab=historial). Comprobar que termina la carga y muestra fecha de consulta reciente; un informe guardado no prueba disponibilidad actual.
 - Mantener escrituras apagadas. No mostrar códigos Privy, secretos, conexiones ni cuentas ajenas. Ocultar el correo del encabezado al editar el video.
 - El médico de prueba tiene su autorización vencida y ambos permisos retirados. Mostrar ese estado como tal; conceder permisos otra vez exigiría preparación y operaciones adicionales, fuera de esta grabación de lectura.
-- Comprobar el [informe y límites actuales](../evidence/sow2-week2-gateway-2026-10-15/INFORME.md). Los registros de semana 1 y sus recibos se conservan por separado.
+- Comprobar el [informe y límites actuales](../evidence/sow2-week2-read-recovery-2026-10-19/INFORME.md). Los registros de semana 1 y sus recibos se conservan por separado.
 
 ## Recorrido sugerido
 
