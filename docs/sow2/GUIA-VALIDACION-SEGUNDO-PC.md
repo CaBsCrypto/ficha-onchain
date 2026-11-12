@@ -6,9 +6,11 @@ La prueba usa las dos cuentas sintéticas existentes, la ficha ya creada y Stell
 
 Instala Git, PowerShell 7, Node.js 22, Python 3 y FFmpeg para Windows con `gdigrab`, `ffprobe` y codificación H.264. La atestación requiere Stellar CLI y el alias de firma ya autorizado. Usa dos perfiles separados de Brave, Chrome o Edge para paciente y médico.
 
-En el Windows de origen, el mismo usuario que preparó el paquete exporta la clave con `node .\export-transfer-key.cjs <ruta-privada-para-la-clave>`. Transfiere ese archivo por separado del paquete cifrado y sus utilidades de recuperación.
+Si vas a retomar en el PC que exportó el entorno original, usa `TRUSTLEAF-SEMANA3-DELTA-PC-ORIGINAL.aes256gcm.json`. El paquete trae la configuración específica de la demo, los manifiestos y las tomas. Reutiliza la configuración Testnet, el keyring y el firmante que ya tienes en ese PC. Para recuperar un entorno que ya no esté disponible, usa el paquete completo `TRUSTLEAF-SEMANA3-SEGUNDO-PC.aes256gcm.json`.
 
-En el Windows de destino, abre PowerShell 7 en el directorio del paquete. Coteja el inventario SHA-256, verifica el cifrado y extrae a un directorio nuevo dentro de tu perfil.
+En el Windows que preparó esta entrega, el mismo usuario abre la carpeta del paquete elegido y exporta su clave con `node .\export-transfer-key.cjs <ruta-privada-para-la-clave>`. Lleva la clave por separado. Copia el archivo cifrado, `SHA256SUMS.txt`, `restore-private-transfer.cjs` y `private-transfer-core.cjs` al PC donde vas a validar.
+
+En el PC donde vas a validar, abre PowerShell 7 en el directorio del paquete. Coteja el inventario SHA-256, verifica el cifrado y extrae a un directorio nuevo dentro de tu perfil.
 
 ```powershell
 $privateRoot = Join-Path $env:LOCALAPPDATA 'TrustLeaf/SOW2-S3'
@@ -22,7 +24,8 @@ foreach ($line in $sums) {
         throw "No coincide el SHA-256 de $($Matches.name)"
     }
 }
-$archive = (Resolve-Path -LiteralPath '.\TRUSTLEAF-SEMANA3-SEGUNDO-PC.aes256gcm.json').Path
+$archiveName = Read-Host 'Nombre del archivo cifrado recibido'
+$archive = (Resolve-Path -LiteralPath $archiveName).Path
 $keyFile = Read-Host 'Ruta al archivo de clave recibido por separado'
 node .\restore-private-transfer.cjs $archive $keyFile --verify-only
 if ($LASTEXITCODE -ne 0) { throw 'La verificación del paquete falló' }
@@ -30,7 +33,9 @@ node .\restore-private-transfer.cjs $archive $keyFile --extract $privateRoot
 if ($LASTEXITCODE -ne 0) { throw 'La extracción del paquete falló' }
 ```
 
-Comprueba el inventario SHA-256 de `RECOVERY-MANIFEST.private.json` después de la extracción. Ajusta únicamente las rutas de máquina de `config/operational.env.local`, incluida `STELLAR_CONFIG_DIR`, para que apunten a la configuración extraída. Coteja la dirección pública del alias de autoridad con el alcance antes de usarlo. Conserva la configuración, los keyrings, los manifiestos y los recibos dentro de tu perfil. `evidence/digital-cabs-pdf-scope.private.json` debe conservar el nombre y los bytes originales.
+Comprueba el inventario SHA-256 de `RECOVERY-MANIFEST.private.json` después de la extracción. Con el paquete de retorno, copia tu archivo privado de configuración Testnet a `config/operational.env.local` dentro de `$privateRoot`. Incorpora las siete variables de `config/semana3-demo.env.fragment` en esa copia y reemplaza cualquier valor anterior de esas mismas variables. Deja una sola definición por nombre y apunta `STELLAR_CONFIG_DIR` a la ruta absoluta de la configuración Stellar que ya usas. Con el paquete completo, ajusta las rutas de máquina del `config/operational.env.local` extraído al equipo actual.
+
+Coteja la dirección pública del alias de autoridad con el alcance antes de usarlo. Conserva la configuración, los keyrings, los manifiestos y los recibos dentro de tu perfil. `evidence/digital-cabs-pdf-scope.private.json` debe conservar el nombre y los bytes originales.
 
 Clona la rama y coteja el SHA con el que figura en la entrega. Si la rama avanzó, selecciona el commit entregado antes de registrar la prueba.
 
