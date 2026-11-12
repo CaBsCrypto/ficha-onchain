@@ -1,0 +1,20 @@
+{
+  "status": "prepared_not_executed",
+  "purpose": "Synthetic medical attachment for an authorized future week 3 rehearsal; no clinical use.",
+  "file": "aporte-medico-sintetico-v1.pdf",
+  "mediaType": "application/pdf",
+  "bytes": 964,
+  "pages": 1,
+  "sha256": "ff33beb1f5c938fc0b3d264b2b21ab02e3bb3e0e4447a1dacdeb30172bf1c93c",
+  "source": "scripts/lib/clinical-fixtures.mjs:syntheticClinicalPdf(1)",
+  "synthetic": true,
+  "containsRealPersonalData": false,
+  "executedOnChain": false,
+  "transactionHash": null,
+  "validation": {
+    "pdfinfoPages": 1,
+    "pdfinfoJavaScript": false,
+    "pdfinfoEncrypted": false,
+    "renderInspected": true
+  }
+}

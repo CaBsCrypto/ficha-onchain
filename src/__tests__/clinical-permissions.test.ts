@@ -98,3 +98,26 @@ describe('clinical permission accessible presentation', () => {
     expect(html).toContain('No elimina copias');
   });
 });
+
+
+describe('permission rehearsal limit errors', () => {
+  it.each([
+    ['clinical_rehearsal_fee_exceeded', 'La comisión supera el límite'],
+    ['clinical_rehearsal_budget_exceeded', 'El presupuesto restante'],
+    ['clinical_rehearsal_budget_unavailable', 'No pudimos comprobar los recibos'],
+  ])('uses the closed code for %s even when the message is translated or contains provider data', (code, expected) => {
+    const failure = Object.assign(new Error('RPC PRIVATE_DATA secret@example.test'), { code });
+    const message = clinicalPermissionError(failure);
+    expect(message).toContain(expected); expect(message).not.toContain('PRIVATE_DATA');
+    expect(message).not.toContain('secret@example.test'); expect(message).not.toContain('inténtalo de nuevo');
+    expect(clinicalPermissionError(new Error(code))).toBe(message);
+  });
+  it('never forwards unknown codes, objects, or throwing error properties', () => {
+    const hostile = new Error('PRIVATE_DATA'); Object.defineProperty(hostile, 'code', { get() { throw Error('RPC_PRIVATE_DATA'); } });
+    for (const failure of [Object.assign(new Error('PRIVATE_DATA'), { code: '__proto__' }),
+      Object.assign(new Error('PRIVATE_DATA'), { code: 'RPC_PRIVATE_DATA' }),
+      { code: 'clinical_rehearsal_budget_exceeded', message: 'PRIVATE_DATA' }, hostile]) {
+      expect(clinicalPermissionError(failure)).not.toContain('PRIVATE_DATA');
+    }
+  });
+});

@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { syntheticPdf } from '../../scripts/fixtures/clinical-files.mjs';
 import { createHash } from 'node:crypto';
 import { Account, Address, FeeBumpTransaction, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { CLINICAL_CONTRACT, CLINICAL_WASM } from '@/lib/clinical/chain';
@@ -20,6 +21,7 @@ vi.mock('@stellar/stellar-sdk', async original => {
   return { ...actual, rpc: { ...actual.rpc, Server: class { constructor() { return adapters.rpc; } } } };
 });
 import { POST as prepare } from '@/app/api/private-clinical-operations/route';
+import { CLINICAL_PREPARE_CAPABILITY_HEADER, CLINICAL_PREPARE_CAPABILITY_VERSION } from '@/lib/clinical/client-contract';
 import { POST as sign } from '@/app/api/private-clinical-operations/[id]/sign/route';
 import { POST as retry } from '@/app/api/private-clinical-operations/[id]/retry/route';
 import { GET as inspect } from '@/app/api/private-clinical-operations/[id]/route';
@@ -34,7 +36,10 @@ const patient = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 71));
 const doctor = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 72));
 const other = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 73));
 const payer = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 74));
-const people = [patient, doctor, other].map((key, i) => ({ key, id: `did:privy:flow_${i}`, email: `flow-${i}@example.test`, walletId: `local-wallet-${i}`, token: `local-token-${i}` }));
+const secondDoctor = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 75));
+const expiredDoctor = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 76));
+// P1, D1, P2, D2 and D3 are isolated synthetic identities, never real account aliases.
+const people = [patient, doctor, other, secondDoctor, expiredDoctor].map((key, i) => ({ key, id: `did:privy:flow_${i}`, email: `flow-${i}@example.test`, walletId: `local-wallet-${i}`, token: `local-token-${i}` }));
 const clone = <T>(value: T): T => structuredClone(value);
 const hex = (value: Uint8Array) => Buffer.from(value).toString('hex');
 const bytes = (value: string) => Buffer.from(value, 'hex');
@@ -66,7 +71,7 @@ function fixture() {
       if (!saved) db.bindings.push({ app_id: values[0], user_id: values[1], wallet_id: values[2], address: values[3] });
       return { rows: [{ wallet_id: values[2], address: values[3] }] };
     }
-    if (q.includes('FROM doctors')) return { rows: values.length && values[0] !== 7 ? [] : [{ id: 7, name: 'Local synthetic doctor', email: people[1].email, status: 'active' }] };
+    if (q.includes('FROM doctors')) {const doctors=[1,3,4].map((index,i)=>({id:7+i,name:'Local synthetic doctor '+i,email:people[index].email,status:'active'}));return {rows:values.length?doctors.filter(d=>d.id===values[0]||d.email===values[0]):doctors};}
     if (q.includes('FROM clinical_web_histories')) {
       return { rows: clone(db.histories.filter(h => q.includes('history_id=$1') ? h.history_id === values[0] : h.owner_user_id === values[0] && h.contract_id === values[1])) };
     }
@@ -140,14 +145,21 @@ function fixture() {
       digest = createHash('sha256').update(xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('create'), new Address(CLINICAL_CONTRACT).toScVal(), ...args]).toXDR()).digest();
     } else {
       const input = scValToNative(args[0]), h = hex(input.history_id), known = chain.histories.get(h);
-      expect(known.patient).toBe(source); opId = hex(input.operation_id);
+      opId = hex(input.operation_id);
       digest = createHash('sha256').update(xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(method === 'append_version' ? 'append' : 'grant'), new Address(CLINICAL_CONTRACT).toScVal(), args[0]]).toXDR()).digest();
       if (method === 'append_version') {
         const e = hex(input.entry_id), prior = chain.heads.get(`${h}:${e}`);
+        if (source !== known.patient) {
+          expect(source).toBe(doctor.publicKey());
+          const grant = chain.grants.get(`${h}:${source}`);
+          expect(grant?.can_append).toBe(true); expect(Number(grant.revision)).toBe(Number(input.expected_grant_revision));
+        }
+        if (prior) expect(prior.author).toBe(source);
         expect(prior?.head_version ?? 0).toBe(input.expected_version); expect(input.author).toBe(source);
         result = { author: source, commitment: input.commitment, previous_commitment: prior ? chain.versions.get(versionKey(h, e, prior.head_version)).commitment : null, version: input.expected_version + 1, created_at: BigInt(++counts.ledger) }; kind = 'Version';
         chain.versions.set(versionKey(h, e, result.version), result); chain.heads.set(`${h}:${e}`, { author: source, head_version: result.version });
       } else if (method === 'set_permissions') {
+        expect(known.patient).toBe(source);
         const g = chain.grants.get(`${h}:${input.doctor}`); expect(Number(g?.revision ?? 0)).toBe(Number(input.expected_revision));
         result = { can_read: input.can_read, can_append: input.can_append, revision: BigInt(Number(input.expected_revision) + 1) }; kind = 'Permissions';
         chain.grants.set(`${h}:${input.doctor}`, result); counts.ledger++;
@@ -171,7 +183,7 @@ function fixture() {
       if (method === 'interface_version') value = 1;
       else if (method === 'get_registry') value = REGISTRY_PRIVATE;
       else if (method === 'get_admin') value = PRIVATE_ADMIN;
-      else if (method === 'is_authorized') value = args[0] === doctor.publicKey();
+      else if (method === 'is_authorized') value = [doctor.publicKey(), secondDoctor.publicKey()].includes(args[0]);
       else if (method === 'get_history_for_patient') value = [...chain.histories.values()].find(history => history.patient === args[0]);
       else if (method === 'get_history') value = chain.histories.get(h);
       else if (method === 'get_entry') value = chain.heads.get(`${h}:${hex(args[1])}`);
@@ -200,37 +212,47 @@ function fixture() {
 
 it('chains the actual clinical web services across creation, file/version reads, corrections, independent grants and isolated sessions', async () => {
   const f = fixture(); let requestNo = 0;
-  const request = (path: string, method = 'GET', body?: unknown, person = people[0]) => new Request(`http://localhost${path}`, { method, headers: { Authorization: `Bearer ${person.token}`, Host: 'localhost', Origin: 'http://localhost', 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const request = (path: string, method = 'GET', body?: unknown, person = people[0]) => new Request(`http://localhost${path}`, { method, headers: { Authorization: `Bearer ${person.token}`, Host: 'localhost', Origin: 'http://localhost', 'Content-Type': 'application/json', ...(path === '/api/private-clinical-operations' && method === 'POST' ? { [CLINICAL_PREPARE_CAPABILITY_HEADER]: CLINICAL_PREPARE_CAPABILITY_VERSION } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   const context = (id: string) => ({ params: Promise.resolve({ id }) });
   async function json<T>(response: Response): Promise<T> { const body = await response.json(); expect(body, 'actual route response').not.toHaveProperty('error'); expect(response.status).toBe(200); expect(response.headers.get('Cache-Control')).toBe('no-store'); return body; }
   const snapshot = async (person = people[0]) => json<ClinicalSnapshot>(await history(request('/api/private-clinical-history', 'GET', undefined, person)));
-  async function perform(input: Omit<ClinicalPrepareRequest, 'requestId'>, loseReply = false) {
+  async function perform(input: Omit<ClinicalPrepareRequest, 'requestId'>, loseReply = false, person = people[0]) {
     const requestId = `0e336456-9c8c-4360-b797-${(++requestNo).toString().padStart(12, '0')}`, payload = { ...input, requestId };
-    const prepared = await json<{ operation: ClinicalOperation }>(await prepare(request('/api/private-clinical-operations', 'POST', payload)));
-    const duplicate = await json<{ operation: ClinicalOperation }>(await prepare(request('/api/private-clinical-operations', 'POST', payload)));
+    const prepared = await json<{ operation: ClinicalOperation }>(await prepare(request('/api/private-clinical-operations', 'POST', payload, person)));
+    const duplicate = await json<{ operation: ClinicalOperation }>(await prepare(request('/api/private-clinical-operations', 'POST', payload, person)));
     expect(duplicate).toEqual(prepared); expect(prepared.operation.state).toBe('awaiting_signature');
     expect(f.db.operations.filter(o => o.id === requestId)).toHaveLength(1);
     f.flags.loseSendReply = loseReply;
     f.counts.signatures++;
-    const signed = await json<{ operation: ClinicalOperation }>(await sign(request(`/api/private-clinical-operations/${requestId}/sign`, 'POST', { confirmed: true, signature: '0x' + patient.sign(Buffer.from(prepared.operation.signing!.hash, 'hex')).toString('hex') }), context(requestId)));
+    const signed = await json<{ operation: ClinicalOperation }>(await sign(request(`/api/private-clinical-operations/${requestId}/sign`, 'POST', { confirmed: true, signature: '0x' + person.key.sign(Buffer.from(prepared.operation.signing!.hash, 'hex')).toString('hex') }, person), context(requestId)));
     expect(signed.operation.state).toBe('submitted'); const before = clone(f.db.operations.find(o => o.id === requestId));
     if (loseReply) {
       f.flags.receiptVisible = false; const signatureCount = f.counts.signatures, sendCount = f.counts.sends;
-      const pending = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`), context(requestId)));
+      const pending = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`, 'GET', undefined, person), context(requestId)));
       expect(pending.operation).toEqual(signed.operation); expect(f.counts.sends).toBe(sendCount);
-      const replayed = await json<{ operation: ClinicalOperation }>(await retry(request(`/api/private-clinical-operations/${requestId}/retry`, 'POST', { confirmed: true }), context(requestId)));
+      const replayed = await json<{ operation: ClinicalOperation }>(await retry(request(`/api/private-clinical-operations/${requestId}/retry`, 'POST', { confirmed: true }, person), context(requestId)));
       expect(replayed.operation).toEqual(signed.operation); expect(f.counts.signatures).toBe(signatureCount); expect(f.counts.sends).toBe(sendCount + 1);
       expect(f.db.operations.find(o => o.id === requestId).signed_xdr).toBe(before.signed_xdr); f.flags.receiptVisible = true;
     }
-    const confirmed = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`), context(requestId)));
+    const confirmed = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`, 'GET', undefined, person), context(requestId)));
     expect(confirmed.operation.state).toBe('confirmed'); expect(confirmed.operation.transactionHash).toBe(signed.operation.transactionHash);
-    const again = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`), context(requestId)));
+    const again = await json<{ operation: ClinicalOperation }>(await inspect(request(`/api/private-clinical-operations/${requestId}`, 'GET', undefined, person), context(requestId)));
     expect(again).toEqual(confirmed); return f.db.operations.find(o => o.id === requestId);
   }
   expect((await snapshot()).history).toBeNull();
   await perform({ action: 'create_history' });
   const created = await snapshot(); expect(created.history?.patient).toBe(patient.publicKey()); expect(created.entries).toEqual([]);
-  const pdf = (version: number) => Buffer.from(`%PDF-1.7\nSYNTHETIC FILE VERSION ${version}\n%%EOF\n`);
+  const pdf = (version: number) => syntheticPdf('SYNTHETIC FILE VERSION ' + version);
+  for (const invalid of [
+    { fileName: 'broken.pdf', mediaType: 'application/pdf', base64: Buffer.from('%PDF-1.7\nNO OBJECTS\n%%EOF\n').toString('base64') },
+    { fileName: 'broken.jpg', mediaType: 'image/jpeg', base64: Buffer.from('ffd8ffe000044a46ffd9','hex').toString('base64') },
+    { fileName: 'wrong.png', mediaType: 'application/pdf', base64: pdf(1).toString('base64') },
+  ]) {
+    const before = JSON.stringify(f.db), signs = f.counts.signatures, sends = f.counts.sends;
+    const denied = await prepare(request('/api/private-clinical-operations','POST',{requestId:'0e336456-9c8c-4360-b797-000000000097',action:'append_version',file:invalid}));
+    expect(denied.status).toBe(400); expect(await denied.json()).toEqual({error:'clinical_file_invalid'});
+    expect(JSON.stringify(f.db)).toBe(before); expect(f.counts.signatures).toBe(signs); expect(f.counts.sends).toBe(sends);
+  }
   const first = await perform({ action: 'append_version', file: { fileName: 'synthetic.pdf', mediaType: 'application/pdf', base64: pdf(1).toString('base64') } }, true);
   const entryId = first.expected.entryId;
   async function download(version: number) { const response = await document(request(`/api/private-clinical-history/document?entryId=${entryId}&version=${version}`)); expect(response.status).toBe(200); expect(response.headers.get('Content-Type')).toBe('application/pdf'); expect(response.headers.get('Cache-Control')).toBe('no-store'); return Buffer.from(await response.arrayBuffer()); }
@@ -244,7 +266,7 @@ it('chains the actual clinical web services across creation, file/version reads,
   expect(versions[0].transactionHash).not.toBe(versions[1].transactionHash);
   const reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_CONTRACT, registryId: REGISTRY_PRIVATE, wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN });
   const store = clinicalNeonStore(adapters.client);
-  // Technical reader only: the doctor's future week-3 web route is not claimed.
+  // Keep the low-level reader and exercise the actual week-3 HTTP handlers too.
   const physicianRead = () => readClinicalVersion({ credential: people[1].token, historyId: created.history!.id, entryId, version: 1 }, {
     deployment: reader.deployment,
     authenticate: async (credential: string) => ({ ...(await adapters.privy.verifyAuthToken(credential)), sessionId: 'local-doctor-session' }),
@@ -258,18 +280,66 @@ it('chains the actual clinical web services across creation, file/version reads,
   await perform({ action: 'set_permissions', doctorId: 7, canRead: true, canAppend: false, expectedRevision: 0 });
   expect((await snapshot()).grants[0]).toMatchObject({ doctorId: 7, canRead: true, canAppend: false, revision: 1 });
   expect(Buffer.from((await physicianRead()).content)).toEqual(pdf(1));
-  await perform({ action: 'set_permissions', doctorId: 7, canRead: false, canAppend: false, expectedRevision: 1 });
-  expect((await snapshot()).grants[0]).toMatchObject({ canRead: false, canAppend: false, revision: 2 });
+  const selectedPath = `/api/private-clinical-history?historyId=${created.history!.id}`;
+  const doctorSnapshot = async () => json<ClinicalSnapshot>(await history(request(selectedPath, 'GET', undefined, people[1])));
+  const doctorReadOnly = await doctorSnapshot();
+  expect(doctorReadOnly.context).toMatchObject({ role: 'doctor', canRead: true, canAppend: false, grantRevision: 1 });
+  expect(doctorReadOnly.entries.every(e => e.source === 'patient' && !e.canCorrect)).toBe(true);
+  const doctorDenied = await prepare(request('/api/private-clinical-operations', 'POST', { requestId: '0e336456-9c8c-4360-b797-000000000099', action: 'append_version', historyId: created.history!.id, note: { title: 'DENIED', text: 'read only', eventDate: null } }, people[1]));
+  expect(doctorDenied.status).toBe(403);
+  await perform({ action: 'set_permissions', doctorId: 7, canRead: true, canAppend: true, expectedRevision: 1 });
+  const doctorNote = await perform({ action: 'append_version', historyId: created.history!.id,
+    note: { title: 'PHYSICIAN NOTE', text: 'SYNTHETIC PHYSICIAN CONTRIBUTION', eventDate: null } }, true, people[1]);
+  const doctorCorrected = await perform({ action: 'append_version', historyId: created.history!.id,
+    entryId: doctorNote.expected.entryId, expectedVersion: 1,
+    note: { title: 'PHYSICIAN CORRECTION', text: 'SYNTHETIC PHYSICIAN CORRECTION', eventDate: null } }, false, people[1]);
+  const medicalView = await doctorSnapshot();
+  expect(medicalView.entries.filter(e => e.entryId === doctorNote.expected.entryId).map(e => [e.source,e.version,e.canCorrect])).toEqual([['doctor',2,true],['doctor',1,false]]);
+  const forbiddenCorrection = await prepare(request('/api/private-clinical-operations', 'POST', { requestId: '0e336456-9c8c-4360-b797-000000000098', action: 'append_version', historyId: created.history!.id, entryId, expectedVersion: 2,
+    note: { title: 'DENIED', text: 'foreign correction', eventDate: null } }, people[1]));
+  expect(forbiddenCorrection.status).toBe(409);
+  // D2 is authorised with an isolated grant, but may not correct D1. D3 retains a stale grant but is not authorised.
+  for (const person of [people[3],people[4]]) f.chain.grants.set(created.history!.id+':'+person.key.publicKey(),{can_read:true,can_append:true,revision:1n});
+  const d2view=await json<ClinicalSnapshot>(await history(request(selectedPath,'GET',undefined,people[3])));
+  expect(d2view.entries.filter(e=>e.entryId===doctorNote.expected.entryId).every(e=>!e.canCorrect)).toBe(true);
+  for(const person of [people[2],people[3],people[4]]){
+    const before={operations:f.db.operations.length,versions:f.db.versions.length,signatures:f.counts.signatures,sends:f.counts.sends};
+    const denied=await prepare(request('/api/private-clinical-operations','POST',{requestId:'0e336456-9c8c-4360-b797-000000000096',action:'append_version',historyId:created.history!.id,entryId:doctorNote.expected.entryId,expectedVersion:2,note:{title:'DENIED',text:'FOREIGN AUTHOR CORRECTION',eventDate:null}},person));
+    expect(denied.status).toBe(person===people[3]?409:404);
+    expect({operations:f.db.operations.length,versions:f.db.versions.length,signatures:f.counts.signatures,sends:f.counts.sends}).toEqual(before);
+    const privateOperation=await inspect(request('/api/private-clinical-operations/'+doctorNote.id,'GET',undefined,person),context(doctorNote.id));
+    expect(privateOperation.status).toBe(404);expect(await privateOperation.text()).not.toContain('SYNTHETIC PHYSICIAN');
+  }
+  for(const person of [people[2],people[4]]){
+    const denied=await history(request(selectedPath,'GET',undefined,person));expect(denied.status).toBe(404);expect(await denied.text()).not.toContain('PHYSICIAN');
+  }
+  for (const person of [people[3],people[4]]) f.chain.grants.delete(created.history!.id+':'+person.key.publicKey());
+  const patientView = await snapshot();
+  expect(patientView.entries.find(e => e.transactionHash === doctorCorrected.transaction_hash)).toMatchObject({ source: 'doctor', author: doctor.publicKey(), version: 2, canCorrect: false });
+  await perform({ action: 'set_permissions', doctorId: 7, canRead: false, canAppend: true, expectedRevision: 2 });
+  const appendOnly = await doctorSnapshot();
+  expect(appendOnly.context).toMatchObject({ canRead: false, canAppend: true, grantRevision: 3 });
+  expect(appendOnly.entries).toEqual([]);
+  const blockedFile = await document(request(`/api/private-clinical-history/document?historyId=${created.history!.id}&entryId=${entryId}&version=1`, 'GET', undefined, people[1]));
+  expect(blockedFile.status).toBe(404); expect(await blockedFile.text()).not.toContain('SYNTHETIC FILE');
+  await perform({ action: 'append_version', historyId: created.history!.id,
+    file: { fileName: 'physician.pdf', mediaType: 'application/pdf', base64: pdf(3).toString('base64') } }, false, people[1]);
+  await perform({ action: 'set_permissions', doctorId: 7, canRead: false, canAppend: false, expectedRevision: 3 });
+  expect((await snapshot()).grants[0]).toMatchObject({ canRead: false, canAppend: false, revision: 4 });
+  const revokedSnapshot = await history(request(selectedPath, 'GET', undefined, people[1]));
+  expect(revokedSnapshot.status).toBe(404); expect(await revokedSnapshot.text()).not.toContain('PHYSICIAN');
   await expect(physicianRead()).rejects.toThrow('clinical_version_unavailable');
   expect(await download(1)).toEqual(pdf(1));
   const foreign = await snapshot(people[2]); expect(foreign).toMatchObject({ history: null, entries: [], grants: [], operations: [] });
   const foreignRead = await document(request(`/api/private-clinical-history/document?entryId=${entryId}&version=1`, 'GET', undefined, people[2]));
   expect(foreignRead.status).toBe(404); expect(await foreignRead.text()).not.toContain('SYNTHETIC FILE');
-  expect((await snapshot()).entries).toEqual(corrected.entries); // Fresh route requests preserve the confirmed history.
-  expect(f.db.operations).toHaveLength(6); expect(f.db.operations.every(o => o.state === 'confirmed')).toBe(true);
-  expect(f.counts.signatures).toBe(6); expect(f.counts.sends).toBe(7); expect(f.chain.receipts.size).toBe(6);
-  expect(f.db.versions).toHaveLength(3); expect(f.db.versions.every(v => v.state === 'confirmed')).toBe(true);
+  expect((await snapshot()).entries.filter(e => e.source === 'patient')).toEqual(corrected.entries); // Fresh route requests preserve the confirmed history.
+  expect(f.db.operations).toHaveLength(11); expect(f.db.operations.every(o => o.state === 'confirmed')).toBe(true);
+  expect(f.counts.signatures).toBe(11); expect(f.counts.sends).toBe(13); expect(f.chain.receipts.size).toBe(11);
+  expect(f.db.versions).toHaveLength(6); expect(f.db.versions.every(v => v.state === 'confirmed')).toBe(true);
   const persisted = JSON.stringify(f.db);
-  for (const privateText of ['PRIVATE SYNTHETIC NOTE', 'LOCAL NOTE TITLE', 'SYNTHETIC FILE VERSION', 'synthetic-correction.pdf']) expect(persisted).not.toContain(privateText);
+  for (const privateText of ['PRIVATE SYNTHETIC NOTE', 'LOCAL NOTE TITLE', 'SYNTHETIC FILE VERSION', 'synthetic-correction.pdf', 'SYNTHETIC PHYSICIAN', 'PHYSICIAN NOTE', 'PHYSICIAN CORRECTION', 'physician.pdf']) expect(persisted).not.toContain(privateText);
   expect(f.counts.releases).toBeGreaterThan(0);
-});
+}, 15_000);
+
+vi.mock('@/lib/clinical/sponsorship', () => ({ assertClinicalSponsorshipConfigured: vi.fn(), reserveClinicalSponsorship: vi.fn(), assertClinicalSponsorshipSign: vi.fn(), bindClinicalSponsorshipSubmission: vi.fn(), cancelClinicalSponsorship: vi.fn(), reconcileClinicalSponsorship: vi.fn() }));

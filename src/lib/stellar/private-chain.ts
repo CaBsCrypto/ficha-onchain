@@ -1,5 +1,8 @@
 import { Account, Address, BASE_FEE, Contract, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { PRIVATE_ADMIN, RX_PRIVATE, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private-config';
+import { clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
+import { assertUnintegratedSponsorship } from '../../../scripts/lib/sponsorship-write-gate.mjs';
+import { assertPrivateRxScopeOpen, type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
 
 export type PrivateAction = 'consent' | 'withdraw_consent' | 'mint' | 'activate' | 'revoke';
 export interface ExpectedOperation {
@@ -43,11 +46,15 @@ export function createPrivateChain(server=new rpc.Server('https://soroban-testne
     const tx=new TransactionBuilder(account,{fee:BASE_FEE,networkPassphrase:Networks.TESTNET})
       .addOperation(new Contract(RX_PRIVATE).call(method,...args)).setTimeout(60).build();
     const sim=await server.simulateTransaction(tx);
+    // A successful Protocol 23+ simulation may still read archived entries.
+    // Report unavailable until explicitly restored; reads never restore/sign.
+    if('restorePreamble' in sim)throw new PrivateFlowError('private_chain_unavailable',503);
     if(rpc.Api.isSimulationError(sim)) {
       if(missing && /^\s*(?:HostError:\s*)?Error\(Contract,\s*#3\)(?:\s|$)/.test(sim.error))return null;
       throw new PrivateFlowError('private_chain_unavailable',503);
     }
-    if(!rpc.Api.isSimulationSuccess(sim)||!sim.result)throw new PrivateFlowError('private_chain_unavailable',503);
+    if(!rpc.Api.isSimulationSuccess(sim)||!sim.result||!clinicalSimulationIsLive(sim)||
+      !Array.isArray(sim.result.auth)||sim.result.auth.length)throw new PrivateFlowError('private_chain_unavailable',503);
     return scValToNative(sim.result.retval);
   }
   return {
@@ -84,7 +91,30 @@ export function createPrivateChain(server=new rpc.Server('https://soroban-testne
       if(!Number.isSafeInteger(until)||until<=0)throw new PrivateFlowError('consent_unavailable',503);
       return until;
     },
-    async prepare(source:string,action:PrivateAction,expected:ExpectedOperation) {
+    async prepare(source:string,action:PrivateAction,expected:ExpectedOperation,scope?:PrivateRxIssuanceScope) {
+      if (scope) {
+        if ((action !== 'consent' && action !== 'mint') || source !== scope[action === 'consent' ? 'patient' : 'doctor'].address ||
+          expected.patient !== scope.patient.address || expected.doctor !== scope.doctor.address || expected.issuanceId !== scope.issuanceId ||
+          expected.validUntil !== scope.bookingValidUntil) throw new PrivateFlowError('private_rx_scope_rejected',403);
+        assertPrivateRxScopeOpen(scope, action);
+        const account = await server.getAccount(source);
+        const now = Math.floor(Date.now() / 1000), maxTime = Math.min(now + 300, scope.until, scope.bookingValidUntil);
+        if (maxTime <= now) throw new PrivateFlowError('private_rx_scope_expired');
+        const raw = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
+          .addOperation(privateInvocation(action,expected)).setTimebounds(0,maxTime).build();
+        const simulation = await server.simulateTransaction(raw);
+        if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !clinicalSimulationIsLive(simulation)) {
+          throw new PrivateFlowError('private_chain_unavailable',503);
+        }
+        const tx = rpc.assembleTransaction(raw, simulation).build();
+        if (!(tx instanceof Transaction) || tx.sequence !== raw.sequence || Number(tx.timeBounds?.maxTime) !== maxTime) {
+          throw new PrivateFlowError('prepared_operation_invalid');
+        }
+        assertPrivateRxScopeOpen(scope, action);
+        assertUnsignedOperation(tx,source,action,expected);
+        return tx;
+      }
+      assertUnintegratedSponsorship();
       let account;
       try { account=await server.getAccount(source); }
       catch(error) {
@@ -100,6 +130,7 @@ export function createPrivateChain(server=new rpc.Server('https://soroban-testne
       return tx;
     },
     async submit(envelope:string) {
+      assertUnintegratedSponsorship();
       const sent=await server.sendTransaction(TransactionBuilder.fromXDR(envelope,Networks.TESTNET));
       return sent.status;
     },
@@ -107,6 +138,7 @@ export function createPrivateChain(server=new rpc.Server('https://soroban-testne
   };
 }
 export function sponsorOwnerSignature(unsignedXdr:string,source:string,signature:string,action:PrivateAction,expected:ExpectedOperation) {
+  assertUnintegratedSponsorship();
   const tx=TransactionBuilder.fromXDR(unsignedXdr,Networks.TESTNET);
   if(!(tx instanceof Transaction))throw new PrivateFlowError('prepared_operation_invalid');
   assertUnsignedOperation(tx,source,action,expected);

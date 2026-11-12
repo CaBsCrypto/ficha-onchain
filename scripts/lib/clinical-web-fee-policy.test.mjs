@@ -63,13 +63,36 @@ test('RPC budget reads the selected payer and reserve from the same ledger; miss
     const server={
       getLedgerEntries:async key=>({latestLedger:100,entries:scenario==='missing-account'?[]:[{key,
         val:xdr.LedgerEntryData.account(selectedAccount)}]}),
-      getLedgers:async request=>{
-        headerReads++; assert.deepEqual(request,{startLedger:100,pagination:{limit:1}});
-        return {ledgers:scenario==='missing-header'?[]:[{sequence:100,headerXdr:{header:()=>({ledgerSeq:()=>scenario==='wrong-ledger'?99:100,baseReserve:()=>5000000})}}]};
+      _getLedgers:async request=>{
+        headerReads++; assert.deepEqual(request,{startLedger:100,pagination:{limit:1},xdrFormat:'json'});
+        return {ledgers:scenario==='missing-header'?[]:[{sequence:100,hash:'a'.repeat(64),headerJson:{hash:'a'.repeat(64),header:{ledger_seq:scenario==='wrong-ledger'?99:100,base_reserve:5000000}}}]};
       },
     };
     if (scenario==='valid') await assert.doesNotReject(()=>checkClinicalWebRelayerBudget(server,actor));
     else await assert.rejects(()=>checkClinicalWebRelayerBudget(server,actor), /rehearsal_relayer_unfunded/);
     assert.equal(headerReads,['missing-account','wrong-account'].includes(scenario)?0:1);
+  }
+});
+
+
+test('JSON reserve header avoids SDK14 decoding of newer SCP values; every binding still fails closed', async () => {
+  for(const scenario of ['valid','missing-header','wrong-ledger','wrong-inner-ledger','wrong-hash','invalid-hash','missing-reserve','non-integer-reserve','zero-reserve','insufficient','raw-error']) {
+    let rawReads=0,decodedReads=0;
+    const ledger={hash:'a'.repeat(64),sequence:100,headerJson:{hash:'a'.repeat(64),header:{ledger_version:30,ledger_seq:100,base_reserve:5000000,scp_value:{ext:{signed_ms:{}}}}}};
+    if(scenario==='wrong-ledger')ledger.sequence=99;
+    if(scenario==='wrong-inner-ledger')ledger.headerJson.header.ledger_seq=99;
+    if(scenario==='wrong-hash')ledger.headerJson.hash='b'.repeat(64);
+    if(scenario==='invalid-hash')ledger.hash=ledger.headerJson.hash='not-a-hash';
+    if(scenario==='missing-reserve')delete ledger.headerJson.header.base_reserve;
+    if(scenario==='non-integer-reserve')ledger.headerJson.header.base_reserve='5000000';
+    if(scenario==='zero-reserve')ledger.headerJson.header.base_reserve=0;
+    const server={
+      getLedgerEntries:async key=>({latestLedger:100,entries:[{key,val:xdr.LedgerEntryData.account(account(scenario==='insufficient'?'4009999999':'4010000000'))}]}),
+      getLedgers:async()=>{decodedReads++;throw Error('XDR Read Error: unknown StellarValueType member for value 3');},
+      _getLedgers:async request=>{rawReads++;assert.deepEqual(request,{startLedger:100,pagination:{limit:1},xdrFormat:'json'});if(scenario==='raw-error')throw Error('rpc_unavailable');return {ledgers:scenario==='missing-header'?[]:[ledger]};},
+    };
+    if(scenario==='valid')await assert.doesNotReject(()=>checkClinicalWebRelayerBudget(server,actor));
+    else await assert.rejects(()=>checkClinicalWebRelayerBudget(server,actor),/rehearsal_relayer_unfunded/);
+    assert.equal(decodedReads,0);assert.equal(rawReads,1);
   }
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePortalLanguage } from '@/hooks/useLanguage';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { FormField, inputCls, selectCls } from './Modal';
@@ -13,9 +14,10 @@ interface AvailabilityBlock {
   slot_minutes: number;
 }
 
-const WEEKDAYS = [
-  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado',
-] as const;
+const WEEKDAYS = {
+  es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+} as const;
 
 // Monday-first display order (weekdays 1..6, then 0)
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -32,6 +34,9 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 // ── DisponibilidadTab ─────────────────────────────────────────────────────────
 export function DisponibilidadTab() {
+  const language = usePortalLanguage();
+  const english = language === 'en';
+  const weekdays = WEEKDAYS[language];
   const doctorEmail = usePrivyEmail() ?? '';
   const [dateGuide, setDateGuide] = useState<Record<number, string>>({});
 
@@ -42,21 +47,21 @@ export function DisponibilidadTab() {
       }).formatToParts(new Date());
       const part = (name: string) => Number(parts.find(p => p.type === name)?.value);
       const today = new Date(Date.UTC(part('year'), part('month') - 1, part('day')));
-      const format = new Intl.DateTimeFormat('es-CL', {
+      const format = new Intl.DateTimeFormat(english ? 'en-US' : 'es-CL', {
         timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric',
       });
       setDateGuide(Object.fromEntries(DISPLAY_ORDER.map(weekday => {
         const offset = (weekday - today.getUTCDay() + 7) % 7;
         const date = new Date(today);
         date.setUTCDate(date.getUTCDate() + offset);
-        return [weekday, `${format.format(date)}${offset === 0 ? ' · hoy' : ''}`];
+        return [weekday, `${format.format(date)}${offset === 0 ? (english ? ' · today' : ' · hoy') : ''}`];
       })));
     }
     refreshDates();
     const timer = window.setInterval(refreshDates, 60_000);
     window.addEventListener('focus', refreshDates);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshDates); };
-  }, []);
+  }, [english]);
 
   // Availability state
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
@@ -93,13 +98,13 @@ export function DisponibilidadTab() {
           slot_minutes: b.slot_minutes,
         })));
       } else {
-        setGridError(aData.error ?? 'No se pudo cargar la disponibilidad');
+        setGridError(english ? 'Could not load availability.' : aData.error ?? 'No se pudo cargar la disponibilidad');
       }
     } catch {
-      setGridError('Error de conexión — revisa tu red');
+      setGridError(english ? 'Connection error. Check your network.' : 'Error de conexión — revisa tu red');
     }
     setLoading(false);
-  }, [doctorEmail]);
+  }, [doctorEmail, english]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -109,7 +114,7 @@ export function DisponibilidadTab() {
     setGridSaved(false);
     setDraftError('');
     if (draftEnd <= draftStart) {
-      setDraftError('La hora de término debe ser posterior a la de inicio');
+      setDraftError(english ? 'The end time must be after the start time.' : 'La hora de término debe ser posterior a la de inicio');
       return;
     }
     // Reject a block that overlaps an existing one on the same day, so the
@@ -123,7 +128,7 @@ export function DisponibilidadTab() {
         b.start_time < draftEnd,
     );
     if (clash) {
-      setDraftError(`Ese horario se cruza con un bloque que ya tienes el ${WEEKDAYS[draftWeekday]}`);
+      setDraftError(english ? `This time overlaps another block on ${weekdays[draftWeekday]}.` : `Ese horario se cruza con un bloque que ya tienes el ${weekdays[draftWeekday]}`);
       return;
     }
     setBlocks((prev) => [
@@ -140,7 +145,7 @@ export function DisponibilidadTab() {
 
   async function handleSaveGrid() {
     if (!dirty || savingGrid || loading) return;
-    if (!blocks.length && !window.confirm("Quitar toda la disponibilidad. Las citas existentes se conservarán. ¿Continuar?")) return;
+    if (!blocks.length && !window.confirm(english ? "Remove all availability? Existing appointments will be kept." : "Quitar toda la disponibilidad. Las citas existentes se conservarán. ¿Continuar?")) return;
     setSavingGrid(true);
     setGridError('');
     setGridSaved(false);
@@ -152,7 +157,7 @@ export function DisponibilidadTab() {
       });
       const data = await res.json() as { data?: AvailabilityBlock[]; error?: string };
       if (!res.ok) {
-        setGridError(data.error ?? 'No se pudo guardar la disponibilidad');
+        setGridError(english ? 'Could not save availability.' : data.error ?? 'No se pudo guardar la disponibilidad');
         setSavingGrid(false);
         return;
       }
@@ -165,7 +170,7 @@ export function DisponibilidadTab() {
       setSavedBlocks(data.data ?? []);
       setGridSaved(true);
     } catch {
-      setGridError('Error de conexión — revisa tu red');
+      setGridError(english ? 'Connection error. Check your network.' : 'Error de conexión — revisa tu red');
     }
     setSavingGrid(false);
   }
@@ -183,9 +188,9 @@ export function DisponibilidadTab() {
   if (!doctorEmail) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-800">Disponibilidad</h2>
+        <h2 className="text-lg font-semibold text-slate-800">{english ? "Availability" : "Disponibilidad"}</h2>
         <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200">
-          Inicia sesión para configurar tu perfil y horarios.
+          {english ? "Sign in to configure your profile and hours." : "Inicia sesión para configurar tu perfil y horarios."}
         </div>
       </div>
     );
@@ -195,9 +200,9 @@ export function DisponibilidadTab() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">Disponibilidad</h2>
+        <h2 className="text-lg font-semibold text-slate-800">{english ? "Availability" : "Disponibilidad"}</h2>
         <p className="break-all text-xs text-slate-500">{doctorEmail}</p>
-        <p className="mt-2 text-sm text-slate-600">Todas las horas corresponden a Chile continental (America/Santiago), incluidos sus cambios de horario.</p>
+        <p className="mt-2 text-sm text-slate-600">{english ? "All times use mainland Chile time (America/Santiago), including daylight saving changes." : "Todas las horas corresponden a Chile continental (America/Santiago), incluidos sus cambios de horario."}</p>
       </div>
 
       {loading ? (
@@ -209,27 +214,27 @@ export function DisponibilidadTab() {
           {/* ── Availability card ── */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Disponibilidad semanal
+              {english ? "Weekly availability" : "Disponibilidad semanal"}
             </p>
             <p className="mb-4 text-xs text-slate-400">
-              Los horarios se repiten cada semana. La fecha junto a cada día indica su próxima ocurrencia, incluido hoy, como guía; no limita el bloque a esa fecha.
+              {english ? "Time blocks repeat every week. The date beside each weekday shows its next occurrence, including today." : "Los horarios se repiten cada semana. La fecha junto a cada día indica su próxima ocurrencia, incluido hoy, como guía; no limita el bloque a esa fecha."}
             </p>
 
             {/* Add block row */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <FormField label="Día">
+                <FormField label={english ? "Day" : "Día"}>
                   <select
                     value={draftWeekday}
                     onChange={(e) => { setDraftWeekday(Number(e.target.value)); setDraftError(''); }}
                     className={selectCls}
                   >
                     {DISPLAY_ORDER.map((wd) => (
-                      <option key={wd} value={wd}>{WEEKDAYS[wd]}{dateGuide[wd] ? ` · ${dateGuide[wd]}` : ''}</option>
+                      <option key={wd} value={wd}>{weekdays[wd]}{dateGuide[wd] ? ` · ${dateGuide[wd]}` : ''}</option>
                     ))}
                   </select>
                 </FormField>
-                <FormField label="Inicio">
+                <FormField label={english ? "Start" : "Inicio"}>
                   <input
                     type="time"
                     value={draftStart}
@@ -237,7 +242,7 @@ export function DisponibilidadTab() {
                     className={inputCls}
                   />
                 </FormField>
-                <FormField label="Término">
+                <FormField label={english ? "End" : "Término"}>
                   <input
                     type="time"
                     value={draftEnd}
@@ -245,7 +250,7 @@ export function DisponibilidadTab() {
                     className={inputCls}
                   />
                 </FormField>
-                <FormField label="Duración por cita (min)">
+                <FormField label={english ? "Appointment length (min)" : "Duración por cita (min)"}>
                   <select
                     value={draftSlot}
                     onChange={(e) => setDraftSlot(Number(e.target.value))}
@@ -266,8 +271,7 @@ export function DisponibilidadTab() {
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
                     <path d="M12 5v14M5 12h14" />
                   </svg>
-                  Agregar bloque
-                </button>
+                  {english ? "Add time block\n" : "Agregar bloque\n"}                </button>
               </div>
             </div>
 
@@ -275,13 +279,13 @@ export function DisponibilidadTab() {
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {grouped.length === 0 ? (
                 <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400 sm:col-span-2 lg:col-span-3">
-                  Completa el horario y pulsa Agregar bloque.
+                  {english ? "Set the time and select Add time block." : "Completa el horario y pulsa Agregar bloque."}
                 </p>
               ) : (
                 grouped.map((g) => (
                   <div key={g.weekday} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {WEEKDAYS[g.weekday]}
+                      {weekdays[g.weekday]}
                       {dateGuide[g.weekday] && <span className="mt-1 block font-normal normal-case tracking-normal">{dateGuide[g.weekday]}</span>}
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -295,7 +299,7 @@ export function DisponibilidadTab() {
                           <button
                             type="button"
                             onClick={() => removeBlock(b)}
-                            aria-label="Eliminar bloque"
+                            aria-label={english ? "Remove time block" : "Eliminar bloque"}
                             className="text-slate-400 transition-colors hover:text-rose-500"
                           >
                             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -316,7 +320,7 @@ export function DisponibilidadTab() {
             )}
             {gridSaved && (
               <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                Disponibilidad guardada · {savedBlocks?.length ?? 0} bloques semanales.
+                {english ? `Availability saved · ${savedBlocks?.length ?? 0} weekly blocks.` : `Disponibilidad guardada · ${savedBlocks?.length ?? 0} bloques semanales.`}
               </div>
             )}
 
@@ -328,8 +332,8 @@ export function DisponibilidadTab() {
                 className="w-full rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 {savingGrid ? (
-                  <span className="flex items-center justify-center gap-2"><Spinner /> Guardando…</span>
-                ) : 'Guardar disponibilidad'}
+                  <span className="flex items-center justify-center gap-2"><Spinner /> {english ? "Saving…" : "Guardando…"}</span>
+                ) : english ? 'Save availability' : 'Guardar disponibilidad'}
               </button>
             </div>
           </div>

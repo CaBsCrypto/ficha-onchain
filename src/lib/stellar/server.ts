@@ -21,6 +21,7 @@ import { randomBytes } from "node:crypto";
 import { NETWORK_PASSPHRASE } from "./config";
 import { server } from "./client";
 import { withSignerLock } from "./serialize";
+import { assertUnintegratedSponsorship } from "../../../scripts/lib/sponsorship-write-gate.mjs";
 
 /** Fee the relayer is willing to cover for a bumped transaction (stroops). */
 const RELAY_FEE = "2000000"; // 0.2 XLM ceiling — plenty for a Soroban invoke.
@@ -83,6 +84,7 @@ export interface SubmitResult {
 export async function sendAndConfirm(
   tx: Transaction | FeeBumpTransaction,
 ): Promise<SubmitResult> {
+  assertUnintegratedSponsorship();
   const sent = await server.sendTransaction(tx);
   if (sent.status === "ERROR") {
     throw new Error(
@@ -111,6 +113,7 @@ export async function sendAndConfirm(
  * gasless mints.
  */
 export async function feeBumpAndSend(innerXdr: string): Promise<SubmitResult> {
+  assertUnintegratedSponsorship();
   const relayer = getRelayerKeypair();
   const inner = TransactionBuilder.fromXDR(
     innerXdr,
@@ -173,6 +176,7 @@ async function signInvokeAndSubmit(args: {
   method: string;
   args: xdr.ScVal[];
 }): Promise<SubmitResult> {
+  assertUnintegratedSponsorship();
   const signer = Keypair.fromSecret(args.signerSecret);
 
   // One full build→prepare→sign→submit cycle. buildInvokeXdr fetches the account
@@ -315,6 +319,7 @@ export async function deployClinicalRecord(args: {
   ownerAddress: string;
   deployerSecret: string;
 }): Promise<string> {
+  assertUnintegratedSponsorship();
   const deployer = Keypair.fromSecret(args.deployerSecret);
   const wasmHash = Buffer.from(CLINICAL_RECORD_WASM_HASH, "hex");
 

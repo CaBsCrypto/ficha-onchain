@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { Account, Address, Keypair, Networks, SorobanDataBuilder, nativeToScVal } from '@stellar/stellar-sdk';
+import { Account, Address, Keypair, Networks, SorobanDataBuilder, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 import type { Transaction } from '@stellar/stellar-sdk';
 import { PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import { listPrivatePrescriptions } from '@/lib/private-prescriptions';
@@ -148,5 +148,62 @@ describe('bounded verified prescription lists', () => {
     f.chain.prescription.mockClear(); f.chain.verifyDeployment.mockRejectedValueOnce(Error('private_contract_mismatch'));
     await expect(listPrivatePrescriptions(actor, 'patient')).rejects.toThrow('private_contract_mismatch');
     expect(f.chain.prescription).not.toHaveBeenCalled(); expect(f.release).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('live prescription read boundary', () => {
+  it.each(['archived', 'legacy-restore', 'malformed-data', 'authorization'])('rejects %s simulation output before a prescription is verified', async mode => {
+    const f = await simulationFixture();
+    const simulate = f.server.simulateTransaction.getMockImplementation()!;
+    f.server.simulateTransaction.mockImplementation(async tx => {
+      const result = await simulate(tx);
+      if (mode === 'archived') {
+        const data = result.transactionData.build();
+        data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: [0] })));
+        return { ...result, transactionData: { build: () => data } } as any;
+      }
+      if (mode === 'legacy-restore') return { ...result, restorePreamble: { transactionData: {} } } as any;
+      if (mode === 'malformed-data') return { ...result, transactionData: { build: () => { throw Error('Malformed XDR'); } } } as any;
+      return { ...result, result: { ...result.result, auth: [{}] } } as any;
+    });
+    await expect(f.chain.prescription('1')).rejects.toMatchObject({ message: 'private_chain_unavailable', status: 503 });
+    expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+    expect(f.server.getTransaction).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an archived deployment getter rather than accepting its simulated configuration', async () => {
+    const f = await simulationFixture();
+    const simulate = f.server.simulateTransaction.getMockImplementation()!;
+    f.server.simulateTransaction.mockImplementation(async tx => {
+      const result = await simulate(tx), data = result.transactionData.build();
+      data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: [0, 1] })));
+      return { ...result, transactionData: { build: () => data } } as any;
+    });
+    await expect(f.chain.verifyDeployment()).rejects.toMatchObject({ message: 'private_chain_unavailable', status: 503 });
+    expect(f.server.sendTransaction).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts a live extension v1 with no archived entries, retaining the existing record verification', async () => {
+    const f = await simulationFixture();
+    const simulate = f.server.simulateTransaction.getMockImplementation()!;
+    f.server.simulateTransaction.mockImplementation(async tx => {
+      const result = await simulate(tx), data = result.transactionData.build();
+      data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: [] })));
+      return { ...result, transactionData: { build: () => data } } as any;
+    });
+    await expect(f.chain.verifyDeployment()).resolves.toBeUndefined();
+    await expect(f.chain.prescription('1')).resolves.toMatchObject({ id: '1', status: 'Active', patient: owner, doctor });
+    expect(f.server.sendTransaction).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps only the exact contract Missing error as an absent record', async () => {
+    const f = await simulationFixture();
+    f.server.simulateTransaction.mockResolvedValue({ error: 'Error(Contract, #3)', latestLedger: 1 } as any);
+    await expect(f.chain.prescription('1')).resolves.toBeNull();
+    f.server.simulateTransaction.mockResolvedValue({ error: 'Error(Contract, #30)', latestLedger: 1 } as any);
+    await expect(f.chain.prescription('1')).rejects.toMatchObject({ status: 503 });
+    f.server.simulateTransaction.mockResolvedValue({ error: 'Error(Contract, #3)', latestLedger: 1, restorePreamble: {} } as any);
+    await expect(f.chain.prescription('1')).rejects.toMatchObject({ status: 503 });
+    expect(f.server.sendTransaction).not.toHaveBeenCalled();
   });
 });

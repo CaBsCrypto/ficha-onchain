@@ -1,22 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
+import { sealDraft } from '@/lib/clinical/drafts-crypto';
 import { Account, BASE_FEE, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 import { CLINICAL_CONTRACT, assertClinicalUnsigned, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import type { ClinicalAction, ClinicalActor, ClinicalExpected, ClinicalPrepareRequest } from '@/types/clinical';
 
-const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), sponsor: vi.fn(), doctor: vi.fn(), seal: vi.fn(), chain: {} as Record<string, any> }));
+const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), factory: vi.fn(), sponsor: vi.fn(), aggregate: vi.fn(), doctor: vi.fn(), seal: vi.fn(), context: vi.fn(), rx: vi.fn(), chain: {} as Record<string, any> }));
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/clinical/doctor-context', () => ({ clinicalDoctorContext: m.context }));
+vi.mock('@/lib/clinical/prescriptions', () => ({ clinicalPrescriptionReference: m.rx }));
 vi.mock('@/lib/db', () => ({ getDbConnection: m.connection, getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
-vi.mock('@/lib/clinical/history', () => ({ clinicalPublicOperation: (r: Record<string, any>) => ({ id: r.id, action: r.action, state: r.state, expiresAt: Number(r.expires_at), transactionHash: r.transaction_hash ?? null, errorCode: r.error_code ?? null }) }));
+vi.mock('@/lib/clinical/history', () => ({ clinicalPreparedOperation: (_actor: unknown, r: Record<string, any>) => ({ id: r.id, action: r.action, state: r.state, expiresAt: Number(r.expires_at), transactionHash: r.transaction_hash ?? null, errorCode: r.error_code ?? null }) }));
 vi.mock('@/lib/clinical/config', () => ({ CLINICAL_ID: 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U', assertClinicalEnvironment: (write = false) => { if (write && process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
 vi.mock('@/lib/private-config', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/private-config')>(), assertPrivateWrites: () => { if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
-vi.mock('@/lib/clinical/chain', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/clinical/chain')>(); return { ...actual, createClinicalWebChain: () => m.chain, sponsorClinicalSignature: (...args: Parameters<typeof actual.sponsorClinicalSignature>) => { m.sponsor(...args); return actual.sponsorClinicalSignature(...args); } }; });
+vi.mock('@/lib/clinical/chain', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/clinical/chain')>(); return { ...actual, createClinicalWebChain: () => { m.factory(); return m.chain; }, sponsorClinicalSignature: (...args: Parameters<typeof actual.sponsorClinicalSignature>) => { m.sponsor(...args); return actual.sponsorClinicalSignature(...args); } }; });
 vi.mock('../../scripts/lib/clinical-crypto.mjs', async importOriginal => {
   const actual = await importOriginal<typeof import('../../scripts/lib/clinical-crypto.mjs')>();
   return { ...actual, sealClinicalVersion: (...args: Parameters<typeof actual.sealClinicalVersion>) => { m.seal(...args); return actual.sealClinicalVersion(...args); } };
 });
+vi.mock('@/lib/clinical/rehearsal-budget',()=>({assertClinicalRehearsalBudget:(...args:unknown[])=>m.aggregate(...args)}));
+import * as writeScope from '@/lib/clinical/create-once';
+import * as rehearsalFunctions from '@/lib/clinical/rehearsal';
 import { cancelClinicalOperation, prepareClinicalOperation, reconcileClinicalOperation, signClinicalOperation } from '@/lib/clinical/operations';
+import { sealClinicalVersion } from '../../scripts/lib/clinical-crypto.mjs';
+import type { ClinicalCapturePlan } from '@/lib/clinical/capture';
 
 // Local deterministic identities only; no deployed secret or provider is used.
 let testSignature: () => string;
@@ -33,7 +41,8 @@ const createInput: ClinicalPrepareRequest = { requestId: ID, action: 'create_his
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 function requestFingerprint(input: ClinicalPrepareRequest) {
   const canonical = JSON.stringify({ requestId: input.requestId, action: input.action, entryId: input.entryId, expectedVersion: input.expectedVersion,
-    note: input.note, file: input.file, doctorId: input.doctorId, canRead: input.canRead, canAppend: input.canAppend, expectedRevision: input.expectedRevision });
+    note: input.note, file: input.file, doctorId: input.doctorId, canRead: input.canRead, canAppend: input.canAppend, expectedRevision: input.expectedRevision,
+    ...(input.historyId?{historyId:input.historyId}:{}),...(input.draftId?{draftId:input.draftId,draftRevision:input.draftRevision}:{}) });
   return 'test-kek:' + createHmac('sha256', Buffer.from(keyring['test-kek'], 'hex')).update(canonical).digest('hex');
 }
 function build(action: ClinicalAction, expected: ClinicalExpected, sequence = '100') {
@@ -42,21 +51,22 @@ function build(action: ClinicalAction, expected: ClinicalExpected, sequence = '1
 }
 function fixture(ownHistory = false) {
   const state = { row: null as Record<string, any> | null, history: ownHistory ? { history_id: historyId, owner_user_id: actor.userId, wallet_id: actor.walletId, patient_wallet: actor.address, contract_id: CLINICAL_CONTRACT, network: 'testnet', transaction_hash: '1'.repeat(64) } : null,
-    versions: {} as Record<string, any>, head: null as { author: string; headVersion: number } | null,
+    versions: {} as Record<string, any>, draft: null as Record<string, any> | null, head: null as { author: string; headVersion: number } | null,
     version: null as Record<string, any> | null, receipt: 'NOT_FOUND', wrongReceipt: false, historyPatient: actor.address,
     quotaRows: [] as Array<{id:string}>, queue: '', rpcFailure: false, failStorage: false, events: [] as string[], releaseCount: 0 };
-  let transaction: { row: typeof state.row; history: typeof state.history; versions: typeof state.versions } | null = null;
+  let transaction: { row: typeof state.row; history: typeof state.history; versions: typeof state.versions; draft: typeof state.draft } | null = null;
   const savedPoints = new Map<string, typeof transaction>();
   const query = vi.fn(async (sql: string, values: any[] = []) => {
     state.events.push(sql.trim().replace(/\s+/g, ' '));
     const q = sql.replace(/\s+/g, ' ').trim();
-    if (q === 'BEGIN') { transaction = clone({ row: state.row, history: state.history, versions: state.versions }); return { rows: [] }; }
+    if (q === 'BEGIN') { transaction = clone({ row: state.row, history: state.history, versions: state.versions, draft:state.draft }); return { rows: [] }; }
     if (q === 'COMMIT') { transaction = null; return { rows: [] }; }
     if (q === 'ROLLBACK') { if (transaction) Object.assign(state, clone(transaction)); transaction = null; return { rows: [] }; }
-    if (q.startsWith('SAVEPOINT ')) { savedPoints.set(q.slice(10), clone({ row: state.row, history: state.history, versions: state.versions })); return { rows: [] }; }
+    if (q.startsWith('SAVEPOINT ')) { savedPoints.set(q.slice(10), clone({ row: state.row, history: state.history, versions: state.versions, draft:state.draft })); return { rows: [] }; }
     if (q.startsWith('ROLLBACK TO SAVEPOINT ')) { Object.assign(state, clone(savedPoints.get(q.slice(22)))); return { rows: [] }; }
     if (q.startsWith('RELEASE SAVEPOINT ')) { savedPoints.delete(q.slice(18)); return { rows: [] }; }
     if (q.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (q.startsWith('SELECT commitment FROM doctor_authorization_requests')) return {rows:[{commitment:'c'.repeat(64)}]};
     if (q.startsWith('SELECT to_regclass')) return { rows: [{ relation: values[0] }] };
     if (q.startsWith("SELECT id FROM clinical_web_operations WHERE source_wallet=")) return { rows: [...state.quotaRows, ...(state.row ? [{ id: state.row.id }] : [])] };
     if (q.startsWith('SELECT 1 FROM') && q.includes('state IN')) return { rows: state.queue && q.includes(`FROM ${state.queue} `) ? [{}] : [] };
@@ -66,6 +76,19 @@ function fixture(ownHistory = false) {
     }
     if (q.startsWith('SELECT 1 FROM clinical_web_histories')) return { rows: state.history ? [{}] : [] };
     if (q.startsWith('SELECT * FROM clinical_web_histories')) return { rows: state.history ? [clone(state.history)] : [] };
+
+    if(q.startsWith('SELECT id,revision,owner_user_id')&&q.includes('FROM clinical_private_drafts')){
+      return {rows:state.draft&&state.draft.publication_request_id===values[0]?[clone(state.draft)]:[]};
+    }
+    if(q.startsWith('SELECT * FROM clinical_private_drafts')){
+      const d=state.draft,visible=d&&d.id===values[0]&&[d.owner_user_id,d.wallet_id,d.author_wallet,d.contract_id,d.network].every((v,i)=>v===values[i+1]);
+      return {rows:visible?[clone(d!)]:[]};
+    }
+    if(q.startsWith('UPDATE clinical_private_drafts SET publication_request_id')){
+      const d=state.draft,visible=d&&d.id===values[0]&&[d.owner_user_id,d.wallet_id,d.author_wallet,d.contract_id,d.network].every((v,i)=>v===values[i+1])&&d.revision===values[6]&&d.deleted_at===null&&(d.publication_request_id===null||d.publication_request_id===values[7]);
+      if(!visible)return {rows:[]};d!.publication_request_id=values[7];return {rows:[{id:d!.id}]};
+    }
+
     if (q.startsWith('INSERT INTO clinical_web_operations')) {
       state.row = { id: values[0], actor_user_id: values[1], wallet_id: values[2], source_wallet: values[3], action: values[4], contract_id: values[5], network: 'testnet', method: values[6], expected: JSON.parse(values[7]),
         prepared_envelope: values[8] === null ? null : JSON.parse(values[8]), state: 'awaiting_signature', unsigned_xdr: values[9], signing_hash: values[10], expires_at: values[11], request_fingerprint: values[12], signed_xdr: null, transaction_hash: null, error_code: null };
@@ -151,6 +174,17 @@ describe.each(['local', 'hosted'])('single authorized %s history creation', mode
     expect(m.sponsor).toHaveBeenCalledTimes(1); expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(f.state.row!.signed_xdr);
     expect(f.state.row!.state).toBe('submitted');
     expect(f.state.events.slice(0,f.state.events.indexOf('RPC_SUBMIT')).filter(q=>q==='COMMIT')).toHaveLength(2);
+  });
+  it('passes the active policy deadline only to a new preparation and preserves the saved unsigned attempt', async () => {
+    const f = fixture(); scoped();
+    const prefix = mode === 'local' ? 'TRUSTLEAF_CLINICAL_CREATE_ONCE_' : 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_';
+    const until = Number(process.env[prefix + 'UNTIL']);
+    await prepareClinicalOperation(user, actor, createInput);
+    expect(m.chain.prepare).toHaveBeenCalledWith(actor.address, 'create_history', expect.any(Object), undefined);
+    const saved = { unsigned: f.state.row!.unsigned_xdr, hash: f.state.row!.signing_hash, expires: f.state.row!.expires_at };
+    await prepareClinicalOperation(user, actor, createInput);
+    expect({ unsigned: f.state.row!.unsigned_xdr, hash: f.state.row!.signing_hash, expires: f.state.row!.expires_at }).toEqual(saved);
+    expect(m.chain.prepare).toHaveBeenCalledTimes(1); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
   });
   it.each(['append_version', 'set_permissions'] as const)('rejects %s before encryption, preparation or a database transaction', async action => {
     const f=fixture(); scoped();
@@ -519,5 +553,312 @@ describe('continuous owner recording operations',()=>{
     const f=fixture();demo();f.state.quotaRows=previous(19);await prepareClinicalOperation(user,actor,createInput);
     expect((await cancelClinicalOperation(actor,ID)).operation.state).toBe('cancelled');expect(m.chain.submit).not.toHaveBeenCalled();
     await expect(prepareClinicalOperation(user,actor,{...createInput,requestId:'1f4929bd-48f9-4b9d-bde4-47f7b66a6d91'})).rejects.toThrow('clinical_patient_demo_quota_exceeded');
+  });
+});
+
+
+describe('medical append uses the author wallet and the selected patient permission', () => {
+  const selectedHistory = deriveClinicalHistoryId(doctor.publicKey());
+  const medicalInput: ClinicalPrepareRequest = { ...appendInput, historyId: selectedHistory };
+  function medicalFixture() {
+    const f = fixture(true);
+    f.state.historyPatient = doctor.publicKey();
+    m.chain.history.mockImplementation(async () => ({ id: selectedHistory, patient: doctor.publicKey(), createdAt: 1 }));
+    m.context.mockResolvedValue({ historyId: selectedHistory, doctorId: 7, canRead: false, canAppend: true, grantRevision: 3 });
+    return f;
+  }
+  it('prepares and signs an append-only doctor note without reading patient content', async () => {
+    const f = medicalFixture();
+    await prepareClinicalOperation(user, actor, medicalInput);
+    expect(f.state.row!.expected).toMatchObject({ historyId: selectedHistory, patient: doctor.publicKey(), author: actor.address,
+      expectedGrantRevision: 3, expectedVersion: 0 });
+    expect(f.state.row!.source_wallet).toBe(actor.address);
+    expect(JSON.stringify(f.state.row)).not.toContain(note.text);
+    const result = await signClinicalOperation(user, actor, ID, testSignature());
+    expect(result.operation.state).toBe('submitted');
+    expect(m.chain.submit).toHaveBeenCalledOnce();
+    expect(m.chain.version).not.toHaveBeenCalled();
+  });
+  it('shares only the current request deployment reader while checking medical permissions before and after signing',async()=>{
+    medicalFixture();await prepareClinicalOperation(user,actor,medicalInput);
+    expect(m.context).toHaveBeenCalledTimes(2);
+    for(const call of m.context.mock.calls)expect(call[3]).toBe(m.chain);
+    m.context.mockClear();await signClinicalOperation(user,actor,ID,testSignature());
+    expect(m.context.mock.calls.length).toBeGreaterThanOrEqual(2);
+    for(const call of m.context.mock.calls)expect(call[3]).toBe(m.chain);
+  });
+  it('still rejects permission withdrawn between the two signing observations when the deployment reader is reused',async()=>{
+    const f=medicalFixture();await prepareClinicalOperation(user,actor,medicalInput);
+    m.context.mockReset();m.context.mockResolvedValueOnce({doctorId:7,canRead:false,canAppend:true,grantRevision:3}).mockResolvedValue({doctorId:7,canRead:false,canAppend:false,grantRevision:4});
+    await expect(signClinicalOperation(user,actor,ID,testSignature())).rejects.toThrow('clinical_permission_conflict');
+    expect(f.state.row!.signed_xdr).toBeNull();expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('uses one deployment reader for signing and its initial send, while a later retry gets a fresh reader',async()=>{
+    const f=medicalFixture();await prepareClinicalOperation(user,actor,medicalInput);m.factory.mockClear();
+    await signClinicalOperation(user,actor,ID,testSignature());expect(m.factory).toHaveBeenCalledTimes(1);
+    m.factory.mockClear();await reconcileClinicalOperation(actor,ID,true,user);expect(m.factory).toHaveBeenCalledTimes(1);
+    expect(f.state.row!.signed_xdr).not.toBeNull();expect(m.sponsor).toHaveBeenCalledOnce();
+  });
+  it('cannot use a read-only grant to prepare a contribution', async () => {
+    const f = medicalFixture(); m.context.mockResolvedValue({ doctorId: 7, canRead: true, canAppend: false, grantRevision: 3 });
+    await expect(prepareClinicalOperation(user, actor, medicalInput)).rejects.toThrow('clinical_access_denied');
+    expect(f.state.row).toBeNull(); expect(m.chain.prepare).not.toHaveBeenCalled();
+  });
+  it('does not let a doctor overwrite an entry by the patient or another doctor', async () => {
+    const f = medicalFixture(); f.state.head = { author: doctor.publicKey(), headVersion: 1 };
+    await expect(prepareClinicalOperation(user, actor, { ...medicalInput, entryId: 'cd'.repeat(32), expectedVersion: 1 })).rejects.toThrow('clinical_version_conflict');
+    expect(f.state.row).toBeNull(); expect(m.seal).not.toHaveBeenCalled();
+  });
+  it('supports a new version of the doctor own entry and preserves its previous commitment', async () => {
+    const f = medicalFixture(); f.state.head = { author: actor.address, headVersion: 1 }; f.state.version = { commitment: '6'.repeat(64) };
+    await prepareClinicalOperation(user, actor, { ...medicalInput, entryId: 'cd'.repeat(32), expectedVersion: 1 });
+    expect(f.state.row!.expected).toMatchObject({ patient: doctor.publicKey(), author: actor.address, expectedVersion: 1, previousCommitment: '6'.repeat(64), expectedGrantRevision: 3 });
+  });
+  it('rechecks a withdrawal before signing without saving or sending a signature', async () => {
+    const f = medicalFixture(); await prepareClinicalOperation(user, actor, medicalInput);
+    m.context.mockRejectedValue(new Error('clinical_context_unavailable'));
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('clinical_context_unavailable');
+    expect(f.state.row!.signed_xdr).toBeNull(); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('rejects a changed permission revision even when append remains granted', async () => {
+    medicalFixture(); await prepareClinicalOperation(user, actor, medicalInput);
+    m.context.mockResolvedValue({ doctorId: 7, canRead: true, canAppend: true, grantRevision: 4 });
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('clinical_permission_conflict');
+    expect(m.sponsor).not.toHaveBeenCalled();
+  });
+  it('rechecks permission after preparing the unsigned transaction and rolls back if changed', async () => {
+    const f = medicalFixture(); m.context.mockResolvedValueOnce({ doctorId: 7, canRead: true, canAppend: true, grantRevision: 3 })
+      .mockResolvedValue({ doctorId: 7, canRead: true, canAppend: false, grantRevision: 4 });
+    await expect(prepareClinicalOperation(user, actor, medicalInput)).rejects.toThrow('clinical_permission_conflict');
+    expect(f.state.row).toBeNull(); expect(m.sponsor).not.toHaveBeenCalled();
+  });
+  it('preserves a signed uncertain attempt when permissions are withdrawn before retry', async () => {
+    const f = medicalFixture(); await prepareClinicalOperation(user, actor, medicalInput);
+    await signClinicalOperation(user, actor, ID, testSignature()); const original = clone(f.state.row);
+    m.chain.submit.mockClear(); m.context.mockRejectedValue(new Error('clinical_context_unavailable'));
+    const result = await reconcileClinicalOperation(actor, ID, true, user);
+    expect(result.operation.errorCode).toBe('clinical_retry_unavailable'); expect(f.state.row).toEqual(original);
+    expect(m.chain.submit).not.toHaveBeenCalled(); expect(m.sponsor).toHaveBeenCalledOnce();
+  });
+  it.each(['sign', 'retry'])('does not extend a restricted patient demo to a saved doctor %s', async action => {
+    const f = medicalFixture(); await prepareClinicalOperation(user, actor, medicalInput);
+    if (action === 'retry') await signClinicalOperation(user, actor, ID, testSignature());
+    const original = clone(f.state.row); m.sponsor.mockClear(); m.chain.submit.mockClear();
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED','false'); vi.stubEnv('TRUSTLEAF_ENV','test'); vi.stubEnv('VERCEL_ENV','production'); vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK','testnet');
+    vi.stubEnv('TRUSTLEAF_DATABASE_URL','postgres://fixture:fixture@ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech/fixture');
+    vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED','true'); vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS',actor.address); vi.stubEnv('TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER',payer.publicKey());
+    await expect(action === 'sign' ? signClinicalOperation(user, actor, ID, testSignature()) : reconcileClinicalOperation(actor, ID, true, user)).rejects.toThrow('clinical_access_denied');
+    expect(f.state.row).toEqual(original); expect(m.sponsor).not.toHaveBeenCalled(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('binds a reused UUID to its original selected patient', async () => {
+    const f = medicalFixture(); await prepareClinicalOperation(user, actor, medicalInput); const original = clone(f.state.row);
+    await expect(prepareClinicalOperation(user, actor, { ...medicalInput, historyId: 'ef'.repeat(32) })).rejects.toThrow('clinical_request_conflict');
+    expect(f.state.row).toEqual(original);
+  });
+  it('revalidates a linked prescription before signing and keeps the link encrypted', async () => {
+    const f = medicalFixture(); const id = '20000000-0000-4000-8000-000000000002'; m.rx.mockResolvedValue({ id });
+    await prepareClinicalOperation(user, actor, { ...medicalInput, note: { ...note, prescriptionId: id } });
+    expect(JSON.stringify(f.state.row)).not.toContain(id);
+    expect(m.rx).toHaveBeenCalledWith(user, actor, doctor.publicKey(), id);
+    m.rx.mockRejectedValue(new Error('clinical_prescription_unavailable'));
+    await expect(signClinicalOperation(user, actor, ID, testSignature())).rejects.toThrow('clinical_prescription_unavailable');
+    expect(f.state.row!.signed_xdr).toBeNull(); expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it.each(['private_operations', 'clinical_transaction_attempts', 'clinical_web_operations'])('shares source exclusion with %s', async table => {
+    const f = medicalFixture(); f.state.queue = table;
+    await expect(prepareClinicalOperation(user, actor, medicalInput)).rejects.toThrow('another_operation_pending');
+    expect(f.state.row).toBeNull(); expect(m.context).not.toHaveBeenCalled();
+  });
+  function aggregateFixture(){
+    const f=medicalFixture();
+    const step={key:'append_pdf',actor:'doctor',action:'append_version',requestId:ID,operationId:opId,maxFeeStroops:'150000000',input:medicalInput};
+    const plan={schemaVersion:2,runId:'00000000-0000-4000-8000-000000000001',historyId:selectedHistory,patient:{...actor,address:doctor.publicKey(),userId:'did:privy:selected'},doctor:actor,startingGrantRevision:2,steps:[step],authorization:{requestId:'00000000-0000-4000-8000-000000000002'},aggregateBudget:{approvedAt:1}};
+    const policy={mode:'rehearsal',wallet:actor.address,relayer:payer.publicKey(),until:Math.floor(Date.now()/1000)+600,plan};
+    vi.spyOn(writeScope,'assertClinicalWriteScope').mockReturnValue(policy as any);
+    vi.spyOn(writeScope,'clinicalCreateOnceConfigured').mockReturnValue(true);
+    vi.spyOn(writeScope,'assertClinicalCreateOnceFee').mockImplementation(()=>{});
+    vi.spyOn(writeScope,'assertClinicalCreateOnceSavedFee').mockImplementation(()=>{});
+    vi.spyOn(rehearsalFunctions,'assertClinicalRehearsalOrder').mockImplementation(async client=>{await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['clinical-rehearsal:'+plan.runId]);});
+    vi.spyOn(rehearsalFunctions,'assertClinicalRehearsalAuthorization').mockImplementation(()=>{});
+    vi.spyOn(rehearsalFunctions,'assertClinicalRehearsalFee').mockImplementation(()=>{});
+    m.chain.doctorAuthorization=vi.fn(async()=>({}));
+    m.aggregate.mockImplementation(async()=>{f.state.events.push('AGGREGATE_CHECK');});
+    return f;
+  }
+
+  function draftAggregateFixture() {
+    const f=aggregateFixture(),draftId='60000000-0000-4000-8000-000000000001';
+    const context={schemaVersion:1 as const,network:'testnet' as const,contractId:CLINICAL_CONTRACT,draftId,
+      authorUserId:actor.userId,authorWalletId:actor.walletId,author:actor.address,historyId:selectedHistory,
+      patient:doctor.publicKey(),entryId:null,expectedVersion:null,revision:1};
+    f.state.draft={id:draftId,owner_user_id:actor.userId,wallet_id:actor.walletId,author_wallet:actor.address,
+      contract_id:CLINICAL_CONTRACT,network:'testnet',history_id:selectedHistory,patient_wallet:doctor.publicKey(),
+      entry_id:null,expected_version:null,revision:1,envelope:sealDraft(context,{note},{activeKeyId:'test-kek',keyring}),
+      publication_request_id:null,deleted_at:null};
+    return {...f,input:{...medicalInput,draftId,draftRevision:1},draftContext:context};
+  }
+  it('publishes an exact approved draft then signs and recovers the same HMAC-bound intent and envelope',async()=>{
+    const f=draftAggregateFixture();await prepareClinicalOperation(user,actor,f.input);
+    expect(f.state.draft!.publication_request_id).toBe(ID);
+    expect(f.state.row!.request_fingerprint).toBe(requestFingerprint(f.input));
+    const originalUnsigned=f.state.row!.unsigned_xdr,originalFingerprint=f.state.row!.request_fingerprint;
+    await prepareClinicalOperation(user,actor,f.input); // Lost prepare response: one original UUID and draft revision.
+    await signClinicalOperation(user,actor,ID,testSignature());
+    expect(m.sponsor).toHaveBeenCalledOnce();expect(m.chain.submit).toHaveBeenCalledOnce();
+    const signed=f.state.row!.signed_xdr,hash=f.state.row!.transaction_hash;
+    await reconcileClinicalOperation(actor,ID,true,user);
+    expect(m.sponsor).toHaveBeenCalledOnce();expect(m.chain.submit).toHaveBeenLastCalledWith(signed);
+    expect(f.state.row).toMatchObject({unsigned_xdr:originalUnsigned,request_fingerprint:originalFingerprint,signed_xdr:signed,transaction_hash:hash});
+  });
+  it('rejects a foreign or stale encrypted draft before preparing or inserting the approved intent',async()=>{
+    for(const patch of [{owner_user_id:'did:privy:other'},{wallet_id:'other-wallet'},{author_wallet:doctor.publicKey()},{revision:2}]){
+      const f=draftAggregateFixture();Object.assign(f.state.draft!,patch);
+      await expect(prepareClinicalOperation(user,actor,f.input)).rejects.toThrow(/clinical_draft/);
+      expect(f.state.row).toBeNull();expect(m.chain.prepare).not.toHaveBeenCalled();expect(m.sponsor).not.toHaveBeenCalled();
+    }
+  });
+  it('refuses a changed server draft UUID/revision/publication binding before any relayer signature',async()=>{
+    for(const patch of [{id:'60000000-0000-4000-8000-000000000002'},{revision:2},{publication_request_id:null},{patient_wallet:actor.address},{owner_user_id:'did:privy:other'}]){
+      const f=draftAggregateFixture();await prepareClinicalOperation(user,actor,f.input);Object.assign(f.state.draft!,patch);
+      await expect(signClinicalOperation(user,actor,ID,testSignature())).rejects.toThrow('clinical_rehearsal_scope_rejected');
+      expect(f.state.row!.signed_xdr).toBeNull();expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+    }
+  });
+  it('rechecks decrypted draft content after preparation, rather than trusting matching metadata alone',async()=>{
+    const f=draftAggregateFixture();await prepareClinicalOperation(user,actor,f.input);
+    f.state.draft!.envelope=sealDraft(f.draftContext,{note:{...note,text:'altered private draft'}},{activeKeyId:'test-kek',keyring});
+    await expect(signClinicalOperation(user,actor,ID,testSignature())).rejects.toThrow('clinical_draft_conflict');
+    expect(f.state.row!.signed_xdr).toBeNull();expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+
+  it('aggregate denial rolls back preparation before INSERT or any signature',async()=>{
+    const f=aggregateFixture();m.aggregate.mockImplementation(async()=>{f.state.events.push('AGGREGATE_DENIED');throw Error('clinical_rehearsal_budget_exceeded');});
+    await expect(prepareClinicalOperation(user,actor,medicalInput)).rejects.toThrow('clinical_rehearsal_budget_exceeded');
+    expect(f.state.row).toBeNull();expect(f.state.events).toContain('ROLLBACK');
+    expect(f.state.events.some(sql=>sql.startsWith('INSERT INTO clinical_web_operations'))).toBe(false);
+    expect(f.state.events.findIndex(sql=>sql.includes('pg_advisory_xact_lock')&&sql.includes('$1'))).toBeLessThan(f.state.events.indexOf('AGGREGATE_DENIED'));
+    expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('aggregate denial before sponsoring leaves the same unsigned intent unchanged',async()=>{
+    const f=aggregateFixture();await prepareClinicalOperation(user,actor,medicalInput);const saved=clone(f.state.row);
+    m.aggregate.mockRejectedValue(Error('clinical_rehearsal_budget_exceeded'));
+    await expect(signClinicalOperation(user,actor,ID,testSignature())).rejects.toThrow('clinical_rehearsal_budget_exceeded');
+    expect(f.state.row).toEqual(saved);expect(f.state.row!.signed_xdr).toBeNull();expect(m.sponsor).not.toHaveBeenCalled();expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+  it('a final aggregate denial preserves one signed hash and permits only recovery of that same envelope',async()=>{
+    const f=aggregateFixture();await prepareClinicalOperation(user,actor,medicalInput);
+    m.aggregate.mockResolvedValueOnce(undefined).mockRejectedValueOnce(Error('clinical_rehearsal_budget_unavailable'));
+    const result=await signClinicalOperation(user,actor,ID,testSignature());
+    expect(result.operation.state).toBe('submitted');expect(m.chain.submit).not.toHaveBeenCalled();expect(m.sponsor).toHaveBeenCalledOnce();
+    const saved=clone(f.state.row);m.aggregate.mockResolvedValue(undefined);
+    await reconcileClinicalOperation(actor,ID,true,user);
+    expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(saved.signed_xdr);expect(f.state.row!.transaction_hash).toBe(saved.transaction_hash);expect(f.state.row!.unsigned_xdr).toBe(saved.unsigned_xdr);expect(m.sponsor).toHaveBeenCalledOnce();
+  });
+
+});
+
+vi.mock('@/lib/clinical/sponsorship', () => ({ assertClinicalSponsorshipConfigured: vi.fn(), reserveClinicalSponsorship: vi.fn(), assertClinicalSponsorshipSign: vi.fn(), bindClinicalSponsorshipSubmission: vi.fn(), cancelClinicalSponsorship: vi.fn(), reconcileClinicalSponsorship: vi.fn() }));
+
+describe('Digital and Cabs correction and withdrawal', () => {
+  function continuationFixture() {
+    const f = fixture(true);
+    const author: ClinicalActor = { userId: 'did:privy:synthetic_doctor', walletId: 'synthetic_doctor_wallet', address: doctor.publicKey() };
+    const authorUser = { userId: author.userId, email: 'synthetic-doctor@example.test' };
+    const requestId = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const pdfBytes = Buffer.from('%PDF-1.4\n%%EOF\n');
+    const pdf = { mediaType: 'application/pdf' as const, fileName: 'synthetic.pdf', byteLength: pdfBytes.length,
+      sha256: createHash('sha256').update(pdfBytes).digest('hex') };
+    const openedAt = Math.floor(Date.now() / 1000) - 1;
+    function confirmedContribution(id: string, operationId: string, hash: string, content: Buffer, metadata: { fileName: string; mediaType: string }) {
+      const entryId = deriveClinicalEntryId(historyId, author.address, operationId);
+      const context = { schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT, historyId, entryId,
+        author: author.address, patient: actor.address, version: 1, previousCommitment: null };
+      const sealed = sealClinicalVersion({ context, content, metadata, keyring, activeKeyId: 'test-kek' });
+      return { id, state: 'confirmed', transaction_hash: hash, action: 'append_version', method: 'append_version',
+        actor_user_id: author.userId, wallet_id: author.walletId, source_wallet: author.address, contract_id: CLINICAL_CONTRACT, network: 'testnet',
+        prepared_envelope: sealed.envelope, expected: { historyId, patient: actor.address, author: author.address, entryId, operationId,
+          expectedVersion: 0, expectedGrantRevision: 1, previousCommitment: null, commitment: sealed.commitment } };
+    }
+    const original = confirmedContribution(requestId(2), '2'.repeat(64), 'a'.repeat(64), Buffer.from(JSON.stringify(note)),
+      { fileName: 'antecedente.json', mediaType: 'application/json' });
+    const attachment = confirmedContribution(requestId(3), '3'.repeat(64), 'b'.repeat(64), pdfBytes,
+      { fileName: pdf.fileName, mediaType: pdf.mediaType });
+    const grant = { id: requestId(1), state: 'confirmed', transaction_hash: 'c'.repeat(64), action: 'set_permissions', method: 'set_permissions',
+      actor_user_id: actor.userId, wallet_id: actor.walletId, source_wallet: actor.address, contract_id: CLINICAL_CONTRACT, network: 'testnet',
+      expected: { historyId, patient: actor.address, doctorId: 9, doctor: author.address, operationId: '1'.repeat(64),
+        expectedRevision: 0, canRead: true, canAppend: true } };
+    const prescriptionId = requestId(7);
+    const correction = { requestId: requestId(4), operationId: '4'.repeat(64), entryId: original.expected.entryId,
+      previousCommitment: original.expected.commitment, note: { ...note, prescriptionId } };
+    const revocation = { requestId: requestId(5), operationId: '5'.repeat(64) };
+    const plan: ClinicalCapturePlan = { schemaVersion: 2, runId: requestId(6), openedAt, until: openedAt + 600, network: 'testnet',
+      contractId: CLINICAL_CONTRACT, registryId: 'CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2',
+      relayer: payer.publicKey(), patient: actor, doctor: author, historyId, doctorId: 9, doctorValidUntil: openedAt + 3600,
+      grantRequestId: grant.id, noteRequestId: original.id, pdfRequestId: attachment.id, note, pdf,
+      grantTransactionHash: grant.transaction_hash, noteTransactionHash: original.transaction_hash,
+      continuation: { correction, revocation, pdfTransactionHash: attachment.transaction_hash }, policyHash: 'e'.repeat(64) };
+    const proofs: Array<Record<string, any>> = [grant, original, attachment];
+    const query = f.client.query.getMockImplementation()!;
+    f.client.query.mockImplementation(async (sql, values = []) => {
+      if (sql.startsWith('SELECT * FROM clinical_web_operations WHERE id=ANY')) {
+        return { rows: [...proofs, ...(f.state.row ? [f.state.row] : [])].filter(row => values[0].includes(row.id)) };
+      }
+      if (sql.startsWith('SELECT id FROM clinical_web_operations WHERE source_wallet=')) {
+        return { rows: [...proofs, ...(f.state.row ? [f.state.row] : [])]
+          .filter(row => row.source_wallet === values[0] && row.action === values[2]).map(row => ({ id: row.id })) };
+      }
+      return query(sql, values);
+    });
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
+    vi.spyOn(writeScope, 'assertClinicalWriteScope').mockImplementation((_action, wallet) => ({ mode: 'capture', wallet, plan, until: plan.until, relayer: plan.relayer }));
+    vi.spyOn(writeScope, 'assertClinicalCreateOnceFee').mockImplementation(() => {});
+    m.chain.doctorAuthorization = vi.fn(async () => ({ version: 1, validUntil: plan.doctorValidUntil, revoked: false }));
+    m.chain.grant.mockResolvedValue({ revision: 1, canRead: true, canAppend: true });
+    m.chain.entry.mockResolvedValue({ headVersion: 1, author: author.address });
+    m.chain.version.mockResolvedValue({ commitment: correction.previousCommitment });
+    m.context.mockResolvedValue({ historyId, doctorId: 9, grantRevision: 1, canRead: true, canAppend: true });
+    m.rx.mockResolvedValue({ id: prescriptionId });
+    const edit: ClinicalPrepareRequest = { requestId: correction.requestId, action: 'append_version', historyId,
+      entryId: correction.entryId, expectedVersion: 1, note: correction.note };
+    const revoke: ClinicalPrepareRequest = { requestId: revocation.requestId, action: 'set_permissions', doctorId: 9,
+      expectedRevision: 1, canRead: false, canAppend: false };
+    return { f, plan, author, authorUser, edit, revoke, proofs, attachment, prescriptionId };
+  }
+
+  it('preserves grant revision 1 until the exact note correction is confirmed, then prepares only the fixed withdrawal', async () => {
+    const c = continuationFixture();
+    await expect(prepareClinicalOperation(user, actor, c.revoke)).rejects.toThrow('clinical_rehearsal_order_conflict');
+    expect(m.chain.prepare).not.toHaveBeenCalled();
+    await prepareClinicalOperation(c.authorUser, c.author, c.edit);
+    expect(c.f.state.row?.expected).toMatchObject({ expectedVersion: 1, entryId: c.edit.entryId,
+      previousCommitment: c.plan.continuation!.correction.previousCommitment, operationId: c.plan.continuation!.correction.operationId });
+    expect(m.rx).toHaveBeenCalledWith(c.authorUser, c.author, actor.address, c.prescriptionId);
+    expect(JSON.stringify(c.f.state.row)).not.toContain(c.prescriptionId);
+    await expect(prepareClinicalOperation(user, actor, c.revoke)).rejects.toThrow('clinical_rehearsal_order_conflict');
+    c.proofs.push({ ...c.f.state.row!, state: 'confirmed', transaction_hash: 'd'.repeat(64) });
+    c.f.state.row = null;
+    await prepareClinicalOperation(user, actor, c.revoke);
+    expect(c.f.state.row?.expected).toMatchObject({ expectedRevision: 1, canRead: false, canAppend: false,
+      operationId: c.plan.continuation!.revocation.operationId });
+    expect(c.f.client.query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(hashtext($1))', [`clinical-capture:${historyId}`]);
+    await expect(prepareClinicalOperation(c.authorUser, c.author, c.edit)).rejects.toThrow('clinical_rehearsal_order_conflict');
+  });
+
+  it('rejects an inaccessible prescription or absent read permission before preparing an envelope', async () => {
+    const c = continuationFixture();
+    m.rx.mockRejectedValue(Error('clinical_prescription_unavailable'));
+    await expect(prepareClinicalOperation(c.authorUser, c.author, c.edit)).rejects.toThrow('clinical_prescription_unavailable');
+    expect(c.f.state.row).toBeNull();
+    expect(m.chain.prepare).not.toHaveBeenCalled();
+    m.chain.grant.mockResolvedValue({ revision: 1, canRead: false, canAppend: true });
+    await expect(prepareClinicalOperation(c.authorUser, c.author, c.edit)).rejects.toThrow('clinical_rehearsal_order_conflict');
+    expect(m.chain.prepare).not.toHaveBeenCalled();
+  });
+
+  it('refuses a substituted PDF receipt before preparing a correction', async () => {
+    const c = continuationFixture();
+    c.attachment.transaction_hash = 'f'.repeat(64);
+    await expect(prepareClinicalOperation(c.authorUser, c.author, c.edit)).rejects.toThrow('clinical_rehearsal_order_conflict');
+    expect(m.chain.prepare).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { PoolClient } from '@neondatabase/serverless';
 import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, resolveDoctor } from '@/lib/doctor-authorizations';
@@ -64,12 +65,23 @@ async function assertBinding(sql: Sql, owner: Owner) {
   if (rows.length !== 1) fail('doctor_identity_mismatch', 403);
 }
 /** Every writer uses this normalized email lock, then doctor/onboarding row locks. */
-export async function onboardingTransaction<T>(email: string, run: (sql: Sql) => Promise<T>): Promise<T> {
-  assertPrivateWrites();
+export async function onboardingTransaction<T>(email: string, run: (sql: Sql) => Promise<T>,
+  options: { rehearsalWriteScope?: (client?: PoolClient) => Promise<void> } = {}): Promise<T> {
+  // Only the reviewed renewal wrapper supplies this internal callback. It
+  // reloads the approved exact rehearsal before connecting and after the lock.
+  const authorize = async (client?: PoolClient) => {
+    if (options.rehearsalWriteScope) { assertPrivateEnvironment(); await options.rehearsalWriteScope(client); }
+    else assertPrivateWrites();
+  };
+  await authorize();
   const client = await getDbConnection();
   try {
+    await authorize();
     await client.query('BEGIN');
+    // The v2 run lock precedes email/row locks and lives through this enqueue.
+    if (options.rehearsalWriteScope) await authorize(client);
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`doctor-onboarding:${normalizeEmail(email)}`]);
+    await authorize(client);
     const result = await run(sqlForConnection(client));
     await client.query('COMMIT');
     return result;

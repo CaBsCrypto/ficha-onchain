@@ -16,6 +16,16 @@
 # next.js
 /.next/
 /.trustleaf-local/
+*.private.json
+*.dpapi
+*.xdr
+*.aes256gcm.json
+*.transfer-key
+*.mp4
+*.mkv
+*.mov
+TrustLeaf-*.gif
+/.render-deps/
 /out/
 
 # production

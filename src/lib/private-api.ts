@@ -5,11 +5,11 @@ import { assertPrivateEnvironment, PrivateFlowError } from '@/lib/private-config
 import { DoctorAuthorizationError } from '@/lib/doctor-authorizations';
 import { WalletBindingError } from '@/lib/stellar/privy-wallet-binding';
 
-export async function privateApi(request:Request,work:(actor:AuthedUser)=>Promise<unknown>) {
-  const actor=await requireUser(request);
-  if(!actor?.email)return unauthorized();
-  if(request.method!=='GET'&&!isSameOrigin(request))return NextResponse.json({error:'forbidden'},{status:403});
+export async function privateApi(request:Request,work:(actor:AuthedUser)=>Promise<unknown>,options:{strict?:boolean}={}) {
   try {
+    const actor=options.strict?await requireUser(request,{strict:true}):await requireUser(request);
+    if(!actor?.email)return unauthorized();
+    if(request.method!=='GET'&&!isSameOrigin(request))return NextResponse.json({error:'forbidden'},{status:403});
     assertPrivateEnvironment();
     return NextResponse.json(await work(actor),{headers:{'Cache-Control':'no-store'}});
   }catch(error) {

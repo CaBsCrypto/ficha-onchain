@@ -7,6 +7,8 @@ import { isApprovedDoctor } from '@/lib/doctor-access';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/private-chain';
 import { encryptPrescription, decryptPrescription, prescriptionCommitment } from '../../scripts/lib/private-prescription.mjs';
+import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxDocument, assertPrivateRxScopeOpen,
+  type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
 
 // Rows stay inside the server boundary; only explicit view models leave it.
 export type PrivateRow = Record<string, any>;
@@ -124,8 +126,13 @@ export async function listPrivatePrescriptions(actor:AuthedUser,role:string) {
     return {prescriptions,checkedAt:new Date().toISOString()};
   }finally{client.release();}
 }
-export async function preparePrescription(actor:AuthedUser,appointmentId:number,document:unknown) {
-  assertPrivateWrites();const wallet=await privateActorWallet(actor);
+export async function preparePrescription(actor:AuthedUser,appointmentId:number,document:unknown,scope?:PrivateRxIssuanceScope) {
+  if(scope) {
+    assertPrivateRxScopeOpen(scope,'mint'); assertPrivateRxActor(scope,actor,undefined,'doctor'); assertPrivateRxDocument(scope,document);
+    if(appointmentId!==scope.appointmentId)throw new PrivateFlowError('private_rx_scope_rejected',403);
+  }else assertPrivateWrites();
+  const wallet=await privateActorWallet(actor);
+  if(scope)assertPrivateRxActor(scope,actor,wallet,'doctor');
   if(!document||typeof document!=='object'||Array.isArray(document))throw new PrivateFlowError('invalid_prescription_document',400);
   const d=document as Record<string,unknown>;
   if(Object.keys(d).some(k=>!['medication','dosage','instructions'].includes(k))||['medication','dosage','instructions'].some(k=>typeof d[k]!=='string'||!(d[k] as string).trim()||(d[k] as string).length>2000))throw new PrivateFlowError('invalid_prescription_document',400);
@@ -134,6 +141,7 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
   try {
     await client.query('BEGIN');
     const {appointment,booking,prescription}=await loadPrivateContext(client,actor,appointmentId,true);
+    if(scope)assertPrivateRxContext(scope,appointment,booking,prescription);
     if(actor.email!==appointment.doctor_email||!booking||actor.userId!==booking.doctor_user_id||wallet.address!==booking.doctor_wallet)throw new PrivateFlowError('forbidden',403);
     const chain=createPrivateChain();await chain.verifyDeployment();await verifyParticipants(client,booking);
     await assertReviewedPrescriber(client,appointment,booking);
@@ -141,14 +149,17 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
     if(prescription) {
       const plain=decryptPrescription(prescription.ciphertext,encryptionKey(),storageContext(prescription.id));
       if(JSON.stringify(plain.document)!==JSON.stringify(clean))throw new PrivateFlowError('private_prescription_already_prepared');
+      if(scope)assertPrivateRxScopeOpen(scope,'mint');
       await client.query('COMMIT');return {prescription:await prescriptionView(prescription,appointment,chain)};
     }
-    const id=randomUUID(),expiresAt=Math.floor(Date.now()/1000)+30*86400;
+    const id=scope?.prescriptionId??randomUUID(),expiresAt=Math.floor(Date.now()/1000)+30*86400;
     const payload={schemaVersion:1,network:'testnet',contractId:RX_PRIVATE,doctor:booking.doctor_wallet,patient:booking.patient_wallet,
       issuanceId:booking.issuance_id,expiresAt,document:clean,blinding:randomBytes(32).toString('hex')};
     const commitment=prescriptionCommitment(payload),ciphertext=encryptPrescription(payload,encryptionKey(),storageContext(id));
+    if(scope)assertPrivateRxScopeOpen(scope,'mint');
     const row=(await client.query(`INSERT INTO private_prescriptions (id,network,contract_id,appointment_id,issuance_id,doctor_wallet,patient_wallet,expires_at,commitment,ciphertext,state)
       VALUES($1,'testnet',$2,$3,$4,$5,$6,$7,$8,$9,'prepared') RETURNING *`,[id,RX_PRIVATE,appointmentId,booking.issuance_id,booking.doctor_wallet,booking.patient_wallet,expiresAt,commitment,ciphertext])).rows[0];
+    if(scope)assertPrivateRxScopeOpen(scope,'mint');
     await client.query('COMMIT');return {prescription:await prescriptionView(row,appointment,chain)};
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }

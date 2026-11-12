@@ -4,18 +4,21 @@ import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { assertPrivateEnvironment, assertPrivateWrites, PRIVY_APP, RX_PRIVATE } from '@/lib/private-config';
+import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxCreate, assertPrivateRxScopeOpen, privateRxRole,
+  type PrivateRxAppointmentScope } from '@/lib/digital-cabs-rx';
 
 export class BookingPreparationError extends Error {
   constructor(public code: string, public status = 409) { super(code); }
 }
 
 /** Keep role checks, attendance/start changes and queue insertion in one transaction. */
-export async function bookingTransaction<T>(run: (sql: Sql) => Promise<T>): Promise<T> {
-  assertPrivateWrites();
+export async function bookingTransaction<T>(run: (sql: Sql) => Promise<T>, scope?: PrivateRxAppointmentScope): Promise<T> {
+  if (scope) assertPrivateRxScopeOpen(scope); else assertPrivateWrites();
   const client = await getDbConnection();
   try {
     await client.query('BEGIN');
     const result = await run(sqlForConnection(client));
+    if (scope) assertPrivateRxScopeOpen(scope);
     await client.query('COMMIT');
     return result;
   } catch (error) {
@@ -56,6 +59,33 @@ export async function availableAppointmentSlots(sql: Sql, doctorEmail: string, d
     slots: slots.map(s => ({ time: s.time, available: true })), time_off: null };
 }
 
+/** A scoped extra half hour is derived, never persisted in the weekly grid.
+ * Call under the doctor row lock when using it as a reservation prerequisite. */
+export async function privateRxOneTimeSlotAvailable(sql: Sql, scope: PrivateRxAppointmentScope, doctorEmail: string) {
+  if (scope.phase !== 'appointment' || scope.slot.oneTime !== true) return false;
+  assertPrivateRxScopeOpen(scope);
+  const rows = await sql.query<{ available: boolean }>(`WITH wanted AS (
+    SELECT $2::date + $3::time AS starts, $2::date + $3::time + INTERVAL '30 minutes' AS ends
+  ), relevant AS (
+    SELECT a.date, CASE WHEN a.time_slot ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN a.time_slot::time END AS clock_time
+    FROM appointments a WHERE LOWER(a.doctor_email)=$1 AND a.status IS DISTINCT FROM 'cancelled'
+      AND (a.date=$2::date OR (a.date=$2::date-1 AND $3::time<'04:00'::time))
+  ), occupied AS (
+    SELECT r.date + r.clock_time AS starts, COALESCE((SELECT MAX(av.slot_minutes) FROM doctor_availability av
+      WHERE LOWER(av.doctor_email)=$1 AND av.weekday=EXTRACT(DOW FROM r.date) AND av.slot_minutes BETWEEN 5 AND 240
+        AND r.clock_time>=av.start_time AND r.date+r.clock_time+make_interval(mins=>av.slot_minutes)<=r.date+av.end_time
+        AND MOD(EXTRACT(EPOCH FROM (r.clock_time-av.start_time))::integer,NULLIF(av.slot_minutes*60,0))=0),240) AS minutes
+    FROM relevant r
+  ) SELECT ($2::date=(NOW() AT TIME ZONE 'America/Santiago')::date
+    AND w.starts>=(NOW() AT TIME ZONE 'America/Santiago')
+    AND NOT EXISTS (SELECT 1 FROM doctor_time_off o WHERE LOWER(o.doctor_email)=$1 AND o.date=$2::date)
+    AND NOT EXISTS (SELECT 1 FROM occupied o WHERE o.starts IS NULL OR
+      (o.starts<w.ends AND o.starts+make_interval(mins=>o.minutes)>w.starts))) AS available FROM wanted w`,
+    [doctorEmail.toLowerCase(), scope.slot.date, scope.slot.timeSlot]);
+  assertPrivateRxScopeOpen(scope);
+  return rows.length === 1 && rows[0].available === true;
+}
+
 const appointmentSelect = `SELECT a.*,TO_CHAR(a.date,'YYYY-MM-DD') AS date,d.name AS doctor_name,
   CASE WHEN b.appointment_id IS NULL THEN NULL ELSE jsonb_build_object('issuance_id',b.issuance_id,'state',b.state,
     'valid_until',b.valid_until,'attestation_hash',b.attestation_hash,'revocation_hash',b.revocation_hash,
@@ -89,8 +119,8 @@ async function ownedAppointment(sql: Sql, actor: AuthedUser, id: number, lock = 
 }
 
 export async function createPrivateAppointment(sql: Sql, actor: AuthedUser,
-  input: { doctorId: number; date: string; timeSlot: string; type?: string }) {
-  assertPrivateWrites();
+  input: { doctorId: number; date: string; timeSlot: string; type?: string }, scope?: PrivateRxAppointmentScope) {
+  if (scope) assertPrivateRxCreate(scope, actor, input); else assertPrivateWrites();
   if (!actor.email) throw new BookingPreparationError('verified_email_required', 403);
   if (!validBookingDate(input.date) || !validBookingTime(input.timeSlot) || !Number.isSafeInteger(input.doctorId) || input.doctorId < 1)
     throw new BookingPreparationError('invalid_appointment', 400);
@@ -99,12 +129,31 @@ export async function createPrivateAppointment(sql: Sql, actor: AuthedUser,
   const doctor = await resolveDoctor(sql, input.doctorId);
   if (doctor.userId === actor.userId) throw new BookingPreparationError('distinct_participants_required', 403);
   const patient = await verifiedWallet(sql, actor.userId, actor.email);
+  if (scope) {
+    assertPrivateRxActor(scope, actor, patient, 'patient');
+    assertPrivateRxActor(scope, { userId: doctor.userId, email: String(doctor.doctor.email) }, doctor, 'doctor');
+  }
   if (!(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)}))) throw new BookingPreparationError('doctor_not_authorized', 403);
   // Availability updates lock this same doctor row; slot selection cannot race a grid replacement.
   const [locked] = await sql`SELECT id FROM doctors WHERE id=${input.doctorId} AND LOWER(email)=${doctor.doctor.email} FOR UPDATE`;
   if (!locked) throw new BookingPreparationError('doctor_identity_changed', 409);
-  const slots = await availableAppointmentSlots(sql, String(doctor.doctor.email), input.date);
-  if (!slots.slots.some(s => s.time === input.timeSlot)) throw new BookingPreparationError('slot_not_available', 409);
+  if (scope) {
+    // Lock the existing doctor/slot before checking idempotency, including terminal rows.
+    const existing = await sql.query(`SELECT a.*,TO_CHAR(a.date,'YYYY-MM-DD') AS date FROM appointments a
+      WHERE a.doctor_id=$1 AND a.date=$2::date AND a.time_slot=$3 ORDER BY a.id LIMIT 2 FOR UPDATE`, [scope.doctorId, scope.slot.date, scope.slot.timeSlot]);
+    if (existing.length > 1) throw new BookingPreparationError('private_rx_scope_rejected', 403);
+    if (existing.length) {
+      assertPrivateRxContext(scope, existing[0]);
+      if (!['scheduled','in_progress'].includes(existing[0].status)) throw new BookingPreparationError('private_rx_scope_rejected', 403);
+      return { appointment: publicAppointment(await ownedAppointment(sql, actor, Number(existing[0].id))) };
+    }
+  }
+  const doctorEmail = String(doctor.doctor.email);
+  const available = scope?.slot.oneTime === true
+    ? await privateRxOneTimeSlotAvailable(sql, scope, doctorEmail)
+    : (await availableAppointmentSlots(sql, doctorEmail, input.date)).slots.some(s => s.time === input.timeSlot);
+  if (!available) throw new BookingPreparationError('slot_not_available', 409);
+  if (scope) assertPrivateRxScopeOpen(scope);
   const [inserted] = await sql`INSERT INTO appointments(doctor_id,doctor_email,doctor_user_id,doctor_wallet_id,doctor_wallet,
     patient_email,patient_user_id,patient_wallet_id,patient_wallet,patient_name,date,time_slot,type,status)
     VALUES(${input.doctorId},${doctor.doctor.email},${doctor.userId},${doctor.walletId},${doctor.address},
@@ -115,9 +164,10 @@ export async function createPrivateAppointment(sql: Sql, actor: AuthedUser,
 }
 
 /** Caller holds the appointment lock. Attendance establishes identity only, never consent. */
-export async function preparePrescriptionBooking(sql: Sql, actor: AuthedUser, appointmentId: number) {
-  assertPrivateWrites();
+export async function preparePrescriptionBooking(sql: Sql, actor: AuthedUser, appointmentId: number, scope?: PrivateRxAppointmentScope) {
+  if (scope) { assertPrivateRxScopeOpen(scope); privateRxRole(scope, actor); } else assertPrivateWrites();
   const a = await ownedAppointment(sql, actor, appointmentId, true);
+  if (scope) assertPrivateRxContext(scope, a);
   if (a.status !== 'in_progress' || !a.attendance_at || a.attendance_user_id !== a.patient_user_id || a.started_by !== a.doctor_user_id)
     throw new BookingPreparationError('booking_not_eligible');
   const patient = await verifiedWallet(sql, a.patient_user_id, a.patient_email);
@@ -125,6 +175,11 @@ export async function preparePrescriptionBooking(sql: Sql, actor: AuthedUser, ap
   if (patient.walletId !== a.patient_wallet_id || patient.address !== a.patient_wallet || doctor.walletId !== a.doctor_wallet_id || doctor.address !== a.doctor_wallet)
     throw new BookingPreparationError('appointment_wallet_changed', 403);
   if (!(await isApprovedDoctor(sql,Number(a.doctor_id),{...doctor,userId:a.doctor_user_id,email:a.doctor_email}))) throw new BookingPreparationError('doctor_not_authorized', 403);
+  if (scope) {
+    const role = privateRxRole(scope, actor);
+    assertPrivateRxActor(scope, actor, role === 'patient' ? patient : doctor, role);
+    assertPrivateRxScopeOpen(scope);
+  }
   const [row] = await sql`INSERT INTO prescription_booking_requests(appointment_id,issuance_id,network,contract_id,
     patient_requested_by,patient_email,doctor_email,patient_wallet,doctor_wallet,doctor_user_id,doctor_wallet_id,patient_wallet_id,valid_until,state)
     SELECT a.id,${randomBytes(32).toString('hex')},'testnet',${RX_PRIVATE},a.patient_user_id,a.patient_email,a.doctor_email,
@@ -176,14 +231,20 @@ export async function requestBookingCancellation(sql: Sql, actor: AuthedUser, ap
     state: changed.state, onchainRevoked: false, nextAction: 'reconcile_booking_before_confirming_cancellation' };
 }
 
-export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: number, action: 'attend' | 'start' | 'complete' | 'cancel') {
-  assertPrivateWrites();
+export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: number, action: 'attend' | 'start' | 'complete' | 'cancel', scope?: PrivateRxAppointmentScope) {
+  if (scope) {
+    assertPrivateRxScopeOpen(scope);
+    if (action !== 'attend' && action !== 'start') throw new BookingPreparationError('private_rx_scope_rejected', 403);
+    assertPrivateRxActor(scope, actor, undefined, action === 'attend' ? 'patient' : 'doctor');
+  } else assertPrivateWrites();
   if (action === 'cancel') return requestBookingCancellation(sql, actor, id);
   const a = await ownedAppointment(sql, actor, id, true);
+  if (scope) assertPrivateRxContext(scope, a);
   const role = action === 'attend' ? 'patient' : 'doctor';
   if (a[`${role}_user_id`] !== actor.userId || a[`${role}_email`] !== actor.email) throw new BookingPreparationError('wrong_consultation_role', 403);
   const wallet = await verifiedWallet(sql, actor.userId, actor.email!);
   if (wallet.walletId !== a[`${role}_wallet_id`] || wallet.address !== a[`${role}_wallet`]) throw new BookingPreparationError('appointment_wallet_changed', 403);
+  if (scope) assertPrivateRxActor(scope, actor, wallet, role);
   if (role === 'doctor' && !(await isApprovedDoctor(sql,Number(a.doctor_id),{...wallet,userId:actor.userId,email:actor.email!}))) throw new BookingPreparationError('doctor_not_authorized', 403);
   if (['cancelled','cancel_requested','completed'].includes(a.status)) throw new BookingPreparationError('consultation_not_open');
   if (action === 'complete') {
@@ -192,6 +253,7 @@ export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: 
     const [completed] = await sql`UPDATE appointments SET status='completed',completed_at=NOW() WHERE id=${id} AND status='in_progress' RETURNING id`;
     if (!completed) throw new BookingPreparationError('consultation_not_open');
   } else {
+    if (scope) assertPrivateRxScopeOpen(scope);
     const [updated] = action === 'attend'
       ? await sql`UPDATE appointments SET attendance_at=COALESCE(attendance_at,NOW()),attendance_user_id=${actor.userId}
           WHERE id=${id} AND status IN ('scheduled','in_progress') AND date=(NOW() AT TIME ZONE 'America/Santiago')::date
@@ -200,7 +262,7 @@ export async function changePrivateAppointment(sql: Sql, actor: AuthedUser, id: 
           WHERE id=${id} AND status IN ('scheduled','in_progress') AND date=(NOW() AT TIME ZONE 'America/Santiago')::date
             AND date+time_slot::time<=(NOW() AT TIME ZONE 'America/Santiago')+INTERVAL '30 minutes' RETURNING *`;
     if (!updated) throw new BookingPreparationError('consultation_outside_checkin_window');
-    if (updated.attendance_at && updated.started_at) await preparePrescriptionBooking(sql, actor, id);
+    if (updated.attendance_at && updated.started_at) await preparePrescriptionBooking(sql, actor, id, scope);
   }
   const result = await ownedAppointment(sql, actor, id);
   return { appointment: publicAppointment(result), bookingPending: result.booking?.state === 'prepared' };

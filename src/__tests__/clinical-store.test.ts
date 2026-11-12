@@ -204,3 +204,14 @@ describe('clinical web migration: explicit dev-only preparation', () => {
     }
   });
 });
+
+describe('never-submitted signed expiry retains the existing persisted-state invariant',()=>{
+ it('reads a failed signed intent with its exact never-submitted reason and immutable bytes',async()=>{
+  const persisted=operationRow({state:'failed',signed_xdr:'c2lnbmVk',transaction_hash:TX,error_code:'signed_expired_before_submission',confirmed_at:null});
+  const row=await clinicalWebStore(client([persisted]),scope).getOperation(ID,USER);expect(row?.state).toBe('failed');expect(row?.signedXdr).toBe('c2lnbmVk');expect(row?.transactionHash).toBe(TX);expect(row?.errorCode).toBe('signed_expired_before_submission');
+ });
+ it('continues rejecting cancelled signed rows even with a never-submitted reason',async()=>{
+  const persisted=operationRow({state:'cancelled',signed_xdr:'c2lnbmVk',transaction_hash:TX,error_code:'signed_expired_before_submission',confirmed_at:null});
+  await expect(clinicalWebStore(client([persisted]),scope).getOperation(ID,USER)).rejects.toThrow('clinical_storage_invalid');
+ });
+});

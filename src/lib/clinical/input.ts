@@ -5,19 +5,23 @@ import { uuid } from '@/lib/private-api';
 function fail(code = 'clinical_request_invalid'): never { throw new PrivateFlowError(code, 400); }
 const exact = (value: unknown, keys: string[]): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(k => keys.includes(k));
 export function clinicalNote(value: unknown): ClinicalNote {
-  if (!exact(value, ['title', 'text', 'eventDate']) || typeof value.title !== 'string' || typeof value.text !== 'string' ||
+  if (!exact(value, ['title', 'text', 'eventDate', 'prescriptionId']) || typeof value.title !== 'string' || typeof value.text !== 'string' ||
+      (value.prescriptionId !== undefined && !uuid(value.prescriptionId)) ||
       !value.title.trim() || value.title.length > 120 || !value.text.trim() || value.text.length > 20_000 ||
       (value.eventDate !== null && (typeof value.eventDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.eventDate) ||
         !Number.isFinite(Date.parse(value.eventDate)) || new Date(value.eventDate).toISOString().slice(0, 10) !== value.eventDate))) fail();
-  return { title: value.title.trim(), text: value.text.trim(), eventDate: value.eventDate as string | null };
+  return { title: value.title.trim(), text: value.text.trim(), eventDate: value.eventDate as string | null, ...(value.prescriptionId !== undefined ? { prescriptionId: String(value.prescriptionId) } : {}) };
 }
 export function clinicalInput(supplied: unknown): ClinicalPrepareRequest {
-  if (!exact(supplied, ['requestId', 'action', 'entryId', 'expectedVersion', 'note', 'file', 'doctorId', 'canRead', 'canAppend', 'expectedRevision']) || !uuid(supplied.requestId)) fail();
+  if (!exact(supplied, ['requestId', 'action', 'historyId', 'entryId', 'expectedVersion', 'note', 'file', 'doctorId', 'canRead', 'canAppend', 'expectedRevision', 'draftId', 'draftRevision']) || !uuid(supplied.requestId)) fail();
   const value = { ...supplied };
   const allowed = (keys: string[]) => { if (Object.keys(value).some(k => !['requestId', 'action', ...keys].includes(k))) fail(); };
   if (value.action === 'create_history') allowed([]);
   else if (value.action === 'append_version') {
-    allowed(['entryId', 'expectedVersion', 'note', 'file']);
+    allowed(['historyId', 'entryId', 'expectedVersion', 'note', 'file', 'draftId', 'draftRevision']);
+    if ((value.draftId === undefined) !== (value.draftRevision === undefined) ||
+      (value.draftId !== undefined && (!uuid(value.draftId) || !Number.isSafeInteger(value.draftRevision) || Number(value.draftRevision) < 1))) fail();
+    if (value.historyId !== undefined && (typeof value.historyId !== 'string' || !/^[a-f0-9]{64}$/.test(value.historyId))) fail();
     if ((value.note === undefined) === (value.file === undefined) ||
       (value.entryId !== undefined && (typeof value.entryId !== 'string' || !/^[a-f0-9]{64}$/.test(value.entryId))) ||
       (value.entryId === undefined ? value.expectedVersion !== undefined && value.expectedVersion !== 0 :

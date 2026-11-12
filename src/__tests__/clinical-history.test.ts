@@ -4,7 +4,7 @@ import { CLINICAL_CONTRACT, clinicalInvocation, deriveClinicalEntryId, deriveCli
 import { sealClinicalVersion } from '../../scripts/lib/clinical-crypto.mjs';
 import type { ClinicalActor, ClinicalExpected } from '@/types/clinical';
 
-const m = vi.hoisted(() => ({ query: vi.fn(), auth: vi.fn(), actor: vi.fn(), doctor: vi.fn(), chainFactory: vi.fn(), readerFactory: vi.fn(), chain: {} as Record<string, any>, reader: {} as Record<string, any> }));
+const m = vi.hoisted(() => ({ query: vi.fn(), auth: vi.fn(), actor: vi.fn(), doctor: vi.fn(), chainFactory: vi.fn(), readerFactory: vi.fn(), documents: [] as Uint8Array[], chain: {} as Record<string, any>, reader: {} as Record<string, any> }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: m.auth }));
@@ -12,6 +12,12 @@ vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
 vi.mock('@/lib/clinical/identity', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/identity')>(), resolveClinicalActor: m.actor }));
 vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: () => { m.chainFactory(); return m.chain; } }));
 vi.mock('../../scripts/lib/clinical-chain-read.mjs', () => ({ createClinicalChainReader: () => { m.readerFactory(); return m.reader; } }));
+vi.mock('../../scripts/lib/clinical-read.mjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../scripts/lib/clinical-read.mjs')>();
+  return { ...actual, readClinicalVersion: async (...args: Parameters<typeof actual.readClinicalVersion>) => {
+    const document = await actual.readClinicalVersion(...args); m.documents.push(document.content); return document;
+  } };
+});
 import { clinicalDocument, clinicalGrants, clinicalOperations, clinicalPublicOperation, clinicalSnapshot, ownClinicalHistory } from '@/lib/clinical/history';
 
 // Deterministic local identities and encryption keys; no Testnet or database calls.
@@ -32,7 +38,7 @@ function fixture(author = patient) {
   const firstOp = operationId;
   const actualEntryId = deriveClinicalEntryId(historyId, author.publicKey(), firstOp);
   function addVersion(text = 'LOCAL PRIVATE NOTE') {
-    const version = state.head + 1, opId = version === 1 ? firstOp : '8'.repeat(64);
+    const version = state.head + 1, opId = version === 1 ? firstOp : version.toString(16).padStart(64, '0');
     const previous = state.stored.at(-1)?.commitment ?? null;
     const context = { schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT, historyId, entryId: actualEntryId, author: author.publicKey(), patient: actor.address, version, previousCommitment: previous };
     const note = { title: `Local note v${version}`, text, eventDate: null }, metadata = { mediaType: 'application/json', fileName: 'antecedente.json' };
@@ -64,7 +70,7 @@ function fixture(author = patient) {
     if (sql.includes('FROM clinical_web_histories')) return state.own ? [state.own] : [];
     if (sql.startsWith('SELECT id,name FROM doctors')) return state.doctors;
     if (sql.includes('FROM clinical_web_operations') && sql.includes('transaction_hash=$1')) return state.operations.filter(o => o.transaction_hash === values[0]);
-    if (sql.includes('FROM clinical_web_operations')) return state.operations.filter(o => o.actor_user_id === values[0] && o.wallet_id === values[1] && o.source_wallet === values[2]);
+    if (sql.includes('FROM clinical_web_operations')) return state.operations.filter(o => o.actor_user_id === values[0] && o.wallet_id === values[1] && o.source_wallet === values[2] && (sql.includes("AND action='create_history'") ? o.action === 'create_history' && o.expected.patient === values[4] : !values[4] || o.expected.historyId === values[4]));
     if (sql.startsWith('SELECT entry_id,version,transaction_hash,operation_id,commitment')) return state.stored;
     if (sql.startsWith('SELECT context,envelope,commitment,operation_id,state,transaction_hash')) {
       if (state.encryptedFailure) throw Error('PRIVATE PROVIDER DIAGNOSTIC');
@@ -93,7 +99,7 @@ function fixture(author = patient) {
   return { state, actualEntryId, addVersion, addCreation };
 }
 beforeEach(() => {
-  vi.resetAllMocks(); vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'history-test');
+  vi.resetAllMocks(); m.documents = []; vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'history-test');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -194,13 +200,13 @@ describe('clinical private document reads and integrity', () => {
 });
 
 describe('clinical timeline, historical versions and corresponding receipts', () => {
-  it('scopes static readers to one snapshot while checking every version before and after decryption', async () => {
+  it('scopes bounded worker readers to one snapshot while checking every version before and after decryption', async () => {
     const f = fixture(); f.addVersion(); f.addVersion();
     await clinicalSnapshot(request(), user, actor);
-    expect(m.chainFactory).toHaveBeenCalledOnce(); expect(m.readerFactory).toHaveBeenCalledOnce();
+    expect(m.chainFactory).toHaveBeenCalledTimes(2); expect(m.readerFactory).toHaveBeenCalledTimes(2);
     expect(m.reader.readAccess).toHaveBeenCalledTimes(4); expect(m.reader.readVersion).toHaveBeenCalledTimes(4);
     await clinicalSnapshot(request(), user, actor);
-    expect(m.chainFactory).toHaveBeenCalledTimes(2); expect(m.readerFactory).toHaveBeenCalledTimes(2);
+    expect(m.chainFactory).toHaveBeenCalledTimes(4); expect(m.readerFactory).toHaveBeenCalledTimes(4);
     expect(m.reader.readAccess).toHaveBeenCalledTimes(8); expect(m.reader.readVersion).toHaveBeenCalledTimes(8);
   });
   it('preserves earlier patient versions while only the latest own contribution can be corrected', async () => {
@@ -285,4 +291,83 @@ it('reports an unavailable doctor identity without fabricating a permission stat
  const data=await clinicalSnapshot(request(),user,actor);
  expect(data.grantsUnavailable).toBe(true);expect(data.grants).toEqual([]);expect(data.entries).toHaveLength(1);
  expect(m.chain.grant).not.toHaveBeenCalled();
+});
+
+it('scopes the patient timeline to its own history even when this wallet also authors another patient history', async () => {
+  const f = fixture(); const own = f.addVersion();
+  f.state.operations.push({ ...own.operation, id: 'another-history-operation', expected: { ...own.operation.expected, historyId: '0'.repeat(64), patient: doctor.publicKey() } });
+  const snapshot = await clinicalSnapshot(request(), user, actor);
+  expect(snapshot.operations).toHaveLength(1); expect(snapshot.operations[0].id).toBe(own.operation.id);
+  expect(m.query).toHaveBeenCalledWith(expect.stringContaining("expected->>'historyId'=$5"), [actor.userId, actor.walletId, actor.address, CLINICAL_CONTRACT, historyId]);
+});
+it('keeps only own history-creation recovery visible before a patient history exists', async () => {
+  const f = fixture(); f.addVersion(); const creation = f.addCreation(); f.state.own = null;
+  const snapshot = await clinicalSnapshot(request(), user, actor);
+  expect(snapshot.history).toBeNull(); expect(snapshot.operations.map(op => op.id)).toEqual([creation.id]);
+});
+
+describe('bounded snapshot scheduling and cancellation', () => {
+  it('loads at most eight versions concurrently, checks one head per entry and reuses exactly eight request-local readers', async () => {
+    const f = fixture(); for (let n = 0; n < 9; n++) f.addVersion('AUTHORIZED VERSION ' + n);
+    const original = m.query.getMockImplementation()!;
+    let release!: () => void, reached!: () => void, active = 0, peak = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { reached = resolve; });
+    m.query.mockImplementation(async (sql: string, values: unknown[]) => {
+      if (!sql.startsWith('SELECT context,envelope,commitment,operation_id,state,transaction_hash')) return original(sql, values);
+      active++; peak = Math.max(peak, active); if (active === 8) reached();
+      try { await gate; return await original(sql, values); } finally { active--; }
+    });
+    const pending = clinicalSnapshot(request(), user, actor);
+    await started;
+    try {
+      expect(peak).toBe(8); expect(m.readerFactory).toHaveBeenCalledTimes(8);
+      expect(m.chain.entry).toHaveBeenCalledTimes(1);
+    } finally { release(); }
+    const snapshot = await pending;
+    expect(snapshot.entries.map(e => e.version)).toEqual([9,8,7,6,5,4,3,2,1]);
+    expect(peak).toBe(8);
+    expect(m.readerFactory).toHaveBeenCalledTimes(8); expect(m.chainFactory).toHaveBeenCalledTimes(8);
+    expect(m.reader.readAccess).toHaveBeenCalledTimes(18); expect(m.reader.readVersion).toHaveBeenCalledTimes(18);
+    expect(m.documents).toHaveLength(9); expect(m.documents.every(content => content.length > 0 && content.every(byte => byte === 0))).toBe(true);
+    expect(snapshot.entries[0].note?.text).toBe('AUTHORIZED VERSION 8');
+  });
+
+  it.each(['duplicate','gap','invalid'])('rejects a %s version index before head RPC or decryption', async condition => {
+    const f = fixture(); f.addVersion(); f.addVersion();
+    if (condition === 'duplicate') f.state.stored.push({ ...f.state.stored[0] });
+    if (condition === 'gap') f.state.stored.shift();
+    if (condition === 'invalid') f.state.stored[0].version = 0;
+    await expect(clinicalSnapshot(request(), user, actor)).rejects.toMatchObject({ message: 'clinical_history_unavailable', status: 503 });
+    expect(m.chain.entry).not.toHaveBeenCalled(); expect(m.readerFactory).not.toHaveBeenCalled(); expect(m.documents).toEqual([]);
+  });
+
+  it('waits for already running reads, clears their decrypted bytes and starts no later versions after a proof failure', async () => {
+    const f = fixture(); for (let n = 0; n < 9; n++) f.addVersion();
+    m.chain.version.mockRejectedValue(Error('proof unavailable'));
+    await expect(clinicalSnapshot(request(), user, actor)).rejects.toThrow('proof unavailable');
+    expect(m.readerFactory).toHaveBeenCalledTimes(8);
+    expect(m.documents).toHaveLength(8); expect(m.documents.every(content => content.every(byte => byte === 0))).toBe(true);
+    expect(m.chain.verifyRecordedOperation).not.toHaveBeenCalled();
+  });
+
+  it('stops scheduling after request cancellation while clearing already authorized content', async () => {
+    const f = fixture(); for (let n = 0; n < 9; n++) f.addVersion();
+    let release!: () => void, reached!: () => void, calls = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { reached = resolve; });
+    m.chain.verifyRecordedOperation.mockImplementation(async () => { calls++; if (calls === 8) reached(); await gate; return true; });
+    const controller = new AbortController(), req = new Request('http://localhost/api/private-clinical-history', {
+      signal: controller.signal, headers: { Authorization: 'Bearer local-synthetic-credential' } });
+    const pending = expect(clinicalSnapshot(req, user, actor)).rejects.toMatchObject({ message: 'clinical_history_unavailable', status: 503 });
+    await started; controller.abort(); release(); await pending;
+    expect(calls).toBe(8); expect(m.documents).toHaveLength(8);
+    expect(m.documents.every(content => content.every(byte => byte === 0))).toBe(true);
+  });
+
+  it('does not start worker readers for an already aborted snapshot', async () => {
+    const f = fixture(); f.addVersion(); const controller = new AbortController(); controller.abort();
+    await expect(clinicalSnapshot(new Request('http://localhost/test', { signal: controller.signal }), user, actor)).rejects.toMatchObject({ status: 503 });
+    expect(m.readerFactory).not.toHaveBeenCalled(); expect(m.documents).toEqual([]);
+  });
 });

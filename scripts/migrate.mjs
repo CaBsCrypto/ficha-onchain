@@ -13,6 +13,7 @@ import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "node:fs";
 import { databaseConnectionString } from './lib/database-connection.mjs';
 import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs';
+import { CLINICAL_RESILIENCE_SCHEMA_SQL } from './lib/clinical-resilience-schema.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -749,6 +750,15 @@ step("private operations", async () => {
 
 // Browser-backed clinical histories remain separate from the synthetic week-one
 // runner. A hosted Testnet target requires the explicit migration policy.
+// Additive only: existing histories, operations and permissions remain intact.
+step("clinical-resilience-v1", async () => {
+  if (!process.argv.includes('--step=clinical-resilience-v1')) return;
+  clinicalMigrationConnection(process.env,true);
+  const dependency = await sql`SELECT to_regclass('public.clinical_web_operations') AS relation`;
+  if (!dependency[0]?.relation) throw Error('clinical_resilience_requires_clinical_web_v1');
+  for (const statement of CLINICAL_RESILIENCE_SCHEMA_SQL) await sql.query(statement);
+});
+
 step("clinical-web-v1", async () => {
   if (!process.argv.includes('--step=clinical-web-v1')) return;
   clinicalMigrationConnection(process.env, true);

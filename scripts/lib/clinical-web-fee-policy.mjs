@@ -55,9 +55,13 @@ export async function checkClinicalWebRelayerBudget(server, relayer) {
     const payer = await server.getLedgerEntries(key), entry = payer.entries?.[0];
     if (!Number.isSafeInteger(payer.latestLedger) || payer.latestLedger < 1 || payer.entries?.length !== 1 ||
         !entry.key.toXDR().equals(key.toXDR()) || entry.val.switch().name !== 'account' || !entry.val.account().accountId().toXDR().equals(id.toXDR())) throw fail();
-    const reserveLedger = await server.getLedgers({startLedger:payer.latestLedger,pagination:{limit:1}});
-    const header = reserveLedger.ledgers?.[0];
-    if (reserveLedger.ledgers?.length !== 1 || header.sequence !== payer.latestLedger || header.headerXdr.header().ledgerSeq() !== header.sequence) throw fail();
-    assertClinicalWebRelayerBudget(entry.val.account(),header.headerXdr.header().baseReserve());
+    // The pinned SDK14 decoder rejects newer SCP union arms in ledger metadata.
+    // Request RPC's documented JSON form; retain same-ledger, hash and reserve
+    // validation, and reject unknown/missing fields without a balance fallback.
+    const reserveLedger = await server._getLedgers({startLedger:payer.latestLedger,pagination:{limit:1},xdrFormat:'json'});
+    const ledger = reserveLedger.ledgers?.[0], header = ledger?.headerJson?.header;
+    if (reserveLedger.ledgers?.length !== 1 || ledger.sequence !== payer.latestLedger || header?.ledger_seq !== ledger.sequence ||
+        !/^[0-9a-f]{64}$/.test(ledger.hash) || ledger.headerJson.hash !== ledger.hash) throw fail();
+    assertClinicalWebRelayerBudget(entry.val.account(),header.base_reserve);
   } catch { throw Error('rehearsal_relayer_unfunded'); }
 }

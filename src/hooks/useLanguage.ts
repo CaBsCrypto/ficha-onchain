@@ -86,3 +86,8 @@ export function useLanguage(): LanguageContextValue {
   }
   return ctx;
 }
+
+/** The private clinical portal currently provides Spanish and English copy. */
+export function usePortalLanguage(): "es" | "en" {
+  return useContext(LanguageContext)?.lang === "en" ? "en" : "es";
+}

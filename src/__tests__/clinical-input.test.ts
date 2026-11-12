@@ -27,3 +27,16 @@ describe('bounded clinical requests', () => {
     await expect(clinicalBody(new Request('http://localhost/test', { method: 'POST', body, duplex: 'half' } as RequestInit))).rejects.toThrow('clinical_request_too_large');
   });
 });
+
+
+it('accepts only an opaque history locator for doctor append, never roles or wallets', () => {
+  const intent = { requestId, action: 'append_version', historyId: 'ab'.repeat(32), note: { title: 'A', text: 'B', eventDate: null } };
+  expect(clinicalInput(intent).historyId).toBe(intent.historyId);
+  for (const invalid of ['', 'doctor@example.test', 'ab'.repeat(31)]) expect(() => clinicalInput({ ...intent, historyId: invalid })).toThrow();
+  for (const field of ['patient', 'wallet', 'role', 'author']) expect(() => clinicalInput({ ...intent, [field]: 'forged' })).toThrow();
+});
+it('keeps the existing prescription ID inside a validated note', () => {
+  const prescriptionId = '20000000-0000-4000-8000-000000000002';
+  expect(clinicalNote({ title: 'A', text: 'B', eventDate: null, prescriptionId }).prescriptionId).toBe(prescriptionId);
+  expect(() => clinicalNote({ title: 'A', text: 'B', eventDate: null, prescriptionId: 'rx-7' })).toThrow();
+});

@@ -1,9 +1,12 @@
 // Explicit one-shot Testnet worker. No patient keys; booking attestation is not consent.
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { Address, BASE_FEE, Contract, Keypair, Networks, StrKey, TransactionBuilder, rpc, nativeToScVal, scValToNative } from '@stellar/stellar-sdk';
+import { Address, BASE_FEE, Contract, Keypair, Networks, StrKey, Transaction, TransactionBuilder, rpc, nativeToScVal, scValToNative } from '@stellar/stellar-sdk';
 import { PRIVATE_REGISTRY_ID, readAuthorization } from './lib/private-registry.mjs';
+import { assertUnintegratedSponsorship } from './lib/sponsorship-write-gate.mjs';
 import { PRIVATE_PRESCRIPTION_ID, PRIVY_APP_ID, assertCurrentPrivyIdentity } from './lib/private-worker-runtime.mjs';
+import { clinicalSimulationIsLive } from './lib/clinical-live-read.mjs';
+import { privateRxInvocation, privateRxQuote } from './lib/private-rx-sponsorship.mjs';
 
 export function validateBookingJob(job) {
   if (job.network !== 'testnet' || job.contract_id !== PRIVATE_PRESCRIPTION_ID || !/^[a-f0-9]{64}$/.test(job.issuance_id) ||
@@ -20,26 +23,31 @@ export function assertBookingMatches(job, booking) {
 /** All effects injected for deterministic recovery tests. A store lease is mandatory.
  * Unknown submission outcomes retain the same signed XDR/hash; never rebuild them.
  */
-export async function runOnce({ store, chain, writesEnabled = false, prepareEnabled = true }) {
-  let job=await store.claim({ signedOnly: !writesEnabled || !prepareEnabled });
+export async function runOnce({ store, chain, writesEnabled = false, prepareEnabled = true, appointmentId }) {
+  if (appointmentId !== undefined && (!Number.isSafeInteger(appointmentId) || appointmentId < 1)) throw Error('private_rx_booking_scope_rejected');
+  let job=await store.claim({ signedOnly: !writesEnabled || !prepareEnabled, ...(appointmentId === undefined ? {} : { appointmentId }) });
   if (!job) return { status:'idle' };
+  if (appointmentId !== undefined && Number(job.appointment_id) !== appointmentId) throw Error('private_rx_booking_scope_rejected');
   try {
     validateBookingJob(job);
+    if (appointmentId !== undefined && (job.cancellation_requested_at || (job.tx_kind && job.tx_kind !== 'attest'))) return {status:'writes_paused'};
     if (job.transaction_hash) {
       if (!job.prepared_xdr) throw Error('pending_transaction_missing_envelope');
       await chain.verifyEnvelope(job);
       const receipt=await chain.receipt(job.transaction_hash);
+      if (chain.verifySponsorshipReceipt) await chain.verifySponsorshipReceipt(job, receipt);
       if (receipt.status==='SUCCESS') {
         const state=assertBookingMatches(job,await chain.booking(job));
         if (!['Active','Revoked','Consumed'].includes(state) || (job.tx_kind==='revoke' && state!=='Revoked')) throw Error('booking_state_mismatch');
-        await store.complete(job,state==='Consumed'?'consumed':state==='Revoked'?'revoked':'confirmed');
+        await store.complete(job,state==='Consumed'?'consumed':state==='Revoked'?'revoked':'confirmed',
+          chain.verifySponsorshipReceipt ? { receipt } : undefined);
         return {status:'confirmed',kind:job.tx_kind};
       }
       if (receipt.status==='FAILED') {
         if(job.tx_kind==='revoke' && assertBookingMatches(job,await chain.booking(job))==='Consumed') {
           await store.complete(job,'consumed',{failedAttempt:true});return {status:'already_consumed'};
         }
-        await store.fail(job,'transaction_failed');return {status:'failed'};
+        await store.fail(job,'transaction_failed',chain.verifySponsorshipReceipt ? { receipt } : undefined);return {status:'failed'};
       }
       if (!writesEnabled) return { status: 'writes_paused' };
       // A cancellation racing an unconfirmed attestation cannot safely assert
@@ -48,7 +56,7 @@ export async function runOnce({ store, chain, writesEnabled = false, prepareEnab
       if (job.tx_kind==='attest' && !(await store.eligible(job))) return {status:'pending_eligibility_changed'};
       if (job.tx_kind==='attest') await chain.validateIdentity(job);
       if (await chain.expired(job.prepared_xdr)) return {status:'expired_needs_reconciliation'};
-      await chain.submit(job.prepared_xdr);
+      await chain.submit(job.prepared_xdr, job);
       return {status:'pending',reusedEnvelope:true};
     }
     if (!writesEnabled || !prepareEnabled) return { status: 'writes_paused' };
@@ -72,11 +80,12 @@ export async function runOnce({ store, chain, writesEnabled = false, prepareEnab
     if (!cancelled && !(await store.eligible(job))) throw Error('booking_no_longer_eligible');
     if (!cancelled) await chain.validateIdentity(job);
     job=await store.prepared(job,kind,prepared);
-    await chain.submit(job.prepared_xdr);
+    await chain.submit(job.prepared_xdr, job);
     return {status:'pending',kind};
   } catch (error) {
+    if (!job.transaction_hash && chain.cancelUnsignedSponsorship) await chain.cancelUnsignedSponsorship();
     // Never expose provider errors, database details, or signed envelopes in logs.
-    if (!job.transaction_hash && ['booking_request_invalid','identity_changed','booking_no_longer_eligible','doctor_or_booking_expired'].includes(error?.message)) {
+    if (appointmentId === undefined && !job.transaction_hash && ['booking_request_invalid','identity_changed','booking_no_longer_eligible','doctor_or_booking_expired'].includes(error?.message)) {
       await store.fail(job,error.message);
       return {status:'failed'};
     }
@@ -85,7 +94,7 @@ export async function runOnce({ store, chain, writesEnabled = false, prepareEnab
   } finally { await store.release(job); }
 }
 
-export function createChain({authority,relayer,signXdr,provider,server=new rpc.Server('https://soroban-testnet.stellar.org')}) {
+export function createChain({authority,relayer,signXdr,provider,strictReads=false,assertSponsorship=assertUnintegratedSponsorship,server=new rpc.Server('https://soroban-testnet.stellar.org')}) {
   const networkPassphrase=Networks.TESTNET;
   async function read(job,method,args=[]) {
     validateBookingJob(job);
@@ -93,6 +102,9 @@ export function createChain({authority,relayer,signXdr,provider,server=new rpc.S
       .addOperation(new Contract(job.contract_id).call(method,...args)).setTimeout(60).build();
     const sim=await server.simulateTransaction(tx);
     if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) throw Error('contract_read_failed');
+    if (strictReads && (rpc.Api.isSimulationRestore(sim) || !clinicalSimulationIsLive(sim) || !Array.isArray(sim.result.auth) || sim.result.auth.length)) {
+      throw Error('contract_read_failed');
+    }
     return scValToNative(sim.result.retval);
   }
   async function configuration(job) {
@@ -107,6 +119,7 @@ export function createChain({authority,relayer,signXdr,provider,server=new rpc.S
     return new Contract(PRIVATE_PRESCRIPTION_ID).call(kind==='revoke'?'revoke_booking':'attest_booking',...args);
   }
   return {
+    verifyConfiguration: configuration,
     receipt: hash=>server.getTransaction(hash),
     booking: async job=>{await configuration(job);return read(job,'get_booking',[nativeToScVal(Buffer.from(job.issuance_id,'hex'))]);},
     validateIdentity: async job=>{
@@ -126,10 +139,12 @@ export function createChain({authority,relayer,signXdr,provider,server=new rpc.S
       return Number(inner.timeBounds?.maxTime??0)<=Math.floor(Date.now()/1000);
     },
     submit: async envelope=>{
+      await assertSponsorship();
       const sent=await server.sendTransaction(TransactionBuilder.fromXDR(envelope,networkPassphrase));
       if (!['PENDING','DUPLICATE','TRY_AGAIN_LATER'].includes(sent.status)) throw Error('submission_not_accepted');
     },
     prepare: async (job,kind)=>{
+      await assertSponsorship();
       await configuration(job);
       if (kind==='attest') {
         const doctor=await readAuthorization({wallet:job.doctor_wallet,source:authority,registryId:PRIVATE_REGISTRY_ID,expectedAdmin:authority,server});
@@ -149,14 +164,102 @@ export function createChain({authority,relayer,signXdr,provider,server=new rpc.S
   };
 }
 
+export function assertScopedAttestationJob(scope, job) {
+  validateBookingJob(job);
+  if (scope?.phase !== 'issuance' || Number(job.appointment_id) !== scope.appointmentId || job.issuance_id !== scope.issuanceId ||
+      Number(job.valid_until) !== scope.bookingValidUntil || job.contract_id !== scope.contractId ||
+      job.doctor_user_id !== scope.doctor.userId || job.doctor_wallet_id !== scope.doctor.walletId || job.doctor_wallet !== scope.doctor.address ||
+      job.patient_requested_by !== scope.patient.userId || job.patient_wallet_id !== scope.patient.walletId || job.patient_wallet !== scope.patient.address ||
+      job.cancellation_requested_at || job.revocation_hash || (job.tx_kind && job.tx_kind !== 'attest')) throw Error('private_rx_booking_scope_rejected');
+}
+
+/** This function builds a fee quote from a live simulation. It has no signer or store. */
+export async function quoteScopedAttestation({ scope, job, server, now = () => Math.floor(Date.now() / 1000) }) {
+  assertScopedAttestationJob(scope, job);
+  if (job.state !== 'prepared' || job.transaction_hash || job.prepared_xdr || job.attestation_hash || job.attempts?.length ||
+      scope.attestationQuoteSha256 !== null) throw Error('private_rx_booking_scope_rejected');
+  const reader = createChain({ authority: scope.authority, server, strictReads: true });
+  await reader.verifyConfiguration(job);
+  const doctor = await readAuthorization({ wallet: scope.doctor.address, source: scope.authority,
+    registryId: scope.registryId, expectedAdmin: scope.authority, server });
+  if (!doctor.authorized) throw Error('doctor_or_booking_expired');
+  const account = await server.getAccount(scope.authority), sourceSequence = account.sequenceNumber();
+  const maxTime = Math.min(now() + 300, scope.until, scope.bookingValidUntil);
+  if (maxTime <= now()) throw Error('private_rx_scope_expired');
+  const raw = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
+    .addOperation(privateRxInvocation(scope, 'attest')).setTimebounds(0, maxTime).build();
+  const simulation = await server.simulateTransaction(raw);
+  if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !clinicalSimulationIsLive(simulation) ||
+      !Number.isSafeInteger(simulation.latestLedger) || simulation.latestLedger <= 0) throw Error('private_rx_attestation_quote_unavailable');
+  const unsigned = rpc.assembleTransaction(raw, simulation).build();
+  if (!(unsigned instanceof Transaction) || unsigned.sequence !== raw.sequence || Number(unsigned.timeBounds?.maxTime) !== maxTime) {
+    throw Error('private_rx_attestation_quote_unavailable');
+  }
+  const unsignedXdr = unsigned.toXDR();
+  const quote = await privateRxQuote(scope, 'attest', unsignedXdr, undefined, { preparedAt: now(), now: now() });
+  return { schemaVersion: 1, network: 'testnet', runId: scope.runId, appointmentId: scope.appointmentId, issuanceId: scope.issuanceId,
+    requestId: scope.steps.attest.requestId, contractId: scope.contractId, authority: scope.authority, relayer: scope.relayer,
+    bookingValidUntil: scope.bookingValidUntil, ledger: simulation.latestLedger, sourceSequence, unsignedXdr, quote };
+}
+
+/** The scoped worker only consumes the approved quote and its exact envelope. */
+export function createScopedAttestationChain({ scope, artifact, sponsorship, assertJob, signXdr, provider, server }) {
+  const read = createChain({ authority: scope.authority, provider, server, strictReads: true });
+  const verifyJob = async (job, phase) => {
+    assertScopedAttestationJob(scope, job);
+    await assertJob(job, phase);
+  };
+  return {
+    ...read,
+    async prepare(job, kind) {
+      if (kind !== 'attest' || job.attestation_hash || job.transaction_hash || job.prepared_xdr || job.attempts?.length) throw Error('private_rx_booking_scope_rejected');
+      await verifyJob(job, 'prepare');
+      await read.verifyConfiguration(job);
+      const doctor = await readAuthorization({ wallet: scope.doctor.address, source: scope.authority,
+        registryId: scope.registryId, expectedAdmin: scope.authority, server });
+      if (!doctor.authorized) throw Error('doctor_or_booking_expired');
+      const latest = await server.getLatestLedger(), account = await server.getAccount(scope.authority);
+      if (!Number.isSafeInteger(latest.sequence) || latest.sequence < artifact.ledger || account.sequenceNumber() !== artifact.sourceSequence) {
+        throw Error('private_rx_attestation_quote_stale');
+      }
+      await verifyJob(job, 'prepare');
+      await sponsorship.reserve('attest', artifact.unsignedXdr, undefined, { atomic: false, preparedAt: artifact.quote.preparedAt, pinnedQuoteId: artifact.quote.quoteId });
+      await verifyJob(job, 'sign');
+      return sponsorship.signAuthority(artifact.unsignedXdr, signXdr);
+    },
+    async verifyEnvelope(job) {
+      await verifyJob(job, 'read');
+      await sponsorship.verifyBound('attest', artifact.unsignedXdr, undefined, job.prepared_xdr, job.transaction_hash);
+    },
+    async submit(envelope, job) {
+      await verifyJob(job, 'submit');
+      if (job.prepared_xdr !== envelope) throw Error('private_rx_booking_scope_rejected');
+      const outer = await sponsorship.assertCanSubmit('attest', artifact.unsignedXdr, undefined, envelope, job.transaction_hash);
+      await read.validateIdentity(job);
+      await verifyJob(job, 'submit');
+      if (await read.expired(envelope)) throw Error('sponsorship_envelope_expired');
+      const sent = await server.sendTransaction(outer);
+      if (!['PENDING', 'DUPLICATE', 'TRY_AGAIN_LATER'].includes(sent.status)) throw Error('submission_not_accepted');
+    },
+    verifySponsorshipReceipt(job, receipt) {
+      return sponsorship.reconcile('attest', artifact.unsignedXdr, undefined, job.prepared_xdr, job.transaction_hash, receipt,{readOnly:true});
+    },
+    cancelUnsignedSponsorship: () => sponsorship.cancelAuthorityBeforeSigning(),
+  };
+}
+
 /** Connected PostgreSQL session required. Caller holds a global authority lock
  * for the full run so parallel worker processes cannot compete for its sequence.
  */
-export function createStore(client,contractId) {
+export function createStore(client,contractId,{ appointmentId, sponsorship, settleSponsorship } = {}) {
   if(contractId!==PRIVATE_PRESCRIPTION_ID)throw Error('private_contract_required');
+  if (appointmentId !== undefined && (!Number.isSafeInteger(appointmentId) || appointmentId < 1 || !sponsorship || typeof settleSponsorship !== 'function')) throw Error('private_rx_booking_scope_rejected');
   const q=(text,values=[])=>client.query(text,values);
   const token=randomUUID();
-  const owns=(job)=>[job.appointment_id,token];
+  const owns=(job)=>{
+    if (appointmentId !== undefined && Number(job.appointment_id) !== appointmentId) throw Error('private_rx_booking_scope_rejected');
+    return [job.appointment_id,token];
+  };
   const identities=`JOIN appointments a ON a.id=r.appointment_id
     JOIN privy_stellar_wallet_bindings p ON p.app_id='${PRIVY_APP_ID}' AND p.user_id=r.patient_requested_by
       AND p.wallet_id=r.patient_wallet_id AND p.address=r.patient_wallet
@@ -171,19 +274,22 @@ export function createStore(client,contractId) {
     AND a.patient_wallet=r.patient_wallet AND a.doctor_wallet=r.doctor_wallet
     AND a.attendance_at<=NOW() AND a.attendance_user_id=r.patient_requested_by AND a.started_by=r.doctor_user_id`;
   return {
-    claim:async({signedOnly=false}={})=>{
+    claim:async({signedOnly=false,appointmentId:requested}={})=>{
+      if (requested !== appointmentId) throw Error('private_rx_booking_scope_rejected');
       const {rows}=await q(`WITH candidate AS (SELECT appointment_id FROM prescription_booking_requests
         WHERE network='testnet' AND contract_id=$1 AND state IN ('prepared','submitted','cancel_requested')
           AND (lease_until IS NULL OR lease_until<NOW()) AND (NOT $3 OR transaction_hash IS NOT NULL)
+          ${appointmentId === undefined ? '' : "AND appointment_id=$4 AND state IN ('prepared','submitted') AND cancellation_requested_at IS NULL AND (tx_kind IS NULL OR tx_kind='attest')"}
           ORDER BY updated_at FOR UPDATE SKIP LOCKED LIMIT 1)
         UPDATE prescription_booking_requests r SET lease_token=$2,lease_until=NOW()+INTERVAL '5 minutes'
-        FROM candidate WHERE r.appointment_id=candidate.appointment_id RETURNING r.*`,[contractId,token,signedOnly]);return rows[0];
+        FROM candidate WHERE r.appointment_id=candidate.appointment_id RETURNING r.*`,[contractId,token,signedOnly,...(appointmentId === undefined ? [] : [appointmentId])]);return rows[0];
     },
     eligible:async job=>{
       const {rows}=await q(`SELECT 1 FROM prescription_booking_requests r ${identities}
         WHERE r.appointment_id=$1 AND r.lease_token=$2 AND r.lease_until>NOW() AND ${eligibility}`,owns(job));return rows.length===1;
     },
     prepared:async(job,kind,p)=>{
+      if (sponsorship && kind !== 'attest') throw Error('private_rx_booking_scope_rejected');
       await q('BEGIN');
       try {
         await q('SELECT id FROM appointments WHERE id=$1 FOR UPDATE',[job.appointment_id]);
@@ -198,13 +304,15 @@ export function createStore(client,contractId) {
           WHERE appointment_id=$1 AND lease_token=$2 AND lease_until>NOW() AND transaction_hash IS NULL
           AND ($3='revoke' OR cancellation_requested_at IS NULL) RETURNING *`,[...owns(job),kind,p.xdr,p.hash,attempt]);
         if(rows.length!==1)throw Error('lease_or_cancellation_changed');
+        if(sponsorship)await sponsorship.persistAuthority(p);
         await q('COMMIT');return rows[0];
       }catch(error){await q('ROLLBACK');throw error;}
     },
-    complete:async(job,state,{failedAttempt=false}={})=>{
+    complete:async(job,state,{failedAttempt=false,receipt}={})=>{
       await q('BEGIN');
       try {
       await q('SELECT id FROM appointments WHERE id=$1 FOR UPDATE',[job.appointment_id]);
+      if(sponsorship)await settleSponsorship(job,receipt);
       const result=await q(`UPDATE prescription_booking_requests SET
         attestation_hash=CASE WHEN tx_kind='attest' AND NOT $4 THEN transaction_hash ELSE attestation_hash END,
         revocation_hash=CASE WHEN tx_kind='revoke' AND NOT $4 THEN transaction_hash ELSE revocation_hash END,
@@ -216,10 +324,11 @@ export function createStore(client,contractId) {
       await q('COMMIT');
       }catch(error){await q('ROLLBACK');throw error;}
     },
-    fail:async(job,error)=>{
+    fail:async(job,error,{receipt}={})=>{
       await q('BEGIN');
       try{
       await q('SELECT id FROM appointments WHERE id=$1 FOR UPDATE',[job.appointment_id]);
+      if(sponsorship&&error==='transaction_failed')await settleSponsorship(job,receipt);
       const result=await q(`UPDATE prescription_booking_requests SET state='failed',last_error=$3,updated_at=NOW()
       WHERE appointment_id=$1 AND lease_token=$2 AND lease_until>NOW()
         AND ($3<>'cancelled_before_attestation' OR (transaction_hash IS NULL AND attestation_hash IS NULL AND attempts='[]'::jsonb))`,[...owns(job),error]);

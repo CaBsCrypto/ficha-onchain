@@ -10,6 +10,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrescriptionCard } from '@/components/private-portal/Prescriptions';
+import { PrivateConsultations } from '@/components/private-portal/Consultations';
+import { LanguageProvider } from '@/hooks/useLanguage';
 import type { PrivateOperation, PrivatePrescription } from '@/components/private-portal/types';
 
 const provider = vi.hoisted(() => ({ signRawHash: vi.fn(), getAccessToken: vi.fn() }));
@@ -83,6 +85,7 @@ function documentResponse(call: Call) {
 }
 
 beforeEach(() => {
+  window.localStorage.removeItem('ficha-lang');
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-10T12:00:00Z'));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -115,6 +118,96 @@ afterEach(async () => {
 });
 
 describe('active private signing components with controlled Privy and HTTP', () => {
+  it('keeps the patient appointment and attendance flow in English', async () => {
+    let attended = false;
+    const appointment = {
+      id: 123, status: 'scheduled', date: '2026-09-10', time_slot: '10:00', type: 'Presencial',
+      patient_email: 'patient@example.test', patient_name: 'Test patient',
+      doctor_email: 'doctor@example.test', doctor_name: 'Test doctor',
+    };
+    transport = call => {
+      if (call.url === '/api/appointments?role=patient') return Response.json({ appointments: [appointment] });
+      if (call.url === '/api/private-consultations/123') return Response.json({
+        appointment: { ...appointment, attended_at: attended ? '2026-09-10T12:00:00Z' : null },
+        booking: null, consent: { status: 'absent' }, operations: [],
+      });
+      if (call.url === '/api/appointments' && call.method === 'PATCH') { attended = true; return Response.json({ success: true }); }
+      throw new Error('Unexpected controlled request during attendance');
+    };
+    window.localStorage.setItem('ficha-lang', 'en');
+    await act(async () => root.render(createElement(LanguageProvider, {
+      children: createElement(PrivateConsultations, { role: 'patient' }),
+    })));
+    expect(container.textContent).toContain('My appointments');
+    expect(container.textContent).toContain('September 10, 2026');
+    expect(button('Book an appointment')).toBeDefined();
+    await click('Open appointment');
+    expect(container.textContent).toContain('Test appointment #123');
+    expect(container.textContent).toContain('Permission to issue one prescription');
+    expect(button('Authorize one prescription').disabled).toBe(true);
+    await click('Confirm my attendance');
+    expect(container.textContent).toContain('Patient attendanceConfirmed');
+    expect(button('Authorize one prescription').disabled).toBe(true);
+    expect(requests('PATCH', '/api/appointments').map(call => call.body)).toEqual([{ id: 123, action: 'attend' }]);
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+  });
+
+  it('shows the exact sponsored mint fee in English before an explicit Privy confirmation', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const pending = {
+      ...operation('awaiting_signature', 'mint'),
+      sponsorship: { maxFeeStroops: '4150886', quotePreparedAt: now, quoteExpiresAt: now + 120 },
+    };
+    transport = call => {
+      const document = documentResponse(call);
+      if (document) return document;
+      if (call.url === '/api/private-operations' && call.method === 'POST') return reply(pending);
+      if (call.url === `${operationPath}/confirm` && call.method === 'POST') return reply(operation('confirmed', 'mint'));
+      throw new Error('Unexpected request during sponsored review');
+    };
+    window.localStorage.setItem('ficha-lang', 'en');
+    const value = prescription({ rxId: null, status: 'Pending' });
+    await act(async () => root.render(createElement(LanguageProvider, {
+      children: createElement(PrescriptionCard, { prescription: value, role: 'doctor', onChange: changed }),
+    })));
+    await click('Review and continue issuance');
+    await click('Open private document', dialog());
+    expect(dialog().textContent).toContain('Test medication');
+    await click('Confirm with my account', dialog());
+    expect(dialog().textContent).toContain('Maximum sponsored fee: 0.4150886 XLM · Stellar Testnet');
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+    expect(requests('POST', `${operationPath}/confirm`)).toHaveLength(0);
+
+    await click('Confirm with Privy', dialog());
+    expect(provider.signRawHash).toHaveBeenCalledOnce();
+    expect(requests('POST', '/api/private-operations')).toHaveLength(1);
+    expect(requests('POST', `${operationPath}/confirm`)).toHaveLength(1);
+    expect(notice()).toContain('Prescription issuance · Operation confirmed');
+  });
+
+  it('disables final signing when the sponsored review expires', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const pending = {
+      ...operation('awaiting_signature', 'mint'),
+      sponsorship: { maxFeeStroops: '100', quotePreparedAt: now, quoteExpiresAt: now + 3 },
+    };
+    transport = call => {
+      const document = documentResponse(call);
+      if (document) return document;
+      if (call.url === '/api/private-operations' && call.method === 'POST') return reply(pending);
+      throw new Error('The expired review must not confirm');
+    };
+    await openMint();
+    await confirm();
+    expect(button('Confirmar con Privy', dialog()).disabled).toBe(false);
+    await tick();
+    expect(button('Confirmar con Privy', dialog()).disabled).toBe(true);
+    expect(dialog().textContent).toContain('La cotización venció.');
+    await click('Volver', dialog());
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+    expect(requests('POST', `${operationPath}/confirm`)).toHaveLength(0);
+  });
+
   it('a Privy rejection leaves an unsigned request and open dialog; only an explicit retry can confirm', async () => {
     const unsigned = operation();
     provider.signRawHash.mockRejectedValueOnce(new Error('user_rejected: private-provider-detail'));

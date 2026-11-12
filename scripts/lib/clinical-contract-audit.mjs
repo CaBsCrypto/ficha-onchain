@@ -31,13 +31,21 @@ export function createClinicalContractAuditor({ server, readerAddress }) {
     if (!StrKey.isValidContract(contractId) || !METHODS.has(method)) throw failed('audit_configuration_invalid');
     const tx = new TransactionBuilder(new Account(readerAddress, '0'), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
       .addOperation(new Contract(contractId).call(method, ...args)).setTimeout(60).build();
-    const result = await server.simulateTransaction(tx);
-    if (!rpc.Api.isSimulationSuccess(result) || rpc.Api.isSimulationRestore(result) || !result.result ||
-        !Array.isArray(result.result.auth) || result.result.auth.length !== 0) throw failed('audit_read_unavailable');
-    const current = unsignedInteger(result.latestLedger, 1);
-    if (current < ledger) throw failed('audit_ledger_regressed');
-    ledger = current;
-    return scValToNative(result.result.retval);
+    // Repeat only the same unsigned read when a valid response trails this request's floor.
+    // Malformed, archival or authorization responses fail immediately; the floor never moves back.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await server.simulateTransaction(tx);
+      if (!rpc.Api.isSimulationSuccess(result) || rpc.Api.isSimulationRestore(result) || !result.result ||
+          !Array.isArray(result.result.auth) || result.result.auth.length !== 0) throw failed('audit_read_unavailable');
+      const current = unsignedInteger(result.latestLedger, 1);
+      const value = scValToNative(result.result.retval);
+      if (current < ledger) {
+        if (attempt === 2) throw failed('audit_ledger_regressed');
+        continue;
+      }
+      ledger = current;
+      return value;
+    }
   }
   async function verifyWasm(contractId, expectedWasmHash) {
     if (!StrKey.isValidContract(contractId) || !HEX.test(expectedWasmHash)) throw failed('audit_configuration_invalid');

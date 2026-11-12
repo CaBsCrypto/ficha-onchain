@@ -1,3 +1,4 @@
+import { usePortalLanguage } from '@/hooks/useLanguage';
 import { localDate } from './client';
 import { prescriptionLabel } from './state';
 import type { PrescriptionDocument, PrivatePrescription, PrescriptionVerification as Verification } from './types';
@@ -30,30 +31,32 @@ export const prescriptionStyles = `
 `;
 
 export function PrescriptionSheet({ document, prescription: listed, verification, onQrReady }: { document: PrescriptionDocument; prescription: PrivatePrescription; verification?: Verification; onQrReady?: (ready: boolean) => void }) {
+  const language = usePortalLanguage();
+  const english = language === 'en';
   const prescription = verification ? { ...listed, rxId: verification.rxId, status: verification.status, expiresAt: verification.expiresAt, expired: verification.expired } : listed;
   const inactive = prescription.status === 'Revoked' || prescription.status === 'Blocked' || prescription.expired;
   const statusClass = inactive ? 'rx-inactive' : prescription.rxId != null && prescription.status === 'Active' ? 'rx-active' : '';
-  return <><style>{prescriptionStyles}</style><article aria-label="Documento de receta privada" className="tl-rx">
+  return <><style>{prescriptionStyles}</style><article aria-label={english ? "Private prescription document" : "Documento de receta privada"} className="tl-rx">
     <header>
-      <div className="rx-brand-row"><span className="rx-brand">Trust<span>Leaf</span></span>{!inactive && <span className={`rx-status ${statusClass}`}>{prescriptionLabel(prescription)}</span>}</div>
-      <div className="rx-title"><h4>{prescription.rxId != null ? `Receta N.º ${prescription.rxId}` : 'Receta preparada'}</h4></div>
+      <div className="rx-brand-row"><span className="rx-brand">Trust<span>Leaf</span></span>{!inactive && <span className={`rx-status ${statusClass}`}>{prescriptionLabel(prescription, language)}</span>}</div>
+      <div className="rx-title"><h4>{prescription.rxId != null ? `${english ? 'Prescription No.' : 'Receta N.º'} ${prescription.rxId}` : (english ? 'Prepared prescription' : 'Receta preparada')}</h4></div>
     </header>
     <div className="rx-body">
-      {inactive && <p className="rx-warning">{prescriptionLabel(prescription)} · Se conserva como documento histórico.</p>}
+      {inactive && <p className="rx-warning">{prescriptionLabel(prescription, language)} · {english ? "Kept as a historical document." : "Se conserva como documento histórico."}</p>}
       <dl className="rx-people">
-        <div><dt>Paciente</dt><dd>{prescription.patientName}</dd></div>
-        <div><dt>Médico emisor</dt><dd>{prescription.doctorName}</dd></div>
+        <div><dt>{english ? "Patient" : "Paciente"}</dt><dd>{prescription.patientName}</dd></div>
+        <div><dt>{english ? "Issuing doctor" : "Médico emisor"}</dt><dd>{prescription.doctorName}</dd></div>
       </dl>
 
       <dl className="rx-treatment">
-        <div className="rx-medication"><dt>Medicamento de prueba</dt><dd>{document.medication}</dd></div>
-        <div className="rx-dose"><dt>Dosis e indicación</dt><dd>{document.dosage}</dd></div>
+        <div className="rx-medication"><dt>{english ? "Test medication" : "Medicamento de prueba"}</dt><dd>{document.medication}</dd></div>
+        <div className="rx-dose"><dt>{english ? "Dosage and directions" : "Dosis e indicación"}</dt><dd>{document.dosage}</dd></div>
       </dl>
       <div className="rx-closing">
-        <dl className="rx-instructions"><dt>Instrucciones</dt><dd>{document.instructions || 'Sin instrucciones adicionales'}</dd></dl>
+        <dl className="rx-instructions"><dt>{english ? "Instructions" : "Instrucciones"}</dt><dd>{document.instructions || (english ? 'No additional instructions' : 'Sin instrucciones adicionales')}</dd></dl>
         {verification && <PrescriptionVerification verification={verification} onQrReady={onQrReady} />}
       </div>
     </div>
-    <footer><p>Vencimiento: {localDate(prescription.expiresAt)} · Hora de Chile</p><p><strong>Datos sintéticos · Sin uso clínico</strong> · Stellar Testnet</p><p className="rx-copy-note">El estado corresponde al momento de generar esta copia.</p></footer>
+    <footer><p>{english ? 'Expires' : 'Vencimiento'}: {localDate(prescription.expiresAt, language)} · {english ? "Chile time" : "Hora de Chile"}</p><p><strong>{english ? "Synthetic data · No clinical use" : "Datos sintéticos · Sin uso clínico"}</strong> · Stellar Testnet</p><p className="rx-copy-note">{english ? "Status reflects the time this copy was generated." : "El estado corresponde al momento de generar esta copia."}</p></footer>
   </article></>;
 }

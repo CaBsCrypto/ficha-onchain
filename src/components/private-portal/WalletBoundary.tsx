@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { usePrivy, useUser } from '@privy-io/react-auth';
 import { useRouter } from 'next/navigation';
+import { usePortalLanguage } from '@/hooks/useLanguage';
 import { privyEmail } from '@/lib/auth/privy-email';
 import { accessApi, accessFailure, type AccessError } from './access-client';
 import { bootstrapStellarWallet, type PortalWallet } from './wallet-bootstrap';
@@ -16,6 +17,7 @@ type Role = 'doctor' | 'patient';
 function VerifiedWalletBoundary({ children, role }: { children: React.ReactNode; role: Role }) {
   const { user, logout } = usePrivy();
   const { refreshUser } = useUser();
+  const english = usePortalLanguage() === 'en';
   const router = useRouter();
   const userRef = useRef(user);
   const refreshUserRef = useRef(refreshUser);
@@ -47,18 +49,25 @@ function VerifiedWalletBoundary({ children, role }: { children: React.ReactNode;
     try { await logout(); router.replace(`/login/${role}`); }
     catch (failure) { setLeaving(false); setError(accessFailure(failure)); }
   }
+  const errorMessage = error && (english ? (
+    error.status === 401 ? 'Your session expired. Sign in again with Privy.' :
+    error.status === 403 ? 'This account does not have access.' :
+    error.status === 409 ? 'We could not verify the link to your Stellar account. Check again or ask the administrator to review it.' :
+    'We could not verify access right now. Check again using the same account.'
+  ) : error.message);
   if (!wallet || leaving) return <div className="mx-auto my-16 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h1 className="text-xl font-semibold text-slate-800">Tu cuenta Stellar</h1>
-    <p className="mt-2 break-all text-sm text-slate-600">Cuenta actual: {privyEmail(user) ?? 'Cuenta de Privy'}</p>
-    <p role={error ? 'alert' : 'status'} className="mt-3 text-sm text-slate-600">{leaving ? 'Cerrando sesión…' : error?.message || 'Preparando tu cuenta con Privy…'}</p>
-    {error?.reference && <p className="mt-2 text-xs text-slate-500">Referencia: {error.reference}</p>}
-    {error && error.status !== 401 && error.status !== 403 && <button onClick={() => setRevision(value => value + 1)} className="mt-4 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">Volver a consultar</button>}
-    <button disabled={leaving} onClick={() => void changeAccount()} className="ml-4 mt-4 text-sm text-slate-600 underline disabled:opacity-50">{error?.status === 401 ? 'Volver a ingresar con Privy' : 'Cambiar de cuenta'}</button>
+    <h1 className="text-xl font-semibold text-slate-800">{english ? 'Your Stellar account' : 'Tu cuenta Stellar'}</h1>
+    <p className="mt-2 break-all text-sm text-slate-600">{english ? 'Current account:' : 'Cuenta actual:'} {privyEmail(user) ?? (english ? 'Privy account' : 'Cuenta de Privy')}</p>
+    <p role={error ? 'alert' : 'status'} className="mt-3 text-sm text-slate-600">{leaving ? (english ? 'Signing out…' : 'Cerrando sesión…') : errorMessage || (english ? 'Checking your Privy account…' : 'Preparando tu cuenta con Privy…')}</p>
+    {error?.reference && <p className="mt-2 text-xs text-slate-500">{english ? 'Reference:' : 'Referencia:'} {error.reference}</p>}
+    {error && error.status !== 401 && error.status !== 403 && <button onClick={() => setRevision(value => value + 1)} className="mt-4 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">{english ? 'Check again' : 'Volver a consultar'}</button>}
+    <button disabled={leaving} onClick={() => void changeAccount()} className="ml-4 mt-4 text-sm text-slate-600 underline disabled:opacity-50">{error?.status === 401 ? (english ? 'Sign in again with Privy' : 'Volver a ingresar con Privy') : (english ? 'Switch account' : 'Cambiar de cuenta')}</button>
   </div>;
   return <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>;
 }
 export function WalletBoundary({ children, role = 'patient' }: { children: React.ReactNode; role?: Role }) {
   const { ready, authenticated, user } = usePrivy();
-  if (!ready || !authenticated || !user) return <p role="status" className="p-8 text-center text-sm text-slate-500">Verificando sesión…</p>;
+  const english = usePortalLanguage() === 'en';
+  if (!ready || !authenticated || !user) return <p role="status" className="p-8 text-center text-sm text-slate-500">{english ? 'Checking session…' : 'Verificando sesión…'}</p>;
   return <VerifiedWalletBoundary key={user.id} role={role}>{children}</VerifiedWalletBoundary>;
 }

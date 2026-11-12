@@ -1,0 +1,39 @@
+%PDF-1.4
+% SYNTHETIC TESTNET
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 399 >>
+stream
+BT /F1 18 Tf 50 780 Td (TrustLeaf - Synthetic clinical fixture) Tj
+0 -38 Td (Stellar Testnet - NOT FOR CLINICAL USE) Tj
+0 -38 Td (Document version: 1) Tj
+0 -38 Td (Example examination attachment) Tj
+0 -38 Td (Example date: 2026-10-01) Tj
+0 -38 Td (This file contains invented data for technical validation only.) Tj
+0 -38 Td (Earlier versions remain available. No real patient is represented.) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000029 00000 n 
+0000000078 00000 n 
+0000000135 00000 n 
+0000000261 00000 n 
+0000000331 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+781
+%%EOF

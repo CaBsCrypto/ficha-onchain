@@ -92,22 +92,34 @@ export function createClinicalChainReader(configuration, { server = new rpc.Serv
       if (!READ_METHODS.has(method) || (missingGrantAllowed && method !== 'get_grant')) throw unavailable();
       const tx = new TransactionBuilder(new Account(configured.readerAddress, sourceSequence), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
         .addOperation(new Contract(configured.contractId).call(method, ...args)).setTimeout(60).build();
-      const simulation = await server.simulateTransaction(tx);
-      const currentLedger = uint(simulation.latestLedger, 1);
-      if (currentLedger < observedLedger || (requestScoped && currentLedger < highestLedger) ||
-          !clinicalTtlMetadataUsable(entry.liveUntilLedgerSeq, currentLedger)) throw unavailable();
-      observedLedger = currentLedger;
-      if (requestScoped) highestLedger = currentLedger;
-      if (rpc.Api.isSimulationError(simulation)) {
-        // Only this exact contract's Missing error on its grant getter denotes
-        // absence. Provider, auth and archival errors are never an empty grant.
-        if (missingGrantAllowed && typeof simulation.error === 'string' &&
-            /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(simulation.error)) return null;
-        throw unavailable();
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const simulation = await server.simulateTransaction(tx);
+        const currentLedger = uint(simulation.latestLedger, 1);
+        if (!clinicalTtlMetadataUsable(entry.liveUntilLedgerSeq, currentLedger) || 'restorePreamble' in simulation) throw unavailable();
+        if (rpc.Api.isSimulationError(simulation)) {
+          if (currentLedger < observedLedger || (requestScoped && currentLedger < highestLedger)) throw unavailable();
+          observedLedger = currentLedger;
+          if (requestScoped) highestLedger = currentLedger;
+          // Only this exact contract's Missing error on its grant getter denotes
+          // absence. Provider, auth and archival errors are never an empty grant.
+          if (missingGrantAllowed && typeof simulation.error === 'string' &&
+              /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(simulation.error)) return null;
+          throw unavailable();
+        }
+        if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !clinicalSimulationIsLive(simulation) || !simulation.result ||
+            !Array.isArray(simulation.result.auth) || simulation.result.auth.length > 0) throw unavailable();
+        const value = scValToNative(simulation.result.retval);
+        // Retry only a valid unsigned simulation from a lagging RPC backend.
+        // Neither request watermark may decrease, including after a failed read.
+        if (currentLedger < observedLedger || (requestScoped && currentLedger < highestLedger)) {
+          if (attempt < 2) continue;
+          throw unavailable();
+        }
+        observedLedger = currentLedger;
+        if (requestScoped) highestLedger = currentLedger;
+        return value;
       }
-      if (!rpc.Api.isSimulationSuccess(simulation) || rpc.Api.isSimulationRestore(simulation) || !clinicalSimulationIsLive(simulation) || !simulation.result ||
-          !Array.isArray(simulation.result.auth) || simulation.result.auth.length > 0) throw unavailable();
-      return scValToNative(simulation.result.retval);
+      throw unavailable();
     }
     if (await read('interface_version') !== 1 || await read('get_registry') !== configured.registryId) throw unavailable();
     return { read, ledger: () => observedLedger };

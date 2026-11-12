@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import { ClinicalSponsorshipStatus } from "@/components/admin/ClinicalSponsorshipStatus";
 
 interface Onboarding { id: string; state: string; source: string; submissionId: string | null; wallet: string | null; reviewNote?: string | null; profile?: { name: string; specialty: string; licenseNum: string; rut: string }; }
 interface Doctor { id: number; name: string; email: string; specialty: string | null; status: string; onboarding?: Onboarding | null; }
@@ -11,7 +12,11 @@ interface AuthorizationRequest {
   id: string; state: "pending" | "submitted" | "confirmed" | "failed"; action: Action;
   method: string; transactionHash: string | null; errorCode: string | null;
 }
+type RehearsalReview = { status: 'active'; action: 'renew'; validUntil: number; until: number; durationHours: 24 | 168; timeAnchor?: 'approval'; continuationSchema?: 12 } | { status: 'unavailable' };
+type InitialReview = { status: 'active'; action: 'authorize'; validUntil: number; until: number; maxFeeStroops: '10000000' } | { status: 'unavailable' };
 interface Review {
+  rehearsal?: RehearsalReview;
+  initialAuthorization?: InitialReview;
   onboarding?: Onboarding | null;
   doctor: Doctor; wallet: string;
   authorization: { status: AuthorizationStatus; version: number; validUntil: number | null; commitment: string | null };
@@ -30,7 +35,7 @@ const ACTION: Record<Action, string> = { authorize: "autorizar", renew: "renovar
 const ONBOARDING_STATUS: Record<string, string> = { invited: 'Invitado', draft: 'Perfil en preparación', submitted: 'En revisión', changes_requested: 'Cambios solicitados', rejected: 'Rechazado', authorization_pending: 'Autorización pendiente', authorized: 'Autorizado', expired: 'Invitación vencida', revoked: 'Revocado' };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30";
 const secondaryButton = "rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50";
-function expiry(timestamp: number | null) { return timestamp ? new Date(timestamp * 1000).toLocaleString("es-CL") : "—"; }
+function expiry(timestamp: number | null) { return timestamp ? new Date(timestamp * 1000).toLocaleString("es-CL", { timeZone: "America/Santiago" }) : "—"; }
 function requestError(status: number) {
   if (status === 401) return "Tu sesión venció. Vuelve a iniciar sesión.";
   if (status === 403) return "Esta cuenta no tiene permiso para realizar esta acción.";
@@ -114,8 +119,14 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
         if (!response.ok) throw new Error(requestError(response.status));
         const body = await response.json() as Review;
         if (!body.authorization || body.doctor?.id !== doctor.id || body.syntheticOnly !== true) throw new Error("No se pudo verificar el expediente de prueba.");
+        if (body.rehearsal && (body.rehearsal.status !== 'unavailable' && (body.rehearsal.status !== 'active' || body.rehearsal.action !== 'renew' || !((body.rehearsal.durationHours === 24 && body.rehearsal.continuationSchema === undefined) || (body.rehearsal.durationHours === 168 && body.rehearsal.continuationSchema === 12 && body.rehearsal.timeAnchor === 'approval')) || !Number.isSafeInteger(body.rehearsal.validUntil) || !Number.isSafeInteger(body.rehearsal.until) || (body.rehearsal.timeAnchor !== undefined && body.rehearsal.timeAnchor !== 'approval')))) throw new Error('No se pudo comprobar el alcance de esta revisión.');
+        const initial = body.initialAuthorization;
+        if (initial && (body.rehearsal || initial.status !== 'unavailable' && (initial.status !== 'active' ||
+            initial.action !== 'authorize' || initial.maxFeeStroops !== '10000000' || !Number.isSafeInteger(initial.until) ||
+            !Number.isSafeInteger(initial.validUntil) || initial.validUntil <= initial.until))) throw new Error('No se pudo comprobar el alcance del alta inicial.');
         if (alive && !posting.current && epoch === requestEpoch.current) {
-          const revision = `${body.onboarding?.submissionId ?? 'legacy'}:${body.onboarding?.state ?? ''}:${body.authorization.version}`;
+          const renewal = body.rehearsal;
+          const revision = JSON.stringify([body.onboarding?.submissionId ?? 'legacy', body.onboarding?.state ?? '', body.authorization.version, renewal, initial]);
           if (reviewedRevision.current !== revision) { setReviewed(false); reviewedRevision.current = revision; }
           setReview(body); setError("");
         }
@@ -129,7 +140,9 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
     return () => { alive = false; controller.abort(); clearTimeout(timer); };
   }, [doctor.id, refresh]);
   async function submit(action: Action) {
-    if (posting.current || !reviewed || error || !review) return;
+    if (posting.current || !reviewed || error || !review || review.rehearsal?.status === 'unavailable' || review.initialAuthorization?.status === 'unavailable') return;
+    if (review.rehearsal?.status === 'active' && (action !== 'renew' || review.rehearsal.until * 1000 <= Date.now())) { setReviewed(false); setError('La ventana del ensayo no permite esta acción. Actualiza el estado antes de continuar.'); return; }
+    if (review.initialAuthorization?.status === 'active' && (action !== 'authorize' || review.authorization.version !== 0 || review.initialAuthorization.until * 1000 <= Date.now())) { setReviewed(false); setError('La ventana del alta inicial ya no permite esta acción. Actualiza el estado antes de continuar.'); return; }
     posting.current = true; requestEpoch.current += 1; setSaving(true); setReviewed(false);
     try {
       const response = await authedFetch("/api/admin/doctor-authorizations", {
@@ -168,9 +181,17 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
   const onboarding = review?.onboarding;
   const canAuthorize = !onboarding || ['submitted', 'authorized', 'revoked'].includes(onboarding.state);
   const pending = request?.state === "pending" || request?.state === "submitted";
-  const blocked = saving || pending || !reviewed || !!error || !review?.wallet || !review?.dossier || !canAuthorize || review.authorization.status === "paused";
+  const rehearsal = review?.rehearsal?.status === 'active' ? review.rehearsal : null;
+  const rehearsalUnavailable = review?.rehearsal?.status === 'unavailable';
+  const rehearsalExpired = !!rehearsal && rehearsal.until * 1000 <= Date.now();
+  const rehearsalConfirmed = !!rehearsal && request?.state === 'confirmed' && request.action === 'renew' && review?.authorization.validUntil === rehearsal.validUntil;
+  const initial = review?.initialAuthorization?.status === 'active' ? review.initialAuthorization : null;
+  const initialUnavailable = review?.initialAuthorization?.status === 'unavailable';
+  const initialBlocked = !!initial && (initial.until * 1000 <= Date.now() || review?.authorization.version !== 0);
+  const scopeUnavailable = rehearsalUnavailable || initialUnavailable;
+  const blocked = scopeUnavailable || rehearsalExpired || rehearsalConfirmed || initialBlocked || saving || pending || !reviewed || !!error || !review?.wallet || !review?.dossier || !canAuthorize || review.authorization.status === "paused";
   const status = review?.authorization.status;
-  const primaryAction: Action = (review?.authorization.version ?? 0) > 0 ? "renew" : "authorize";
+  const primaryAction: Action = initial?.action ?? rehearsal?.action ?? ((review?.authorization.version ?? 0) > 0 ? "renew" : "authorize");
   const hash = request?.transactionHash;
   return (
     <section aria-labelledby="doctor-review-title" className="rounded-2xl border border-sky-200 bg-white p-5 shadow-sm sm:p-6">
@@ -187,7 +208,7 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
             {Object.entries({ Nombre: onboarding.profile.name, Especialidad: onboarding.profile.specialty, 'Registro de prueba': onboarding.profile.licenseNum, 'RUT sintético': onboarding.profile.rut }).map(([label, value]) => <div key={label}><dt className="text-slate-500">{label}</dt><dd>{value}</dd></div>)}
           </dl>}
           {onboarding.reviewNote && <p className="mt-3 text-sm">Observaciones: {onboarding.reviewNote}</p>}
-          {['submitted', 'changes_requested', 'rejected'].includes(onboarding.state) && <div className="mt-4 space-y-3">
+          {!review.rehearsal && !review.initialAuthorization && ['submitted', 'changes_requested', 'rejected'].includes(onboarding.state) && <div className="mt-4 space-y-3">
             <label className="block text-sm">Observaciones para el médico<textarea value={note} onChange={event => setNote(event.target.value)} maxLength={500} className={inputClass} disabled={saving} /></label>
             <div className="flex flex-wrap gap-2">
               {onboarding.state === 'submitted' && <button className={secondaryButton} disabled={saving || !!error || !note.trim()} onClick={() => void reviewApplication('request_changes')}>Solicitar cambios</button>}
@@ -202,9 +223,13 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
           <p className="mt-1 text-sm text-slate-600">Vigencia: {expiry(review.authorization.validUntil)}</p>
           <p className="mt-2 break-all font-mono text-xs text-slate-500">Wallet Stellar: {review.wallet || "Asociación pendiente"}</p>
         </div>
+        {rehearsal && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Ensayo autorizado: sólo renovar este médico hasta el {expiry(rehearsal.validUntil)} · Hora de Chile. Es el vencimiento fijo del alcance de {rehearsal.durationHours === 168 ? '7 días' : '24 horas'} desde su {rehearsal.timeAnchor === 'approval' ? 'aprobación' : 'preparación'}. Puedes confirmar dentro de la ventana local, hasta el {expiry(rehearsal.until)} · Hora de Chile.</p>}
+        {rehearsalUnavailable && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No hay un alcance de renovación vigente para esta revisión. Puedes consultar el expediente y los recibos; las confirmaciones permanecen deshabilitadas.</p>}
+        {initial && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Alta inicial de prueba en Stellar Testnet, vigente hasta el {expiry(initial.validUntil)}. Comisión máxima de 1 XLM de Testnet a cargo de TrustLeaf. Confirma hasta el {expiry(initial.until)} · Hora de Chile.</p>}
+        {initialUnavailable && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">El alcance de alta inicial no está disponible para este perfil.</p>}
         {review.dossier && !onboarding && <div>
           <h3 className="font-semibold text-slate-800">Expediente sintético</h3>
-          <p className="mt-1 text-sm text-slate-500">Datos exclusivamente de prueba. Autorizar o renovar establece una vigencia de 30 días.</p>
+          <p className="mt-1 text-sm text-slate-500">{review.rehearsal ? 'Datos exclusivamente de prueba. Las confirmaciones dependen del alcance específico mostrado en esta revisión.' : 'Datos exclusivamente de prueba. Autorizar o renovar establece una vigencia de 30 días.'}</p>
           <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
             {[["Nombre de prueba", review.dossier.fullName], ["Registro de prueba", review.dossier.license], ["Especialidad", review.dossier.specialty], ["Fuente de verificación", review.dossier.verificationSource]].map(([label, value]) => (
               <div key={label}><dt className="text-slate-500">{label}</dt><dd className="mt-0.5 break-words font-medium text-slate-700">{value}</dd></div>
@@ -216,11 +241,11 @@ function AuthorizationReview({ doctor, onClose }: { doctor: Doctor; onClose: () 
           <p className="mt-1">{request.state === "pending" ? "Esperando al procesador administrativo. Si está apagado, la solicitud permanece pendiente." : request.state === "submitted" ? "Transacción enviada. Esperando su confirmación en Stellar Testnet." : request.state === "confirmed" ? "El recibo confirmó esta solicitud. El estado vigente aparece arriba." : "No se confirmó el cambio solicitado. Puedes actualizar el estado y volver a revisar."}</p>
           {hash && /^[a-f0-9]{64}$/i.test(hash) && <a href={`https://stellar.expert/explorer/testnet/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-semibold underline">Ver recibo en Stellar Testnet</a>}
         </div>}
-        {!pending && <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={saving || !!error || !review.dossier} className="mt-0.5 h-4 w-4 accent-sky-600" /><span>Revisé el expediente sintético y la cuenta del médico. Confirmo la acción que elija a continuación.</span></label>}
-        <div className="flex flex-wrap gap-3">
-          <button disabled={blocked} onClick={() => void submit(primaryAction)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Enviando solicitud…" : status === "revoked" ? "Confirmar nueva autorización" : primaryAction === "renew" ? "Confirmar renovación" : "Confirmar autorización"}</button>
-          {review.authorization.version > 0 && status !== "revoked" && (!onboarding || onboarding.state === 'authorized') && <button disabled={blocked} onClick={() => void submit("revoke")} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40">Confirmar revocación</button>}
-        </div>
+        {!pending && !scopeUnavailable && <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={saving || initialBlocked || !!error || !review.dossier} className="mt-0.5 h-4 w-4 accent-sky-600" /><span>Revisé el expediente sintético y la cuenta del médico. {initial ? `Confirmo el alta de prueba hasta el ${expiry(initial.validUntil)} · Hora de Chile.` : rehearsal ? `Confirmo únicamente renovar hasta el ${expiry(rehearsal.validUntil)} · Hora de Chile.` : 'Confirmo la acción que elija a continuación.'}</span></label>}
+        {!scopeUnavailable && <div className="flex flex-wrap gap-3">
+          <button disabled={blocked} onClick={() => void submit(primaryAction)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Enviando solicitud…" : rehearsalConfirmed ? "Renovación de ensayo confirmada" : status === "revoked" ? "Confirmar nueva autorización" : primaryAction === "renew" ? "Confirmar renovación" : "Confirmar autorización"}</button>
+          {!review.rehearsal && !review.initialAuthorization && review.authorization.version > 0 && status !== "revoked" && (!onboarding || onboarding.state === 'authorized') && <button disabled={blocked} onClick={() => void submit("revoke")} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40">Confirmar revocación</button>}
+        </div>}
         <p className="text-xs text-slate-500">El permiso cambia cuando Stellar confirma el recibo. TrustLeaf paga la comisión.</p>
       </div>}
     </section>
@@ -254,6 +279,7 @@ export default function AdminDoctorsPage() {
         <div><h1 className="text-xl font-bold text-slate-800">Médicos</h1><p className="mt-1 text-sm text-slate-500">Autorizaciones en Stellar Testnet · Datos sintéticos</p></div>
         <button onClick={() => setShowAdd(true)} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">Invitar médico</button>
       </div>
+      <ClinicalSponsorshipStatus />
       {selected && <AuthorizationReview key={selected.id} doctor={selected} onClose={() => setSelected(null)} />}
       {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700"><p>{error}</p><button onClick={() => void fetchDoctors()} className="mt-2 font-semibold underline">Volver a cargar</button></div>}
       <label className="block"><span className="mb-2 block text-sm font-medium text-slate-600">Buscar médico</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo o especialidad" className={inputClass} /></label>

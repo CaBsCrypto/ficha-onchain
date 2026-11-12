@@ -174,20 +174,31 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
     }).catch(error => { readAccount = undefined; throw error; }));
     const tx = new TransactionBuilder(new Account(source.address, source.sequence), { fee: BASE_FEE, networkPassphrase: Networks.TESTNET })
       .addOperation(new Contract(contract).call(method, ...args)).setTimeout(60).build();
-    const sim = await server.simulateTransaction(tx);
-    const ledger = number(sim.latestLedger, 1);
-    if (ledger < observedLedger) throw unavailable();
-    observedLedger = ledger;
-    if ('restorePreamble' in sim) throw unavailable();
-    if (rpc.Api.isSimulationError(sim)) {
-      // Only the exact deployed contract's Missing error for this selected getter
-      // is absence. Archival/restoration/provider failures always remain errors.
-      if (missing && /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(sim.error)) return null;
-      throw unavailable();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const sim = await server.simulateTransaction(tx);
+      const ledger = number(sim.latestLedger, 1);
+      if ('restorePreamble' in sim) throw unavailable();
+      if (rpc.Api.isSimulationError(sim)) {
+        if (ledger < observedLedger) throw unavailable();
+        observedLedger = ledger;
+        // Only the exact deployed contract's Missing error for this selected getter
+        // is absence. Archival/restoration/provider failures always remain errors.
+        if (missing && /^\s*(?:HostError:\s*)?Error\(Contract,\s*#1\)(?:\s|$)/.test(sim.error)) return null;
+        throw unavailable();
+      }
+      if (!rpc.Api.isSimulationSuccess(sim) || rpc.Api.isSimulationRestore(sim) || !clinicalSimulationIsLive(sim) || !sim.result ||
+          !Array.isArray(sim.result.auth) || sim.result.auth.length) throw unavailable();
+      const value = scValToNative(sim.result.retval);
+      // An RPC backend can briefly lag a prior read. Repeat only this unsigned
+      // simulation; malformed, archival and authorization failures never retry.
+      if (ledger < observedLedger) {
+        if (attempt < 2) continue;
+        throw unavailable();
+      }
+      observedLedger = ledger;
+      return value;
     }
-    if (!rpc.Api.isSimulationSuccess(sim) || rpc.Api.isSimulationRestore(sim) || !clinicalSimulationIsLive(sim) || !sim.result ||
-        !Array.isArray(sim.result.auth) || sim.result.auth.length) throw unavailable();
-    return scValToNative(sim.result.retval);
+    throw unavailable();
   }
   async function pinnedCode(contract: string, hash: string) {
     const key = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({ contract: new Address(contract).toScAddress(),
@@ -282,12 +293,31 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
       }
       return true;
     }),
+    /** Canonical live registry metadata for a specifically bounded rehearsal. */
+    doctorAuthorization: (address: string) => checked(async () => {
+      const value = await read(REGISTRY_PRIVATE, 'get_authorization', [wallet(address)]);
+      fields(value, ['commitment', 'schema_version', 'version', 'valid_until', 'revoked']);
+      if (typeof value.revoked !== 'boolean') throw unavailable();
+      return { version: number(value.version, 1, 0xffff_ffff), validUntil: number(value.valid_until, 1),
+        commitment: hex32(value.commitment), revoked: value.revoked, schemaVersion: number(value.schema_version, 1, 1) };
+    }),
     doctorAuthorized: (address: string) => checked(async () => {
       const value = await read(REGISTRY_PRIVATE, 'is_authorized', [wallet(address)]);
       if (typeof value !== 'boolean') throw unavailable();
       return value;
     }),
-    async prepare(source: string, action: ClinicalAction, expected: ClinicalExpected) {
+    /** Exact Missing from the pinned deployment, observed no earlier than the receipt ledger. */
+    async expiredOperationAbsent(expected: ClinicalExpected, minimumLedger: number) {
+      return checked(async () => {
+        observedLedger = Math.max(observedLedger, number(minimumLedger, 1));
+        await history(expected.historyId);
+        const author = expected.author ?? expected.patient;
+        const value = await read(CLINICAL_CONTRACT, 'get_operation', [wallet(author), bytes(expected.operationId)], true);
+        if (value !== null) throw unavailable();
+        return { contractId: CLINICAL_CONTRACT, author, operationId: expected.operationId, observedLedger };
+      });
+    },
+    async prepare(source: string, action: ClinicalAction, expected: ClinicalExpected, until?: number) {
       await ensure();
       const invocation = clinicalInvocation(action, expected);
       let account: Account;
@@ -298,7 +328,10 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
       }
       if (account.accountId() !== source) throw unavailable();
       try {
-        const unsigned = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET }).addOperation(invocation).setTimeout(180).build();
+        const now = Math.floor(Date.now() / 1000);
+        if (until !== undefined && (!Number.isSafeInteger(until) || until <= now)) throw unavailable();
+        const maxTime = until === undefined ? now + 180 : Math.min(now + 300, until);
+        const unsigned = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET }).addOperation(invocation).setTimebounds(0, maxTime).build();
         const prepared = await server.prepareTransaction(unsigned);
         assertClinicalUnsigned(prepared, source, action, expected);
         if (prepared.sequence !== unsigned.sequence || JSON.stringify(prepared.timeBounds) !== JSON.stringify(unsigned.timeBounds)) throw invalid();

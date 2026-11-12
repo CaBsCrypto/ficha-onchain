@@ -1,4 +1,5 @@
 import type { ClinicalGrant, ClinicalPrepareRequest } from '@/types/clinical';
+import { clinicalRehearsalLimitMessages } from './errors';
 
 export interface ClinicalPermissionDraft { canRead: boolean; canAppend: boolean }
 export function initialClinicalPermissionDraft(grant: ClinicalGrant): ClinicalPermissionDraft {
@@ -25,7 +26,14 @@ export function clinicalPermissionChange(grant: ClinicalGrant, draft: ClinicalPe
     canAppend: draft.canAppend, expectedRevision: grant.revision };
 }
 export function clinicalPermissionError(error: unknown): string {
-  const code = error instanceof Error ? error.message : '';
+  let code: unknown = error instanceof Error ? error.message : '';
+  // A client error already translates .message; only its fixed .code selects
+  // presentation. Never forward provider messages or arbitrary code values.
+  try { if (error instanceof Error && 'code' in error) code = (error as Error & { code: unknown }).code; }
+  catch { code = ''; }
+  if (typeof code === 'string' && Object.prototype.hasOwnProperty.call(clinicalRehearsalLimitMessages, code)) {
+    return clinicalRehearsalLimitMessages[code as keyof typeof clinicalRehearsalLimitMessages];
+  }
   if (code === 'clinical_permission_conflict' || code === 'clinical_identity_changed') return 'Los permisos cambiaron. Actualiza el historial y vuelve a revisar tu elección.';
   if (code === 'doctor_not_authorized') return 'El médico ya no tiene autorización vigente. Actualiza el historial; puedes retirar sus permisos.';
   if (code === 'clinical_permission_withdrawal_only') return 'Para retirar los permisos de este médico, desmarca ambas opciones.';
