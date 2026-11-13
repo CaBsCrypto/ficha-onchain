@@ -12,7 +12,10 @@ vi.mock('@privy-io/react-auth', () => ({usePrivy:()=>mock, useModalStatus:()=>({
 vi.mock('next/navigation', () => ({useRouter:()=>({replace:mock.replace}),useSearchParams:()=>new URLSearchParams(mock.tab ? `tab=${mock.tab}` : "")}));
 vi.mock('next/link', () => ({default:(props:any)=>createElement('a',props)}));
 vi.mock('@/hooks/useTrackUser', () => ({useTrackUser:()=>{}}));
-vi.mock('@/hooks/useLanguage', () => ({useLanguage:()=>({lang:'es'})}));
+vi.mock('@/hooks/useLanguage', () => ({
+  useLanguage: () => ({ lang: 'es' }),
+  usePortalLanguage: () => 'es',
+}));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({WalletBoundary:({children}:any)=>children}));
 let root:Root, box:HTMLDivElement;
 beforeEach(()=>{
