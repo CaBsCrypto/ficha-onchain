@@ -8,13 +8,14 @@ import type { ClinicalActor } from '@/types/clinical';
 import { assertClinicalWriteScope, clinicalCreateOnceConfigured } from './create-once';
 import { rehearsalConfigured, currentClinicalRehearsal } from './rehearsal';
 import { clinicalCaptureConfigured, loadClinicalCapture, assertClinicalCaptureActor } from './capture';
+import { hostedClinicalActor, withHostedClinicalRequest } from './hosted';
 import { CLINICAL_PREPARE_CAPABILITY_HEADER, CLINICAL_PREPARE_CAPABILITY_VERSION } from './client-contract';
 import { createServerClinicalReadTrace } from './read-trace-server';
 import { clinicalReadStage, emitClinicalReadTrace, type ClinicalReadTrace } from './read-trace';
 
 export const clinicalJson = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'no-store', 'Vary': 'Authorization' } });
 /** Auth failures and provider exceptions never carry provider payloads into the response. */
-export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor, trace?: ClinicalReadTrace) => Promise<unknown>, options: { allowCreateOnce?: boolean; offchainOnly?: boolean; requirePrepareClient?: boolean } = {}) {
+export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor, trace?: ClinicalReadTrace) => Promise<unknown>, options: { allowCreateOnce?: boolean; offchainOnly?: boolean; requirePrepareClient?: boolean; hostedView?: boolean } = {}) {
   const diagnostic = createServerClinicalReadTrace(request), trace = diagnostic?.trace;
   const respond = (response: Response) => { emitClinicalReadTrace(trace, 'respond', 'ok'); return response; };
   emitClinicalReadTrace(trace, 'ingress', 'start');
@@ -27,20 +28,26 @@ export async function clinicalApi(request: Request, work: (user: AuthedUser, act
     if (options.requirePrepareClient && request.headers.get(CLINICAL_PREPARE_CAPABILITY_HEADER) !== CLINICAL_PREPARE_CAPABILITY_VERSION) {
       return respond(clinicalJson({ error: 'clinical_client_update_required' }, 409));
     }
-    const scoped = request.method === 'POST' && options.allowCreateOnce === true && clinicalCreateOnceConfigured();
-    assertClinicalEnvironment(request.method !== 'GET' && !scoped && !options.offchainOnly);
+    assertClinicalEnvironment(request.method !== 'GET' && options.allowCreateOnce !== true && !options.offchainOnly);
     const actor = await clinicalReadStage(trace, 'bind', () => resolveClinicalActor(user));
-    // Only opted-in clinical routes may reach their action/intent policy while
-    // general writes are off. They recheck the actual action before mutation.
-    if (scoped && !options.offchainOnly) {
-      if (clinicalCaptureConfigured()) {
-        const plan = loadClinicalCapture();
-        if (!plan) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
-        assertClinicalCaptureActor(plan, actor);
-      } else if (rehearsalConfigured()) currentClinicalRehearsal(actor);
-      else assertClinicalWriteScope('create_history', actor.address);
-    }
-    const result = await clinicalReadStage(trace, 'work', () => trace ? work(user, actor, trace) : work(user, actor));
+    const perform = async () => {
+      const scoped = request.method === 'POST' && options.allowCreateOnce === true && clinicalCreateOnceConfigured(actor.address);
+      assertClinicalEnvironment(request.method !== 'GET' && !scoped && !options.offchainOnly);
+      // Legacy modes verify ingress as before. Hosted phase policy checks the
+      // persisted request/actual action in the service under the SQL lock.
+      if (scoped && !options.offchainOnly && !hostedClinicalActor(actor.address)) {
+        if (clinicalCaptureConfigured()) {
+          const plan = loadClinicalCapture();
+          if (!plan) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
+          assertClinicalCaptureActor(plan, actor);
+        } else if (rehearsalConfigured()) currentClinicalRehearsal(actor);
+        else assertClinicalWriteScope('create_history', actor.address);
+      }
+      return clinicalReadStage(trace, 'work', () => trace ? work(user, actor, trace) : work(user, actor));
+    };
+    const result = options.allowCreateOnce || options.hostedView
+      ? await withHostedClinicalRequest(request, actor, perform)
+      : await perform();
     // Do not deliver content after a changed/expired session or wallet association.
     const current = await clinicalReadStage(trace, 'final_auth', () => requireUser(request, { strict: true }));
     if (!current || current.userId !== actor.userId) return respond(clinicalJson({ error: 'unauthorized' }, 401));

@@ -45,7 +45,7 @@ def shot_files(directory, stem, *, allow_fragments):
     return fragments
 
 
-def render(directory, executable, *, cpu, final):
+def render(directory, executable, *, cpu, final, max_seconds=None):
     if not directory.is_dir():
         raise NotADirectoryError(directory)
     output = directory / (FINAL_OUTPUT if final else BASE_OUTPUT)
@@ -82,6 +82,8 @@ def render(directory, executable, *, cpu, final):
             chapters.extend(['[CHAPTER]', f'TIMEBASE=1/{FPS}', f'START={start}', f'END={end}', f'title={title}'])
             print(f'{start/FPS:6.2f} - {end/FPS:6.2f} s   {title}', flush=True)
             start = end
+        if max_seconds is not None and start > max_seconds * FPS:
+            raise ValueError(f'Combined video is {start/FPS:.2f}s. Trim it to at most {max_seconds}s.')
         playlist, markers = work / 'clips.ffconcat', work / 'chapters.ffmetadata'
         playlist.write_text('\n'.join(files) + '\n', encoding='utf-8')
         markers.write_text('\n'.join(chapters) + '\n', encoding='utf-8')
@@ -98,9 +100,12 @@ if __name__ == '__main__':
     parser.add_argument('--artifacts-dir', type=Path, required=True, help='Directory containing the clean takes.')
     parser.add_argument('--ffmpeg-path', type=Path, help='Explicit path to FFmpeg. Defaults to FFmpeg on PATH.')
     parser.add_argument('--final', action='store_true', help='Join all eight takes into the complete video.')
+    parser.add_argument('--max-seconds', type=int, help='Reject a video longer than this duration.')
     parser.add_argument('--cpu', action='store_true', help='Encode with two CPU threads instead of NVIDIA NVENC.')
     args = parser.parse_args()
     executable = args.ffmpeg_path.resolve() if args.ffmpeg_path else which('ffmpeg')
     if not executable or not Path(executable).is_file():
         parser.error('Install FFmpeg on PATH or pass --ffmpeg-path.')
-    render(args.artifacts_dir.resolve(), executable, cpu=args.cpu, final=args.final)
+    if args.max_seconds is not None and args.max_seconds < 1:
+        parser.error('--max-seconds must be positive.')
+    render(args.artifacts_dir.resolve(), executable, cpu=args.cpu, final=args.final, max_seconds=args.max_seconds)

@@ -5,7 +5,7 @@ import { requireUser, unauthorized } from '@/lib/auth/privy-auth';
 import { assertPrivateEnvironment, PRIVY_APP } from '@/lib/private-config';
 import { availableAppointmentSlots, BookingPreparationError, privateRxOneTimeSlotAvailable, validBookingDate } from '@/lib/prescription-booking';
 import { resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
-import { assertPrivateRxActor, currentPrivateRxScope } from '@/lib/digital-cabs-rx';
+import { assertPrivateRxActor, currentPrivateRxScope, privateRxSlotHost } from '@/lib/digital-cabs-rx';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
@@ -24,9 +24,9 @@ export async function GET(request:Request){
     let data=await availableAppointmentSlots(sql,doctorEmail,date,next);
     // Other users keep the normal availability view; a stale/closed scope adds nothing.
     try {
-      const scope=currentPrivateRxScope();
+      const scope=await currentPrivateRxScope();
       if(scope?.phase==='appointment'&&scope.slot.oneTime===true&&scope.patient.userId===actor.userId&&scope.doctorId===id&&scope.slot.date===date&&
-        /^(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?$/.test(request.headers.get('host')??'')&&(!data.date||data.date>=date)) {
+        privateRxSlotHost(request,scope)&&(!data.date||data.date>=date)) {
         assertPrivateRxActor(scope,{userId:doctor.userId,email:doctorEmail},doctor,'doctor');
         const time=scope.slot.timeSlot;
         if(data.date===date)data={...data,slots:data.slots.filter(slot=>slot.time!==time)};

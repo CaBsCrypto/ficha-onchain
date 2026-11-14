@@ -20,6 +20,7 @@ import { clinicalDoctorContext, clinicalDoctorIdentity } from './doctor-context'
 import { clinicalPrescriptionReference } from './prescriptions';
 import { rehearsalConfigured, clinicalRehearsalView } from './rehearsal';
 import { clinicalCaptureConfigured, clinicalCaptureView } from './capture';
+import { hostedClinicalActor, hostedClinicalView } from './hosted';
 import { clinicalReadStage, type ClinicalReadTrace } from './read-trace';
 
 export function clinicalStorageClient() { return { query: async (sql: string, values?: unknown[]) => ({ rows: await getDb().query(sql, values) }) }; }
@@ -222,13 +223,18 @@ export async function clinicalGrants(historyId: string, onUnavailable?: () => vo
 }
 export async function clinicalSnapshot(request: Request, user: AuthedUser, actor: ClinicalActor, historyId?: string, trace?: ClinicalReadTrace): Promise<ClinicalSnapshot> {
   const draftsEnabled = true;
-  const writes = clinicalWriteCapabilities(actor.address);
+  const hosted = hostedClinicalActor(actor.address);
+  const capabilities = clinicalWriteCapabilities(actor.address);
+  const writes = hosted && historyId && hosted.snapshot.historyId !== historyId
+    ? { create_history: false, append_version: false, set_permissions: false }
+    : capabilities;
   const chain = createClinicalWebChain();
   const own = await clinicalReadStage(trace, 'target', () => clinicalReadTarget(user, actor, historyId, chain));
   const operations = await clinicalReadStage(trace, 'ops', () => clinicalOperations(actor, own?.history.id ?? null));
-  const rehearsal = own ? (clinicalCaptureConfigured() ? clinicalCaptureView(actor, own.history.id) : clinicalRehearsalView(actor, own.history.id)) : undefined;
-  const doctorCanWrite = !clinicalCreateOnceConfigured() || rehearsalConfigured() || (clinicalCaptureConfigured() && !!rehearsal);
-  if (!own) return { draftsEnabled, writes, history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
+  const rehearsal = hosted ? hostedClinicalView(actor, own?.history.id)
+    : own ? (clinicalCaptureConfigured() ? clinicalCaptureView(actor, own.history.id) : clinicalRehearsalView(actor, own.history.id)) : undefined;
+  const doctorCanWrite = !clinicalCreateOnceConfigured(actor.address) || rehearsalConfigured() || ((!!hosted || clinicalCaptureConfigured()) && !!rehearsal);
+  if (!own) return { draftsEnabled, writes, ...(hosted && rehearsal ? { rehearsal } : {}), history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
   if (own.context && !own.context.canRead) {
     await clinicalReadStage(trace, 'finalcontext', () => clinicalConfirmReadTarget(request, actor, own, chain));
     return { draftsEnabled, writes: { create_history: false, set_permissions: false, append_version: doctorCanWrite && writes.append_version && own.context.canAppend },

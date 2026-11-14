@@ -44,6 +44,9 @@ jobs:
       - name: Private services, identity and worker tests
         run: npm run test:private
 
+      - name: Hosted capture and prescription scopes
+        run: node --test scripts/lib/hosted-capture-store.test.mjs scripts/lib/digital-cabs-rx-scope.test.mjs scripts/lib/private-rx-sponsorship.test.mjs
+
       # NEXT_PUBLIC_* are inlined at build time. The real values live in Vercel;
       # here they only need to be present and well-formed so the build does not
       # throw (e.g. Privy rejects an empty appId while prerendering). These are

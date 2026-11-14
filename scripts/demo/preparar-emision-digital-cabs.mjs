@@ -3,10 +3,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { readDemoInputsOrExit } from './demo-inputs.mjs';
 import { databaseConnectionString } from '../lib/database-connection.mjs';
-import { loadPrivateRxScope } from '../lib/digital-cabs-rx-scope.mjs';
+import { assertPrivateRxOperatorEnvironment, loadHostedPrivateRxScope, loadPrivateRxScope } from '../lib/digital-cabs-rx-scope.mjs';
+import { readHostedCaptureActive } from '../lib/hosted-capture-store.mjs';
 
 const require = createRequire(import.meta.url);
-const { args, configured, privateFile } = readDemoInputsOrExit();
+const { args, configured, privateFile } = readDemoInputsOrExit({ allowHostedOperator: true });
 const scopeFile = name => privateFile(`digital-cabs-rx-${name}.private.json`);
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const digestPattern = /^[0-9a-f]{64}$/;
@@ -16,6 +17,8 @@ function readScope(phase, sha) {
   const file = scopeFile(phase);
   const scope = loadPrivateRxScope({ requireApproval: false, env: {
     DATABASE_URL: databaseConnectionString(configured), TRUSTLEAF_DB_HOST: configured.TRUSTLEAF_DB_HOST,
+    ...(configured.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true' ? { TRUSTLEAF_HOSTED_CAPTURE_OPERATOR: 'true',
+      TRUSTLEAF_HOSTED_CAPTURE_ORIGIN: configured.TRUSTLEAF_HOSTED_CAPTURE_ORIGIN } : {}),
     TRUSTLEAF_ENV: configured.TRUSTLEAF_ENV, NEXT_PUBLIC_STELLAR_NETWORK: configured.NEXT_PUBLIC_STELLAR_NETWORK,
     PRIVY_APP_ID: configured.PRIVY_APP_ID, NEXT_PUBLIC_PRIVY_APP_ID: configured.NEXT_PUBLIC_PRIVY_APP_ID,
     PRESCRIPTION_PRIVATE_CONTRACT_ID: configured.PRESCRIPTION_PRIVATE_CONTRACT_ID,
@@ -42,7 +45,8 @@ function writeScope(phase, scope) {
 async function readQueuedBooking(appointment) {
   const connectionString = databaseConnectionString(configured);
   const url = new URL(connectionString);
-  if (configured.TRUSTLEAF_ENV !== 'local' || configured.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' ||
+  assertPrivateRxOperatorEnvironment(configured);
+  if (configured.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' ||
       configured.VERCEL || configured.VERCEL_ENV || url.hostname !== configured.TRUSTLEAF_DB_HOST ||
       url.hostname !== configured.TRUSTLEAF_DEMO_DB_HOST ||
       !/^ep-[a-z0-9-]+\.c-3\.us-east-1\.aws\.neon\.tech$/.test(url.hostname) ||
@@ -57,6 +61,11 @@ async function readQueuedBooking(appointment) {
   try {
     client = await pool.connect();
     await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    if (configured.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true') {
+      const snapshot = await readHostedCaptureActive(client);
+      if (snapshot?.phase !== 'appointment' || snapshot.sha256 !== appointment.policyHash) throw new Error('rx_scope_unverified');
+      loadHostedPrivateRxScope(snapshot);
+    }
     const { rows } = await client.query(`SELECT a.id AS appointment_id,b.issuance_id,b.valid_until
       FROM appointments a
       JOIN prescription_booking_requests b ON b.appointment_id=a.id

@@ -24,7 +24,16 @@ export const PRIVATE_RX_CONTRACT_ID: string;
 export const PRIVATE_RX_REGISTRY_ID: string;
 export const PRIVATE_RX_AUTHORITY: string;
 export function privateRxScopeConfigured(env?: NodeJS.ProcessEnv): boolean;
+export function assertPrivateRxOperatorEnvironment(env: NodeJS.ProcessEnv, options?: { scopeInputs?: boolean }): { connectionString: string | undefined; directConnectionString?: string };
 export function privateRxAppointmentEpoch(slot: unknown): number;
 export function validatePrivateRxManifest(plan: unknown, verifiedBase: unknown, options: { now: number; basePdfScopeSha256: string; requireApproval?: boolean; allowExpired?: boolean }): void;
 export function loadPrivateRxScope(options?: { env?: NodeJS.ProcessEnv; now?: number; requireApproval?: boolean; allowExpired?: boolean }): PrivateRxScope | null;
+export interface PrivateRxHostedSnapshot {
+  phase: string; bytes: Buffer; sha256: string; approvalSha256: string | null; expiresAt: number; approvedAt: number | null; active: boolean;
+  baseBytes: Buffer | null; baseSha256: string | null; origin: string; doctorId: number;
+  historyId: string; relayer: string; patient: PrivateRxActor; doctor: PrivateRxActor;
+}
+export function loadHostedPrivateRxScope(snapshot: PrivateRxHostedSnapshot, options?: { now?: number; historical?: boolean }): PrivateRxScope;
+export function privateRxHostedContext(scope: PrivateRxScope): Readonly<{ phase: 'appointment' | 'attest' | 'issuance'; expiresAt: number; origin: string; historical: boolean }> | undefined;
+export function assertHostedPrivateRxReceiptScope(scope: PrivateRxScope, step: PrivateRxStepKey): void;
 export function assertPrivateRxScopeOpen(scope: PrivateRxScope, options?: { env?: NodeJS.ProcessEnv; now?: number; step?: PrivateRxStepKey }): PrivateRxScope;

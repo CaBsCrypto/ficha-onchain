@@ -4,9 +4,10 @@ import { requireUser, unauthorized } from '@/lib/auth/privy-auth';
 import { isSameOrigin } from '@/lib/auth/same-origin';
 import { PrivateFlowError } from '@/lib/private-config';
 import { BookingPreparationError, bookingTransaction, changePrivateAppointment, createPrivateAppointment, listPrivateAppointments } from '@/lib/prescription-booking';
-import { assertPrivateRxActor, assertPrivateRxCreate, assertPrivateRxLoopback, currentPrivateRxScope, privateRxAppointmentScope, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
+import { assertPrivateRxActor, assertPrivateRxCreate, assertPrivateRxOrigin, currentPrivateRxScope, privateRxAppointmentScope, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
+export const maxDuration=60;
 const json=(value:unknown,status=200)=>NextResponse.json(value,{status,headers:{'Cache-Control':'no-store'}});
 function failure(error:unknown){
   if(error instanceof BookingPreparationError)return json({error:error.code},error.status);
@@ -33,9 +34,9 @@ async function mutate(request:Request,patch:boolean){
   if(patch){
     if(Object.keys(body).some(k=>!['id','action'].includes(k))||!Number.isSafeInteger(body.id)||Number(body.id)<1||!['attend','start','complete','cancel'].includes(String(body.action)))return json({error:'invalid_appointment_action'},400);
     try {
-      const scope=privateRxAppointmentScope(currentPrivateRxScope()), action=body.action as 'attend'|'start'|'complete'|'cancel';
+      const scope=privateRxAppointmentScope(await currentPrivateRxScope()), action=body.action as 'attend'|'start'|'complete'|'cancel';
       if(scope) {
-        assertPrivateRxLoopback(request);
+        assertPrivateRxOrigin(request,scope);
         if(action!=='attend'&&action!=='start')throw new PrivateFlowError('private_rx_scope_rejected',403);
         assertPrivateRxActor(scope,actor,undefined,action==='attend'?'patient':'doctor');
       }
@@ -46,9 +47,9 @@ async function mutate(request:Request,patch:boolean){
   }
   if(Object.keys(body).some(k=>!['doctorId','date','timeSlot','type'].includes(k))||!Number.isSafeInteger(body.doctorId)||Number(body.doctorId)<1||typeof body.date!=='string'||typeof body.timeSlot!=='string'||(body.type!==undefined&&typeof body.type!=='string'))return json({error:'invalid_appointment'},400);
   try {
-    const scope=privateRxAppointmentScope(currentPrivateRxScope());
+    const scope=privateRxAppointmentScope(await currentPrivateRxScope());
     const input={doctorId:Number(body.doctorId),date:String(body.date),timeSlot:String(body.timeSlot),type:body.type as string|undefined};
-    if(scope){assertPrivateRxLoopback(request);assertPrivateRxCreate(scope,actor,input);}
+    if(scope){assertPrivateRxOrigin(request,scope);assertPrivateRxCreate(scope,actor,input);}
     const result=scope ? await bookingTransaction(sql=>createPrivateAppointment(sql,actor,input,scope),scope)
       : await bookingTransaction(sql=>createPrivateAppointment(sql,actor,input));
     return json(result,201);

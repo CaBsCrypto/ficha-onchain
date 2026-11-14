@@ -82,9 +82,57 @@ function nonzeroDigest(value: unknown): value is string {
   return typeof value === 'string' && digest.test(value) && !/^0+$/.test(value);
 }
 
-function loadCaptureContinuation(raw: CaptureContinuationManifest, file: string, policyHash: string, env: NodeJS.ProcessEnv, now: number): ClinicalCapturePlan {
-  const basePdfScopeSha256 = env.TRUSTLEAF_DEMO_PDF_SCOPE_SHA256;
-  const confirmedPdfHash = env.TRUSTLEAF_DEMO_PDF_TX_SHA256;
+interface CaptureBaseline {
+  sha256: string;
+  pdfTransactionHash: string;
+  readBytes: () => Buffer;
+}
+
+interface CaptureValidation {
+  policyHash: string;
+  doctorId: string;
+  relayer: string;
+  baseline?: CaptureBaseline;
+  now?: number;
+}
+
+function captureDocument(bytes: Buffer, policyHash: string) {
+  if (!digest.test(policyHash) || bytes.length > 4096 ||
+      createHash('sha256').update(bytes).digest('hex') !== policyHash) throw denied();
+  return JSON.parse(bytes.toString('utf8'));
+}
+
+function captureV1(raw: Omit<ClinicalCapturePlan, 'policyHash'>, settings: CaptureValidation, now: number) {
+  const pdfKeys = ['pdfRequestId', 'grantTransactionHash', 'noteTransactionHash', 'pdf'];
+  const pdfMode = pdfKeys.some(key => Object.hasOwn(raw, key));
+  if (!exact(raw, ['schemaVersion', 'runId', 'openedAt', 'until', 'network', 'contractId', 'registryId', 'relayer',
+    'patient', 'doctor', 'historyId', 'doctorId', 'doctorValidUntil', 'grantRequestId', 'noteRequestId', 'note',
+    ...(pdfMode ? pdfKeys : [])])) throw denied();
+  const ids = [raw.runId, raw.grantRequestId, raw.noteRequestId];
+  if (pdfMode) {
+    if (!raw.pdfRequestId || !raw.pdf || !validPdf(raw.pdf) ||
+        !nonzeroDigest(raw.grantTransactionHash) || !nonzeroDigest(raw.noteTransactionHash) ||
+        raw.grantTransactionHash === raw.noteTransactionHash) throw denied();
+    ids.push(raw.pdfRequestId);
+  }
+  if (raw.schemaVersion !== 1 || !ids.every(id => uuid.test(id)) || new Set(ids).size !== ids.length ||
+      !epoch(raw.openedAt) || !epoch(raw.until) || raw.openedAt > now || raw.until <= raw.openedAt ||
+      raw.until - raw.openedAt > 3600 || !epoch(raw.doctorValidUntil) || raw.until >= raw.doctorValidUntil ||
+      raw.network !== 'testnet' || raw.contractId !== CLINICAL_ID || raw.registryId !== REGISTRY_PRIVATE ||
+      !epoch(raw.doctorId) || String(raw.doctorId) !== settings.doctorId ||
+      !digest.test(raw.historyId) || !validActor(raw.patient) || !validActor(raw.doctor) ||
+      raw.historyId !== deriveClinicalHistoryId(raw.patient.address) ||
+      raw.patient.userId === raw.doctor.userId || raw.patient.walletId === raw.doctor.walletId ||
+      new Set([raw.patient.address, raw.doctor.address, raw.relayer]).size !== 3 || raw.relayer !== settings.relayer ||
+      !exact(raw.note, ['title', 'text', 'eventDate']) || raw.note.eventDate !== null ||
+      !sameNote(raw.note, clinicalNote(raw.note))) throw denied();
+  return raw;
+}
+
+function loadCaptureContinuation(raw: CaptureContinuationManifest, settings: CaptureValidation, now: number): ClinicalCapturePlan {
+  const { baseline, policyHash } = settings;
+  const basePdfScopeSha256 = baseline?.sha256;
+  const confirmedPdfHash = baseline?.pdfTransactionHash;
   if (!nonzeroDigest(basePdfScopeSha256) || !nonzeroDigest(confirmedPdfHash) ||
       !exact(raw, ['schemaVersion', 'runId', 'openedAt', 'until', 'basePdfScopeSha256', 'pdfTransactionHash', 'correction', 'revocation']) ||
       raw.basePdfScopeSha256 !== basePdfScopeSha256 || raw.pdfTransactionHash !== confirmedPdfHash ||
@@ -94,14 +142,10 @@ function loadCaptureContinuation(raw: CaptureContinuationManifest, file: string,
       ![raw.correction.operationId, raw.revocation.operationId, raw.correction.entryId, raw.correction.previousCommitment].every(nonzeroDigest) ||
       raw.correction.operationId === raw.revocation.operationId) throw denied();
 
-  const baseFile = fileURLToPath(new URL('digital-cabs-pdf-scope.private.json', pathToFileURL(file)));
-  if (file === baseFile || policyHash === basePdfScopeSha256) throw denied();
-  const baseBytes = readFileSync(baseFile);
-  if (baseBytes.length > 4096 || createHash('sha256').update(baseBytes).digest('hex') !== basePdfScopeSha256) throw denied();
-  const basePdfOpenedAt = JSON.parse(baseBytes.toString('utf8')).openedAt;
-  if (!epoch(basePdfOpenedAt)) throw denied();
-  const base = loadClinicalCapture({ ...env, [fileKey]: baseFile, [digestKey]: basePdfScopeSha256 }, basePdfOpenedAt);
-  if (!base?.pdf || !base.pdfRequestId || base.schemaVersion !== 1 || raw.openedAt < base.until || raw.until >= base.doctorValidUntil) throw denied();
+  if (!baseline || policyHash === basePdfScopeSha256) throw denied();
+  const baseDocument = captureDocument(baseline.readBytes(), basePdfScopeSha256);
+  const base = captureV1(baseDocument, settings, baseDocument.openedAt);
+  if (!base.pdf || !base.pdfRequestId || raw.openedAt < base.until || raw.until >= base.doctorValidUntil) throw denied();
   const ids = [base.runId, base.grantRequestId, base.noteRequestId, base.pdfRequestId, raw.runId, raw.correction.requestId, raw.revocation.requestId];
   if (!ids.every(id => typeof id === 'string' && uuid.test(id)) || new Set(ids).size !== ids.length) throw denied();
 
@@ -116,55 +160,52 @@ function loadCaptureContinuation(raw: CaptureContinuationManifest, file: string,
   return Object.freeze({ ...base, schemaVersion: 2, runId: raw.runId, openedAt: raw.openedAt, until: raw.until, continuation, policyHash });
 }
 
+export function validateClinicalCapture(bytes: Buffer, settings: CaptureValidation): ClinicalCapturePlan {
+  const now = settings.now ?? Math.floor(Date.now() / 1000);
+  let plan: Omit<ClinicalCapturePlan, 'policyHash'>;
+  try {
+    const raw = captureDocument(bytes, settings.policyHash);
+    plan = raw?.schemaVersion === 2
+      ? loadCaptureContinuation(raw, settings, now)
+      : captureV1(raw, settings, now);
+  } catch { throw denied(); }
+  if (now >= plan.until) throw new PrivateFlowError('clinical_rehearsal_expired', 409);
+  return Object.freeze({ ...plan, patient: Object.freeze(plan.patient), doctor: Object.freeze(plan.doctor),
+    note: Object.freeze(clinicalNote(plan.note)), ...(plan.pdf ? { pdf: Object.freeze(plan.pdf) } : {}),
+    policyHash: settings.policyHash });
+}
+
 export function loadClinicalCapture(env = process.env, now = Math.floor(Date.now() / 1000)): ClinicalCapturePlan | null {
   if (!clinicalCaptureConfigured(env)) return null;
-  let plan: Omit<ClinicalCapturePlan, 'policyHash'>;
-  let policyHash: string;
+  let file: string;
+  let settings: CaptureValidation;
+  let bytes: Buffer;
   try {
-    const file = env[fileKey];
-    policyHash = env[digestKey] ?? '';
+    file = env[fileKey] ?? '';
     const competingScope = Object.keys(env).some(key =>
       /^TRUSTLEAF_CLINICAL_(?:CREATE_ONCE|HOSTED_CREATE_ONCE|PATIENT_DEMO|REHEARSAL|MIGRATION|WEB_MIGRATION)(?:_|$)/.test(key) ||
       key.startsWith('TRUSTLEAF_INITIAL_DOCTOR_SCOPE_'));
     if (competingScope || env.TRUSTLEAF_ENV !== 'local' || env.VERCEL || env.VERCEL_ENV ||
         env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'false' || env.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' ||
-        !file || !isAbsolute(file) || resolve(file) !== realpathSync(file) || !digest.test(policyHash)) throw denied();
-    const bytes = readFileSync(file);
-    if (bytes.length > 4096 || createHash('sha256').update(bytes).digest('hex') !== policyHash) throw denied();
-    const raw = JSON.parse(bytes.toString('utf8'));
-    if (raw?.schemaVersion === 2) {
-      plan = loadCaptureContinuation(raw, file, policyHash, env, now);
-    } else {
-      plan = raw;
-      const pdfKeys = ['pdfRequestId', 'grantTransactionHash', 'noteTransactionHash', 'pdf'];
-      const pdfMode = pdfKeys.some(key => Object.hasOwn(plan, key));
-      if (!exact(plan, ['schemaVersion', 'runId', 'openedAt', 'until', 'network', 'contractId', 'registryId', 'relayer',
-        'patient', 'doctor', 'historyId', 'doctorId', 'doctorValidUntil', 'grantRequestId', 'noteRequestId', 'note',
-        ...(pdfMode ? pdfKeys : [])])) throw denied();
-      const ids = [plan.runId, plan.grantRequestId, plan.noteRequestId];
-      if (pdfMode) {
-        if (!plan.pdfRequestId || !plan.pdf || !validPdf(plan.pdf) ||
-            !nonzeroDigest(plan.grantTransactionHash) || !nonzeroDigest(plan.noteTransactionHash) ||
-            plan.grantTransactionHash === plan.noteTransactionHash) throw denied();
-        ids.push(plan.pdfRequestId);
-      }
-      if (plan.schemaVersion !== 1 || !ids.every(id => uuid.test(id)) || new Set(ids).size !== ids.length ||
-          !epoch(plan.openedAt) || !epoch(plan.until) || plan.openedAt > now || plan.until <= plan.openedAt ||
-          plan.until - plan.openedAt > 3600 || !epoch(plan.doctorValidUntil) || plan.until >= plan.doctorValidUntil ||
-          plan.network !== 'testnet' || plan.contractId !== CLINICAL_ID || plan.registryId !== REGISTRY_PRIVATE ||
-          !epoch(plan.doctorId) || String(plan.doctorId) !== env.TRUSTLEAF_DEMO_DOCTOR_ID ||
-          !digest.test(plan.historyId) || !validActor(plan.patient) || !validActor(plan.doctor) ||
-          plan.historyId !== deriveClinicalHistoryId(plan.patient.address) ||
-          plan.patient.userId === plan.doctor.userId || plan.patient.walletId === plan.doctor.walletId ||
-          new Set([plan.patient.address, plan.doctor.address, plan.relayer]).size !== 3 ||
-          Keypair.fromSecret(env.RELAYER_SECRET ?? '').publicKey() !== plan.relayer ||
-          !exact(plan.note, ['title', 'text', 'eventDate']) || plan.note.eventDate !== null ||
-          !sameNote(plan.note, clinicalNote(plan.note))) throw denied();
-    }
+        !file || !isAbsolute(file) || resolve(file) !== realpathSync(file)) throw denied();
+    bytes = readFileSync(file);
+    settings = {
+      policyHash: env[digestKey] ?? '',
+      doctorId: env.TRUSTLEAF_DEMO_DOCTOR_ID ?? '',
+      relayer: Keypair.fromSecret(env.RELAYER_SECRET ?? '').publicKey(),
+      now,
+      baseline: {
+        sha256: env.TRUSTLEAF_DEMO_PDF_SCOPE_SHA256 ?? '',
+        pdfTransactionHash: env.TRUSTLEAF_DEMO_PDF_TX_SHA256 ?? '',
+        readBytes: () => {
+          const baseFile = fileURLToPath(new URL('digital-cabs-pdf-scope.private.json', pathToFileURL(file)));
+          if (file === baseFile || resolve(baseFile) !== realpathSync(baseFile)) throw denied();
+          return readFileSync(baseFile);
+        },
+      },
+    };
   } catch { throw denied(); }
-  if (now >= plan.until) throw new PrivateFlowError('clinical_rehearsal_expired', 409);
-  return Object.freeze({ ...plan, patient: Object.freeze(plan.patient), doctor: Object.freeze(plan.doctor),
-    note: Object.freeze(clinicalNote(plan.note)), ...(plan.pdf ? { pdf: Object.freeze(plan.pdf) } : {}), policyHash });
+  return validateClinicalCapture(bytes, settings);
 }
 
 function sameNoteFields(left: ClinicalNote, right: ClinicalNote) {
@@ -255,9 +296,9 @@ export function assertClinicalCaptureExpected(plan: ClinicalCapturePlan, actor: 
       expected.previousCommitment !== null) throw denied();
 }
 
-export function clinicalCaptureView(actor: ClinicalActor, historyId: string): ClinicalSnapshot['rehearsal'] {
+export function clinicalCaptureView(actor: ClinicalActor, historyId: string, capture?: ClinicalCapturePlan | null): ClinicalSnapshot['rehearsal'] {
   try {
-    const plan = loadClinicalCapture();
+    const plan = capture === undefined ? loadClinicalCapture() : capture;
     if (!plan || plan.historyId !== historyId) return undefined;
     const action = assertClinicalCaptureActor(plan, actor);
     const requestId = captureRequestId(plan, action);

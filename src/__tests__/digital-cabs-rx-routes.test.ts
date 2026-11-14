@@ -9,13 +9,14 @@ import { assertPrivateRxContext } from '@/lib/digital-cabs-rx';
 import { DIGITAL_CABS_RX_DOCUMENT, PRIVATE_RX_CONTRACT_ID } from '../../scripts/lib/digital-cabs-rx-scope.mjs';
 
 const DIGITAL_CABS_RX_SLOT = { date: '2026-11-13', timeSlot: '09:00', type: 'Presencial' } as const;
-const m = vi.hoisted(() => ({ scope: null as any, failure: '', user: vi.fn(), sql: vi.fn(), query: vi.fn(), connect: vi.fn(),
+const m = vi.hoisted(() => ({ scope: null as any, hosted: null as any, failure: '', user: vi.fn(), sql: vi.fn(), query: vi.fn(), connect: vi.fn(),
   connectionQuery: vi.fn(), release: vi.fn(), wallet: vi.fn(), doctor: vi.fn(), registry: vi.fn(),
   document: vi.fn(), operation: vi.fn(), confirm: vi.fn(), legacyGate: vi.fn() }));
 vi.mock('../../scripts/lib/digital-cabs-rx-scope.mjs', async importOriginal => ({
   ...await importOriginal<typeof import('../../scripts/lib/digital-cabs-rx-scope.mjs')>(),
   privateRxScopeConfigured: () => !!m.scope || !!m.failure,
   loadPrivateRxScope: () => { if (m.failure) throw Error(m.failure); return m.scope; },
+  privateRxHostedContext: () => m.hosted,
   assertPrivateRxScopeOpen: (scope: any) => { if (m.failure) throw Error(m.failure); if (!m.scope || scope !== m.scope) throw Error('private_rx_scope_rejected'); return scope; },
 }));
 vi.mock('@/lib/private-config', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/private-config')>(),
@@ -49,7 +50,7 @@ const request = (path: string, body: unknown, method = 'POST', origin = 'http://
   new Request('http://localhost/api/' + path, { method, headers: { host: 'localhost', origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 beforeEach(() => {
-  vi.resetAllMocks(); m.scope = appointmentScope(); m.failure = '';
+  vi.resetAllMocks(); m.scope = appointmentScope(); m.hosted = null; m.failure = '';
   m.user.mockResolvedValue(patient); m.connect.mockResolvedValue({ query: m.connectionQuery, release: m.release });
   m.connectionQuery.mockResolvedValue({ rows: [] }); m.query.mockResolvedValue([]); m.sql.mockResolvedValue([]);
   m.wallet.mockImplementation(async (_sql, userId) => userId === patient.userId ? patient : doctor);
@@ -57,6 +58,23 @@ beforeEach(() => {
   m.registry.mockResolvedValue({ authorized: true });
   m.document.mockResolvedValue({ prescription: { id: prescriptionId } }); m.operation.mockResolvedValue({ operation: { id: consentId } });
   m.confirm.mockResolvedValue({ operation: { id: consentId } });
+});
+
+it('hosted consent requires the configured HTTPS origin, public Host and role', async () => {
+  m.scope = issuanceScope();
+  m.hosted = { phase: 'issuance', historical: false, origin: 'https://www.trustleaf.org' };
+  const body = { action: 'consent', appointmentId: 14, confirmed: true };
+  const requestAt = (url: string, host: string, origin: string) =>
+    new Request(url + '/api/private-operations', { method: 'POST',
+      headers: { host, origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const good = 'https://www.trustleaf.org', host = 'www.trustleaf.org';
+  expect((await prepareOperation(requestAt(good, host, 'http://' + host))).status).toBe(403);
+  expect((await prepareOperation(requestAt('https://preview.example.test', 'preview.example.test', good))).status).toBe(403);
+  expect((await prepareOperation(requestAt('https://trustleaf.org', 'trustleaf.org', 'https://trustleaf.org'))).status).toBe(403);
+  m.user.mockResolvedValueOnce(doctor);
+  expect((await prepareOperation(requestAt(good, host, good))).status).toBe(403);
+  expect((await prepareOperation(requestAt(good, host, good))).status).toBe(200);
+  expect(m.operation).toHaveBeenCalledExactlyOnceWith(patient, 'consent', { appointmentId: 14 }, m.scope);
 });
 
 it('rejects a different slot, the wrong actor and a foreign origin before opening a database transaction', async () => {

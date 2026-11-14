@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Keypair, Networks, Transaction, TransactionBuilder, rpc } from '@stellar/stellar-sdk';
 import { Pool, neonConfig } from '@neondatabase/serverless';
@@ -9,7 +9,11 @@ import { databaseConnectionString } from './lib/database-connection.mjs';
 import { clinicalRpcUrl } from './lib/clinical-rpc.mjs';
 import { acquireClinicalSourceLocks } from './lib/clinical-source-lock.mjs';
 import { acquireSignerLock, PRIVY_APP_ID, secureStoreSigner } from './lib/private-worker-runtime.mjs';
-import { assertPrivateRxScopeOpen, loadPrivateRxScope, PRIVATE_RX_SCOPE_ENV } from './lib/digital-cabs-rx-scope.mjs';
+import { assertPrivateRxScopeOpen, assertPrivateRxOperatorEnvironment, loadHostedPrivateRxScope, loadPrivateRxScope,
+  PRIVATE_RX_SCOPE_ENV } from './lib/digital-cabs-rx-scope.mjs';
+import { lockHostedCaptureRecoverySession, lockHostedCaptureSession, readHostedCaptureActive,
+  readHostedCaptureByRequest } from './lib/hosted-capture-store.mjs';
+import { readDemoInputs } from './demo/demo-inputs.mjs';
 import { createPrivateRxSponsorship, privateRxQuote } from './lib/private-rx-sponsorship.mjs';
 import { quoteExpiresAt, sha256 } from './lib/sponsorship-domain.mjs';
 import { assertScopedAttestationJob, createScopedAttestationChain, createStore, quoteScopedAttestation, runOnce } from './worker-prescription-bookings.mjs';
@@ -17,6 +21,7 @@ import { assertScopedAttestationJob, createScopedAttestationChain, createStore, 
 const QUOTE_FILE = 'digital-cabs-rx-attestation-quote.private.json';
 const deny = (code = 'private_rx_attestation_scope_rejected') => { throw Error(code); };
 const check = (value, code) => { if (!value) deny(code); };
+const operator = env => env.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true';
 
 function quotePath(env) {
   const scopeFile = env[PRIVATE_RX_SCOPE_ENV.file], file = env.TRUSTLEAF_PRIVATE_RX_ATTESTATION_QUOTE_FILE;
@@ -105,21 +110,25 @@ async function assertNoOtherAuthorityAttempt(client, scope) {
 
 export async function runPrivateRxAttestation({ mode, env = process.env }) {
   const quoteOnly = mode === '--quote-only', reconcileRead = mode === '--reconcile-read', once = mode === '--once';
-  check(quoteOnly || reconcileRead || once, 'private_rx_explicit_mode_required');
-  const scope = loadPrivateRxScope({ env, requireApproval: once, allowExpired: reconcileRead });
-  check(scope?.phase === 'issuance' && (quoteOnly ? scope.attestationQuoteSha256 === null : Boolean(scope.attestationQuoteSha256)));
-  if (reconcileRead) check(env[PRIVATE_RX_SCOPE_ENV.approval] === scope.policyHash);
+  const hosted = operator(env), historicalSettlement = hosted && mode === '--settle-receipt';
+  check(quoteOnly || reconcileRead || once || historicalSettlement, 'private_rx_explicit_mode_required');
+  const hostedConfig = hosted ? assertPrivateRxOperatorEnvironment(env, { scopeInputs: true }) : undefined;
+  const inputScope = loadPrivateRxScope({ env, requireApproval: once && !hosted, allowExpired: reconcileRead || historicalSettlement });
+  check(inputScope?.phase === 'issuance' && (quoteOnly ? inputScope.attestationQuoteSha256 === null : Boolean(inputScope.attestationQuoteSha256)));
+  let scope = inputScope;
+  if (!quoteOnly && (hosted || reconcileRead)) check(env[PRIVATE_RX_SCOPE_ENV.approval] === scope.policyHash);
   if (!once) check(!env.RELAYER_SECRET && !env.DOCTOR_REGISTRY_ADMIN_ALIAS, 'private_rx_read_mode_has_signer');
   const server = new rpc.Server(clinicalRpcUrl(env.TRUSTLEAF_CLINICAL_RPC_PROVIDER), { timeout: 20000 });
   check((await server.getNetwork()).passphrase === Networks.TESTNET);
-  const database = new URL(databaseConnectionString(env));
-  if (once) database.hostname = database.hostname.replace('-pooler.', '.');
+  const direct = once || historicalSettlement;
+  const database = new URL((direct ? hostedConfig?.directConnectionString : hostedConfig?.connectionString) ?? databaseConnectionString(env));
+  if (once || historicalSettlement) database.hostname = database.hostname.replace('-pooler.', '.');
   neonConfig.webSocketConstructor = WebSocket;
   const pool = new Pool({ connectionString: database.href, connectionTimeoutMillis: 15000 });
-  let client, locks, bookingLock = false, readTransaction = false;
+  let client, locks, releaseHosted, bookingLock = false, readTransaction = false;
   const releaseSigners = [];
   try {
-    if (once) {
+    if (once && !hosted) {
       check(Keypair.fromSecret(env.RELAYER_SECRET ?? '').publicKey() === scope.relayer && env.STELLAR_CONFIG_DIR && env.DOCTOR_REGISTRY_ADMIN_ALIAS);
       for (const address of [scope.authority, scope.relayer].sort()) {
         const release = await acquireSignerLock(env.STELLAR_CONFIG_DIR, address);
@@ -128,7 +137,34 @@ export async function runPrivateRxAttestation({ mode, env = process.env }) {
       }
     }
     client = await pool.connect();
-    if (!once) { await client.query('BEGIN READ ONLY'); readTransaction = true; }
+    if (hosted && !quoteOnly) {
+      if (once) {
+        const locked = await lockHostedCaptureSession(client, 'attest', scope.policyHash);
+        releaseHosted = locked;
+        const snapshot = await readHostedCaptureByRequest(client, scope.steps.attest.requestId);
+        check(snapshot?.phase === 'attest' && snapshot.sha256 === scope.policyHash);
+        scope = loadHostedPrivateRxScope(snapshot);
+        check(Keypair.fromSecret(env.RELAYER_SECRET ?? '').publicKey() === scope.relayer && env.STELLAR_CONFIG_DIR && env.DOCTOR_REGISTRY_ADMIN_ALIAS);
+        for (const address of [scope.authority, scope.relayer].sort()) {
+          const release = await acquireSignerLock(env.STELLAR_CONFIG_DIR, address);
+          check(release, 'private_rx_authority_busy');
+          releaseSigners.push(release);
+        }
+      } else {
+        if (historicalSettlement) releaseHosted = await lockHostedCaptureRecoverySession(client,scope.steps.attest.requestId,scope.policyHash);
+        const snapshot = await readHostedCaptureByRequest(client, scope.steps.attest.requestId);
+        check(snapshot?.phase === 'attest' && snapshot.sha256 === scope.policyHash);
+        scope = loadHostedPrivateRxScope(snapshot, { historical: true });
+      }
+    }
+    if (!once && !historicalSettlement) { await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'); readTransaction = true; }
+    if (hosted && quoteOnly) {
+      const snapshot = await readHostedCaptureActive(client);
+      check(snapshot?.phase === 'appointment');
+      const appointment = loadHostedPrivateRxScope(snapshot);
+      check(appointment.phase === 'appointment' && appointment.runId === scope.runId && appointment.basePdfScopeSha256 === scope.basePdfScopeSha256 &&
+        appointment.slot.date === scope.slot.date && appointment.slot.timeSlot === scope.slot.timeSlot && appointment.slot.type === scope.slot.type);
+    }
     const job = await readBooking(client, scope, quoteOnly);
     if (quoteOnly) {
       const artifact = await quoteScopedAttestation({ scope, job, server });
@@ -138,21 +174,28 @@ export async function runPrivateRxAttestation({ mode, env = process.env }) {
     }
     const artifact = await readPinnedQuote(scope, env, once && !savedEnvelope(job));
     const sponsorship = createPrivateRxSponsorship({ scope, client, env });
-    if (reconcileRead) return { status: 'read_only', requestId: artifact.requestId, ...await receiptSummary(job, artifact, sponsorship, server) };
+    const identifiers = { requestId: artifact.requestId, appointmentId: scope.appointmentId, issuanceId: scope.issuanceId, scopeSha256: scope.policyHash };
+    if (reconcileRead) return { status: 'read_only', ...identifiers, ...await receiptSummary(job, artifact, sponsorship, server) };
+    if (historicalSettlement) {
+      const receipt = await receiptSummary(job, artifact, sponsorship, server);
+      if (!job.transaction_hash || !['SUCCESS', 'FAILED'].includes(receipt.receiptStatus)) {
+        return { status: 'no_terminal_receipt_to_settle', ...identifiers, ...receipt };
+      }
+    }
     locks = await acquireClinicalSourceLocks(client, [scope.authority, scope.relayer]);
     const booking = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS locked', ['trustleaf-booking:' + scope.authority]);
     check(booking.rows[0]?.locked === true, 'private_rx_authority_busy');
     bookingLock = true;
     const before = await readBooking(client, scope);
     if (['confirmed', 'consumed', 'failed'].includes(before.state)) {
-      return { status: 'terminal', requestId: artifact.requestId, ...await receiptSummary(before, artifact, sponsorship, server) };
+      return { status: 'terminal', ...identifiers, ...await receiptSummary(before, artifact, sponsorship, server) };
     }
-    const sending = !savedEnvelope(before);
+    const sending = !historicalSettlement && !savedEnvelope(before);
     if (sending) sponsorship.assertConfigured('attest');
     const assertJob = async (claimed, phase) => {
-      assertPrivateRxScopeOpen(scope, { env, step: 'attest' });
       await locks.assertHeld();
       assertScopedAttestationJob(scope, claimed);
+      if (!historicalSettlement) assertPrivateRxScopeOpen(scope, { env, step: 'attest' });
       if (phase === 'read') return;
       check(sending);
       const live = await readBooking(client, scope, true);
@@ -161,26 +204,47 @@ export async function runPrivateRxAttestation({ mode, env = process.env }) {
       assertPrivateRxScopeOpen(scope, { env, step: 'attest' });
     };
     const chain = createScopedAttestationChain({ scope, artifact, sponsorship, assertJob, server,
-      provider: new PrivyClient(PRIVY_APP_ID, env.PRIVY_APP_SECRET),
+      provider: sending ? new PrivyClient(PRIVY_APP_ID, env.PRIVY_APP_SECRET) : undefined,
       signXdr: sending ? secureStoreSigner({ alias: env.DOCTOR_REGISTRY_ADMIN_ALIAS, configDir: env.STELLAR_CONFIG_DIR }) : async () => deny() });
     const store = createStore(client, scope.contractId, { appointmentId: scope.appointmentId, sponsorship,
-      settleSponsorship: (row, receipt) => sponsorship.reconcile('attest', artifact.unsignedXdr, undefined, row.prepared_xdr, row.transaction_hash, receipt, { atomic: true }) });
+      settleSponsorship: (row, receipt) => sponsorship.reconcile('attest', artifact.unsignedXdr, undefined, row.prepared_xdr, row.transaction_hash, receipt,
+        { atomic: true, historical: historicalSettlement }) });
     const result = await runOnce({ store, chain, writesEnabled: sending, prepareEnabled: sending, appointmentId: scope.appointmentId });
     const saved = await readBooking(client, scope);
-    return { ...result, requestId: artifact.requestId, ...await receiptSummary(saved, artifact, sponsorship, server) };
+    return { ...result, ...identifiers, ...await receiptSummary(saved, artifact, sponsorship, server) };
   } finally {
-    if (readTransaction) await client.query('ROLLBACK').catch(() => {});
-    if (bookingLock) await client.query('SELECT pg_advisory_unlock(hashtext($1))', ['trustleaf-booking:' + scope.authority]).catch(() => {});
-    if (locks) await locks.release();
-    client?.release();
-    await pool.end();
-    for (const release of releaseSigners.reverse()) await release();
+    try {
+      if (readTransaction) await client.query('ROLLBACK').catch(() => {});
+      if (bookingLock) await client.query('SELECT pg_advisory_unlock(hashtext($1))', ['trustleaf-booking:' + scope.authority]).catch(() => {});
+      if (locks) await locks.release();
+      if (releaseHosted) await releaseHosted();
+    } finally {
+      client?.release();
+      await pool.end();
+      for (const release of releaseSigners.reverse()) await release();
+    }
   }
 }
 
+function operatorArguments(args) {
+  if (args.length === 1) return { mode: args[0] };
+  const { args: command, configured, artifactsDir } = readDemoInputs(args, { allowHostedOperator: true });
+  const [mode, digest, ...extra] = command;
+  check(operator(configured) && extra.length === 0 && /^[a-f0-9]{64}$/.test(digest ?? '') &&
+    ['--quote-only', '--once', '--reconcile-read', '--settle-receipt'].includes(mode), 'private_rx_explicit_mode_required');
+  assertPrivateRxOperatorEnvironment(configured);
+  const env = { ...configured,
+    [PRIVATE_RX_SCOPE_ENV.file]: join(artifactsDir, mode === '--quote-only' ? 'digital-cabs-rx-issuance-preview.private.json' : 'digital-cabs-rx-issuance.private.json'),
+    [PRIVATE_RX_SCOPE_ENV.hash]: digest,
+    TRUSTLEAF_PRIVATE_RX_ATTESTATION_QUOTE_FILE: join(artifactsDir, QUOTE_FILE) };
+  delete env[PRIVATE_RX_SCOPE_ENV.approval];
+  if (mode !== '--quote-only') env[PRIVATE_RX_SCOPE_ENV.approval] = digest;
+  if (mode !== '--once') for (const name of ['RELAYER_SECRET', 'DOCTOR_REGISTRY_ADMIN_ALIAS', 'STELLAR_CONFIG_DIR', 'PRIVY_APP_SECRET']) delete env[name];
+  return { mode, env };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const args = process.argv.slice(2);
-  runPrivateRxAttestation({ mode: args.length === 1 ? args[0] : '' }).then(result => console.log(JSON.stringify(result))).catch(error => {
+  Promise.resolve().then(() => runPrivateRxAttestation(operatorArguments(process.argv.slice(2)))).then(result => console.log(JSON.stringify(result))).catch(error => {
     const code = /^(?:private_rx_|sponsorship_|clinical_source_)[a-z_]+$/.test(error?.message ?? '') ? error.message : 'private_rx_attestation_unavailable';
     console.error(JSON.stringify({ status: 'blocked', error: code }));
     process.exitCode = 1;

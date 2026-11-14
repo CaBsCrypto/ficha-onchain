@@ -4,12 +4,14 @@ import { usePortalLanguage } from '@/hooks/useLanguage';
 import { DocumentView } from './DocumentView';
 import { localDate, usePortalData } from './client';
 import { prescriptionLabel } from './state';
+import { testPatientLabel } from './test-patient-label';
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation, type ReviewSponsorshipQuote } from './Operation';
 import type { PortalRole, PrivatePrescription } from './types';
 
 export function PrescriptionCard({ prescription, role, onChange, unavailable = false }: { prescription: PrivatePrescription; role: PortalRole; onChange: () => void; unavailable?: boolean }) {
   const language = usePortalLanguage();
   const english = language === 'en';
+  const patientLabel = testPatientLabel(prescription.patientName, english);
   const [documentReady, setDocumentReady] = useState(false);
   const { run, busy, operation, error } = usePrivateOperation(prescription.operation);
   const pending = operation?.state === 'submitted' || prescription.operation?.state === 'submitted';
@@ -18,7 +20,7 @@ export function PrescriptionCard({ prescription, role, onChange, unavailable = f
   }
   return <article data-patient-list-card={role === "patient" ? "" : undefined} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{prescription.rxId != null ? `${english ? 'Prescription' : 'Receta'} #${prescription.rxId}` : (english ? 'Document prepared' : 'Documento preparado')}</h3><span data-prescription-status={prescription.status} className={`max-w-full whitespace-normal rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Active' && !prescription.expired && prescription.rxId != null ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{prescriptionLabel(prescription, language)}</span></div>
-    <p className="text-sm text-slate-600">{english ? 'Doctor' : 'Médico'}: <strong>{prescription.doctorName}</strong><span data-patient-desktop={role === "patient" ? "" : undefined}><br />{english ? 'Patient' : 'Paciente'}: <strong>{prescription.patientName}</strong></span></p>
+    <p className="text-sm text-slate-600">{english ? 'Doctor' : 'Médico'}: <strong>{prescription.doctorName}</strong><span data-patient-desktop={role === "patient" ? "" : undefined}><br />{english ? 'Patient' : 'Paciente'}: <strong>{patientLabel}</strong></span></p>
 
     <p className="text-xs text-slate-500">{english ? 'Expires' : 'Vence'}: {localDate(prescription.expiresAt, language)} · {english ? "Chile time" : "Hora de Chile"}</p>
     {(role === 'doctor' || prescription.rxId != null) && <div data-patient-document><DocumentView id={prescription.id} prescription={prescription} /></div>}

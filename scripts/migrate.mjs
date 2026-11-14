@@ -14,6 +14,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { databaseConnectionString } from './lib/database-connection.mjs';
 import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs';
 import { CLINICAL_RESILIENCE_SCHEMA_SQL } from './lib/clinical-resilience-schema.mjs';
+import { HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
+import { assertHostedCaptureOperator } from './lib/hosted-capture-store.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -1074,6 +1076,16 @@ step("doctor onboarding requests", async () => {
  FOR EACH ROW EXECUTE FUNCTION trustleaf_preserve_onboarding_submission()`;
 });
 
+step('hosted-capture-v1', async () => {
+  // Explicit selection keeps this migration out of general dev runs.
+  if (!process.argv.includes('--step=hosted-capture-v1')) return;
+  const target = assertHostedCaptureOperator();
+  const migrate = neon(target.connectionString);
+  await migrate.transaction(tx => [
+    tx.query("SELECT pg_advisory_xact_lock(hashtext('trustleaf-hosted-capture-v1'))"),
+    ...HOSTED_CAPTURE_SCHEMA_SQL.map(statement => tx.query(statement)),
+  ]);
+});
 // ── Run ─────────────────────────────────────────────────────────────────────
 const host = new URL(connection).hostname;
 console.log(`\n  target: ${host}\n`);

@@ -18,6 +18,8 @@ import { requirePrivyAdmin } from "@/lib/auth/admin";
 import { isSameOrigin } from '@/lib/auth/same-origin';
 import { assertPrivateEnvironment } from '@/lib/private-config';
 import { clinicalMigrationConnection } from '../../../../../scripts/lib/clinical-migration-policy.mjs';
+import { HOSTED_CAPTURE_SCHEMA_SQL } from '../../../../../scripts/lib/hosted-capture-schema.mjs';
+import { assertHostedCaptureWeb } from '../../../../../scripts/lib/hosted-capture-store.mjs';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -893,8 +895,29 @@ export async function POST(request: Request) {
 
   let body: { confirm?: unknown; step?: unknown };
   try { body = (await request.json()) as typeof body; } catch { body = {}; }
-  if (!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(key=>!['confirm','step'].includes(key)) || (body.step !== undefined && body.step !== 'clinical-web-v1') || body.confirm !== "MIGRATE") {
+  if (!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(key=>!['confirm','step'].includes(key)) || (body.step !== undefined && body.step !== 'clinical-web-v1' && body.step !== 'hosted-capture-v1') || body.confirm !== "MIGRATE") {
     return NextResponse.json({ error: "confirmation_required", hint: "send confirm:'MIGRATE'" }, { status: 400 });
+  }
+
+  if (body.step === 'hosted-capture-v1') {
+    let client;
+    try {
+      const { origin } = assertHostedCaptureWeb();
+      if (request.headers.get('origin') !== origin || request.headers.get('host') !== new URL(origin).host) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      }
+      client = await getDbConnection();
+      await client.query('BEGIN');
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('trustleaf-hosted-capture-v1'))");
+      for (const statement of HOSTED_CAPTURE_SCHEMA_SQL) await client.query(statement);
+      await client.query('COMMIT');
+      return NextResponse.json({ ok: true, ran: ['hosted-capture-v1'], failed: [] }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      await client?.query('ROLLBACK').catch(() => {});
+      return NextResponse.json({ error: 'hosted_capture_migration_failed' }, { status: 503 });
+    } finally {
+      client?.release();
+    }
   }
 
   let sql;

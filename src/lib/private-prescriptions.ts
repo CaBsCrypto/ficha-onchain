@@ -7,7 +7,7 @@ import { isApprovedDoctor } from '@/lib/doctor-access';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/private-chain';
 import { encryptPrescription, decryptPrescription, prescriptionCommitment } from '../../scripts/lib/private-prescription.mjs';
-import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxDocument, assertPrivateRxScopeOpen,
+import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxDocument, assertPrivateRxScopeOpen, lockHostedPrivateRxMutation,
   type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
 
 // Rows stay inside the server boundary; only explicit view models leave it.
@@ -140,6 +140,7 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
   const client=await getDbConnection();
   try {
     await client.query('BEGIN');
+    if (scope) await lockHostedPrivateRxMutation(client, scope);
     const {appointment,booking,prescription}=await loadPrivateContext(client,actor,appointmentId,true);
     if(scope)assertPrivateRxContext(scope,appointment,booking,prescription);
     if(actor.email!==appointment.doctor_email||!booking||actor.userId!==booking.doctor_user_id||wallet.address!==booking.doctor_wallet)throw new PrivateFlowError('forbidden',403);

@@ -6,10 +6,11 @@ import {
   PRIVATE_RX_AUTHORITY,
   PRIVATE_RX_CONTRACT_ID,
   privateRxAppointmentEpoch,
+  assertPrivateRxOperatorEnvironment,
   validatePrivateRxManifest,
 } from '../lib/digital-cabs-rx-scope.mjs';
 
-const { args, configured, privateFile } = readDemoInputsOrExit();
+const { args, configured, privateFile } = readDemoInputsOrExit({ allowHostedOperator: true });
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -49,6 +50,7 @@ function prepareAppointmentManifest(slot) {
 }
 
 try {
+  assertPrivateRxOperatorEnvironment(configured);
   const [mode, date, timeSlot, ...rest] = args;
   if (mode !== '--single-slot' || rest.length || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(timeSlot)) {
     throw new Error('rx_arguments_unexpected');

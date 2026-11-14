@@ -3,6 +3,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { StrKey } from '@stellar/stellar-sdk';
 import { databaseConnectionString } from './database-connection.mjs';
+import { assertHostedCaptureOperator } from './hosted-capture-store.mjs';
 
 export const PRIVATE_RX_SCOPE_ENV = Object.freeze({
   file: 'TRUSTLEAF_DIGITAL_CABS_RX_SCOPE_FILE',
@@ -23,6 +24,7 @@ const santiagoClock = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sant
 const CAP = 10_000_000n;
 const STEPS = ['attest', 'consent', 'mint'];
 const approvedScopes = new WeakSet();
+const hostedScopes = new WeakMap();
 const hex = /^[0-9a-f]{64}$/;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const epoch = value => Number.isSafeInteger(value) && value > 0;
@@ -105,6 +107,16 @@ export function validatePrivateRxManifest(plan, verifiedBase, { now, basePdfScop
 export function privateRxScopeConfigured(env = process.env) {
   return Object.values(PRIVATE_RX_SCOPE_ENV).some(name => Object.hasOwn(env, name));
 }
+
+export function assertPrivateRxOperatorEnvironment(env, { scopeInputs = false } = {}) {
+  if (env.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true') {
+    const operatorEnv = { ...env };
+    if (scopeInputs) for (const name of Object.values(PRIVATE_RX_SCOPE_ENV)) delete operatorEnv[name];
+    return assertHostedCaptureOperator(operatorEnv);
+  }
+  check(env.TRUSTLEAF_ENV === 'local' && !Object.hasOwn(env, 'VERCEL') && !Object.hasOwn(env, 'VERCEL_ENV'));
+  return { connectionString: databaseConnectionString(env) };
+}
 function readExact(file, expected) {
   check(typeof file === 'string' && isAbsolute(file) && resolve(file) === realpathSync(file) && /\.private\.json$/i.test(file));
   const stat = statSync(file); check(stat.isFile() && stat.size > 0 && stat.size <= 8192);
@@ -117,6 +129,37 @@ function freeze(value) {
   return Object.freeze(value);
 }
 
+/** Bind a server-selected phase to the same schema and exact PDF baseline as local capture. */
+export function loadHostedPrivateRxScope(snapshot, { now = Math.floor(Date.now() / 1000), historical = false } = {}) {
+  const { phase, bytes, sha256, approvalSha256, approvedAt, active, expiresAt, baseBytes, baseSha256, origin } = snapshot ?? {};
+  check(['appointment', 'attest', 'issuance'].includes(phase) && origin === 'https://www.trustleaf.org' &&
+    Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= 8192 && sha(bytes) === sha256 && approvalSha256 === sha256 &&
+    Buffer.isBuffer(baseBytes) && baseBytes.length > 0 && baseBytes.length <= 8192 && sha(baseBytes) === baseSha256 &&
+    epoch(approvedAt) && approvedAt <= now && epoch(expiresAt) && (historical || active === true));
+  check(historical || now < expiresAt, 'private_rx_scope_expired');
+  const plan = JSON.parse(bytes.toString('utf8')), base = JSON.parse(baseBytes.toString('utf8'));
+  check(plan.phase === (phase === 'appointment' ? 'appointment' : 'issuance') &&
+    plan.doctorId === snapshot.doctorId && plan.historyId === snapshot.historyId && plan.relayer === snapshot.relayer &&
+    expiresAt <= plan.until && approvedAt >= plan.openedAt && approvedAt < expiresAt &&
+    match(plan.patient, snapshot.patient) && match(plan.doctor, snapshot.doctor));
+  validatePrivateRxManifest(plan, base, { now, basePdfScopeSha256: baseSha256, requireApproval: !historical, allowExpired: historical });
+  check(plan.phase !== 'issuance' || nonzeroDigest(plan.attestationQuoteSha256));
+  Object.defineProperties(plan, { policyHash: { value: sha256 }, approved: { value: !historical } });
+  if (!historical) approvedScopes.add(plan);
+  hostedScopes.set(plan, Object.freeze({ phase, expiresAt, origin, historical }));
+  return freeze(plan);
+}
+
+export function privateRxHostedContext(scope) {
+  return hostedScopes.get(scope);
+}
+
+export function assertHostedPrivateRxReceiptScope(scope, step) {
+  const context = privateRxHostedContext(scope);
+  check(context?.historical === true && scope.phase === 'issuance' &&
+    (step === 'attest' || context.phase === 'issuance' && (step === 'consent' || step === 'mint')));
+}
+
 export function loadPrivateRxScope({ env = process.env, now = Math.floor(Date.now() / 1000), requireApproval = true, allowExpired = false } = {}) {
   if (!privateRxScopeConfigured(env)) return null;
   try {
@@ -124,9 +167,11 @@ export function loadPrivateRxScope({ env = process.env, now = Math.floor(Date.no
     const policyHash = env[hash], provided = env[approval];
     const basePdfScopeSha256 = env.TRUSTLEAF_DEMO_PDF_SCOPE_SHA256;
     const database = new URL(databaseConnectionString(env));
+    const hostedOperator = env.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true';
+    assertPrivateRxOperatorEnvironment(env, { scopeInputs: true });
     const competing = Object.keys(env).some(key => /^TRUSTLEAF_(?:CLINICAL_(?:CAPTURE|CREATE_ONCE|HOSTED_CREATE_ONCE|PATIENT_DEMO|REHEARSAL|MIGRATION|WEB_MIGRATION)|INITIAL_DOCTOR_SCOPE)(?:_|$)/.test(key));
     check(typeof requireApproval === 'boolean' && typeof allowExpired === 'boolean' && !(requireApproval && allowExpired) &&
-      !competing && !Object.hasOwn(env, 'VERCEL') && !Object.hasOwn(env, 'VERCEL_ENV') && env.TRUSTLEAF_ENV === 'local' &&
+      !competing && (!hostedOperator || !requireApproval) &&
       env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'false' && env.NEXT_PUBLIC_STELLAR_NETWORK === 'testnet' &&
       env.PRIVY_APP_ID === APP && env.NEXT_PUBLIC_PRIVY_APP_ID === APP &&
       env.PRESCRIPTION_PRIVATE_CONTRACT_ID === PRIVATE_RX_CONTRACT_ID && env.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID === PRIVATE_RX_REGISTRY_ID &&
@@ -154,6 +199,15 @@ export function loadPrivateRxScope({ env = process.env, now = Math.floor(Date.no
 
 /** Never accept a preview object or an expired/stale policy at a mutation. */
 export function assertPrivateRxScopeOpen(scope, { env = process.env, now, step } = {}) {
+  const hosted = privateRxHostedContext(scope);
+  if (hosted) {
+    const clock = now ?? Math.floor(Date.now() / 1000);
+    check(approvedScopes.has(scope) && scope.approved === true);
+    check(clock >= scope.openedAt && clock < Math.min(scope.until, hosted.expiresAt), 'private_rx_scope_expired');
+    check(step === undefined || hosted.phase === 'attest' && step === 'attest' ||
+      hosted.phase === 'issuance' && (step === 'consent' || step === 'mint'));
+    return scope;
+  }
   const current = loadPrivateRxScope({ env, now });
   check(scope?.approved === true && approvedScopes.has(scope) && current?.policyHash === scope.policyHash && current.phase === scope.phase &&
     (step === undefined || current.phase === 'issuance' && STEPS.includes(step)));

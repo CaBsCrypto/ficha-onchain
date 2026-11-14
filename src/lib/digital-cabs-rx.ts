@@ -1,10 +1,14 @@
 import type { AuthedUser } from '@/lib/auth/privy-auth';
+import { getDbConnection } from '@/lib/db';
 import { assertPrivateEnvironment, PrivateFlowError } from '@/lib/private-config';
-import { loadPrivateRxScope, assertPrivateRxScopeOpen as assertOpen, privateRxScopeConfigured,
+import type { PoolClient } from '@neondatabase/serverless';
+import { loadPrivateRxScope, loadHostedPrivateRxScope, privateRxHostedContext, assertPrivateRxScopeOpen as assertOpen,
+  privateRxScopeConfigured as localRxScopeConfigured,
   type PrivateRxAppointmentScope, type PrivateRxIssuanceScope, type PrivateRxRole, type PrivateRxScope,
   type PrivateRxStepKey } from '../../scripts/lib/digital-cabs-rx-scope.mjs';
+import { assertHostedCaptureWeb, hostedCaptureWebConfigured, lockHostedCaptureMutation, lockHostedCaptureRecovery,
+  readHostedCaptureActive, readHostedCaptureByRequest } from '../../scripts/lib/hosted-capture-store.mjs';
 
-export { privateRxScopeConfigured };
 export type { PrivateRxAppointmentScope, PrivateRxIssuanceScope, PrivateRxScope, PrivateRxRole, PrivateRxStepKey };
 const denied = () => new PrivateFlowError('private_rx_scope_rejected', 403);
 type Wallet = { walletId: string; address: string };
@@ -19,9 +23,66 @@ function scoped<T>(work: () => T): T {
   }
 }
 
-export function currentPrivateRxScope() {
-  if (!privateRxScopeConfigured()) return null;
-  return scoped(() => { assertPrivateEnvironment(); return loadPrivateRxScope(); });
+export function privateRxScopeConfigured() {
+  return hostedCaptureWebConfigured() || localRxScopeConfigured();
+}
+
+export function assertHostedPrivateRxStatusHost(request: Request) {
+  if (!hostedCaptureWebConfigured()) return;
+  const environment = scoped(() => assertHostedCaptureWeb());
+  if (request.headers.get('host') !== new URL(environment.origin).host) throw denied();
+}
+
+export async function currentPrivateRxScope() {
+  if (!hostedCaptureWebConfigured()) {
+    if (!localRxScopeConfigured()) return null;
+    return scoped(() => { assertPrivateEnvironment(); return loadPrivateRxScope(); });
+  }
+  assertPrivateEnvironment();
+  scoped(() => assertHostedCaptureWeb());
+  const client = await getDbConnection();
+  try {
+    const snapshot = await readHostedCaptureActive(client);
+    if (!snapshot || !['appointment', 'issuance'].includes(snapshot.phase)) return null;
+    return scoped(() => loadHostedPrivateRxScope(snapshot));
+  } finally { client.release(); }
+}
+
+export async function historicalHostedPrivateRxScope(id: string) {
+  if (!hostedCaptureWebConfigured()) return null;
+  assertPrivateEnvironment();
+  scoped(() => assertHostedCaptureWeb());
+  const client = await getDbConnection();
+  try {
+    const snapshot = await readHostedCaptureByRequest(client, id);
+    if (!snapshot || !['issuance', 'attest'].includes(snapshot.phase)) return null;
+    const scope = scoped(() => loadHostedPrivateRxScope(snapshot, { historical: true }));
+    return scope.phase === 'issuance' && [scope.steps.consent.requestId, scope.steps.mint.requestId].includes(id) ? scope : null;
+  } finally { client.release(); }
+}
+
+export async function lockHostedPrivateRxMutation(client: PoolClient, scope: PrivateRxScope) {
+  const context = privateRxHostedContext(scope);
+  if (!context) return;
+  if (context.phase === 'attest' || context.historical) throw denied();
+  try {
+    const snapshot = await lockHostedCaptureMutation(client, context.phase, scope.policyHash);
+    if (context.phase === 'appointment') {
+      const { verifyHostedClinicalBaseline } = await import('@/lib/hosted-capture-proof');
+      await verifyHostedClinicalBaseline(client, snapshot, 'appointment');
+    }
+  } catch (error) {
+    if (error instanceof PrivateFlowError) throw error;
+    throw denied();
+  }
+  assertPrivateRxScopeOpen(scope);
+}
+
+export async function lockHostedPrivateRxRecovery(client: PoolClient, scope: PrivateRxIssuanceScope, requestId: string) {
+  const context = privateRxHostedContext(scope);
+  if (context?.phase !== 'issuance' || !context.historical) throw denied();
+  try { await lockHostedCaptureRecovery(client, requestId, scope.policyHash); }
+  catch { throw denied(); }
 }
 
 export function assertPrivateRxScopeOpen<T extends PrivateRxScope>(scope: T, step?: PrivateRxStepKey): T {
@@ -40,12 +101,25 @@ export function privateRxIssuanceScope(scope: PrivateRxScope | null): PrivateRxI
   return assertPrivateRxScopeOpen(scope);
 }
 
-/** An active capture mutation is reachable only from the local browser. */
-export function assertPrivateRxLoopback(request: Request) {
+/** Scoped writes accept the exact hosted Origin or the existing local loopback. */
+export function assertPrivateRxOrigin(request: Request, scope: PrivateRxScope) {
   let origin: URL;
   try { origin = new URL(request.headers.get('origin') ?? ''); } catch { throw denied(); }
+  const hosted = privateRxHostedContext(scope);
+  if (hosted) {
+    if (request.headers.get('origin') !== hosted.origin ||
+        origin.host !== request.headers.get('host')) throw denied();
+    return;
+  }
   if (origin.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) ||
       origin.host !== request.headers.get('host')) throw denied();
+}
+
+export function privateRxSlotHost(request: Request, scope: PrivateRxScope) {
+  const host = request.headers.get('host') ?? '';
+  const hosted = privateRxHostedContext(scope);
+  if (hosted) return host === new URL(hosted.origin).host;
+  return /^(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?$/.test(host);
 }
 
 export function privateRxRole(scope: PrivateRxScope, user: AuthedUser): PrivateRxRole {

@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { StrKey } from '@stellar/stellar-sdk';
 import { DIGITAL_CABS_RX_DOCUMENT, PRIVATE_RX_AUTHORITY,
   PRIVATE_RX_CONTRACT_ID, PRIVATE_RX_REGISTRY_ID, PRIVATE_RX_SCOPE_ENV, assertPrivateRxScopeOpen, loadPrivateRxScope,
-  privateRxAppointmentEpoch, privateRxScopeConfigured, validatePrivateRxManifest } from './digital-cabs-rx-scope.mjs';
+  assertHostedPrivateRxReceiptScope, loadHostedPrivateRxScope, privateRxAppointmentEpoch, privateRxScopeConfigured,
+  validatePrivateRxManifest } from './digital-cabs-rx-scope.mjs';
 
 const start = Date.parse('2026-11-13T12:00:00Z') / 1000;
 const wallet = n => StrKey.encodeEd25519PublicKey(Buffer.alloc(32, n));
@@ -91,6 +92,41 @@ test('only read-only preview accepts an unquoted or expired plan', () => {
   assert.throws(() => inspect(scope, { now: scope.openedAt - 1, requireApproval: false, allowExpired: true }), { message: 'private_rx_scope_expired' });
   assert.doesNotThrow(() => inspect(scope, { now: scope.until, requireApproval: false, allowExpired: true }));
   denied(() => assertPrivateRxScopeOpen({ ...scope, approved: true, policyHash: 'd'.repeat(64) }, { env: {} }));
+});
+
+function hostedSnapshot(plan, phase) {
+  const bytes = Buffer.from(JSON.stringify(plan));
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  return { bytes, sha256, phase, approvalSha256: sha256, approvedAt: plan.openedAt, active: true, expiresAt: plan.until,
+    baseBytes, baseSha256: basePdfScopeSha256, origin: 'https://www.trustleaf.org',
+    patient, doctor, doctorId: plan.doctorId, historyId: plan.historyId, relayer: plan.relayer };
+}
+
+test('hosted phases bind exact approved bytes and segregate authority, patient and doctor steps', () => {
+  const plan = issuance();
+  const attest = hostedSnapshot(plan, 'attest'), browser = hostedSnapshot(plan, 'issuance');
+  const worker = loadHostedPrivateRxScope(attest, { now: start });
+  const web = loadHostedPrivateRxScope(browser, { now: start });
+  assert.equal(assertPrivateRxScopeOpen(worker, { now: start, step: 'attest' }), worker);
+  assert.equal(assertPrivateRxScopeOpen(web, { now: start, step: 'consent' }), web);
+  assert.equal(assertPrivateRxScopeOpen(web, { now: start, step: 'mint' }), web);
+  denied(() => assertPrivateRxScopeOpen(worker, { now: start, step: 'mint' }));
+  denied(() => assertPrivateRxScopeOpen(web, { now: start, step: 'attest' }));
+  for (const patch of [{ active: false }, { approvalSha256: null }, { doctorId: 10 }, { origin: 'https://trustleaf.org' },
+    { baseBytes: Buffer.from('{}') }, { bytes: Buffer.from('{}') }]) {
+    denied(() => loadHostedPrivateRxScope({ ...browser, ...patch }, { now: start }));
+  }
+});
+
+test('expired historical Rx receipt scope cannot authorize signatures or submissions', () => {
+  const plan = issuance();
+  const snapshot = { ...hostedSnapshot(plan, 'issuance'), active: false };
+  const scope = loadHostedPrivateRxScope(snapshot, { now: plan.until, historical: true });
+  assert.equal(scope.approved, false);
+  assert.doesNotThrow(() => assertHostedPrivateRxReceiptScope(scope, 'consent'));
+  denied(() => assertPrivateRxScopeOpen(scope, { now: start, step: 'consent' }));
+  denied(() => assertHostedPrivateRxReceiptScope({ ...scope }, 'consent'));
+  assert.throws(() => loadHostedPrivateRxScope({ ...snapshot, active: true }, { now: plan.until }), { message: 'private_rx_scope_expired' });
 });
 
 test('loader has no implicit activation, rejects partial config, and rejects unpinned sibling bytes', () => {

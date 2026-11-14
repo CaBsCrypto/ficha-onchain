@@ -1,8 +1,8 @@
 // Retired routes stay retired independently of the private write switch.
-const pages=new Set(['/','/login', '/login/patient', '/login/doctor', '/login/admin','/doctor','/patient','/admin','/admin/doctors','/admin/waitlist','/legal']);
+const pages=new Set(['/','/login', '/login/patient', '/login/doctor', '/login/admin','/doctor','/patient','/admin','/admin/doctors','/admin/waitlist','/admin/hosted-capture','/legal']);
 const api=new Set(['/api/waitlist','/api/privy/stellar-wallet','/api/doctor-status','/api/doctors','/api/appointments',
   '/api/doctor/clinical-context','/api/prescription-bookings','/api/doctor/profile','/api/doctor/availability','/api/doctor/slots',
-  '/api/admin/whoami','/api/admin/sponsorship-status','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate',
+  '/api/admin/whoami','/api/admin/sponsorship-status','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate','/api/admin/hosted-capture-proof',
   '/api/private-prescriptions','/api/private-operations','/api/doctor/onboarding','/api/admin/doctor-onboarding',
   '/api/private-clinical-drafts','/api/private-clinical-history','/api/private-clinical-history/prescriptions','/api/private-clinical-history/document','/api/private-clinical-operations']);
 export function isPrivatePortalPath(pathname:string,localDiagnostic=false) {

@@ -8,6 +8,7 @@ import { clinicalWebFeeQuote } from '../../../scripts/lib/clinical-web-fee-polic
 import { databaseConnectionString } from '@/lib/database-config';
 import { rehearsalConfigured, currentClinicalRehearsal, assertClinicalRehearsalFee, type RehearsalPolicy } from './rehearsal';
 import { captureAction, captureRequestId, clinicalCaptureConfigured, loadClinicalCapture, type ClinicalCapturePlan } from './capture';
+import { hostedClinicalActor, hostedClinicalPolicy, type HostedClinicalPolicy } from './hosted';
 
 const VARIABLES = ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL'] as const;
 const HOSTED_VARIABLES = ['TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL'] as const;
@@ -15,13 +16,17 @@ export const CLINICAL_CREATE_ONCE_MAX_FEE = BigInt(10_000_000);
 export type ClinicalCreateOncePolicy = { wallet: string; relayer: string; until: number; mode?: 'once' } |
   { wallet: string; relayer: string; mode: 'patient_demo'; allowlist: string } |
   { wallet: string; relayer: string; mode: 'rehearsal'; until: number; plan: RehearsalPolicy } |
-  { wallet: string; relayer: string; mode: 'capture'; until: number; plan: ClinicalCapturePlan };
+  { wallet: string; relayer: string; mode: 'capture'; until: number; plan: ClinicalCapturePlan } |
+  HostedClinicalPolicy;
 export const CLINICAL_PATIENT_DEMO_VARIABLES = ['TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER'] as const;
 export const CLINICAL_PATIENT_DEMO_MAX_OPERATIONS = 20;
 const denied = () => new PrivateFlowError('clinical_create_once_scope_rejected', 403);
 
 // Kept as the compatibility entry point used by the four restricted POST routes.
-export function clinicalCreateOnceConfigured() { return clinicalCaptureConfigured() || rehearsalConfigured() || [...VARIABLES, ...HOSTED_VARIABLES, ...CLINICAL_PATIENT_DEMO_VARIABLES].some(key => process.env[key] !== undefined); }
+export function clinicalCreateOnceConfigured(wallet?: string) {
+  return (wallet !== undefined && !!hostedClinicalActor(wallet)) || clinicalCaptureConfigured() || rehearsalConfigured() ||
+    [...VARIABLES, ...HOSTED_VARIABLES, ...CLINICAL_PATIENT_DEMO_VARIABLES].some(key => process.env[key] !== undefined);
+}
 function assertHostedClinicalDatabase() {
   const env = process.env, database = new URL(databaseConnectionString(env) ?? '');
   if (env.VERCEL_ENV !== 'production' || env.TRUSTLEAF_ENV !== 'test' ||
@@ -55,6 +60,11 @@ export function clinicalWriteCapabilities(wallet: string): Record<ClinicalAction
 }
 
 export function assertClinicalWriteScope(action: ClinicalAction, wallet: string): ClinicalCreateOncePolicy | null {
+  const hosted = hostedClinicalActor(wallet);
+  if (hosted) {
+    assertClinicalEnvironment();
+    return hostedClinicalPolicy(hosted, action);
+  }
   if (clinicalCaptureConfigured()) {
     assertClinicalEnvironment();
     const plan = loadClinicalCapture();
@@ -109,6 +119,8 @@ export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | n
   if (!action) throw denied();
   const current = assertClinicalWriteScope(action, policy.wallet);
   if (!current || current.relayer !== policy.relayer || current.mode !== policy.mode) throw denied();
+  if ('hosted' in policy && (!('hosted' in current) || current.hosted.sha256 !== policy.hosted.sha256 ||
+      (policy.mode === 'once' && requestId !== policy.requestId))) throw denied();
   if (policy.mode === 'capture') {
     if (current.mode !== 'capture' || current.plan.policyHash !== policy.plan.policyHash ||
         requestId !== captureRequestId(policy.plan, action)) throw denied();

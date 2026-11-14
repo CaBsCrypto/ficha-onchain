@@ -25,6 +25,8 @@ import { assertClinicalRehearsalBudget } from './rehearsal-budget';
 import { assertDraftPublication, markDraftPrepared } from './drafts';
 import { assertClinicalSponsorshipConfigured, reserveClinicalSponsorship, assertClinicalSponsorshipSign, bindClinicalSponsorshipSubmission, cancelClinicalSponsorship, cancelExpiredNeverSubmittedSponsorship, reconcileClinicalSponsorship } from './sponsorship';
 import { captureAction, captureOperationId, captureRequestId, assertClinicalCaptureInput, assertClinicalCaptureExpected, assertClinicalCapturePdf, type ClinicalCapturePlan } from './capture';
+import { assertHostedClinicalDeadline, assertHostedClinicalRecovery, lockHostedClinicalPolicy } from './hosted';
+import { verifyHostedClinicalBaseline } from '@/lib/hosted-capture-proof';
 
 type Row = Record<string, any>;
 const chain = () => createClinicalWebChain();
@@ -334,10 +336,12 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
   if (input.historyId && (input.action !== 'append_version' || policy && policy.mode !== 'rehearsal' && policy.mode !== 'capture')) throw new PrivateFlowError('clinical_access_denied', 403);
   return locked(actor, async client => {
     if (rehearsal && policy?.mode === 'rehearsal') await rehearsalGate(client, policy, actor, rehearsal);
+    if (policy && 'hosted' in policy) await lockHostedClinicalPolicy(client, policy, input.requestId);
     await assertCreateOnceQuota(client, policy, input.requestId);
     const existing = (await client.query('SELECT * FROM clinical_web_operations WHERE id=$1 FOR UPDATE', [input.requestId])).rows[0];
     if (existing) {
       if (existing.actor_user_id !== actor.userId || existing.wallet_id !== actor.walletId || existing.source_wallet !== actor.address || existing.action !== input.action || existing.contract_id !== CLINICAL_ID) throw new PrivateFlowError('clinical_request_conflict');
+      await assertHostedClinicalRecovery(client, actor, existing.id, existing.action, existing.expected, true);
       const expected = Buffer.from(fingerprint(input, existing.request_fingerprint)), actual = Buffer.from(existing.request_fingerprint ?? '');
       if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) throw new PrivateFlowError('clinical_request_conflict');
       // A repeated id names its first intent, never a replacement payload.
@@ -345,6 +349,10 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
       await verifyDraft(client, actor, input, existing.expected);
       assertClinicalCreateOnceSavedFee(policy, existing.unsigned_xdr, existing.id);
       return { operation: await clinicalPreparedOperation(actor, existing, client) };
+    }
+    if (policy && 'hosted' in policy && input.action === 'append_version') {
+      const phase = policy.hosted.phase;
+      if (phase === 'pdf' || phase === 'close') await verifyHostedClinicalBaseline(client, policy.hosted, phase);
     }
     if (input.file) await validateNewClinicalFile(input.file);
     await client.query("UPDATE clinical_web_operations SET state='cancelled',error_code='signature_request_expired',updated_at=NOW() WHERE source_wallet=$1 AND state='awaiting_signature' AND signed_xdr IS NULL AND expires_at<=EXTRACT(EPOCH FROM NOW())", [actor.address]);
@@ -397,7 +405,7 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
     await verifyDraft(client, actor, input, e);
     if (rehearsal && policy?.mode === 'rehearsal') assertClinicalRehearsalExpected(policy.plan, rehearsal, actor, e);
     if (policy?.mode === 'capture') assertClinicalCaptureExpected(policy.plan, actor, input.action, e);
-    const scopeUntil = policy?.mode === 'rehearsal' || policy?.mode === 'capture' ? policy.until : undefined;
+    const scopeUntil = policy && (policy.mode === 'rehearsal' || policy.mode === 'capture' || 'hosted' in policy) ? policy.until : undefined;
     const tx = await traceClinicalRehearsalPhase(policy, 'prepare_chain', () => c.prepare(actor.address, input.action, e, scopeUntil));
     await traceClinicalRehearsalPhase(policy, 'prepare_recheck', async () => {
       if (input.historyId) await doctorAppendContext(user, actor, e, c);
@@ -409,6 +417,7 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
         await assertClinicalRehearsalBudget(client, policy.plan, rehearsal, tx, e, hash => c.receipt(hash));
       }
     });
+    if (policy && 'hosted' in policy) assertHostedClinicalDeadline(policy);
     await reserveClinicalSponsorship(actor, input.requestId, input.action, e, tx, client);
     const row = await traceClinicalRehearsalPhase(policy, 'prepare_save', async () => (await client.query(`INSERT INTO clinical_web_operations
       (id,actor_user_id,wallet_id,source_wallet,action,contract_id,method,expected,prepared_envelope,state,unsigned_xdr,signing_hash,expires_at,request_fingerprint)
@@ -419,11 +428,13 @@ export async function prepareClinicalOperation(user: AuthedUser, actor: Clinical
   });
 }
 export async function signClinicalOperation(user: AuthedUser, actor: ClinicalActor, id: string, signature: string) {
-  assertClinicalEnvironment(!clinicalCreateOnceConfigured());
+  assertClinicalEnvironment(!clinicalCreateOnceConfigured(actor.address));
   const requestChain = chain(); // One reader for this HTTP request; all grants and identities remain fresh.
   await locked(actor, async client => {
     const row = await operation(client, actor, id);
+    await assertHostedClinicalRecovery(client, actor, id, row.action, row.expected, true);
     const policy = assertClinicalWriteScope(row.action, actor.address);
+    if (policy && 'hosted' in policy) await lockHostedClinicalPolicy(client, policy, id);
     await assertScopedOwner(client, policy, actor, row);
     await assertCreateOnceQuota(client, policy, id, true);
     if (policy?.mode === 'rehearsal') {
@@ -437,6 +448,7 @@ export async function signClinicalOperation(user: AuthedUser, actor: ClinicalAct
     assertClinicalUnsigned(unsigned, actor.address, row.action, row.expected);
     await assertCaptureAuthorization(policy, requestChain);
     await traceClinicalRehearsalPhase(policy, 'sign_eligibility', () => eligible(actor, row, false, user, requestChain));
+    if (policy && 'hosted' in policy) assertHostedClinicalDeadline(policy);
     await assertClinicalSponsorshipSign(actor, row);
     const sponsored = await traceClinicalRehearsalPhase(policy, 'sign_validation', async () => {
       assertClinicalCreateOnceFee(policy, unsigned, row.id);
@@ -459,9 +471,11 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
   const c = requestChain ?? chain(); // A separate GET/retry always creates a new reader.
   return locked(actor, async client => {
     let row = await operation(client, actor, id);
-    if (retry && clinicalCreateOnceConfigured()) {
+    await assertHostedClinicalRecovery(client, actor, id, row.action, row.expected, retry);
+    if (retry && clinicalCreateOnceConfigured(actor.address)) {
       const policy = assertClinicalWriteScope(row.action, actor.address);
-    await assertScopedOwner(client, policy, actor, row);
+      if (policy && 'hosted' in policy) await lockHostedClinicalPolicy(client, policy, id);
+      await assertScopedOwner(client, policy, actor, row);
       await assertCreateOnceQuota(client, policy, id, true);
       assertClinicalCreateOnceSavedFee(policy, row.unsigned_xdr, row.id);
     }
@@ -536,9 +550,9 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
       row = (await client.query("UPDATE clinical_web_operations SET state='confirmed',error_code=NULL,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
     } else if (receipt.status === 'FAILED') {
       row = (await client.query("UPDATE clinical_web_operations SET state='failed',error_code='transaction_failed',updated_at=NOW() WHERE id=$1 RETURNING *", [id])).rows[0];
-    } else if (retry && receipt.status === 'NOT_FOUND' && Number(row.expires_at) > Date.now()/1000 && (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'true' || clinicalCreateOnceConfigured())) {
+    } else if (retry && receipt.status === 'NOT_FOUND' && Number(row.expires_at) > Date.now()/1000 && (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'true' || clinicalCreateOnceConfigured(actor.address))) {
       const policy = assertClinicalWriteScope(row.action, actor.address);
-    await assertScopedOwner(client, policy, actor, row);
+      await assertScopedOwner(client, policy, actor, row);
       await assertCreateOnceQuota(client, policy, id, true);
       assertClinicalCreateOnceSavedFee(policy, row.unsigned_xdr, row.id);
       if (policy?.mode === 'rehearsal') await rehearsalGate(client, policy, actor, await rehearsalStored(client, policy, actor, row), true, c);
@@ -559,6 +573,7 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
           await assertClinicalRehearsalBudget(client, policy.plan, step, saved, row.expected, hash => c.receipt(hash));
         }
         await bindClinicalSponsorshipSubmission(actor, row);
+        if (policy && 'hosted' in policy) assertHostedClinicalDeadline(policy);
         await c.submit(row.signed_xdr);
       } catch { /* Recoverable; keep submitted. */ }
     }
@@ -568,8 +583,10 @@ export async function reconcileClinicalOperation(actor: ClinicalActor, id: strin
 export async function cancelClinicalOperation(actor: ClinicalActor, id: string) {
   return locked(actor, async client => {
     const row = await operation(client, actor, id);
-    if (clinicalCreateOnceConfigured()) {
+    await assertHostedClinicalRecovery(client, actor, id, row.action, row.expected, true);
+    if (clinicalCreateOnceConfigured(actor.address)) {
       const policy = assertClinicalWriteScope(row.action, actor.address);
+      if (policy && 'hosted' in policy) await lockHostedClinicalPolicy(client, policy, id);
       await assertScopedOwner(client, policy, actor, row);
       await assertCreateOnceQuota(client, policy, id, true);
     }

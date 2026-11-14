@@ -1,7 +1,7 @@
 import { privateApi,privateBody } from '@/lib/private-api';
 import { PrivateFlowError } from '@/lib/private-config';
 import { listPrivatePrescriptions,preparePrescription } from '@/lib/private-prescriptions';
-import { assertPrivateRxActor, assertPrivateRxDocument, assertPrivateRxLoopback, currentPrivateRxScope, privateRxIssuanceScope, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
+import { assertPrivateRxActor, assertPrivateRxDocument, assertPrivateRxOrigin, currentPrivateRxScope, privateRxIssuanceScope, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -13,9 +13,9 @@ export async function GET(request:Request){return privateApi(request,async actor
 export async function POST(request:Request){return privateApi(request,async actor=>{
   const body=await privateBody(request,['appointmentId','document','validDays']);
   if(!Number.isSafeInteger(body.appointmentId)||Number(body.appointmentId)<1||(body.validDays!==undefined&&body.validDays!==30))throw new PrivateFlowError('invalid_prescription',400);
-  const scope=privateRxIssuanceScope(currentPrivateRxScope());
+  const scope=privateRxIssuanceScope(await currentPrivateRxScope());
   if(scope) {
-    assertPrivateRxLoopback(request);
+    assertPrivateRxOrigin(request,scope);
     if(body.appointmentId!==scope.appointmentId)throw new PrivateFlowError('private_rx_scope_rejected',403);
     assertPrivateRxActor(scope,actor,undefined,'doctor'); assertPrivateRxDocument(scope,body.document);
     return preparePrescription(actor,scope.appointmentId,body.document,scope);

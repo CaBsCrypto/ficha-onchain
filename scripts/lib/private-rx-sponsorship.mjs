@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Address, Contract, FeeBumpTransaction, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, xdr } from '@stellar/stellar-sdk';
-import { assertPrivateRxScopeOpen } from './digital-cabs-rx-scope.mjs';
+import { assertHostedPrivateRxReceiptScope, assertPrivateRxScopeOpen, privateRxHostedContext } from './digital-cabs-rx-scope.mjs';
 import { clinicalSimulationIsLive } from './clinical-live-read.mjs';
 import { assertBinding, assertPolicy, CLINICAL_QUOTE_MAX_AGE_SECONDS, quoteExpiresAt, sha256, stroops, verifySponsorshipPrincipal } from './sponsorship-domain.mjs';
 import { quoteSponsorship, signedEnvelope } from './sponsorship-quote.mjs';
@@ -76,7 +76,10 @@ export async function privateRxQuote(scope, step, unsignedXdr, expected, { prepa
 
 function policyFor(scope, step, env) {
   const path = step === 'attest' ? '/api/prescription-bookings' : '/api/private-operations';
-  check(env.TRUSTLEAF_SPONSORSHIP_ENABLED === 'true' && env.TRUSTLEAF_SPONSORSHIP_PATHS === path &&
+  const paths = env.TRUSTLEAF_SPONSORSHIP_PATHS;
+  const hostedWeb = privateRxHostedContext(scope)?.phase === 'issuance';
+  const allowedPath = hostedWeb ? paths?.split(',').includes(path) : paths === path;
+  check(env.TRUSTLEAF_SPONSORSHIP_ENABLED === 'true' && allowedPath &&
     env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'false', 'private_rx_sponsorship_disabled');
   const minimum = (left, right) => (stroops(left) < stroops(right) ? left : right);
   const policy = { enabled: true, sponsorDailyLimitStroops: env.TRUSTLEAF_SPONSORSHIP_SPONSOR_DAILY_LIMIT_STROOPS,
@@ -240,12 +243,13 @@ export function createPrivateRxSponsorship({ scope, client, connect, env = proce
     async verifyBound(step, unsignedXdr, expected, encoded, hash) {
       return (await bound(step, unsignedXdr, expected, encoded, hash, false)).outer;
     },
-    async reconcile(step, unsignedXdr, expected, encoded, hash, receipt, { atomic = false, readOnly = false } = {}) {
+    async reconcile(step, unsignedXdr, expected, encoded, hash, receipt, { atomic = false, readOnly = false, historical = false } = {}) {
       const { outer } = await bound(step, unsignedXdr, expected, encoded, hash, atomic);
       if (['UNKNOWN', 'NOT_FOUND'].includes(receipt?.status)) return null;
       const verified = verifyPrivateRxReceipt(receipt, outer, hash);
       if (!readOnly) {
-        assertPrivateRxScopeOpen(scope, { step, env, now: now() });
+        if (historical) assertHostedPrivateRxReceiptScope(scope, step);
+        else assertPrivateRxScopeOpen(scope, { step, env, now: now() });
         await serviceFor(atomic).reconcile(scope.steps[step].requestId, async () => verified);
       }
       return verified;

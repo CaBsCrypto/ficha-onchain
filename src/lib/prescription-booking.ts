@@ -4,7 +4,7 @@ import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { assertPrivateEnvironment, assertPrivateWrites, PRIVY_APP, RX_PRIVATE } from '@/lib/private-config';
-import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxCreate, assertPrivateRxScopeOpen, privateRxRole,
+import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxCreate, assertPrivateRxScopeOpen, lockHostedPrivateRxMutation, privateRxRole,
   type PrivateRxAppointmentScope } from '@/lib/digital-cabs-rx';
 
 export class BookingPreparationError extends Error {
@@ -17,6 +17,7 @@ export async function bookingTransaction<T>(run: (sql: Sql) => Promise<T>, scope
   const client = await getDbConnection();
   try {
     await client.query('BEGIN');
+    if (scope) await lockHostedPrivateRxMutation(client, scope);
     const result = await run(sqlForConnection(client));
     if (scope) assertPrivateRxScopeOpen(scope);
     await client.query('COMMIT');

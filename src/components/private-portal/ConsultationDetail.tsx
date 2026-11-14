@@ -6,6 +6,7 @@ import { jsonBody, localDate, portalApi, usePortalData } from './client';
 import { appointmentDate } from './client';
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation, type ReviewSponsorshipQuote } from './Operation';
 import { PrescriptionCard } from './Prescriptions';
+import { testPatientLabel } from './test-patient-label';
 import type { ConsultationState, PortalRole, PrescriptionDocument, PrivatePrescription } from './types';
 
 const bookingLabels: Record<'es' | 'en', Record<string, string>> = {
@@ -54,6 +55,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     <p className="text-sm text-slate-500">{english ? "Checking the booking and permissions…" : "Consultando la reserva y sus permisos…"}</p>
   </section>;
   const appointment = data?.appointment;
+  const patientLabel = appointment && testPatientLabel(appointment.patient_name || appointment.patient_email, english);
   const attended = appointment?.attended_at ?? appointment?.attendance_at;
   const pending = busy || saving || issuing || operation?.state === 'submitted' || !!data?.operations?.some(op => op.state === 'submitted');
   const unavailable = !!error || pending;
@@ -66,7 +68,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     {data && appointment && <>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">{english ? 'Test appointment' : 'Consulta de prueba'} #{id}</h1>
-        <p className="mt-2 text-sm text-slate-600">{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong><br />{english ? 'Patient' : 'Paciente'}: <strong>{appointment.patient_name || appointment.patient_email}</strong></p>
+        <p className="mt-2 text-sm text-slate-600">{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong><br />{english ? 'Patient' : 'Paciente'}: <strong>{patientLabel}</strong></p>
         <p className="mt-2 text-sm text-slate-500">{role === 'patient' ? appointmentDate(appointment.date, language) : appointment.date.slice(0, 10)} · {appointment.time_slot} · {english ? "Chile time" : "Hora de Chile"}</p>
         <div data-patient-progress className="mt-4 grid gap-3 sm:grid-cols-3">
           <Status title={english ? "Patient attendance" : "Asistencia del paciente"} value={attended ? (english ? 'Confirmed' : 'Confirmada') : (english ? 'Pending' : 'Pendiente')} />
@@ -93,7 +95,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         {data.consent.validUntil && <p className="text-xs text-slate-500">{english ? 'Expires' : 'Vence'}: {localDate(data.consent.validUntil, language)} · {english ? "Chile time" : "Hora de Chile"}</p>}
         {role === 'patient' && <>
           {data.consent.status !== 'consumed' && data.consent.status !== 'active' && <ConfirmationButton label={english ? "Authorize one prescription" : "Autorizar una emisión"} title={english ? "Authorize this doctor to issue one prescription" : "Autorizar a este médico para una receta"} disabled={unavailable || !canAuthorizeIssuance(data)} onConfirm={reviewQuote => consent('consent', reviewQuote)}>
-            <p>{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong>.</p><p>{english ? 'Patient' : 'Paciente'}: <strong>{appointment.patient_name || appointment.patient_email}</strong>. {english ? 'Appointment' : 'Consulta'} #{id}.</p>
+            <p>{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong>.</p><p>{english ? 'Patient' : 'Paciente'}: <strong>{patientLabel}</strong>. {english ? 'Appointment' : 'Consulta'} #{id}.</p>
             <p>{english ? 'You will allow one prescription to be issued. This permission expires by' : 'Permitirás una sola emisión. El permiso vence como máximo el'} <strong>{localDate(Number(data.booking?.valid_until), language)}</strong> {english ? 'and can be withdrawn before use.' : 'y puedes retirarlo antes de que se utilice.'}</p>
           </ConfirmationButton>}
           {data.consent.status === 'active' && <ConfirmationButton danger label={english ? "Withdraw permission" : "Retirar permiso"} title={english ? "Withdraw issuance permission" : "Retirar el permiso de emisión"} disabled={unavailable} onConfirm={reviewQuote => consent('withdraw_consent', reviewQuote)}><p>{english ? "You will withdraw this appointment’s unused permission. The new status appears after its receipt is confirmed." : "Retirarás el permiso que aún no se ha utilizado en esta consulta. Esperaremos su recibo antes de mostrarlo como retirado."}</p></ConfirmationButton>}
@@ -116,7 +118,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
             {english ? "Fill in test data" : "Rellenar datos de prueba"}
           </button>
         </div>
-        <p className="text-sm text-slate-600">{english ? 'Recipient' : 'Destinatario'}: <strong>{appointment.patient_name || appointment.patient_email}</strong>. {english ? "Test validity: 30 days." : "Vigencia de prueba: 30 días."}</p>
+        <p className="text-sm text-slate-600">{english ? 'Recipient' : 'Destinatario'}: <strong>{patientLabel}</strong>. {english ? "Test validity: 30 days." : "Vigencia de prueba: 30 días."}</p>
         <p className="text-xs text-slate-500">{english ? "Use only fictional medication and synthetic data for this demonstration." : "Utiliza exclusivamente medicamentos y datos sintéticos para esta demostración."}</p>
         <fieldset disabled={unavailable || !mintReady} className="space-y-3 disabled:opacity-50">
           <label className="block text-sm text-slate-600">{english ? "Test medication" : "Medicamento de prueba"}<input maxLength={300} value={document.medication} onChange={e => setDocument(value => ({ ...value, medication: e.target.value }))} className={fieldClass} placeholder={english ? "Synthetic medication A" : "Medicamento sintético A"} /></label>
@@ -125,7 +127,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         </fieldset>
         {!mintReady && <p className="text-sm text-amber-700">{english ? "Issuance requires a started appointment, an attested booking and active patient permission." : "Para emitir se requieren una consulta iniciada, reserva acreditada y permiso vigente del paciente."}</p>}
         <ConfirmationButton label={english ? "Review and issue prescription" : "Revisar y emitir receta"} title={english ? "Review prescription before issuing" : "Revisar receta antes de emitir"} disabled={unavailable || !mintReady || !document.medication.trim() || !document.dosage.trim() || !document.instructions.trim()} onConfirm={issue}>
-          <p>{english ? 'Recipient' : 'Destinatario'}: <strong>{appointment.patient_name || appointment.patient_email}</strong>.</p>
+          <p>{english ? 'Recipient' : 'Destinatario'}: <strong>{patientLabel}</strong>.</p>
           <p className="whitespace-pre-wrap"><strong>{document.medication}</strong><br />{document.dosage}<br />{document.instructions}</p>
           <p>{english ? "TrustLeaf encrypts and saves this document before submission. It appears as registered once the receipt is confirmed. Activation requires a separate signature." : "Guardaremos este documento cifrado antes de transmitir. Tras el recibo aparecerá como registrada; la activación será una acción posterior con tu firma."}</p>
         </ConfirmationButton>

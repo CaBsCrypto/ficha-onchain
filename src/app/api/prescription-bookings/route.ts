@@ -4,9 +4,10 @@ import { isSameOrigin } from '@/lib/auth/same-origin';
 import { getDb } from '@/lib/db';
 import { PrivateFlowError } from '@/lib/private-config';
 import { BookingPreparationError, bookingTransaction, preparePrescriptionBooking, privateBookingStatus, requestBookingCancellation } from '@/lib/prescription-booking';
-import { assertPrivateRxLoopback, currentPrivateRxScope, privateRxAppointmentScope, privateRxRole, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
+import { assertPrivateRxOrigin, currentPrivateRxScope, privateRxAppointmentScope, privateRxRole, privateRxScopeConfigured } from '@/lib/digital-cabs-rx';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
+export const maxDuration=60;
 const json=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'no-store'}});
 function failure(error:unknown){
   if(error instanceof BookingPreparationError)return json({error:error.code},error.status);
@@ -22,9 +23,9 @@ async function handle(request:Request,cancel:boolean){
   try{body=await request.json();if(!body||typeof body!=='object'||Array.isArray(body))throw Error();}catch{return json({error:'invalid_json'},400);}
   if(Object.keys(body).some(k=>!['appointmentId','confirmRequest'].includes(k))||!Number.isSafeInteger(body.appointmentId)||Number(body.appointmentId)<1||(!cancel&&body.confirmRequest!==true))return json({error:'explicit_booking_request_required'},400);
   try {
-    const scope=privateRxAppointmentScope(currentPrivateRxScope()), id=Number(body.appointmentId);
+    const scope=privateRxAppointmentScope(await currentPrivateRxScope()), id=Number(body.appointmentId);
     if(scope && cancel) throw new PrivateFlowError('private_rx_scope_rejected',403);
-    if(scope){assertPrivateRxLoopback(request);privateRxRole(scope,actor);}
+    if(scope){assertPrivateRxOrigin(request,scope);privateRxRole(scope,actor);}
     const result=scope ? await bookingTransaction(sql=>preparePrescriptionBooking(sql,actor,id,scope),scope)
       : await bookingTransaction<unknown>(sql=>cancel?requestBookingCancellation(sql,actor,id):preparePrescriptionBooking(sql,actor,id));
     return json(result,202);

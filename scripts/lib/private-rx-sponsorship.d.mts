@@ -30,7 +30,7 @@ export declare function createPrivateRxSponsorship(options: {
   assertCanSubmit(step: PrivateRxStep, unsignedXdr: string, expected: PrivateRxExpected | undefined, encoded: string, hash: string): Promise<FeeBumpTransaction>;
   verifyBound(step: PrivateRxStep, unsignedXdr: string, expected: PrivateRxExpected | undefined, encoded: string, hash: string): Promise<FeeBumpTransaction>;
   reconcile(step: PrivateRxStep, unsignedXdr: string, expected: PrivateRxExpected | undefined, encoded: string, hash: string, receipt: unknown,
-    options?: { atomic?: boolean; readOnly?: boolean }): Promise<Receipt | null>;
+    options?: { atomic?: boolean; readOnly?: boolean; historical?: boolean }): Promise<Receipt | null>;
   quoteView(step: PrivateRxStep, unsignedXdr: string, expected?: PrivateRxExpected,
     options?: { atomic?: boolean }): Promise<{ maxFeeStroops: string; quotePreparedAt: number; quoteExpiresAt: number; quoteValidUntil?: number }>;
   cancelUnsigned(step: PrivateRxStep, unsignedXdr: string, expected?: PrivateRxExpected): Promise<Reservation>;
