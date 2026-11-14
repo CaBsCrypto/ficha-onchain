@@ -15,20 +15,28 @@
  *   const res = await authedFetch("/api/patient/ficha");
  */
 import { getAccessToken } from "@privy-io/react-auth";
+import { clientClinicalReadDiagnostics, createClientClinicalReadTrace } from '@/lib/clinical/read-trace-client';
+import { CLINICAL_READ_DIAGNOSTICS_HEADER, clinicalReadStage, emitClinicalReadTrace, type ClinicalReadTrace } from '@/lib/clinical/read-trace';
 
 export async function authedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
+  suppliedTrace?: ClinicalReadTrace,
 ): Promise<Response> {
   init.signal?.throwIfAborted();
-  const token = await getAccessToken();
-  init.signal?.throwIfAborted();
-
-  const headers = new Headers(init.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  // No token means the session expired or was never established. The request
-  // still goes out so the server answers 401 — one place decides access, and
-  // it is the server.
-  return fetch(input, { ...init, headers });
+  const enabled = clientClinicalReadDiagnostics(input, init);
+  const diagnostic = enabled && !suppliedTrace ? createClientClinicalReadTrace(input, init) : undefined;
+  const trace = enabled ? suppliedTrace ?? diagnostic?.trace : undefined;
+  try {
+    const token = await clinicalReadStage(trace, 'token', () => getAccessToken());
+    init.signal?.throwIfAborted();
+    const headers = new Headers(init.headers);
+    headers.delete(CLINICAL_READ_DIAGNOSTICS_HEADER);
+    if (enabled) headers.set(CLINICAL_READ_DIAGNOSTICS_HEADER, '1');
+    if (token) headers.set('Authorization', 'Bearer ' + token);
+    // A missing token still reaches the existing server-side denial.
+    const response = await clinicalReadStage(trace, 'fetch', () => fetch(input, { ...init, headers }));
+    emitClinicalReadTrace(trace, 'headers', 'ok');
+    return response;
+  } finally { diagnostic?.close(); }
 }

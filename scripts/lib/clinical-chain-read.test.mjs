@@ -207,3 +207,92 @@ test('request readers serialize concurrent methods sharing a ledger watermark', 
   await Promise.all([f.reader.readAccess(selector), f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 })]);
   assert.equal(maximum, 1); assert.equal(f.state.staticChecks, 1);
 });
+
+
+test('document version reads retry only the identical unsigned simulation when an RPC backend lags', async () => {
+  const f = fixture({ requestScoped: true }); await f.reader.verifyDeployment(); f.state.ledger = 101;
+  const simulate = f.server.simulateTransaction, attempts = [];
+  f.server.simulateTransaction = async tx => {
+    const result = await simulate(tx);
+    if (tx.operations[0].func.invokeContract().functionName().toString() !== 'get_version') return result;
+    attempts.push(tx);
+    return attempts.length < 3 ? { ...result, latestLedger: 100 } : result;
+  };
+  const version = await f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 });
+  assert.equal(version.commitment, '8'.repeat(64)); assert.equal(attempts.length, 3);
+  assert.equal(new Set(attempts.map(tx => tx.toXDR())).size, 1);
+  assert.ok(attempts.every(tx => tx.signatures.length === 0)); assert.equal(f.state.staticChecks, 1);
+});
+
+test('three regressed document simulations fail without lowering either request watermark', async () => {
+  const f = fixture({ requestScoped: true }); await f.reader.verifyDeployment(); f.state.ledger = 101;
+  const simulate = f.server.simulateTransaction; let attempts = 0;
+  f.server.simulateTransaction = async tx => {
+    const result = await simulate(tx);
+    if (tx.operations[0].func.invokeContract().functionName().toString() !== 'get_version') return result;
+    attempts++; return { ...result, latestLedger: 100 };
+  };
+  await assert.rejects(() => f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 }), { message: 'clinical_chain_unavailable' });
+  assert.equal(attempts, 3);
+  f.state.ledger = 100;
+  await assert.rejects(() => f.reader.readAccess(selector), { message: 'clinical_chain_unavailable' });
+  assert.equal(attempts, 3); // Reopening a session must still obey the earlier 101 floor.
+  f.state.ledger = 102; f.server.simulateTransaction = simulate;
+  assert.equal((await f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 })).state, 'confirmed');
+});
+
+test('invalid, archived and authorization-bearing document responses never retry despite an older ledger', async () => {
+  for (const condition of ['auth', 'archived', 'restore', 'malformed-data', 'failed', 'malformed-ledger']) {
+    const f = fixture({ requestScoped: true }); await f.reader.verifyDeployment(); f.state.ledger = 101;
+    const simulate = f.server.simulateTransaction; let attempts = 0;
+    f.server.simulateTransaction = async tx => {
+      if (tx.operations[0].func.invokeContract().functionName().toString() !== 'get_version') return simulate(tx);
+      attempts++;
+      if (condition === 'auth') f.state.auth = [{}];
+      if (condition === 'archived') f.state.archived = [0];
+      if (condition === 'restore') f.state.restore = true;
+      if (condition === 'malformed-data') f.state.malformedData = true;
+      if (condition === 'failed') f.state.failure = 'HostError: Error(Contract, #4)';
+      return { ...await simulate(tx), latestLedger: condition === 'malformed-ledger' ? NaN : 100 };
+    };
+    await assert.rejects(() => f.reader.readVersion({ ...selector, entryId: '9'.repeat(64), version: 1 }), { message: 'clinical_chain_unavailable' });
+    assert.equal(attempts, 1, condition);
+  }
+});
+
+test('a fresh grant recheck still rejects changed permissions after a regressed response is retried', async () => {
+  const f = fixture({ requestScoped: true }); await f.reader.verifyDeployment();
+  const simulate = f.server.simulateTransaction, originalGrant = { ...f.state.grant }, finalAttempts = [];
+  let permissionChanged = false;
+  f.server.simulateTransaction = async tx => {
+    const result = await simulate(tx), method = tx.operations[0].func.invokeContract().functionName().toString();
+    if (method === 'can_read') { f.state.grant = { ...f.state.grant, can_read: false, revision: 3n }; permissionChanged = true; }
+    if (method !== 'get_grant' || !permissionChanged) return result;
+    finalAttempts.push(tx);
+    return finalAttempts.length === 1 ? { ...result, latestLedger: 99, result: { ...result.result, retval: nativeToScVal(originalGrant) } } : result;
+  };
+  await assert.rejects(() => f.reader.readAccess(selector), { message: 'clinical_chain_unavailable' });
+  assert.equal(finalAttempts.length, 2);
+  assert.equal(finalAttempts[0].toXDR(), finalAttempts[1].toXDR());
+  assert.equal(f.state.calls.filter(method => method === 'get_grant').length, 3);
+});
+
+test('only current exact Missing grant errors remain absence and none is retried', async () => {
+  for (const condition of ['current', 'regressed', 'restore']) {
+    const f = fixture({ requestScoped: true }); await f.reader.verifyDeployment(); f.state.authorized = false;
+    const simulate = f.server.simulateTransaction; let attempts = 0;
+    f.server.simulateTransaction = async tx => {
+      if (tx.operations[0].func.invokeContract().functionName().toString() !== 'get_grant') return simulate(tx);
+      attempts++;
+      return { latestLedger: condition === 'regressed' ? 99 : 100, error: 'HostError: Error(Contract, #1)',
+        ...(condition === 'restore' ? { restorePreamble: {} } : {}) };
+    };
+    if (condition === 'current') {
+      const access = await f.reader.readAccess(selector);
+      assert.equal(access.canRead, false); assert.equal(access.grantRevision, 0); assert.equal(attempts, 2);
+    } else {
+      await assert.rejects(() => f.reader.readAccess(selector), { message: 'clinical_chain_unavailable' });
+      assert.equal(attempts, 1, condition);
+    }
+  }
+});

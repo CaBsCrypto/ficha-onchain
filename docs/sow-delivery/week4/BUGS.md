@@ -1,5 +1,15 @@
 # Semana 4 — Inventario de bugs y ajustes
 
+> Nota de copia pública · 22-10-2026: Copia pública de continuidad: las cuentas identificables se sustituyeron por actores anónimos donde correspondía; no se alteraron recibos ni hashes.
+
+## Estado consolidado al 23 de septiembre
+
+Los apartados fechados inferiores conservan el historial, no el estado vigente de publicación. #126, #128 y #129 están integradas en main `6e8dfb4`, con CI/Vercel aprobados. W-14: enlaces retirados corregidos y navegación canónica PT observada. W-15: waitlist habilitado, persistencia/duplicados sintéticos y GET anónimo 401 comprobados en main. El rechazo anónimo de la API del preview también quedó acreditado con acceso legítimo de Vercel. La configuración aislada de #129 fue autorizada y su revisión autenticada se completó.
+
+La candidata y main comparten árbol probado: 644 aplicación, 45 privados, 11 contractuales, TypeScript/build. La distinción de médicos iguales tiene regresión; el dataset aislado con un único médico no permite acreditarla visualmente allí. Móvil: matriz 360/390/430/1280; 200% confirmado por el usuario. No equivale a auditoría exhaustiva de accesibilidad.
+
+W-01/W-02 (saneamiento del video) y W-07/W-08 (finalización/activación en complemento separado) continúan pendientes. #12 permanece intacta. #130 es posterior y no bloqueante. Véanse [registro vigente](../week4-review/README.md) y [preparación y limitaciones](../week4-review/PRE-RECORDING.md).
+
 Fuente: minería de fotogramas de la grabación SOW3 (`SOW 3 - TrustLEaf.mp4`, 8:59, consulta 7 / receta 12, versión `50c2ec5`), inventario QA del video (`../sow-video-qa/REVIEW.md`) y barrido de código. Prioridades: P0 seguridad/exposición; P1 bloqueo o brecha del entregable; P2 confusión funcional; P3 detalle visual.
 
 Los tiempos corresponden al video original; si se edita, conservará el mapeo propio. Los fotogramas extraídos para el análisis contienen código OTP y correos reales: residen sólo en el equipo local y **no se versionan**.
@@ -9,7 +19,7 @@ Los tiempos corresponden al video original; si se edita, conservará el mapeo pr
 | ID | Tiempo | Observado | Clasificación / acción | Estado |
 |---|---|---|---|---|
 | W-01 | 00:37–00:43 y 03:38–03:44 | El cuadro de confirmación de Privy muestra el código OTP completo tecleándose en la primera entrada (ventana 00:37–00:43) | P0 / difuminar (pixelar) en edición ambas ventanas completas, no sólo el instante | Confirmado con fotogramas; cerrar al editar |
-| W-02 | 01:27 | Google "Selecciona una cuenta" revela dos correos reales ajenos al recorrido (`cabscryptocontacto@…`, `cristom01@…`) | P1 / pixelar el intervalo; en grabaciones futuras usar navegador invitado o perfil limpio | Confirmado con fotograma (cierra QA-09 con evidencia) |
+| W-02 | 01:27 | Google "Selecciona una cuenta" revela dos correos reales ajenos al recorrido (`actor-admin@…`, `cristom01@…`) | P1 / pixelar el intervalo; en grabaciones futuras usar navegador invitado o perfil limpio | Confirmado con fotograma (cierra QA-09 con evidencia) |
 | W-03 | 00:38, 03:40 | Correos de las cuentas de demostración visibles en el cuadro de Privy | P3 / aceptable si las cuentas se declaran de demo en el material; si no, pixelar junto con W-01 | Decisión de material |
 
 ## Funcionales / de producto

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "test:flow": "node scripts/test-flow.mjs",
@@ -12,7 +12,7 @@
     "smoke:sandbox": "node scripts/smoke-sandbox-isolation.mjs",
     "test:phases": "node scripts/phases/run.mjs",
     "test": "vitest run",
-    "test:private": "node --test scripts/worker-doctor-authorizations.test.mjs scripts/worker-prescription-bookings.test.mjs scripts/worker-private-portal.test.mjs scripts/lib/private-doctor-dossier.test.mjs scripts/lib/private-prescription.test.mjs scripts/lib/read-private-prescription.test.mjs scripts/lib/clinical-crypto.test.mjs scripts/lib/clinical-read.test.mjs scripts/lib/clinical-neon-store.test.mjs scripts/lib/clinical-chain-read.test.mjs scripts/lib/clinical-chain-write.test.mjs scripts/lib/clinical-attempt-store.test.mjs scripts/lib/clinical-source-lock.test.mjs scripts/lib/clinical-restoration-plan.test.mjs scripts/restore-clinical-testnet.test.mjs scripts/lib/clinical-run-config.test.mjs scripts/lib/clinical-demo-policy.test.mjs scripts/lib/clinical-contract-audit.test.mjs scripts/build-clinical-report.test.mjs scripts/lib/clinical-receipt-audit.test.mjs scripts/lib/clinical-funding-audit.test.mjs scripts/validate-clinical-web-schema.test.mjs scripts/lib/clinical-web-rehearsal.test.mjs scripts/lib/clinical-web-receipt-audit.test.mjs scripts/lib/clinical-web-fee-policy.test.mjs scripts/lib/clinical-web-transport.test.mjs scripts/lib/clinical-local-auth.test.mjs scripts/lib/clinical-local-signatures.test.mjs scripts/validate-clinical-web-testnet.test.mjs",
+    "test:private": "node --test scripts/worker-doctor-authorizations.test.mjs scripts/worker-prescription-bookings.test.mjs scripts/worker-private-portal.test.mjs scripts/lib/private-doctor-dossier.test.mjs scripts/lib/private-prescription.test.mjs scripts/lib/read-private-prescription.test.mjs scripts/lib/clinical-crypto.test.mjs scripts/lib/clinical-read.test.mjs scripts/lib/clinical-neon-store.test.mjs scripts/lib/clinical-chain-read.test.mjs scripts/lib/clinical-chain-write.test.mjs scripts/lib/clinical-attempt-store.test.mjs scripts/lib/clinical-source-lock.test.mjs scripts/lib/clinical-restoration-plan.test.mjs scripts/restore-clinical-testnet.test.mjs scripts/lib/clinical-run-config.test.mjs scripts/lib/clinical-demo-policy.test.mjs scripts/lib/clinical-contract-audit.test.mjs scripts/build-clinical-report.test.mjs scripts/lib/clinical-receipt-audit.test.mjs scripts/lib/clinical-funding-audit.test.mjs scripts/validate-clinical-web-schema.test.mjs scripts/lib/clinical-web-rehearsal.test.mjs scripts/lib/clinical-web-receipt-audit.test.mjs scripts/lib/clinical-web-fee-policy.test.mjs scripts/lib/clinical-web-transport.test.mjs scripts/lib/clinical-local-auth.test.mjs scripts/lib/clinical-local-signatures.test.mjs scripts/validate-clinical-web-testnet.test.mjs scripts/lib/clinical-rehearsal-policy.test.mjs scripts/run-clinical-rehearsal-authorization.test.mjs scripts/prepare-clinical-continuation.test.mjs scripts/lib/clinical-rehearsal-closure.test.mjs scripts/lib/clinical-rehearsal-budget.test.mjs scripts/lib/sponsorship-write-gate.test.mjs scripts/lib/clinical-renewal-sponsorship.test.mjs scripts/run-clinical-rehearsal-maintenance.test.mjs scripts/run-clinical-rehearsal-readproof-maintenance.test.mjs scripts/run-clinical-rehearsal-maintenance-three.test.mjs scripts/lib/clinical-rehearsal-trace.test.mjs scripts/audit-clinical-portal-readfootprint.test.mjs scripts/lib/clinical-receipt-retention.test.mjs scripts/lib/clinical-file-validation.test.mjs",
     "validate:clinical:web:testnet": "node scripts/validate-clinical-web-testnet.mjs",
     "test:watch": "vitest"
   },
@@ -30,11 +30,13 @@
     "googleapis": "^140.0.1",
     "next": "16.2.10",
     "passkey-kit": "^0.12.0",
+    "pdfjs-dist": "6.5.438",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.9.2",
     "resend": "^3.5.0",
+    "sharp": "0.34.5",
     "sonner": "^2.0.3",
     "three": "^0.185.1"
   },

@@ -18,7 +18,7 @@ const append: ClinicalExpected = { ...create, entryId: deriveClinicalEntryId(his
   author: patient.publicKey(), commitment: '5'.repeat(64), expectedVersion: 0, expectedGrantRevision: 0, previousCommitment: null };
 const grant: ClinicalExpected = { ...create, doctor: doctor.publicKey(), canRead: true, canAppend: false, expectedRevision: 0 };
 function build(action: ClinicalAction = 'create_history', expected = create, options: {
-  source?: string; operation?: xdr.Operation; network?: string; timeout?: number; memo?: Memo; auth?: xdr.SorobanAuthorizationEntry[]; resourceFee?: string; inclusionFee?: string;
+  source?: string; operation?: xdr.Operation; network?: string; timeout?: number; timeBounds?: Transaction['timeBounds']; memo?: Memo; auth?: xdr.SorobanAuthorizationEntry[]; resourceFee?: string; inclusionFee?: string;
 } = {}) {
   const invocation = options.operation ?? clinicalInvocation(action, expected);
   if (options.auth) invocation.body().invokeHostFunctionOp().auth(options.auth);
@@ -27,7 +27,7 @@ function build(action: ClinicalAction = 'create_history', expected = create, opt
   }).addOperation(invocation);
   if (options.memo) builder.addMemo(options.memo);
   if (options.resourceFee !== undefined) builder.setSorobanData(new SorobanDataBuilder().setResourceFee(options.resourceFee).build());
-  return builder.setTimeout(options.timeout ?? 180).build();
+  return options.timeBounds ? builder.setTimebounds(Number(options.timeBounds.minTime), Number(options.timeBounds.maxTime)).build() : builder.setTimeout(options.timeout ?? 180).build();
 }
 function authFor(op: xdr.Operation, nested = false, addressAuth = false) {
   const root = new xdr.SorobanAuthorizedInvocation({
@@ -160,6 +160,7 @@ function fixture() {
     missingAccount: '', wrongNetwork: false, code: CLINICAL_WASM, head: 1, authorized: true, commitment: '5'.repeat(64),
     clinicalTtl: 500 as number | undefined, registryTtl: 500 as number | undefined, archived: [] as number[], extensionV1: false, malformedData: false,
     history: { history_id: Buffer.from(historyId, 'hex'), patient: patient.publicKey(), created_at: BigInt(1) },
+    authorization: { commitment: Buffer.from('6'.repeat(64), 'hex'), schema_version: 1, version: 4, valid_until: BigInt(1800086400), revoked: false } as Record<string, any>,
     proofDigest: '', proofCommitment: '', proofKind: 'Version', calls: [] as string[], sent: [] as string[] };
   const server = {
     getNetwork: vi.fn(async () => ({ passphrase: state.wrongNetwork ? Networks.PUBLIC : Networks.TESTNET })),
@@ -183,7 +184,7 @@ function fixture() {
       if (state.failure || state.missing === method) return { latestLedger: state.ledger, error: state.failure || 'HostError: Error(Contract, #1)' };
       const values: Record<string, unknown> = { interface_version: 1, get_registry: REGISTRY_PRIVATE, get_admin: PRIVATE_ADMIN,
         get_history: state.history, get_history_for_patient: state.history, get_entry: { author: patient.publicKey(), head_version: state.head },
-        get_grant: { can_read: true, can_append: false, revision: BigInt(1) }, is_authorized: state.authorized,
+        get_grant: { can_read: true, can_append: false, revision: BigInt(1) }, get_authorization: state.authorization, is_authorized: state.authorized,
         get_version: { author: patient.publicKey(), commitment: Buffer.from(state.commitment, 'hex'), previous_commitment: null, version: 1, created_at: BigInt(2) } };
       const appendPayload = xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('append'), new Address(CLINICAL_CONTRACT).toScVal(),
         clinicalInvocation('append_version', append).body().invokeHostFunctionOp().hostFunction().invokeContract().args()[0]]);
@@ -240,7 +241,7 @@ describe('clinical Testnet RPC boundary', () => {
     await expect(f.chain.verifyDeployment()).rejects.toThrow('clinical_chain_unavailable');
   });
   it('accepts a real-sized Soroban fee, signs the exact intent and submits its bounded sponsored envelope', async () => {
-    const f = fixture(); f.server.prepareTransaction = vi.fn(async () => build('create_history', create, {resourceFee:'353053728'}));
+    const f = fixture(); f.server.prepareTransaction = vi.fn(async (unsigned: Transaction) => build('create_history', create, {resourceFee:'353053728', timeBounds: unsigned.timeBounds}));
     const tx = await f.chain.prepare(patient.publicKey(), 'create_history', create);
     expect(tx.fee).toBe('353053828'); expect(tx.signatures).toHaveLength(0);
     const sponsored = sponsorClinicalSignature(tx.toXDR(), patient.publicKey(), patient.sign(tx.hash()).toString('hex'), 'create_history', create);
@@ -250,7 +251,7 @@ describe('clinical Testnet RPC boundary', () => {
     expect(f.state.sent).toEqual([row.signed_xdr]);
   });
   it('rejects a prepared outer budget above 50 Testnet XLM before any signature or transmission', async () => {
-    const f = fixture(); f.server.prepareTransaction = vi.fn(async () => build('create_history', create, {resourceFee:'496000001'}));
+    const f = fixture(); f.server.prepareTransaction = vi.fn(async (unsigned: Transaction) => build('create_history', create, {resourceFee:'496000001', timeBounds: unsigned.timeBounds}));
     await expect(f.chain.prepare(patient.publicKey(), 'create_history', create)).rejects.toThrow('clinical_fee_budget_exceeded');
     expect(f.server.sendTransaction).not.toHaveBeenCalled();
   });
@@ -342,4 +343,119 @@ it('rejects a genuinely older ledger within one chain instance',async()=>{
  f.state.ledger=100;await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
  f.state.ledger=102;await expect(f.chain.historyForPatient(patient.publicKey())).resolves.toMatchObject({id:historyId,patient:patient.publicKey()});
  expect(f.server.getNetwork).toHaveBeenCalledTimes(1);expect(f.server.prepareTransaction).not.toHaveBeenCalled();expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it('retries the same unsigned simulation up to three times without accepting an older ledger', async () => {
+  const f = fixture(); await f.chain.verifyDeployment();
+  const simulate = f.server.simulateTransaction.getMockImplementation()!;
+  f.server.simulateTransaction.mockClear();
+  for (let attempt = 0; attempt < 2; attempt++) f.server.simulateTransaction.mockImplementationOnce(async tx => ({ ...await simulate(tx), latestLedger: 99 }));
+  await expect(f.chain.historyForPatient(patient.publicKey())).resolves.toMatchObject({ id: historyId, patient: patient.publicKey() });
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(3);
+  const attempts = f.server.simulateTransaction.mock.calls.map(([tx]) => tx);
+  expect(new Set(attempts.map(tx => tx.toXDR())).size).toBe(1);
+  expect(attempts.every(tx => tx.signatures.length === 0)).toBe(true);
+  expect(f.server.getAccount).toHaveBeenCalledTimes(1);
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it('rejects three regressed simulations and preserves the previously observed ledger', async () => {
+  const f = fixture(); await f.chain.verifyDeployment(); f.state.ledger = 102;
+  await expect(f.chain.doctorAuthorized(doctor.publicKey())).resolves.toBe(true);
+  f.server.simulateTransaction.mockClear(); f.state.ledger = 101;
+  await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(3);
+  f.server.simulateTransaction.mockClear();
+  await expect(f.chain.doctorAuthorized(doctor.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(3);
+  f.state.ledger = 102;
+  await expect(f.chain.doctorAuthorized(doctor.publicKey())).resolves.toBe(true);
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it('uses the fresh authorization when a regressed allowed response is followed by revocation', async () => {
+  const f = fixture(); await f.chain.verifyDeployment();
+  await expect(f.chain.doctorAuthorized(doctor.publicKey())).resolves.toBe(true);
+  const simulate = f.server.simulateTransaction.getMockImplementation()!;
+  f.state.authorized = false; f.server.simulateTransaction.mockClear();
+  f.server.simulateTransaction.mockImplementationOnce(async tx => {
+    const result = await simulate(tx);
+    return { ...result, latestLedger: 99, result: { ...result.result!, retval: nativeToScVal(true) } };
+  });
+  await expect(f.chain.doctorAuthorized(doctor.publicKey())).resolves.toBe(false);
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(2);
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it.each([0, -1, 1.5, NaN, Infinity])('does not retry malformed simulation ledger %s', async ledger => {
+  const f = fixture(); await f.chain.verifyDeployment(); f.state.ledger = ledger; f.server.simulateTransaction.mockClear();
+  await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(1);
+});
+
+it('does not retry a failed simulation even when its ledger regresses', async () => {
+  const f = fixture(); await f.chain.verifyDeployment(); f.state.ledger = 99; f.state.failure = 'HostError: Error(Contract, #4)';
+  f.server.simulateTransaction.mockClear();
+  await expect(f.chain.historyForPatient(patient.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(1);
+});
+
+it('reads full canonical live doctor authorization without signing or restoring', async () => {
+  const f = fixture();
+  await expect(f.chain.doctorAuthorization(doctor.publicKey())).resolves.toEqual({ version: 4, validUntil: 1800086400, commitment: '6'.repeat(64), revoked: false, schemaVersion: 1 });
+  f.state.authorization.version = 5;
+  await expect(f.chain.doctorAuthorization(doctor.publicKey())).resolves.toMatchObject({ version: 5 });
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+  const request = f.server.simulateTransaction.mock.calls.at(-1)![0];
+  expect(request.signatures).toHaveLength(0);
+  expect(Address.fromScAddress((request.operations[0] as any).func.invokeContract().contractAddress()).toString()).toBe(REGISTRY_PRIVATE);
+});
+it.each(['archived', 'restore', 'malformed-resource', 'unexpected-auth'])('rejects %s registry record simulation after deployment was already verified', async condition => {
+  const f = fixture(); await f.chain.verifyDeployment(); f.state.ledger = 99; f.server.simulateTransaction.mockClear();
+  if (condition === 'archived') f.state.archived = [0];
+  if (condition === 'restore') f.state.restore = true;
+  if (condition === 'malformed-resource') f.state.malformedData = true;
+  if (condition === 'unexpected-auth') f.state.auth = [authFor(clinicalInvocation('create_history', create))];
+  await expect(f.chain.doctorAuthorization(doctor.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.simulateTransaction).toHaveBeenCalledTimes(1);
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+it.each(['schema', 'zero-version', 'overflow-version', 'invalid-expiry', 'commitment', 'revoked-flag', 'extra-field', 'missing-field'])('rejects malformed authorization %s', async condition => {
+  const f = fixture();
+  if (condition === 'schema') f.state.authorization.schema_version = 2;
+  if (condition === 'zero-version') f.state.authorization.version = 0;
+  if (condition === 'overflow-version') f.state.authorization.version = BigInt(4294967296);
+  if (condition === 'invalid-expiry') f.state.authorization.valid_until = BigInt(0);
+  if (condition === 'commitment') f.state.authorization.commitment = Buffer.from([1]);
+  if (condition === 'revoked-flag') f.state.authorization.revoked = 'false';
+  if (condition === 'extra-field') f.state.authorization.unexpected = true;
+  if (condition === 'missing-field') delete f.state.authorization.schema_version;
+  await expect(f.chain.doctorAuthorization(doctor.publicKey())).rejects.toThrow('clinical_chain_unavailable');
+});
+
+
+it.each([[undefined, 180], [120, 120], [900, 300]] as const)('keeps ordinary preparation at 180 seconds and bounds rehearsal preparation to 300 seconds or its nearer deadline (%s)', async (offset, expected) => {
+  const now = 1_900_000_000; vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+  const f = fixture(), until = offset === undefined ? undefined : now + offset;
+  const transaction = await f.chain.prepare(patient.publicKey(), 'create_history', create, until);
+  expect(transaction.timeBounds).toEqual({ minTime: '0', maxTime: String(now + expected) });
+  expect(transaction.signatures).toHaveLength(0);
+  expect(() => assertClinicalUnsigned(transaction, patient.publicKey(), 'create_history', create)).not.toThrow();
+  expect(f.server.prepareTransaction).toHaveBeenCalledTimes(1); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it.each([0, -1, NaN, Infinity])('rejects an expired or malformed preparation deadline %s before preparing or signing', async offset => {
+  const now = 1_900_000_000; vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+  const f = fixture();
+  await expect(f.chain.prepare(patient.publicKey(), 'create_history', create, now + offset)).rejects.toThrow('clinical_chain_unavailable');
+  expect(f.server.prepareTransaction).not.toHaveBeenCalled(); expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+
+it('proves exact operation absence only on the pinned live deployment at or beyond the receipt ledger',async()=>{
+ const f=fixture();f.state.missing='get_operation';const proof=await f.chain.expiredOperationAbsent(append,100);
+ expect(proof).toMatchObject({contractId:CLINICAL_CONTRACT,author:patient.publicKey(),operationId,observedLedger:100});expect(f.server.sendTransaction).not.toHaveBeenCalled();
+});
+it.each(['present','stale','wrong-code','missing-history'])('rejects a %s expired-operation absence proof',async mode=>{
+ const f=fixture();if(mode!=='present')f.state.missing='get_operation';if(mode==='wrong-code')f.state.code='ff'.repeat(32);if(mode==='missing-history')f.state.missing='get_history';
+ await expect(f.chain.expiredOperationAbsent(append,mode==='stale'?101:100)).rejects.toThrow('clinical_chain_unavailable');expect(f.server.sendTransaction).not.toHaveBeenCalled();
 });

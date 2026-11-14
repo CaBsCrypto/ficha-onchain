@@ -15,7 +15,10 @@ vi.mock('@privy-io/react-auth', () => ({ usePrivy: () => mock, useUser: () => ({
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: mock.fetch }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mock.replace }), usePathname: () => '/admin/doctors', useSearchParams: () => new URLSearchParams({ role: mock.role }) }));
 vi.mock('next/link', () => ({ default: (props: any) => createElement('a', props) }));
-vi.mock('@/hooks/useLanguage', () => ({ useLanguage: () => ({ lang: 'es', setLang: vi.fn() }) }));
+vi.mock('@/hooks/useLanguage', () => ({
+  useLanguage: () => ({ lang: 'es', setLang: vi.fn() }),
+  usePortalLanguage: () => 'es',
+}));
 
 let root: Root;
 let container: HTMLDivElement;

@@ -1,10 +1,10 @@
 // Retired routes stay retired independently of the private write switch.
 const pages=new Set(['/','/login', '/login/patient', '/login/doctor', '/login/admin','/doctor','/patient','/admin','/admin/doctors','/admin/waitlist','/legal']);
 const api=new Set(['/api/waitlist','/api/privy/stellar-wallet','/api/doctor-status','/api/doctors','/api/appointments',
-  '/api/prescription-bookings','/api/doctor/profile','/api/doctor/availability','/api/doctor/slots',
-  '/api/admin/whoami','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate',
+  '/api/doctor/clinical-context','/api/prescription-bookings','/api/doctor/profile','/api/doctor/availability','/api/doctor/slots',
+  '/api/admin/whoami','/api/admin/sponsorship-status','/api/admin/doctors','/api/admin/doctor-authorizations','/api/admin/migrate',
   '/api/private-prescriptions','/api/private-operations','/api/doctor/onboarding','/api/admin/doctor-onboarding',
-  '/api/private-clinical-history','/api/private-clinical-history/document','/api/private-clinical-operations']);
+  '/api/private-clinical-drafts','/api/private-clinical-history','/api/private-clinical-history/prescriptions','/api/private-clinical-history/document','/api/private-clinical-operations']);
 export function isPrivatePortalPath(pathname:string,localDiagnostic=false) {
   const path=pathname.replace(/\/+$/,'')||'/';
   if(path.startsWith('/_next/')||/^\/(?:images|fonts|icons|models)\//.test(path)||/^\/[^/]+\.(?:svg|png|jpg|webp|ico|woff2?)$/i.test(path))return true;
@@ -12,6 +12,7 @@ export function isPrivatePortalPath(pathname:string,localDiagnostic=false) {
   if(pages.has(path)||api.has(path))return true;
   if(/^\/api\/private-consultations\/[1-9][0-9]*$/.test(path))return true;
   const id='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
-  return new RegExp(`^/api/private-operations/${id}(?:/confirm)?$`,'i').test(path)||new RegExp(`^/api/private-prescriptions/${id}/document$`,'i').test(path)||
+  return new RegExp(`^/api/private-clinical-drafts/${id}(?:/resume)?$`,'i').test(path)||
+    new RegExp(`^/api/private-operations/${id}(?:/confirm)?$`,'i').test(path)||new RegExp(`^/api/private-prescriptions/${id}/document$`,'i').test(path)||
     new RegExp(`^/api/private-clinical-operations/${id}(?:/sign|/cancel|/retry)?$`,'i').test(path);
 }

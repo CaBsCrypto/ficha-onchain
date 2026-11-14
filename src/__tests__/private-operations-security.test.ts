@@ -9,6 +9,8 @@ import { privateBody } from '@/lib/private-api';
 import { isPrivatePortalPath } from '@/lib/private-routes';
 
 const mocks=vi.hoisted(()=>({connection:vi.fn(),wallet:vi.fn(),doctor:vi.fn(),chain:vi.fn()}));
+// Synthetic cryptographic fixtures opt in explicitly; real gate behavior is tested separately.
+vi.mock('../../scripts/lib/sponsorship-write-gate.mjs',()=>({assertUnintegratedSponsorship:()=>{}}));
 vi.mock('@/lib/db',()=>({getDb:vi.fn(()=>({})),getDbConnection:mocks.connection,sqlForConnection:vi.fn(()=>({}))}));
 vi.mock('@/lib/doctor-authorizations',()=>({verifiedWallet:mocks.wallet,readPrivateDoctor:mocks.doctor,
   DoctorAuthorizationError:class extends Error{status=409;}}));

@@ -61,12 +61,50 @@ const INVALID_TOKEN_CODES = new Set([
   'ERR_JWT_EXPIRED', 'ERR_JWT_CLAIM_VALIDATION_FAILED', 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED',
   'ERR_JWS_INVALID', 'ERR_JWT_INVALID', 'ERR_JOSE_ALG_NOT_ALLOWED',
 ]);
-function providerUnavailable(error: unknown): AccessServiceError {
-  if (error instanceof AccessServiceError) return error;
+type AuthProviderPhase = 'verifyAuthToken' | 'getUser' | 'resolveIdentity';
+const reportedFailures = new WeakSet<AccessServiceError>();
+const PROVIDER_NAMES = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'AbortError', 'TimeoutError',
+  'FetchError', 'PrivyApiError', 'PrivyClientError', 'JWTExpired', 'JWTClaimValidationFailed', 'JWSSignatureVerificationFailed']);
+const PROVIDER_CODES = new Set([...INVALID_TOKEN_CODES, 'ERR_JOSE_NOT_SUPPORTED', 'ERR_JWKS_TIMEOUT', 'ERR_JWKS_INVALID',
+  'ERR_JWKS_NO_MATCHING_KEY', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET', 'client_error', 'api_error',
+  'rate_limit_exceeded', 'rate_limited', 'too_many_requests']);
+const PROVIDER_STATUSES = new Set([400, 401, 403, 404, 408, 409, 422, 425, 429, 500, 502, 503, 504]);
+function diagnosticField(value: unknown, field: string): unknown {
+  try { return value && typeof value === 'object' ? (value as Record<string, unknown>)[field] : undefined; }
+  catch { return undefined; }
+}
+/** Closed metadata only: never inspect message, token, user, URL or response body. */
+function providerDiagnostic(error: unknown, phase: AuthProviderPhase) {
+  const cause = diagnosticField(error, 'cause'), nestedCause = diagnosticField(cause, 'cause');
+  const response = diagnosticField(error, 'response') ?? diagnosticField(cause, 'response');
+  const name = diagnosticField(error, 'name');
+  const providerCode = [diagnosticField(error, 'code'), diagnosticField(cause, 'code'), diagnosticField(nestedCause, 'code'),
+    diagnosticField(error, 'type'), diagnosticField(cause, 'type')].find(value => typeof value === 'string' && PROVIDER_CODES.has(value));
+  const status = [diagnosticField(error, 'status'), diagnosticField(response, 'status'), diagnosticField(cause, 'status')]
+    .find(value => typeof value === 'number' && PROVIDER_STATUSES.has(value));
+  const headers = diagnosticField(error, 'headers') ?? diagnosticField(response, 'headers') ?? diagnosticField(cause, 'headers');
+  let retryAfter: unknown;
+  try {
+    const get = diagnosticField(headers, 'get');
+    retryAfter = typeof get === 'function' ? get.call(headers, 'retry-after') : diagnosticField(headers, 'retry-after') ?? diagnosticField(headers, 'Retry-After');
+  } catch { /* Diagnostic failure never changes access or retains the header object. */ }
+  const retryAfterSeconds = (typeof retryAfter === 'number' || typeof retryAfter === 'string' && /^[0-9]{1,5}$/.test(retryAfter)) &&
+    Number.isSafeInteger(Number(retryAfter)) && Number(retryAfter) >= 0 && Number(retryAfter) <= 86400 ? Number(retryAfter) : null;
+  return { phase, name: typeof name === 'string' && PROVIDER_NAMES.has(name) ? name : 'unknown',
+    providerCode: typeof providerCode === 'string' ? providerCode : 'unclassified', status: typeof status === 'number' ? status : null, retryAfterSeconds };
+}
+function providerUnavailable(error: unknown, phase: AuthProviderPhase): AccessServiceError {
   const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
-  return status === 401 || status === 403
+  const failure = error instanceof AccessServiceError ? error : status === 401 || status === 403
     ? new AccessServiceError('auth_configuration_invalid', 'configuration')
     : new AccessServiceError('auth_service_unavailable', 'auth_provider');
+  if (!reportedFailures.has(failure)) {
+    reportedFailures.add(failure);
+    try { console.warn('[auth]', { category: failure.category, code: failure.code, ...providerDiagnostic(error, phase) }); }
+    catch { /* Logging is not an authentication dependency. */ }
+  }
+  return failure;
 }
 
 /** Verify the session without conflating a provider/configuration outage with an invalid JWT. */
@@ -79,7 +117,7 @@ export async function requirePrivySession(request: Request): Promise<{ userId: s
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
     if (typeof code === 'string' && INVALID_TOKEN_CODES.has(code)) return null;
-    throw providerUnavailable(error);
+    throw providerUnavailable(error, 'verifyAuthToken');
   }
 }
 
@@ -92,7 +130,7 @@ export async function requireUser(request: Request, options: { strict?: boolean 
     try { user = await privy.getUser(claims.userId); }
     catch (error) {
       if (error && typeof error === 'object' && 'status' in error && error.status === 404) return null;
-      throw providerUnavailable(error);
+      throw providerUnavailable(error, 'getUser');
     }
 
     // Resolve the user's email across login methods. Email-OTP accounts store it
@@ -108,10 +146,9 @@ export async function requireUser(request: Request, options: { strict?: boolean 
 
     return { userId: claims.userId, email };
   } catch (err) {
-    const failure = providerUnavailable(err);
+    const failure = providerUnavailable(err, 'resolveIdentity');
     if (options.strict) throw failure;
-    // Keep the historical nullable contract, without logging credentials or provider payloads.
-    console.warn('[auth]', { category: failure.category, code: failure.code });
+    // Keep the historical nullable contract; the closed diagnostic was already emitted.
     return null;
   }
 }

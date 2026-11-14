@@ -6,18 +6,22 @@ import { PrivateFlowError } from '@/lib/private-config';
 import { assertClinicalEnvironment } from './config';
 import { clinicalWebFeeQuote } from '../../../scripts/lib/clinical-web-fee-policy.mjs';
 import { databaseConnectionString } from '@/lib/database-config';
+import { rehearsalConfigured, currentClinicalRehearsal, assertClinicalRehearsalFee, type RehearsalPolicy } from './rehearsal';
+import { captureAction, captureRequestId, clinicalCaptureConfigured, loadClinicalCapture, type ClinicalCapturePlan } from './capture';
 
 const VARIABLES = ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL'] as const;
 const HOSTED_VARIABLES = ['TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL'] as const;
 export const CLINICAL_CREATE_ONCE_MAX_FEE = BigInt(10_000_000);
 export type ClinicalCreateOncePolicy = { wallet: string; relayer: string; until: number; mode?: 'once' } |
-  { wallet: string; relayer: string; mode: 'patient_demo'; allowlist: string };
+  { wallet: string; relayer: string; mode: 'patient_demo'; allowlist: string } |
+  { wallet: string; relayer: string; mode: 'rehearsal'; until: number; plan: RehearsalPolicy } |
+  { wallet: string; relayer: string; mode: 'capture'; until: number; plan: ClinicalCapturePlan };
 export const CLINICAL_PATIENT_DEMO_VARIABLES = ['TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER'] as const;
 export const CLINICAL_PATIENT_DEMO_MAX_OPERATIONS = 20;
 const denied = () => new PrivateFlowError('clinical_create_once_scope_rejected', 403);
 
 // Kept as the compatibility entry point used by the four restricted POST routes.
-export function clinicalCreateOnceConfigured() { return [...VARIABLES, ...HOSTED_VARIABLES, ...CLINICAL_PATIENT_DEMO_VARIABLES].some(key => process.env[key] !== undefined); }
+export function clinicalCreateOnceConfigured() { return clinicalCaptureConfigured() || rehearsalConfigured() || [...VARIABLES, ...HOSTED_VARIABLES, ...CLINICAL_PATIENT_DEMO_VARIABLES].some(key => process.env[key] !== undefined); }
 function assertHostedClinicalDatabase() {
   const env = process.env, database = new URL(databaseConnectionString(env) ?? '');
   if (env.VERCEL_ENV !== 'production' || env.TRUSTLEAF_ENV !== 'test' ||
@@ -51,6 +55,18 @@ export function clinicalWriteCapabilities(wallet: string): Record<ClinicalAction
 }
 
 export function assertClinicalWriteScope(action: ClinicalAction, wallet: string): ClinicalCreateOncePolicy | null {
+  if (clinicalCaptureConfigured()) {
+    assertClinicalEnvironment();
+    const plan = loadClinicalCapture();
+    if (!plan || captureAction(plan, wallet) !== action) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
+    return Object.freeze({ mode: 'capture', wallet, relayer: plan.relayer, until: plan.until, plan });
+  }
+  if (rehearsalConfigured()) {
+    assertClinicalEnvironment();
+    const plan = currentClinicalRehearsal();
+    if (!plan || (wallet === plan.patient.address ? action !== 'set_permissions' : wallet === plan.doctor.address ? action !== 'append_version' : true)) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
+    return Object.freeze({ mode: 'rehearsal', wallet, relayer: plan.relayer, until: plan.until, plan });
+  }
   if (!clinicalCreateOnceConfigured()) { assertClinicalEnvironment(true); return null; }
   assertClinicalEnvironment();
   if (CLINICAL_PATIENT_DEMO_VARIABLES.some(key => process.env[key] !== undefined)) return patientDemoScope(action, wallet);
@@ -78,11 +94,25 @@ export function assertClinicalWriteScope(action: ClinicalAction, wallet: string)
 }
 
 /** Check the real fee bump budget before asking for the patient signature. */
-export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | null, unsigned: Transaction) {
+export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | null, unsigned: Transaction, requestId?: string) {
   if (!policy) return;
-  const current = assertClinicalWriteScope('create_history', policy.wallet);
+  if (policy.mode === 'rehearsal') {
+    const current = assertClinicalWriteScope(policy.wallet === policy.plan.patient.address ? 'set_permissions' : 'append_version', policy.wallet);
+    if (current?.mode !== 'rehearsal' || current.plan.policyHash !== policy.plan.policyHash) throw denied();
+    const role = policy.wallet === policy.plan.patient.address ? 'patient' : 'doctor';
+    const step = policy.plan.steps.find(value => value.requestId === requestId && value.actor === role);
+    if (!step) throw denied();
+    assertClinicalRehearsalFee(policy.plan, step, unsigned, clinicalWebFeeQuote(unsigned).sponsored);
+    return;
+  }
+  const action = policy.mode === 'capture' ? captureAction(policy.plan, policy.wallet) : 'create_history';
+  if (!action) throw denied();
+  const current = assertClinicalWriteScope(action, policy.wallet);
   if (!current || current.relayer !== policy.relayer || current.mode !== policy.mode) throw denied();
-  if (policy.mode === 'patient_demo') {
+  if (policy.mode === 'capture') {
+    if (current.mode !== 'capture' || current.plan.policyHash !== policy.plan.policyHash ||
+        requestId !== captureRequestId(policy.plan, action)) throw denied();
+  } else if (policy.mode === 'patient_demo') {
     if (current.mode !== 'patient_demo' || current.allowlist !== policy.allowlist) throw denied();
   } else if (current.mode === 'patient_demo' || current.until !== policy.until) throw denied();
   try {
@@ -94,9 +124,9 @@ export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | n
 }
 
 /** Recheck the persisted inner transaction before retransmitting the same envelope. */
-export function assertClinicalCreateOnceSavedFee(policy: ClinicalCreateOncePolicy | null, unsignedXdr: string) {
+export function assertClinicalCreateOnceSavedFee(policy: ClinicalCreateOncePolicy | null, unsignedXdr: string, requestId?: string) {
   if (!policy) return;
   const unsigned = TransactionBuilder.fromXDR(unsignedXdr, Networks.TESTNET);
   if (!(unsigned instanceof Transaction)) throw denied();
-  assertClinicalCreateOnceFee(policy, unsigned);
+  assertClinicalCreateOnceFee(policy, unsigned, requestId);
 }
