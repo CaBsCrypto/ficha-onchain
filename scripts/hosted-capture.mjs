@@ -10,7 +10,7 @@ import {
   activateHostedCapture, assertHostedCaptureOperator, closeHostedCapture,
   readHostedCaptureActive, readHostedCaptureBySha, stageHostedCapture,
 } from './lib/hosted-capture-store.mjs';
-import { HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
+import { APPOINTMENT_DURATION_SCHEMA_SQL, HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
 
 function safeSnapshot(value) {
   return value ? {
@@ -20,7 +20,7 @@ function safeSnapshot(value) {
   } : null;
 }
 
-const usage = "node scripts/hosted-capture.mjs --env-file <file> migrate | status [sha256] | stage <phase> <manifest> <sha256> | activate <phase> <sha256> | close <active sha256>";
+const usage = "node scripts/hosted-capture.mjs --env-file <file> migrate | migrate-appointments | status [sha256] | stage <phase> <manifest> <sha256> | activate <phase> <sha256> | close <active sha256>";
 async function verifyChosenPatient(actor, env) {
   const email = env.TRUSTLEAF_HOSTED_CAPTURE_PATIENT_EMAIL?.trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || env.PRIVY_APP_ID !== PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
@@ -33,7 +33,7 @@ async function verifyChosenPatient(actor, env) {
 }
 async function main() {
   const [flag, file, command, ...args] = process.argv.slice(2);
-  const argumentCounts = { migrate: [0], status: [0, 1], stage: [3], activate: [2], close: [1] };
+  const argumentCounts = { migrate: [0], 'migrate-appointments': [0], status: [0, 1], stage: [3], activate: [2], close: [1] };
   if (flag !== '--env-file' || !file || !Object.hasOwn(argumentCounts, command) || !argumentCounts[command].includes(args.length))
     throw Error('hosted_capture_usage');
   const env = parseEnv(readFileSync(file, 'utf8'));
@@ -49,6 +49,10 @@ async function main() {
       await client.query("SELECT pg_advisory_xact_lock(hashtext('trustleaf-hosted-capture-v1'))");
       for (const sql of HOSTED_CAPTURE_SCHEMA_SQL) await client.query(sql);
       output = { status: 'migration_applied' };
+    } else if (command === 'migrate-appointments') {
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      await client.query(APPOINTMENT_DURATION_SCHEMA_SQL);
+      output = { status: 'appointment_duration_schema_applied' };
     } else if (command === 'status') {
       output = { status: 'read_only', scope: safeSnapshot(args[0]
         ? await readHostedCaptureBySha(client, args[0])

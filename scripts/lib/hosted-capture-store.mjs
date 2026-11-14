@@ -33,12 +33,12 @@ export function hostedCaptureWebConfigured(env = process.env) {
   return env.TRUSTLEAF_HOSTED_CAPTURE_ENABLED === 'true';
 }
 
-function assertHostedCaptureEnvironment(env, web) {
+function assertHostedCaptureEnvironment(env, web, webEnabled = hostedCaptureWebConfigured(env)) {
   try {
     const connectionString = databaseConnectionString(env);
     const database = new URL(connectionString);
     const platform = web
-      ? hostedCaptureWebConfigured(env) && !Object.hasOwn(env, 'TRUSTLEAF_HOSTED_CAPTURE_OPERATOR') && env.VERCEL_ENV === 'production'
+      ? webEnabled && !Object.hasOwn(env, 'TRUSTLEAF_HOSTED_CAPTURE_OPERATOR') && env.VERCEL_ENV === 'production'
       : env.TRUSTLEAF_HOSTED_CAPTURE_OPERATOR === 'true' && !hostedCaptureWebConfigured(env) && !Object.hasOwn(env, 'VERCEL') && !Object.hasOwn(env, 'VERCEL_ENV');
     const allowedParams = ['sslmode', 'channel_binding', 'connect_timeout', 'pgbouncer'];
     check(platform && env.TRUSTLEAF_ENV === 'test' && env.NEXT_PUBLIC_STELLAR_NETWORK === 'testnet' &&
@@ -58,6 +58,8 @@ function assertHostedCaptureEnvironment(env, web) {
 
 export const assertHostedCaptureWeb = (env = process.env) => assertHostedCaptureEnvironment(env, true);
 export const assertHostedCaptureOperator = (env = process.env) => assertHostedCaptureEnvironment(env, false);
+export const assertRegularAppointmentWeb = (env = process.env) =>
+  assertHostedCaptureEnvironment(env, true, env.TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED === 'true');
 
 function parse(bytes) {
   check(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= 8192);
@@ -205,13 +207,17 @@ async function assertHistorical(client, requestId, sha256) {
   return historical;
 }
 
-export async function lockHostedCaptureMutation(client, phase, sha256) {
+export async function lockHostedCaptureShared(client) {
   await client.query('SELECT pg_advisory_xact_lock_shared(hashtext($1))', [lockKey]);
+}
+
+export async function lockHostedCaptureMutation(client, phase, sha256) {
+  await lockHostedCaptureShared(client);
   return assertActive(client, phase, sha256);
 }
 
 export async function lockHostedCaptureRecovery(client, requestId, sha256) {
-  await client.query('SELECT pg_advisory_xact_lock_shared(hashtext($1))', [lockKey]);
+  await lockHostedCaptureShared(client);
   return assertHistorical(client, requestId, sha256);
 }
 

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Keypair } from '@stellar/stellar-sdk';
 import { webClinicalHistoryId } from './clinical-web-receipt-audit.mjs';
 import {
-  activateHostedCapture, assertHostedCaptureOperator, assertHostedCaptureWeb, closeHostedCapture,
+  activateHostedCapture, assertHostedCaptureOperator, assertHostedCaptureWeb, assertRegularAppointmentWeb, closeHostedCapture,
   lockHostedCaptureMutation, lockHostedCaptureRecovery, readHostedCaptureActive, readHostedCaptureByRequest,
   readHostedCaptureBySha, recordHostedCaptureVerification, stageHostedCapture,
 } from './hosted-capture-store.mjs';
@@ -86,6 +86,20 @@ test('Pins hosted web, origin and operator connection independently', () => {
     { TRUSTLEAF_DATABASE_URL: env.TRUSTLEAF_DATABASE_URL + '&host=other' }, { TRUSTLEAF_DB_HOST: 'other' },
   ];
   for (const patch of bad) assert.throws(() => assertHostedCaptureWeb({ ...web, ...patch }), /hosted_capture_environment_rejected/);
+});
+
+test('Regular appointments use the same isolated database with a separate production gate', () => {
+  const { TRUSTLEAF_HOSTED_CAPTURE_OPERATOR: _, ...shared } = env;
+  const web = { ...shared, TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED: 'true', VERCEL_ENV: 'production' };
+  assert.equal(assertRegularAppointmentWeb(web).origin, 'https://www.trustleaf.org');
+  assert.throws(() => assertHostedCaptureWeb(web), /hosted_capture_environment_rejected/);
+  for (const change of [
+    { TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED: 'false' },
+    { TRUSTLEAF_PRIVATE_WRITES_ENABLED: 'true' },
+    { VERCEL_ENV: 'preview' },
+    { NEXT_PUBLIC_STELLAR_NETWORK: 'mainnet' },
+    { TRUSTLEAF_DB_HOST: 'different.neon.tech' },
+  ]) assert.throws(() => assertRegularAppointmentWeb({ ...web, ...change }), /hosted_capture_environment_rejected/);
 });
 
 test('Staged bytes are unapproved, active writes lock and historical recovery survives shutdown', async () => {

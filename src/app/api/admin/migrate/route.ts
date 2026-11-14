@@ -18,7 +18,7 @@ import { requirePrivyAdmin } from "@/lib/auth/admin";
 import { isSameOrigin } from '@/lib/auth/same-origin';
 import { assertPrivateEnvironment } from '@/lib/private-config';
 import { clinicalMigrationConnection } from '../../../../../scripts/lib/clinical-migration-policy.mjs';
-import { HOSTED_CAPTURE_SCHEMA_SQL } from '../../../../../scripts/lib/hosted-capture-schema.mjs';
+import { APPOINTMENT_DURATION_SCHEMA_SQL, HOSTED_CAPTURE_SCHEMA_SQL } from '../../../../../scripts/lib/hosted-capture-schema.mjs';
 import { assertHostedCaptureWeb } from '../../../../../scripts/lib/hosted-capture-store.mjs';
 
 export const runtime = "nodejs";
@@ -90,6 +90,7 @@ const STATEMENTS: Array<[string, string]> = [
   ["appointments.attendance_at", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS attendance_at TIMESTAMPTZ`],
   ["appointments.started_by", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS started_by TEXT`],
   ["appointments.completed_at", `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`],
+  ["appointments.booked_slot_minutes", APPOINTMENT_DURATION_SCHEMA_SQL],
   ["appointments.uq_slot", `
     CREATE UNIQUE INDEX IF NOT EXISTS uniq_appt_slot
       ON appointments (doctor_email, date, time_slot)
