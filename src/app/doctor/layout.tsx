@@ -6,8 +6,23 @@ import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
+import { usePortalLanguage } from '@/hooks/useLanguage';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
+import { DoctorDraftRecovery } from '@/components/private-portal/DoctorDraftRecovery';
+
+const shellCopy = {
+  es: {
+    title: 'Portal del médico', portal: 'Portal Médico', profile: 'Mi perfil', signOut: 'Cerrar sesión',
+    home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas clínicas', prescriptions: 'Recetas',
+    authorized: 'Autorización confirmada', validUntil: 'Vigente hasta', pending: 'Hay una solicitud administrativa pendiente de confirmación.',
+  },
+  en: {
+    title: 'Doctor portal', portal: 'Doctor portal', profile: 'My profile', signOut: 'Sign out',
+    home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Clinical records', prescriptions: 'Prescriptions',
+    authorized: 'Authorization confirmed', validUntil: 'Valid until', pending: 'An administrative request is awaiting confirmation.',
+  },
+};
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 function IconHome({ className }: { className?: string }) {
@@ -75,15 +90,17 @@ interface NavItem {
 
 // ── Nav hook (uses useSearchParams — must be inside Suspense) ─────────────────
 function useDoctorNav() {
+  const labels = shellCopy[usePortalLanguage()];
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get('tab') ?? 'inicio';
 
   const items: NavItem[] = [
-    { href: '/doctor?tab=inicio',    label: 'Inicio',    icon: <IconHome className="h-5 w-5" />,     tab: 'inicio'    },
-    { href: '/doctor?tab=consultas', label: 'Consultas', icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
-    { href: '/doctor?tab=disponibilidad', label: 'Disponibilidad', icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
-    { href: '/doctor?tab=recetas', label: 'Recetas', icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
+    { href: '/doctor?tab=inicio', label: labels.home, icon: <IconHome className="h-5 w-5" />, tab: 'inicio' },
+    { href: '/doctor?tab=consultas', label: labels.appointments, icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
+    { href: '/doctor?tab=disponibilidad', label: labels.availability, icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
+    { href: '/doctor?tab=historial', label: labels.records, icon: <IconDoc className="h-5 w-5" />, tab: 'historial' },
+    { href: '/doctor?tab=recetas', label: labels.prescriptions, icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
   ];
 
   function isActive(item: NavItem): boolean {
@@ -97,11 +114,12 @@ function useDoctorNav() {
 // ── Sidebar nav ───────────────────────────────────────────────────────────────
 function SidebarNav() {
   const { items, isActive } = useDoctorNav();
+  const labels = shellCopy[usePortalLanguage()];
   return (
     <aside className="hidden md:flex md:w-56 md:shrink-0 md:flex-col">
       <div className="sticky top-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Portal Médico</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{labels.portal}</p>
         </div>
         <nav className="flex flex-col p-2">
           {items.map((item) => {
@@ -166,6 +184,9 @@ function MobileBottomNav() {
 function DoctorShell({ children, authorization }: { children: React.ReactNode; authorization: PrivateDoctorStatus }) {
   const { logout } = usePrivy();
   const email = usePrivyEmail();
+  const language = usePortalLanguage();
+  const labels = shellCopy[language];
+  const validity = new Date((authorization.authorization.validUntil ?? 0) * 1000);
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -183,7 +204,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
               </span>
             </Link>
             <span className="hidden rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
-              Portal Médico
+              {labels.portal}
             </span>
           </div>
 
@@ -192,7 +213,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
             <Link
               href="/doctor?tab=perfil"
               className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
-              title="Mi perfil"
+              title={labels.profile}
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-600">
                 {(email ?? '?').charAt(0).toUpperCase()}
@@ -205,7 +226,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
               onClick={() => void logout()}
               className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
             >
-              Cerrar sesión
+              {labels.signOut}
             </button>
           </div>
         </div>
@@ -218,9 +239,9 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
         </Suspense>
         <main className="min-w-0 flex-1 pb-28 md:pb-6">
           <div role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            <p className="font-semibold">Autorización confirmada · Stellar Testnet</p>
-            <p className="mt-1">Vigente hasta {new Date((authorization.authorization.validUntil ?? 0) * 1000).toLocaleString('es-CL')}.</p>
-            {authorization.pendingRequest && ['pending', 'submitted'].includes(authorization.pendingRequest.state) && <p className="mt-1">Hay una solicitud administrativa pendiente de confirmación.</p>}
+            <p className="font-semibold">{labels.authorized} · Stellar Testnet</p>
+            <p className="mt-1">{labels.validUntil} {language === 'en' ? validity.toLocaleString('en-US', { timeZone: 'America/Santiago' }) : validity.toLocaleString('es-CL')}.</p>
+            {authorization.pendingRequest && ['pending', 'submitted'].includes(authorization.pendingRequest.state) && <p className="mt-1">{labels.pending}</p>}
           </div>
           {children}
         </main>
@@ -237,6 +258,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
 // ── Minimal shell for the pre-portal screens (registro / pendiente) ────────────
 function GateShell({ children }: { children: React.ReactNode }) {
   const { logout } = usePrivy();
+  const labels = shellCopy[usePortalLanguage()];
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <header className="border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
@@ -245,7 +267,7 @@ function GateShell({ children }: { children: React.ReactNode }) {
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-white shadow-sm"><span className="text-xs font-bold">T</span></span>
             <span className="text-slate-900">Trust<span className="text-sky-500">Leaf</span></span>
           </Link>
-          <button onClick={() => void logout()} className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600">Cerrar sesión</button>
+          <button onClick={() => void logout()} className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600">{labels.signOut}</button>
         </div>
       </header>
       <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-12">{children}</div>
@@ -260,6 +282,7 @@ interface OnboardingView {
 }
 
 function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void }) {
+  const english = usePortalLanguage() === 'en';
   const [onboarding, setOnboarding] = useState<OnboardingView | null>(null);
   const [form, setForm] = useState({ name: '', specialty: '', licenseNum: '', rut: '' });
   const [loading, setLoading] = useState(true);
@@ -267,7 +290,12 @@ function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void
   const [error, setError] = useState('');
   const [demoFilled, setDemoFilled] = useState(false);
   function fillDemoProfile() {
-    setForm({ name: 'Médico de prueba TrustLeaf', specialty: 'Medicina general · Demo', licenseNum: 'DEMO-REG-001', rut: 'DEMO-NO-VALIDO' });
+    setForm({
+      name: english ? 'TrustLeaf Demo Doctor' : 'Médico de prueba TrustLeaf',
+      specialty: english ? 'General practice · Demo' : 'Medicina general · Demo',
+      licenseNum: 'DEMO-REG-001',
+      rut: 'DEMO-NO-VALIDO',
+    });
     setError(''); setDemoFilled(true);
   }
   const accepting = useRef(false);
@@ -312,35 +340,40 @@ function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void
   return (
     <GateShell>
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-800">Alta médica en TrustLeaf</h1>
+        <h1 className="text-xl font-semibold text-slate-800">{english ? 'TrustLeaf doctor registration' : 'Alta médica en TrustLeaf'}</h1>
         <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-xs text-sky-900">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className="font-medium">Identidad vinculada</p>
+            <p className="font-medium">{english ? 'Linked identity' : 'Identidad vinculada'}</p>
             {!loading && editable && <button type="button" disabled={saving} onClick={fillDemoProfile}
               className="rounded-md px-2 py-2 text-xs font-medium text-sky-700 underline decoration-sky-300 underline-offset-4 transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-50">
-              Rellenar datos de prueba
+              {english ? 'Fill with test data' : 'Rellenar datos de prueba'}
             </button>}
           </div>
           <p className="mt-0.5 break-all font-mono text-sky-700">{email}</p>
-          {demoFilled && editable && <p role="status" className="mt-2 text-xs text-slate-600">Datos sintéticos cargados. Puedes editarlos antes de enviar la solicitud.</p>}
+          {demoFilled && editable && <p role="status" className="mt-2 text-xs text-slate-600">{english ? 'Test data filled in. You can edit it before submitting the application.' : 'Datos sintéticos cargados. Puedes editarlos antes de enviar la solicitud.'}</p>}
         </div>
-        {loading && <p role="status" className="mt-4 text-sm text-slate-600">Preparando tu identidad y wallet Stellar…</p>}
-        {!loading && onboarding?.source === 'invitation' && <p className="mt-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">Invitación reconocida. Tu wallet Stellar quedó vinculada a esta cuenta.</p>}
+        {loading && <p role="status" className="mt-4 text-sm text-slate-600">{english ? 'Checking your identity and Stellar wallet…' : 'Preparando tu identidad y wallet Stellar…'}</p>}
+        {!loading && onboarding?.source === 'invitation' && <p className="mt-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">{english ? 'Invitation recognized. Your Stellar wallet is linked to this account.' : 'Invitación reconocida. Tu wallet Stellar quedó vinculada a esta cuenta.'}</p>}
         {!loading && editable && <div className="mt-5 space-y-4">
-          <p className="text-sm text-slate-600">Completa el perfil con datos sintéticos. Enviar la solicitud no concede autorización.</p>
-          {state === 'changes_requested' && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">El administrador solicitó cambios{onboarding?.reviewNote ? `: ${onboarding.reviewNote}` : '.'}</p>}
-          {([['name','Nombre de prueba'],['specialty','Especialidad de prueba'],['licenseNum','Registro de prueba'],['rut','RUT sintético']] as const).map(([key,label]) => <label key={key} className="block text-xs font-medium text-slate-600">
+          <p className="text-sm text-slate-600">{english ? 'Complete your profile with synthetic data. Authorization follows administrative review.' : 'Completa el perfil con datos sintéticos. Enviar la solicitud no concede autorización.'}</p>
+          {state === 'changes_requested' && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{english ? 'The administrator requested changes' : 'El administrador solicitó cambios'}{onboarding?.reviewNote ? `: ${onboarding.reviewNote}` : '.'}</p>}
+          {([
+            ['name', english ? 'Test name' : 'Nombre de prueba'],
+            ['specialty', english ? 'Test specialty' : 'Especialidad de prueba'],
+            ['licenseNum', english ? 'Test registration number' : 'Registro de prueba'],
+            ['rut', english ? 'Synthetic Chilean ID (RUT)' : 'RUT sintético'],
+          ] as const).map(([key,label]) => <label key={key} className="block text-xs font-medium text-slate-600">
             <span className="mb-1.5 block">{label}</span><input required value={form[key]} onChange={event => setForm(previous => ({ ...previous, [key]: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30" />
           </label>)}
-          <div className="flex flex-wrap gap-3"><button disabled={saving || !profileComplete} onClick={() => void submit('save')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">Guardar perfil</button><button disabled={saving || !profileComplete} onClick={() => void submit('submit')} className="flex-1 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Guardando…' : 'Enviar para revisión'}</button></div>
+          <div className="flex flex-wrap gap-3"><button disabled={saving || !profileComplete} onClick={() => void submit('save')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">{english ? 'Save profile' : 'Guardar perfil'}</button><button disabled={saving || !profileComplete} onClick={() => void submit('submit')} className="flex-1 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? (english ? 'Saving…' : 'Guardando…') : (english ? 'Submit for review' : 'Enviar para revisión')}</button></div>
         </div>}
-        {!loading && state === 'submitted' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Solicitud enviada.</strong> El administrador debe revisar el expediente sintético antes de autorizar.</p>}
-        {!loading && state === 'authorization_pending' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>Autorización pendiente en Stellar.</strong> El acceso se habilitará cuando el worker confirme el recibo.</p>}
-        {!loading && state === 'rejected' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800"><strong>Solicitud rechazada.</strong> El administrador debe reabrirla antes de que puedas corregirla.{onboarding?.reviewNote ? ` Motivo: ${onboarding.reviewNote}` : ''}</p>}
-        {!loading && state === 'expired' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">La invitación venció. Solicita al administrador una nueva invitación.</p>}
-        {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">No se pudo completar el alta: {error}</p>}
-        {!editable && <button onClick={() => void load()} className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600">Comprobar estado</button>}
-        <p className="mt-4 text-xs text-slate-500">Una wallet Stellar por persona · Privy · Stellar Testnet</p>
+        {!loading && state === 'submitted' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>{english ? 'Application submitted.' : 'Solicitud enviada.'}</strong> {english ? 'The administrator must review the synthetic profile before granting access.' : 'El administrador debe revisar el expediente sintético antes de autorizar.'}</p>}
+        {!loading && state === 'authorization_pending' && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><strong>{english ? 'Authorization pending on Stellar.' : 'Autorización pendiente en Stellar.'}</strong> {english ? 'Access opens after the worker verifies the receipt.' : 'El acceso se habilitará cuando el worker confirme el recibo.'}</p>}
+        {!loading && state === 'rejected' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800"><strong>{english ? 'Application rejected.' : 'Solicitud rechazada.'}</strong> {english ? 'The administrator must reopen it before you can make changes.' : 'El administrador debe reabrirla antes de que puedas corregirla.'}{onboarding?.reviewNote ? ` Motivo: ${onboarding.reviewNote}` : ''}</p>}
+        {!loading && state === 'expired' && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{english ? 'The invitation expired. Ask the administrator for a new invitation.' : 'La invitación venció. Solicita al administrador una nueva invitación.'}</p>}
+        {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{english ? 'Registration could not be completed:' : 'No se pudo completar el alta:'} {error}</p>}
+        {!editable && <button onClick={() => void load()} className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600">{english ? 'Check status' : 'Comprobar estado'}</button>}
+        <p className="mt-4 text-xs text-slate-500">{english ? 'One Stellar wallet per person · Privy · Stellar Testnet' : 'Una wallet Stellar por persona · Privy · Stellar Testnet'}</p>
       </div>
     </GateShell>
   );
@@ -348,7 +381,14 @@ function DoctorOnboarding({ email, onDone }: { email: string; onDone: () => void
 
 // ── Status screens (pending / blocked) ─────────────────────────────────────────
 function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' | 'revoked' | 'paused' | 'error'; onRefresh: () => void }) {
-  const descriptions = {
+  const english = usePortalLanguage() === 'en';
+  const descriptions = english ? {
+    pending: ['Authorization pending', 'The administrator’s authorization must be confirmed on Stellar before access opens. If the worker is offline, the request stays pending.'],
+    expired: ['Authorization expired', 'Ask the administrator to renew your authorization. Access will reopen when Stellar confirms the renewal.'],
+    revoked: ['Authorization revoked', 'The registry confirms your authorization was revoked. Contact the administrator to review it.'],
+    paused: ['Registry paused', 'The doctor registry is paused. Operations are disabled.'],
+    error: ['We could not verify your authorization', 'Operations stay blocked until the connection is restored and your authorization can be verified. You can check your status again.'],
+  } : {
     pending: ['Autorización pendiente', 'La autorización del administrador debe confirmarse en Stellar antes de habilitar tu acceso. Si el procesador está apagado, la solicitud permanece pendiente.'],
     expired: ['Autorización vencida', 'Solicita al administrador la renovación. Tu acceso se habilitará cuando se confirme en Stellar.'],
     revoked: ['Autorización revocada', 'El registro confirma que tu permiso fue revocado. Contacta al administrador para revisar tu autorización.'],
@@ -365,9 +405,10 @@ function StatusScreen({ variant, onRefresh }: { variant: 'pending' | 'expired' |
         <h1 className="mt-4 text-xl font-semibold text-slate-800">{title}</h1>
         <p role="status" className="mt-2 text-sm text-slate-500">{description}</p>
           <button onClick={onRefresh} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-600">
-            Comprobar estado
+            {english ? 'Check status' : 'Comprobar estado'}
           </button>
         <p className="mt-4 text-xs text-slate-400">DoctorRegistryPrivate · Stellar Testnet</p>
+        <DoctorDraftRecovery />
       </div>
     </GateShell>
   );
@@ -390,10 +431,11 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<DocStatus>('loading');
   const [record, setRecord] = useState<PrivateDoctorStatus | null>(null);
   const [refresh, setRefresh] = useState(0);
-  const check = useCallback(() => { setStatus('loading'); setRefresh((value) => value + 1); }, []);
+  const check = useCallback(() => { setRecord(null); setStatus('loading'); setRefresh((value) => value + 1); }, []);
 
   useEffect(() => {
     let alive = true;
+    let failures = 0;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     async function poll() {
@@ -403,6 +445,7 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
         const body = await response.json() as PrivateDoctorStatus;
         if (body.source !== 'private_registry' || !body.authorization) throw new Error('authorization_unverified');
         if (!alive) return;
+        failures = 0;
         setRecord(body);
         if (body.onboarding && !['authorized','revoked'].includes(body.onboarding.state)) setStatus('onboarding');
         else if (!body.doctor || (!body.onboarding && body.doctor.status === 'pending' && !body.pendingRequest) || (body.authorization.status === 'unregistered' && !body.pendingRequest)) setStatus('onboarding');
@@ -410,9 +453,10 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
         else if (['expired', 'revoked', 'paused'].includes(body.authorization.status)) setStatus(body.authorization.status as 'expired' | 'revoked' | 'paused');
         else setStatus('pending');
       } catch {
-        if (alive) { setRecord(null); setStatus('error'); }
+        if (alive) { failures = Math.min(failures + 1, 5); setRecord(null); setStatus('error'); }
       } finally {
-        if (alive) timer = setTimeout(() => void poll(), 3000);
+        // A failure never keeps a previous authorization or restarts the clinic every three seconds.
+        if (alive) timer = setTimeout(() => void poll(), Math.min(60_000, 3000 * 2 ** failures));
       }
     }
     void poll();
@@ -435,12 +479,13 @@ function DoctorAccessGate({ children }: { children: React.ReactNode }) {
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, user } = usePrivy();
   const router = useRouter();
+  const { title } = shellCopy[usePortalLanguage()];
 
   useEffect(() => {
     if (ready && !authenticated) router.replace('/login/doctor');
   }, [ready, authenticated, router]);
 
-  useEffect(() => { document.title = 'TrustLeaf — Portal del médico'; }, []);
+  useEffect(() => { document.title = `TrustLeaf — ${title}`; }, [title]);
 
   if (!ready || !authenticated) {
     return (

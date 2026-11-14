@@ -63,11 +63,11 @@ async function realLogin(
   register: boolean,
 ): Promise<PasskeySession> {
   // Lazy import keeps passkey-kit (and its browser-only deps) out of the bundle
-  // unless real passkeys are actually enabled. `turbopackIgnore` leaves this as a
+  // unless real passkeys are actually enabled. Both bundler ignore flags keep a
   // runtime import so the bundler never tries to compile passkey-kit's TS source
   // at build time (it only needs to resolve when NEXT_PUBLIC_PASSKEY_ENABLED=true,
   // where a proper transpile/loader would be configured alongside the infra).
-  const { PasskeyKit } = await import(/* turbopackIgnore: true */ "passkey-kit");
+  const { PasskeyKit } = await import(/* webpackIgnore: true, turbopackIgnore: true */ "passkey-kit");
   const walletWasmHash = process.env.NEXT_PUBLIC_WALLET_WASM_HASH;
   if (!walletWasmHash) {
     throw new Error(

@@ -1,6 +1,14 @@
 import type { PrivateOperation } from './types';
 
+/** Fixed clinical limit messages shared by the operation and permission views. */
+export const clinicalRehearsalLimitMessages = Object.freeze({
+  clinical_rehearsal_fee_exceeded: 'La comisión supera el límite del ensayo. No se enviará esta operación.',
+  clinical_rehearsal_budget_exceeded: 'El presupuesto restante del ensayo no cubre este paso y la reserva para retirar permisos. No se enviará esta operación. Si hay un intento existente, consulta ese mismo intento.',
+  clinical_rehearsal_budget_unavailable: 'No pudimos comprobar los recibos y el presupuesto disponible. No continúes con firmas o envíos. Si hay un intento existente, consulta ese mismo intento.',
+});
+
 const messages: Record<string, string> = {
+  signed_expired_before_submission: 'El sobre firmado venció antes de comenzar el envío. Conservamos el intento y liberamos su reserva no utilizada.',
   wallet_binding_changed: 'La asociación de tu cuenta cambió. Las operaciones están bloqueadas hasta revisarla.',
   wallet_binding_ambiguous: 'Tu cuenta necesita revisar su asociación Stellar. No se creará otra wallet.',
   wallet_creation_pending: 'Tu cuenta Stellar se está preparando. Consulta nuevamente en unos instantes.',

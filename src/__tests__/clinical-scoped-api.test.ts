@@ -2,6 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { Keypair } from '@stellar/stellar-sdk';
 import { PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import { CLINICAL_ID } from '@/lib/clinical/config';
+import { CLINICAL_PREPARE_CAPABILITY_HEADER, CLINICAL_PREPARE_CAPABILITY_VERSION } from '@/lib/clinical/client-contract';
 import { assertClinicalWriteScope } from '@/lib/clinical/create-once';
 const m = vi.hoisted(() => ({ auth: vi.fn(), actor: vi.fn(), prepare: vi.fn() }));
 vi.mock('server-only', () => ({}));
@@ -14,7 +15,7 @@ import { POST } from '@/app/api/private-clinical-operations/route';
 const patient=Keypair.fromRawEd25519Seed(Buffer.alloc(32,91)), payer=Keypair.fromRawEd25519Seed(Buffer.alloc(32,92));
 const actor={userId:'did:privy:scope_test',walletId:'scope_wallet',address:patient.publicKey()};
 const input={requestId:'2f4929bd-48f9-4b9d-bde4-47f7b66a6d91',action:'create_history'};
-const request=(body:unknown=input,origin='https://www.trustleaf.org')=>new Request('https://www.trustleaf.org/api/private-clinical-operations',{method:'POST',headers:{host:'www.trustleaf.org',origin,'content-type':'application/json'},body:JSON.stringify(body)});
+const request=(body:unknown=input,origin='https://www.trustleaf.org')=>new Request('https://www.trustleaf.org/api/private-clinical-operations',{method:'POST',headers:{host:'www.trustleaf.org',origin,'content-type':'application/json',[CLINICAL_PREPARE_CAPABILITY_HEADER]:CLINICAL_PREPARE_CAPABILITY_VERSION},body:JSON.stringify(body)});
 beforeEach(()=>{
  vi.resetAllMocks(); m.auth.mockResolvedValue({userId:actor.userId,email:'fixture@example.test'});m.actor.mockResolvedValue(actor);
  const host='ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech';

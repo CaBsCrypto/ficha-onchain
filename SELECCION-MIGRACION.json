@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "sourceBranch": "codex/clinical-recording-mode",
+  "sourceCommit": "66c4deff76b8837628714f5890e41f4ad773c705",
+  "included": [
+    "README.md",
+    "docs/sow-delivery/week3-review/VALIDATION.md",
+    "docs/sow-delivery/week4-review/README.md",
+    "docs/sow-delivery/week4-review/WAITLIST.md",
+    "docs/sow-delivery/week4/BUGS.md",
+    "docs/sow2/GRABACION-SEMANA-2.md",
+    "docs/sow2/GUIA-VALIDACION-SEMANA-2.md",
+    "docs/sow2/QA-SEMANA-2.md",
+    "docs/sow2/SEMANA-2-ESTADO.md",
+    "docs/sow-delivery/FLUJO-GRABACION-TRES-ACTORES.md",
+    "docs/sow-delivery/GOAL-SOW2.md",
+    "docs/sow-delivery/week3-review/RECORDING-PREPARATION.md",
+    "docs/sow-delivery/week4-review/ADDITIONAL-QA.md",
+    "docs/sow-delivery/week4-review/INTENSIVE-AUDIT.md",
+    "docs/sow-delivery/week4-review/PRE-RECORDING.md",
+    "docs/sow-delivery/week4-review/preparation-manifest.json",
+    "scripts/audit-private-flow-testnet.mjs",
+    "scripts/lib/private-prescription-store.mjs",
+    "scripts/lib/testnet-evidence-chain.mjs",
+    "scripts/validate-booking-contract-testnet.mjs",
+    "scripts/validate-prescription-bookings-db.mjs",
+    "scripts/validate-private-flow-testnet.mjs",
+    "scripts/validate-private-registry-testnet.mjs"
+  ],
+  "excluded": [
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/readback.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-2026-10-05/recording-preparation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week1-status-2026-10-12/contracts-audit.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-flow-validation-2026-10-19/INFORME.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-flow-validation-2026-10-19/clinical-web-flows.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-flow-validation-2026-10-19/manifest.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-flow-validation-2026-10-19/verification.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/INFORME.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/contract-readback.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/database-readback.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/maintenance.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/manifest.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/sow2-week2-read-recovery-2026-10-19/verification.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/access-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/admin-browser-access.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/admin-renewal-receipt.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/agenda-preview-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/automated-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/contract-tests.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/deployment-verification.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/doctor-access-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/main-rehearsal-deployment.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/onboarding-deployment-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week2-main-2026-09-11/patient-access-validation.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week3-main-2026-09-14/access-control.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week3-main-2026-09-14/manifest.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/evidence/week3-main-2026-09-14/rehearsal-chain-audit.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/proposals/sow-cycle-2/PRESUPUESTO.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/proposals/sow-cycle-2/PROPUESTA.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/proposals/sow-cycle-2/README.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/proposals/sow-cycle-2/RESULTADOS-D4.md",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    },
+    {
+      "path": "docs/proposals/sow-cycle-2/manifest.json",
+      "reason": "Contenido privado o evidencia correlacionable; original conservado sin cambios"
+    }
+  ],
+  "sanitized": [
+    {
+      "path": "README.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/VALIDATION.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/README.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/WAITLIST.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week4/BUGS.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow2/GRABACION-SEMANA-2.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow2/GUIA-VALIDACION-SEMANA-2.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow2/QA-SEMANA-2.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow2/SEMANA-2-ESTADO.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/FLUJO-GRABACION-TRES-ACTORES.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/GOAL-SOW2.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week3-review/RECORDING-PREPARATION.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    },
+    {
+      "path": "docs/sow-delivery/week4-review/INTENSIVE-AUDIT.md",
+      "reason": "Copia de documentación saneada o anotada por privacidad, procedencia y evidencia excluida; no acredita nuevos checks"
+    }
+  ],
+  "newMigrationFiles": [
+    ".env.example",
+    "README-MIGRACION.md",
+    "PROMPT-RECEPTOR.md",
+    "INVENTARIO-MIGRACION.md",
+    "SELECCION-MIGRACION.json",
+    "MANIFIESTO-MIGRACION.json"
+  ],
+  "privateWalletPackage": "Sólo local; cifrado y clave de apertura fuera del repositorio",
+  "originalIndex": "Sin cambios staged; no hubo versión intermedia de índice que recuperar"
+}

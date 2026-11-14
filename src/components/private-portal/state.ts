@@ -14,12 +14,14 @@ export function canAuthorizeIssuance(detail: ConsultationState, now = Date.now()
     !detail.booking.cancellation_requested_at && Number(detail.booking.valid_until) * 1000 > now &&
     ['absent', 'expired'].includes(detail.consent.status) && detail.prescription?.rxId == null;
 }
-export function prescriptionLabel(prescription: PrivatePrescription) {
-  if (prescription.rxId == null) return 'Emisión pendiente';
-  if (prescription.status === 'Revoked') return 'Revocada';
-  if (prescription.status === 'Blocked') return 'Bloqueada';
-  if (prescription.expired) return 'Vencida';
-  return prescription.status === 'Active' ? 'Activa' : 'Registrada · pendiente de activación';
+export function prescriptionLabel(prescription: PrivatePrescription, language: 'es' | 'en' = 'es') {
+  const english = language === 'en';
+  if (prescription.rxId == null) return english ? 'Awaiting issuance' : 'Emisión pendiente';
+  if (prescription.status === 'Revoked') return english ? 'Revoked' : 'Revocada';
+  if (prescription.status === 'Blocked') return english ? 'Blocked' : 'Bloqueada';
+  if (prescription.expired) return english ? 'Expired' : 'Vencida';
+  if (prescription.status === 'Active') return english ? 'Active' : 'Activa';
+  return english ? 'Registered · awaiting activation' : 'Registrada · pendiente de activación';
 }
 export function rolePath(role: string | null) {
   return role === 'admin' ? '/admin/doctors' : role === 'doctor' ? '/doctor' : '/patient';

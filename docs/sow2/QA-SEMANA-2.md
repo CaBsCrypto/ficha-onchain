@@ -1,5 +1,15 @@
 # SOW 2 · Semana 2 · Registro de QA
 
+> Nota de copia pública · 22-10-2026: Las referencias a evidencias nuevas o propuestas excluidas conservan la procedencia histórica; esos archivos no están incluidos en esta copia y sus comprobaciones no se repitieron.
+
+## Validación del flujo existente · 19 de octubre de 2026
+
+El usuario eligió validar sin nuevas transacciones. Tras la [recuperación autorizada de lectura](../evidence/sow2-week2-read-recovery-2026-10-19/INFORME.md), se revisaron la sesión existente, cuatro entradas y cinco versiones, formularios de texto/PDF hasta revisión local, corrección propia sin guardar, filtros, descarga privada de imagen y permisos retirados. El médico vencido bloquea nuevas concesiones como corresponde. No se prepararon ni firmaron operaciones durante esta revisión del flujo.
+
+En `fd8359c` (producto `f98f0e7`), `validate-clinical-web-flows.mjs --isolated` pasó **317 de aplicación / 14 suites, 58 privadas y 14 del contrato clínico**; `npx tsc --noEmit`, código 0. Son pruebas aisladas con adaptadores de SQL/Privy/RPC; no generan recibos nuevos. Build y suites completas del 15 de octubre se conservan como históricos, no se repitieron hoy al no cambiar el producto.
+
+Ver [informe de flujo, resultados y límites](../evidence/sow2-week2-flow-validation-2026-10-19/INFORME.md) y [guía de uso consolidada](GUIA-VALIDACION-SEMANA-2.md). Las ocho transacciones por API del 11 de octubre y la nota firmada desde el producto el 15 son evidencias distintas. El 200 % y el cambio de cuenta conservan la fecha del 15. No afirmar firma manual de todos los botones, prueba real de JPEG/3 MB ni portal médico completo. Detalle menor observado: un PDF de 974 bytes se redondea como 0 MB. Las secciones siguientes son históricas.
+
 ## Reapertura con Gateway · 15 de octubre de 2026
 
 La sesión del paciente se recuperó al reiniciar la web, pero el RPC SDF devolvía HTTP 503. El usuario aprobó añadir una selección explícita de Gateway Testnet. Código `f98f0e7`, PR #143 en borrador: **965 pruebas de aplicación / 75 archivos, 263 privadas, TypeScript y build aprobados**. Gateway pasó 24 consultas reales sin firmas ni transmisiones. El historial autenticado muestra las tres entradas y cuatro versiones originales, con permisos retirados y escrituras apagadas. No se repitió ninguna operación clínica.

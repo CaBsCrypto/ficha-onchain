@@ -6,28 +6,56 @@ import { assertClinicalEnvironment } from './config';
 import { resolveClinicalActor } from './identity';
 import type { ClinicalActor } from '@/types/clinical';
 import { assertClinicalWriteScope, clinicalCreateOnceConfigured } from './create-once';
+import { rehearsalConfigured, currentClinicalRehearsal } from './rehearsal';
+import { clinicalCaptureConfigured, loadClinicalCapture, assertClinicalCaptureActor } from './capture';
+import { hostedClinicalActor, withHostedClinicalRequest } from './hosted';
+import { CLINICAL_PREPARE_CAPABILITY_HEADER, CLINICAL_PREPARE_CAPABILITY_VERSION } from './client-contract';
+import { createServerClinicalReadTrace } from './read-trace-server';
+import { clinicalReadStage, emitClinicalReadTrace, type ClinicalReadTrace } from './read-trace';
 
 export const clinicalJson = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'no-store', 'Vary': 'Authorization' } });
 /** Auth failures and provider exceptions never carry provider payloads into the response. */
-export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor) => Promise<unknown>, options: { allowCreateOnce?: boolean } = {}) {
+export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor, trace?: ClinicalReadTrace) => Promise<unknown>, options: { allowCreateOnce?: boolean; offchainOnly?: boolean; requirePrepareClient?: boolean; hostedView?: boolean } = {}) {
+  const diagnostic = createServerClinicalReadTrace(request), trace = diagnostic?.trace;
+  const respond = (response: Response) => { emitClinicalReadTrace(trace, 'respond', 'ok'); return response; };
+  emitClinicalReadTrace(trace, 'ingress', 'start');
   try {
-    const user = await requireUser(request, { strict: true });
-    if (!user) return clinicalJson({ error: 'unauthorized' }, 401);
-    if (request.method !== 'GET' && !isSameOrigin(request)) return clinicalJson({ error: 'forbidden' }, 403);
-    const scoped = request.method === 'POST' && options.allowCreateOnce === true && clinicalCreateOnceConfigured();
-    assertClinicalEnvironment(request.method !== 'GET' && !scoped);
-    const actor = await resolveClinicalActor(user);
-    // Only opted-in clinical routes may reach their action/intent policy while
-    // general writes are off. They recheck the actual action before mutation.
-    if (scoped) assertClinicalWriteScope('create_history', actor.address);
-    const result = await work(user, actor);
+    const user = await clinicalReadStage(trace, 'auth', () => requireUser(request, { strict: true }));
+    if (!user) return respond(clinicalJson({ error: 'unauthorized' }, 401));
+    if (request.method !== 'GET' && !isSameOrigin(request)) return respond(clinicalJson({ error: 'forbidden' }, 403));
+    // Reject a stale preparation client before body parsing, RPC, inserts or reservations.
+    // Existing operations keep their read/reconcile/cancel/sign routes available.
+    if (options.requirePrepareClient && request.headers.get(CLINICAL_PREPARE_CAPABILITY_HEADER) !== CLINICAL_PREPARE_CAPABILITY_VERSION) {
+      return respond(clinicalJson({ error: 'clinical_client_update_required' }, 409));
+    }
+    assertClinicalEnvironment(request.method !== 'GET' && options.allowCreateOnce !== true && !options.offchainOnly);
+    const actor = await clinicalReadStage(trace, 'bind', () => resolveClinicalActor(user));
+    const perform = async () => {
+      const scoped = request.method === 'POST' && options.allowCreateOnce === true && clinicalCreateOnceConfigured(actor.address);
+      assertClinicalEnvironment(request.method !== 'GET' && !scoped && !options.offchainOnly);
+      // Legacy modes verify ingress as before. Hosted phase policy checks the
+      // persisted request/actual action in the service under the SQL lock.
+      if (scoped && !options.offchainOnly && !hostedClinicalActor(actor.address)) {
+        if (clinicalCaptureConfigured()) {
+          const plan = loadClinicalCapture();
+          if (!plan) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
+          assertClinicalCaptureActor(plan, actor);
+        } else if (rehearsalConfigured()) currentClinicalRehearsal(actor);
+        else assertClinicalWriteScope('create_history', actor.address);
+      }
+      return clinicalReadStage(trace, 'work', () => trace ? work(user, actor, trace) : work(user, actor));
+    };
+    const result = options.allowCreateOnce || options.hostedView
+      ? await withHostedClinicalRequest(request, actor, perform)
+      : await perform();
     // Do not deliver content after a changed/expired session or wallet association.
-    const current = await requireUser(request, { strict: true });
-    if (!current || current.userId !== actor.userId) return clinicalJson({ error: 'unauthorized' }, 401);
-    const binding = await resolveClinicalActor(current);
-    if (binding.walletId !== actor.walletId || binding.address !== actor.address) return clinicalJson({ error: 'clinical_identity_changed' }, 403);
-    return result instanceof Response ? result : clinicalJson(result);
+    const current = await clinicalReadStage(trace, 'final_auth', () => requireUser(request, { strict: true }));
+    if (!current || current.userId !== actor.userId) return respond(clinicalJson({ error: 'unauthorized' }, 401));
+    const binding = await clinicalReadStage(trace, 'final_bind', () => resolveClinicalActor(current));
+    if (binding.walletId !== actor.walletId || binding.address !== actor.address) return respond(clinicalJson({ error: 'clinical_identity_changed' }, 403));
+    return respond(result instanceof Response ? result : clinicalJson(result));
   } catch (error) {
-    return clinicalJson({ error: error instanceof PrivateFlowError ? error.message : 'clinical_service_unavailable' }, error instanceof PrivateFlowError ? error.status : 503);
-  }
+    emitClinicalReadTrace(trace, 'ingress', 'error');
+    return respond(clinicalJson({ error: error instanceof PrivateFlowError ? error.message : 'clinical_service_unavailable' }, error instanceof PrivateFlowError ? error.status : 503));
+  } finally { diagnostic?.close(); }
 }

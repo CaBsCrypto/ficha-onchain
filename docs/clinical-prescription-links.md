@@ -1,0 +1,17 @@
+# Private prescription references in clinical notes
+
+A clinical JSON note may contain one existing prescription UUID. That UUID is encrypted with the note and covered by the clinical version commitment. No prescription identifier, consultation details, document, or name is added to a new public contract argument. No database migration or prescription reissue is needed.
+
+`clinicalPrescriptionReference(user, actor, patient, id)` is the server gate for preparing a note, rechecking it before signature/retry, and reading its reference. It independently verifies the current Privy-bound wallet and the original booking participant user ID and wallet ID. The prescription patient must equal the patient of the selected clinical history. A clinical read/append grant alone never provides prescription access.
+
+Only confirmed Testnet prescriptions with an existing issuance transaction hash are candidates. The shared prescription verifier checks the live record ID, patient, issuer, commitment, expiry, schema version, and status. The reference retains its existing ID, consultation ID, issuance hash, expiry and status. It does not issue, activate, revoke, decrypt or mutate a prescription. Expired/revoked/blocked references retain those states rather than being presented as usable prescriptions.
+
+The canonical RX read boundary also rejects legacy restoration preambles, archived entries reported in Protocol 23+ simulation resources, malformed resource data and unexpected authorization entries. It only returns live, authorization-free simulated reads and never restores or signs from a read.
+
+The returned transaction hash is the hash stored by the existing confirmed prescription flow. This addition does not independently audit that historical transaction envelope or introduce a stronger receipt provenance guarantee. Opening a linked prescription document continues to use the existing independently authorized private prescription document endpoint.
+
+`GET /api/private-clinical-history/prescriptions` selects only the owner's current history. With one `historyId`, it verifies the selected doctor's current clinical read or append permission, independently of prescription participation. It does not accept a patient wallet, role or doctor ID from the caller. Candidate lists are limited to 50; excess or duplicate rows fail closed. Results recheck current wallet, history context/grant revision and participant rows after chain I/O. Every result uses `no-store` and `Vary: Authorization` through the clinical API boundary.
+
+Missing/unrelated references return `clinical_prescription_unavailable` (404). A reader may omit that reference while retaining the independently authorized clinical note. Provider/integrity failures return `clinical_prescription_verification_unavailable` (503), so an unchecked prescription is never returned as verified. Preparation and signing must reject either failure before mutation/signature.
+
+Week 4 evidence should include: successful patient and issuing-doctor references; another doctor with only a clinical grant denied RX access; another patient's RX rejected; expired/revoked status preserved; a changed wallet or withdrawn clinical grant during I/O rejected; confirmed-only selection; and provider/integrity failure without partial verified results. This implementation has isolated automated coverage for these gates. A real authorized browser flow and transaction receipts remain separate acceptance evidence.

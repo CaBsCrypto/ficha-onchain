@@ -82,7 +82,7 @@ test('RPC adapter rejects wrong ABI or booking authority before invoking secure 
     const server={getAccount:async()=>new Account(authority.publicKey(),'1'),
       simulateTransaction:async()=>({id:'1',latestLedger:1,events:[],transactionData:{},minResourceFee:'100',
         result:{auth:[],retval:reads++===0?nativeToScVal(badVersion?1:2,{type:'u32'}):nativeToScVal(other.publicKey(),{type:'address'})}})};
-    const chain=createChain({authority:authority.publicKey(),relayer,server,signXdr:async()=>{signs++;}});
+    const chain=createChain({assertSponsorship:()=>{},authority:authority.publicKey(),relayer,server,signXdr:async()=>{signs++;}});
     await assert.rejects(chain.prepare(job,'attest'));assert.equal(signs,0);
   }
 });
@@ -131,7 +131,7 @@ test('Privy participant ownership rechecked for both wallets, not supplied addre
   const provider={getUser:async id=>({id,email:{address:id==='did:doctor'?job.doctor_email:job.patient_email},linkedAccounts:[{
     type:'wallet',chainType:'stellar',id:id==='did:doctor'?'doctor-id':'patient-id',address:id==='did:doctor'?doctor:(changed?doctor:patient)}]}),
     walletApi:{getWallet:async({id})=>({id,chainType:'stellar',address:id==='doctor-id'?doctor:patient})}};
-  const chain=createChain({authority:Keypair.random().publicKey(),relayer:Keypair.random(),provider});
+  const chain=createChain({assertSponsorship:()=>{},authority:Keypair.random().publicKey(),relayer:Keypair.random(),provider});
   await chain.validateIdentity(job);changed=true;await assert.rejects(chain.validateIdentity(job),/identity_changed/);
 });
 
@@ -147,7 +147,7 @@ test('booking chain verifies linked registry and exact saved arguments before ac
         get_authorization:{version:1,schema_version:1,commitment:Buffer.alloc(32,1),valid_until:job.valid_until,revoked:false}};
       return {id:'1',latestLedger:1,events:[],transactionData:{},minResourceFee:'100',result:{auth:[],retval:nativeToScVal(values[method])}};
     }};
-  const chain=createChain({authority:authority.publicKey(),relayer,server,signXdr:async xdr=>{
+  const chain=createChain({assertSponsorship:()=>{},authority:authority.publicKey(),relayer,server,signXdr:async xdr=>{
     signs++;const tx=TransactionBuilder.fromXDR(xdr,Networks.TESTNET);tx.sign(authority);return tx.toXDR();
   }});
   const prepared=await chain.prepare(job,'attest');assert.equal(signs,1);

@@ -39,8 +39,9 @@ export function usePortalData<T>(path: string | null, interval = 3000) {
   }, [path, revision, interval]);
   return { data: path && resultPath === path ? data : null, error, loading: !!path && (loading || resultPath !== path && !error), refresh };
 }
-export function localDate(timestamp?: number | null) {
-  return timestamp ? new Date(timestamp * 1000).toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'Pendiente';
+export function localDate(timestamp?: number | null, language: 'es' | 'en' = 'es') {
+  if (!timestamp) return language === 'en' ? 'Pending' : 'Pendiente';
+  return new Date(timestamp * 1000).toLocaleString(language === 'en' ? 'en-US' : 'es-CL', { timeZone: 'America/Santiago' });
 }
 export function santiagoToday() {
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
@@ -48,6 +49,6 @@ export function santiagoToday() {
 }
 
 /** Calendar dates are already in Santiago; UTC prevents shifting their calendar day. */
-export function appointmentDate(date: string) {
-  return new Intl.DateTimeFormat('es-CL', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date.slice(0, 10) + 'T12:00:00Z'));
+export function appointmentDate(date: string, language: 'es' | 'en' = 'es') {
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'es-CL', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date.slice(0, 10) + 'T12:00:00Z'));
 }

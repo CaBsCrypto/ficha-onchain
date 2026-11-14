@@ -6,6 +6,8 @@ import type { FrozenDoctorSubmission } from '@/lib/doctor-onboarding';
 import { resolveStellarWallet } from '@/lib/stellar/privy-wallet-binding';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError } from '@/lib/private-config';
 import { readAuthorization } from '../../scripts/lib/private-registry.mjs';
+import { loadRehearsalPolicy } from '../../scripts/lib/clinical-rehearsal-policy.mjs';
+import { assertInitialDoctorJob, loadInitialDoctorScope } from '../../scripts/lib/initial-doctor-scope.mjs';
 import { commitmentFor, encryptDossier, decryptDossier, type DoctorDossier } from '../../scripts/lib/private-doctor-dossier.mjs';
 
 export const PRIVATE_REGISTRY = 'CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2';
@@ -79,19 +81,102 @@ export function chooseAuthorizationMethod(action: string, chain: Awaited<ReturnT
   if(action==='revoke' && a && !a.revoked)return {method:'revoke_doctor',expectedVersion:a.version,targetVersion:a.version};
   throw new DoctorAuthorizationError('action_does_not_match_registry_state');
 }
+/** Internal local rehearsal gate. Browser requests never supply its IDs or duration. */
+export function assertRehearsalDoctorAuthorization(actor: AuthedUser, doctorId: number, action: string,
+  doctor?: Awaited<ReturnType<typeof resolveDoctor>>) {
+  try {
+    assertPrivateRegistryConfiguration();
+    const plan = loadRehearsalPolicy({ requireApproval: true });
+    const renewalSeconds = plan?.completionContinuation ? 7 * 86400 : 86400;
+    if (!plan || plan.closingContinuation || action !== 'renew' || doctorId !== plan.doctorId || plan.admin !== REGISTRY_ADMIN || plan.registryId !== PRIVATE_REGISTRY ||
+        actor.userId !== plan.reviewer.userId || actor.email?.trim().toLowerCase() !== plan.reviewer.email ||
+        plan.authorization.validUntil !== plan.doctorValidUntil || plan.doctorValidUntil !== plan.createdAt + renewalSeconds ||
+        (plan.completionContinuation && (plan.completionContinuation.doctorWindowSeconds !== 604800 ||
+          plan.completionContinuation.approvedAt !== plan.createdAt || plan.completionContinuation.executionUntil !== plan.until))) throw Error();
+    if (doctor && (doctor.userId !== plan.doctor.userId || doctor.walletId !== plan.doctor.walletId || doctor.address !== plan.doctor.address ||
+        Number(doctor.doctor.id) !== plan.doctorId)) throw Error();
+    return plan;
+  } catch (error) {
+    const code = error instanceof Error && /^clinical_rehearsal_[a-z_]+$/.test(error.message) ? error.message : 'clinical_rehearsal_authorization_rejected';
+    throw new DoctorAuthorizationError(code, 403);
+  }
+}
+export function assertInitialDoctorAuthorization(actor: AuthedUser, doctorId: number, action: string,
+  doctor?: Awaited<ReturnType<typeof resolveDoctor>>) {
+  const denied = () => new DoctorAuthorizationError('initial_doctor_authorization_rejected', 403);
+  try {
+    assertPrivateRegistryConfiguration();
+    const plan = loadInitialDoctorScope();
+    if (!plan || action !== 'authorize' || doctorId !== plan.doctorId ||
+        actor.userId !== plan.reviewer.userId || actor.email?.trim().toLowerCase() !== plan.reviewer.email ||
+        plan.registryId !== PRIVATE_REGISTRY || plan.admin !== REGISTRY_ADMIN) throw denied();
+    if (doctor && (Number(doctor.doctor.id) !== doctorId || doctor.doctor.status !== 'active' ||
+        String(doctor.doctor.email).toLowerCase() !== plan.doctor.email || doctor.userId !== plan.doctor.userId ||
+        doctor.walletId !== plan.doctor.walletId || doctor.address !== plan.doctor.address)) throw denied();
+    return plan;
+  } catch {
+    throw denied();
+  }
+}
 export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, doctorId: number, action: string,
-  options: { submission?: FrozenDoctorSubmission; transactional?: boolean } = {}) {
-  try { assertPrivateWrites(); }
+  options: { submission?: FrozenDoctorSubmission; transactional?: boolean; rehearsal?: true; initial?: true } = {}) {
+  if (options.initial && (options.rehearsal || !options.transactional || options.submission)) {
+    throw new DoctorAuthorizationError('initial_doctor_authorization_rejected', 403);
+  }
+  const initial = options.initial === true ? assertInitialDoctorAuthorization(actor, doctorId, action) : null;
+  const rehearsal = options.rehearsal === true ? assertRehearsalDoctorAuthorization(actor, doctorId, action) : null;
+  const scope = initial ?? rehearsal;
+  try { if (!scope) assertPrivateWrites(); }
   catch (error) { throw new DoctorAuthorizationError(error instanceof PrivateFlowError ? error.message : 'private_configuration_mismatch',503); }
   const d=await resolveDoctor(sql,doctorId);
+  if (initial) assertInitialDoctorAuthorization(actor, doctorId, action, d);
+  if (rehearsal) assertRehearsalDoctorAuthorization(actor, doctorId, action, d);
   const snapshot=options.submission;
   if(snapshot && (snapshot.owner.userId!==d.userId || snapshot.owner.walletId!==d.walletId || snapshot.owner.address!==d.address || snapshot.owner.email!==String(d.doctor.email).toLowerCase()))throw new DoctorAuthorizationError('onboarding_submission_mismatch');
-  const pending=async()=>{const [r]=await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} AND state IN ('pending','submitted') LIMIT 1`;if(r && r.action!==action)throw new DoctorAuthorizationError('another_action_pending');if(r && (r.onboarding_submission_id??null)!==(snapshot?.id??null))throw new DoctorAuthorizationError('onboarding_submission_mismatch');return publicRequest(r);};
+  const pending=async()=>{const [r]=await sql`SELECT * FROM doctor_authorization_requests WHERE contract_id=${PRIVATE_REGISTRY} AND wallet=${d.address} AND state IN ('pending','submitted') LIMIT 1`;
+    if(r && r.action!==action)throw new DoctorAuthorizationError('another_action_pending');
+    if(r && (r.onboarding_submission_id??null)!==(snapshot?.id??null))throw new DoctorAuthorizationError('onboarding_submission_mismatch');
+    if (r && scope) {
+      if (initial) {
+        const current = assertInitialDoctorAuthorization(actor, doctorId, action, d);
+        if (current.policyHash !== initial.policyHash) throw new DoctorAuthorizationError('initial_doctor_authorization_rejected', 403);
+        try { assertInitialDoctorJob(initial, r); }
+        catch { throw new DoctorAuthorizationError('initial_doctor_authorization_rejected', 403); }
+      }
+      if (rehearsal) assertRehearsalDoctorAuthorization(actor, doctorId, action, d);
+      const expected = scope.authorization;
+      if (r.id !== expected.requestId || r.dossier_id !== expected.dossierId || r.method !== expected.method ||
+          Number(r.expected_version) !== expected.expectedVersion || Number(r.target_version) !== expected.targetVersion ||
+          Number(r.valid_until) !== expected.validUntil || r.requested_by !== scope.reviewer.userId || r.requested_email !== scope.reviewer.email ||
+          Number(r.doctor_id) !== doctorId || r.doctor_user_id !== d.userId || String(r.doctor_email).toLowerCase() !== String(d.doctor.email).toLowerCase() ||
+          r.wallet_id !== d.walletId || r.wallet !== d.address || r.network !== 'testnet' || r.contract_id !== PRIVATE_REGISTRY) throw new DoctorAuthorizationError(initial ? 'initial_doctor_authorization_rejected' : 'clinical_rehearsal_authorization_rejected',403);
+      const [stored] = await sql`SELECT * FROM doctor_private_dossiers WHERE id=${expected.dossierId}`;
+      try {
+        if (!stored || stored.wallet !== d.address || stored.network !== 'testnet' || stored.contract_id !== PRIVATE_REGISTRY ||
+            Number(stored.version) !== expected.targetVersion || Number(stored.valid_until) !== expected.validUntil || stored.commitment !== r.commitment) throw Error();
+        const plain = decryptDossier(stored.encrypted_dossier, dataKey(), expected.dossierId);
+        if (commitmentFor(plain) !== r.commitment || plain.wallet !== d.address || plain.version !== expected.targetVersion ||
+            plain.validUntil !== expected.validUntil || plain.reviewedBy !== scope.reviewer.userId || plain.contractId !== PRIVATE_REGISTRY || plain.network !== 'testnet') throw Error();
+      } catch { throw new DoctorAuthorizationError('dossier_integrity_error',503); }
+    }
+    return publicRequest(r);
+  };
+  if (initial) {
+    const [alternate] = await sql.query(`SELECT id FROM doctor_authorization_requests
+      WHERE contract_id=$1 AND network='testnet' AND (wallet=$2 OR doctor_id=$3 OR id=$4::uuid)
+        AND (id<>$4::uuid OR state NOT IN ('pending','submitted'))
+      UNION ALL SELECT id FROM doctor_private_dossiers
+      WHERE contract_id=$1 AND network='testnet' AND wallet=$2 AND id<>$5::uuid LIMIT 1`,
+    [PRIVATE_REGISTRY,d.address,doctorId,initial.authorization.requestId,initial.authorization.dossierId]);
+    if (alternate) throw new DoctorAuthorizationError('initial_doctor_authorization_requires_reconciliation', 409);
+  }
   const existing=await pending(); if(existing)return {request:existing};
   const chain=await readPrivateDoctor(d.address), method=chooseAuthorizationMethod(action,chain);
-  const id=randomUUID();
-  let dossierId: string | null=action==='revoke'?null:randomUUID();
-  let validUntil=action==='revoke'?chain.authorization!.valid_until:Math.floor(Date.now()/1000)+30*86400;
+  const scopedAuthorization = scope?.authorization;
+  if (scopedAuthorization && (method.method !== scopedAuthorization.method || method.expectedVersion !== scopedAuthorization.expectedVersion || method.targetVersion !== scopedAuthorization.targetVersion)) throw new DoctorAuthorizationError(initial ? 'initial_doctor_authorization_rejected' : 'clinical_rehearsal_authorization_rejected',403);
+  const id=scopedAuthorization?.requestId ?? randomUUID();
+  let dossierId: string | null=action==='revoke'?null:scopedAuthorization?.dossierId ?? randomUUID();
+  let validUntil=action==='revoke'?chain.authorization!.valid_until:scopedAuthorization?.validUntil ?? Math.floor(Date.now()/1000)+30*86400;
   let commitment=chain.authorization?.commitment??'', encrypted='';
   let previousRequestId: string | null = null;
   if(dossierId){
@@ -107,6 +192,8 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
       ) previous ON TRUE WHERE ds.network='testnet' AND ds.contract_id=${PRIVATE_REGISTRY}
         AND ds.wallet=${d.address} AND ds.version=${method.targetVersion}`;
     if(stored){
+      if (initial) throw new DoctorAuthorizationError('initial_doctor_authorization_requires_reconciliation',409);
+      if (rehearsal) throw new DoctorAuthorizationError('clinical_rehearsal_authorization_requires_reconciliation',409);
       if(stored.state!=='failed' || stored.has_signed_attempt || stored.transaction_hash || stored.prepared_xdr ||
           stored.dossier_transaction_hash || stored.dossier_status!=='prepared')throw new DoctorAuthorizationError('failed_authorization_requires_reconciliation');
       if(stored.requested_by!==actor.userId || stored.requested_email!==actor.email)throw new DoctorAuthorizationError('retry_requires_original_reviewer',403);
@@ -134,6 +221,14 @@ export async function requestDoctorAuthorization(sql: Sql, actor: AuthedUser, do
     }
   }
   try {
+    if (initial) {
+      const current = assertInitialDoctorAuthorization(actor, doctorId, action, await resolveDoctor(sql, doctorId));
+      if (current.policyHash !== initial.policyHash) throw new DoctorAuthorizationError('initial_doctor_authorization_rejected',403);
+    }
+    if (rehearsal) {
+      const current = assertRehearsalDoctorAuthorization(actor, doctorId, action, await resolveDoctor(sql, doctorId));
+      if (current.policyHash !== rehearsal.policyHash || JSON.stringify(current) !== JSON.stringify(rehearsal)) throw new DoctorAuthorizationError('clinical_rehearsal_authorization_rejected',403);
+    }
     const parameters=[dossierId,PRIVATE_REGISTRY,d.address,method.targetVersion,validUntil,commitment,encrypted,id,doctorId,actor.userId,actor.email,d.userId,d.doctor.email,d.walletId,action,method.method,method.expectedVersion];
     if(previousRequestId){
       const rows=await sql.query(`WITH retryable AS (

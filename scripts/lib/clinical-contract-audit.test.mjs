@@ -141,3 +141,104 @@ test('unknown contract, malformed fixture and unlisted methods are never queried
   assert.equal(f.state.simulations.includes('mint_prescription'), false);
   assert.equal(f.state.submissions, 0);
 });
+
+
+test('a regressed simulation repeats the identical unsigned read and accepts only a fresh ledger', async () => {
+  const f = fixture();
+  await f.auditor.auditDeployment(deployed);
+  const simulate = f.server.simulateTransaction, transactions = [];
+  f.server.simulateTransaction = async tx => {
+    transactions.push(tx);
+    const result = await simulate(tx);
+    if (transactions.length === 1) result.latestLedger = 99;
+    return result;
+  };
+  const actual = await f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200);
+  assert.equal(actual.observedLedger, 100);
+  assert.equal(transactions.length, 4);
+  assert.equal(transactions[0], transactions[1]);
+  assert.equal(transactions[0].toXDR(), transactions[1].toXDR());
+  assert.deepEqual(f.state.simulations.slice(2), ['get_authorization', 'get_authorization', 'is_authorized', 'get_authorization']);
+  assert.equal(f.state.submissions, 0);
+});
+
+test('two regressed reads may recover on the third identical simulation', async () => {
+  const f = fixture();
+  await f.auditor.auditDeployment(deployed);
+  const simulate = f.server.simulateTransaction, transactions = [];
+  f.server.simulateTransaction = async tx => {
+    transactions.push(tx);
+    const result = await simulate(tx);
+    if (transactions.length <= 2) result.latestLedger = 99;
+    return result;
+  };
+  assert.equal((await f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200)).observedLedger, 100);
+  assert.equal(transactions.length, 5);
+  assert.equal(transactions[0], transactions[1]);
+  assert.equal(transactions[1], transactions[2]);
+  assert.equal(f.state.submissions, 0);
+});
+
+test('three regressed simulations fail closed and do not lower the existing ledger floor', async () => {
+  const f = fixture();
+  await f.auditor.auditDeployment(deployed);
+  const simulate = f.server.simulateTransaction, transactions = [];
+  f.server.simulateTransaction = async tx => {
+    transactions.push(tx);
+    const result = await simulate(tx);
+    result.latestLedger = 99;
+    return result;
+  };
+  await assert.rejects(() => f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200), { message: 'audit_ledger_regressed' });
+  assert.equal(transactions.length, 3);
+  assert.equal(transactions[0], transactions[1]);
+  assert.equal(transactions[1], transactions[2]);
+  await assert.rejects(() => f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200), { message: 'audit_ledger_regressed' });
+  assert.equal(transactions.length, 6);
+  assert.equal(f.state.submissions, 0);
+});
+
+test('malformed metadata, XDR, archival and signature requirements never trigger a retry', async () => {
+  for (const mutate of [
+    result => { result.latestLedger = '99'; },
+    result => { result.latestLedger = 99.5; },
+    result => { result.latestLedger = 0; },
+    result => { result.latestLedger = Number.NaN; },
+    result => { result.result.retval = {}; },
+    result => { result.result.auth = [{}]; },
+    result => { result.restorePreamble = { transactionData: {} }; },
+    result => { delete result.result; result.error = 'malformed'; },
+  ]) {
+    const f = fixture();
+    await f.auditor.auditDeployment(deployed);
+    const simulate = f.server.simulateTransaction;
+    let calls = 0;
+    f.server.simulateTransaction = async tx => {
+      calls++;
+      const result = await simulate(tx);
+      result.latestLedger = 99;
+      mutate(result);
+      return result;
+    };
+    await assert.rejects(() => f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200));
+    assert.equal(calls, 1);
+    assert.equal(f.state.submissions, 0);
+  }
+});
+
+test('transport errors and altered executable hashes are rejected without retries', async () => {
+  const f = fixture();
+  await f.auditor.auditDeployment(deployed);
+  let simulations = 0;
+  f.server.simulateTransaction = async () => { simulations++; throw Error('synthetic_transport_failure'); };
+  await assert.rejects(() => f.auditor.doctor(CLINICAL_AUDIT_DOCTOR, 1200), { message: 'synthetic_transport_failure' });
+  assert.equal(simulations, 1);
+  const changed = fixture(), getEntries = changed.server.getLedgerEntries;
+  let entries = 0;
+  changed.server.getLedgerEntries = async key => { entries++; return getEntries(key); };
+  changed.state.hash = '1'.repeat(64);
+  await assert.rejects(() => changed.auditor.auditDeployment(deployed), { message: 'audit_wasm_mismatch' });
+  assert.equal(entries, 1);
+  assert.equal(changed.state.simulations.length, 0);
+  assert.equal(changed.state.submissions, 0);
+});
