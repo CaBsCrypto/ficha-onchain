@@ -9,7 +9,9 @@ import { databaseConnectionString } from './database-connection.mjs';
 const CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
 const REGISTRY = 'CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2';
 const ADMIN = 'GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO';
-const ROOT = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
+// The legacy file authority is local. Vercel can relocate bundled modules
+// from the build directory, so importing the policy must not touch that path.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const VARIABLES = ['TRUSTLEAF_CLINICAL_REHEARSAL_FILE', 'TRUSTLEAF_CLINICAL_REHEARSAL_HASH', 'TRUSTLEAF_CLINICAL_REHEARSAL_APPROVED_HASH'];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -1078,8 +1080,10 @@ function privateApprovalFile(actualFile) {
 
 /** Read only a regular pinned private file; no writes, dates, connections or fallback. */
 function privateBytes(file, env, expectedHash, maximum = MAX_BYTES) {
-  check(typeof file === 'string' && isAbsolute(file) && !contained(ROOT, resolve(file)) && !lstatSync(file).isSymbolicLink());
-  const actual = realpathSync(file); check(!contained(ROOT, actual));
+  const root = realpathSync(ROOT);
+  check(typeof file === 'string' && isAbsolute(file) && !contained(ROOT, resolve(file)) &&
+    !contained(root, resolve(file)) && !lstatSync(file).isSymbolicLink());
+  const actual = realpathSync(file); check(!contained(root, actual));
   for (const key of ['OneDrive','OneDriveConsumer','OneDriveCommercial']) if (env[key]) check(!contained(realpathSync(env[key]), actual));
   check(!actual.split(/[\\/]/).some(part => /^OneDrive(?:\s*-.*)?$/i.test(part)));
   let descriptor;

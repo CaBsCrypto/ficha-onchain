@@ -1174,7 +1174,7 @@ async function withHermeticCompletionAuthority(work,{maintenance=false}={}) {
   source=source.replace("from '@stellar/stellar-sdk'",`from '${pathToFileURL(require.resolve('@stellar/stellar-sdk')).href}'`)
    .replace("from './database-connection.mjs'",`from '${new URL('./database-connection.mjs',import.meta.url).href}'`)
    .replace("from './clinical-web-fee-policy.mjs'",`from '${new URL('./clinical-web-fee-policy.mjs',import.meta.url).href}'`)
-   .replace("const ROOT = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));",`const ROOT = ${JSON.stringify(resolve(dirname(sourceFile),'../..'))};`);
+   .replace("const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');",`const ROOT = ${JSON.stringify(resolve(dirname(sourceFile),'../..'))};`);
   source=source.replace("const MAINTENANCE_BASE_DIRECTORY = resolve(ROOT, '..', 'rehearsals', 'c5d94d9b-0457-4402-8b6d-bc488f820d67');",`const MAINTENANCE_BASE_DIRECTORY = ${JSON.stringify(dirname(ten.file))};`);
   const isolatedFile=join(directory,'isolated-policy-unit.mjs');writeFileSync(isolatedFile,source);
   const isolated=await import(pathToFileURL(isolatedFile).href),env={...environment(),DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY:authority,BOOKING_AUTHORITY_PUBLIC_KEY:authority,
