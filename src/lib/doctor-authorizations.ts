@@ -23,19 +23,19 @@ function provider() {
   if (!process.env.PRIVY_APP_SECRET) throw new DoctorAuthorizationError('configuration_missing', 503);
   return new PrivyClient(PRIVY_APP, process.env.PRIVY_APP_SECRET);
 }
-export async function verifiedWallet(sql: Sql, userId: string, email: string) {
+export async function verifiedWallet(sql: Sql, userId: string, email: string, options?: { existingOnly?: boolean }) {
   const p = provider();
   const user = await p.getUser(userId);
   const actualEmail = (user.email?.address ?? user.google?.email)?.toLowerCase();
   if (actualEmail !== email.toLowerCase()) throw new DoctorAuthorizationError('identity_changed', 403);
-  return resolveStellarWallet(sql, { getUser: id => id === userId ? Promise.resolve(user) : p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId);
+  return resolveStellarWallet(sql, { getUser: id => id === userId ? Promise.resolve(user) : p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId, false, options);
 }
-export async function resolveDoctor(sql: Sql, doctorId: number) {
+export async function resolveDoctor(sql: Sql, doctorId: number, options?: { existingOnly?: boolean }) {
   const [doctor] = await sql`SELECT id,name,email,specialty,status FROM doctors WHERE id=${doctorId}`;
   if (!doctor) throw new DoctorAuthorizationError('doctor_not_found', 404);
   const user = await provider().getUserByEmail(String(doctor.email));
   if (!user) throw new DoctorAuthorizationError('doctor_privy_login_required');
-  const wallet = await verifiedWallet(sql, user.id, String(doctor.email));
+  const wallet = await verifiedWallet(sql, user.id, String(doctor.email), options);
   return {doctor, userId: user.id, ...wallet};
 }
 export function readPrivateDoctor(wallet: string) {

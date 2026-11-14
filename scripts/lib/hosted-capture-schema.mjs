@@ -1,6 +1,9 @@
 // This targeted migration is shared by the dev script and the authenticated hosted migration.
 import { CLINICAL_RESILIENCE_SCHEMA_SQL } from './clinical-resilience-schema.mjs';
 
+export const APPOINTMENT_DURATION_SCHEMA_SQL = `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS
+  booked_slot_minutes SMALLINT CHECK (booked_slot_minutes BETWEEN 5 AND 240)`;
+
 export const HOSTED_CAPTURE_SCHEMA_SQL = [
   ...CLINICAL_RESILIENCE_SCHEMA_SQL,
   `CREATE TABLE IF NOT EXISTS hosted_capture_manifests (

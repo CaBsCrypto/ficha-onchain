@@ -2,26 +2,29 @@ import { isApprovedDoctor } from '@/lib/doctor-access';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { requireUser, unauthorized } from '@/lib/auth/privy-auth';
-import { assertPrivateEnvironment, PRIVY_APP } from '@/lib/private-config';
+import { assertPrivateEnvironment, PrivateFlowError, PRIVY_APP } from '@/lib/private-config';
 import { availableAppointmentSlots, BookingPreparationError, privateRxOneTimeSlotAvailable, validBookingDate } from '@/lib/prescription-booking';
-import { resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
+import { DoctorAuthorizationError, resolveDoctor } from '@/lib/doctor-authorizations';
 import { assertPrivateRxActor, currentPrivateRxScope, privateRxSlotHost } from '@/lib/digital-cabs-rx';
+import { regularAppointmentsEnabled } from '@/lib/regular-appointments';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
-  const actor=await requireUser(request);if(!actor?.email)return unauthorized();
   const p=new URL(request.url).searchParams,date=p.get('date'),requestedId=p.get('doctorId');
-  if(!validBookingDate(date))return NextResponse.json({error:'invalid_date'},{status:400});
   try{
+    const regular=regularAppointmentsEnabled(request);
+    const actor=regular?await requireUser(request,{strict:true}):await requireUser(request);
+    if(!actor?.email)return unauthorized();
+    if(!validBookingDate(date))return NextResponse.json({error:'invalid_date'},{status:400});
     assertPrivateEnvironment();const sql=getDb();
     let id=requestedId===null?null:Number(requestedId);
     if(id===null){const [row]=await sql`SELECT id FROM doctors WHERE LOWER(email)=${p.get('doctorEmail')?.trim().toLowerCase()??''}`;id=row?.id??null;}
     if(!Number.isSafeInteger(id)||Number(id)<1)return NextResponse.json({error:'invalid_doctor'},{status:400});
-    const doctor=await resolveDoctor(sql,Number(id));
+    const doctor=regular?await resolveDoctor(sql,Number(id),{existingOnly:true}):await resolveDoctor(sql,Number(id));
     if(!(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)})))return NextResponse.json({error:'doctor_not_authorized'},{status:403});
     // Never expose another patient's occupied slot or identity, including ?all=1.
     const next=p.get('nextAvailable')==='true', doctorEmail=String(doctor.doctor.email);
-    let data=await availableAppointmentSlots(sql,doctorEmail,date,next);
+    let data=await availableAppointmentSlots(sql,doctorEmail,date,next,regular?{protectHosted:true}:undefined);
     // Other users keep the normal availability view; a stale/closed scope adds nothing.
     try {
       const scope=await currentPrivateRxScope();
@@ -44,5 +47,9 @@ export async function GET(request:Request){
       }
     }catch { /* An unavailable proof cannot advertise an extra slot. */ }
     return NextResponse.json({data},{headers:{'Cache-Control':'no-store'}});
-  }catch(error){return NextResponse.json({error:error instanceof BookingPreparationError?error.code:'slots_unavailable'}, {status:error instanceof BookingPreparationError?error.status:503});}
+  }catch(error){
+    if(error instanceof BookingPreparationError)return NextResponse.json({error:error.code},{status:error.status});
+    if(error instanceof PrivateFlowError||error instanceof DoctorAuthorizationError)return NextResponse.json({error:error.message},{status:error.status});
+    return NextResponse.json({error:'slots_unavailable'},{status:503});
+  }
 }

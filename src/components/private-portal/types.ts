@@ -31,9 +31,12 @@ export interface PrivateBooking {
 }
 export interface ConsultationState {
   appointment: PrivateAppointment; booking: PrivateBooking | null;
+  appointmentMode?: 'regular' | 'scoped' | 'legacy';
+  appointmentActions?: Record<AppointmentAction, boolean>;
   consent: { status: 'absent' | 'active' | 'expired' | 'consumed'; validUntil?: number | null };
   prescription?: PrivatePrescription | null; operations: PrivateOperation[];
 }
+export type AppointmentAction = 'attend' | 'start' | 'cancel' | 'complete';
 export interface PrescriptionDocument { medication: string; dosage: string; instructions: string }
 export interface PrescriptionVerification {
   network: 'testnet'; contract: string; rxId: string | null;

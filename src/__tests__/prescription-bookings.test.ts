@@ -4,12 +4,18 @@ import type { Sql } from '@/lib/db';
 const mocks=vi.hoisted(()=>({user:vi.fn(),sql:vi.fn(),query:vi.fn(),connectionQuery:vi.fn(),release:vi.fn(),wallet:vi.fn(),doctor:vi.fn(),registry:vi.fn()}));
 vi.mock('@/lib/auth/privy-auth',()=>({requireUser:mocks.user,unauthorized:()=>Response.json({error:'unauthorized'},{status:401})}));
 vi.mock('@/lib/db',()=>({getDb:()=>Object.assign(mocks.sql,{query:mocks.query}),getDbConnection:async()=>({query:mocks.connectionQuery,release:mocks.release}),sqlForConnection:()=>Object.assign(mocks.sql,{query:mocks.query})}));
-vi.mock('@/lib/doctor-authorizations',()=>({verifiedWallet:mocks.wallet,resolveDoctor:mocks.doctor,readPrivateDoctor:mocks.registry}));
+vi.mock('@/lib/doctor-authorizations', () => ({
+  verifiedWallet: mocks.wallet, resolveDoctor: mocks.doctor, readPrivateDoctor: mocks.registry,
+  DoctorAuthorizationError: class extends Error {
+    constructor(message: string, public status = 409) { super(message); }
+  },
+}));
 vi.mock('@/lib/doctor-onboarding',()=>({isDoctorLocallyApproved:async()=>true}));
 import { POST,DELETE,GET } from '@/app/api/prescription-bookings/route';
 import { POST as create, PATCH as change, GET as list, DELETE as remove } from '@/app/api/appointments/route';
 import { availableAppointmentSlots,changePrivateAppointment,createPrivateAppointment,preparePrescriptionBooking,requestBookingCancellation,validBookingDate } from '@/lib/prescription-booking';
 import { RX_PRIVATE,REGISTRY_PRIVATE,PRIVY_APP,PRIVATE_ADMIN } from '@/lib/private-config';
+import { DoctorAuthorizationError } from '@/lib/doctor-authorizations';
 import { createWalletChallenge,completeWalletChallenge } from '@/lib/stellar-wallet-binding';
 import { POST as challengePOST,PUT as challengePUT } from '@/app/api/stellar-wallet-binding/route';
 
@@ -118,15 +124,15 @@ describe('attendance, consultation and cancellation transitions',()=>{
   it('records attendance without starting consultation or granting consent',async()=>{
     const waiting=appt({status:'scheduled',attendance_at:null,attendance_user_id:null,started_at:null,started_by:null});
     const attended={...waiting,attendance_at:'2026-09-09T13:00:00Z',attendance_user_id:patient.userId};
-    mocks.query.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([attended]);mocks.sql.mockResolvedValueOnce([attended]);
+    mocks.query.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([attended]).mockResolvedValueOnce([attended]);
     const result=await changePrivateAppointment(sql(),patient,11,'attend');
     expect(result.appointment.status).toBe('scheduled');expect(result.appointment.started_at).toBeNull();
-    expect(mocks.sql).toHaveBeenCalledTimes(1);expect(mocks.sql.mock.calls[0][0].join(' ')).not.toContain('consent');
+    expect(mocks.sql).not.toHaveBeenCalled();expect(mocks.query.mock.calls[1][0]).not.toContain('consent');
   });
   it('enqueues exactly one booking when the doctor starts an attended consultation',async()=>{
     const waiting=appt({status:'scheduled',started_at:null,started_by:null});
-    mocks.query.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([appt()]).mockResolvedValueOnce([appt({booking:booking()})]);
-    mocks.sql.mockResolvedValueOnce([appt()]).mockResolvedValueOnce([booking()]);
+    mocks.query.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([appt()]).mockResolvedValueOnce([appt()]).mockResolvedValueOnce([appt({booking:booking()})]);
+    mocks.sql.mockResolvedValueOnce([booking()]);
     const result=await changePrivateAppointment(sql(),doctor,11,'start');
     expect(result.appointment.status).toBe('in_progress');expect('bookingPending' in result&&result.bookingPending).toBe(true);
     expect(mocks.sql.mock.calls.filter(call=>call[0].join(' ').includes('INSERT INTO prescription_booking_requests'))).toHaveLength(1);
@@ -135,8 +141,24 @@ describe('attendance, consultation and cancellation transitions',()=>{
     mocks.query.mockResolvedValue([appt()]);
     await expect(changePrivateAppointment(sql(),actor,11,action)).rejects.toThrow('wrong_consultation_role');expect(mocks.sql).not.toHaveBeenCalled();
   });
+  it.each([
+    { attendance_at: null, attendance_user_id: null },
+    { attendance_user_id: doctor.userId },
+  ])('does not start a legacy consultation without the patient attendance on its locked row %#', async attendance => {
+    mocks.user.mockResolvedValue(doctor);
+    mocks.query.mockResolvedValue([appt({ status: 'scheduled', started_at: null, started_by: null, ...attendance })]);
+
+    const response = await change(request({ id: 11, action: 'start' }, 'PATCH'));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'consultation_attendance_required' });
+    expect(mocks.query.mock.calls[0][0]).toMatch(/FOR UPDATE OF a/i);
+    expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(mocks.sql).not.toHaveBeenCalled();
+    expect(mocks.connectionQuery).toHaveBeenLastCalledWith('ROLLBACK');
+  });
   it('does not succeed when the check-in window predicate updates no rows',async()=>{
-    mocks.query.mockResolvedValue([appt({attendance_at:null})]);mocks.sql.mockResolvedValue([]);
+    mocks.query.mockResolvedValueOnce([appt({attendance_at:null,attendance_user_id:null})]).mockResolvedValueOnce([]);
     await expect(changePrivateAppointment(sql(),patient,11,'attend')).rejects.toThrow('consultation_outside_checkin_window');
   });
   it('records cancellation as pending until the worker reconciles its attestation',async()=>{
@@ -159,7 +181,197 @@ describe('attendance, consultation and cancellation transitions',()=>{
   });
 });
 
+describe('ordinary hosted appointment mutations with private writes paused', () => {
+  const site = 'https://www.trustleaf.org';
+  const input = { doctorId: 10, date: '2026-09-09', timeSlot: '10:00', type: 'Telemedicina' };
+  const stamp = '2026-09-09T13:00:00Z';
+  const waiting = () => appt({ status: 'scheduled', attendance_at: null, attendance_user_id: null, started_at: null,
+    started_by: null, has_rx_booking: false });
+  const attended = () => ({ ...waiting(), attendance_at: stamp, attendance_user_id: patient.userId });
+  const started = () => ({ ...attended(), status: 'in_progress', started_at: stamp, started_by: doctor.userId });
+  const ordinaryRequest = (body: unknown, method = 'POST') => new Request(site + '/api/appointments', {
+    method, headers: { host: 'www.trustleaf.org', origin: site, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const patch = (action: string) => change(ordinaryRequest({ id: 11, action }, 'PATCH'));
+  const allQueries = () => [
+    ...mocks.sql.mock.calls.map(([strings]) => strings.join(' ')),
+    ...mocks.query.mock.calls.map(([statement]) => statement),
+  ].join('\n');
+  const mockQueries = (respond: (statement: string) => Record<string, unknown>[], protectedSha?: string) => {
+    mocks.query.mockImplementation(async (statement: string) => {
+      if (protectedSha && statement.includes('SELECT m.sha256')) return [{ sha256: protectedSha }];
+      if (/^\s*SELECT\b/i.test(statement) && statement.includes('hosted_capture_')) return [];
+      return respond(statement);
+    });
+  };
+  const expectNoAttestation = () => expect(allQueries()).not.toMatch(/INSERT\s+INTO\s+prescription_booking_requests/i);
+
+  beforeEach(() => {
+    const host = 'ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech';
+    vi.stubEnv('TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED', 'true');
+    vi.stubEnv('TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'false');
+    vi.stubEnv('TRUSTLEAF_ENV', 'test');
+    vi.stubEnv('TRUSTLEAF_DB_HOST', host);
+    vi.stubEnv('TRUSTLEAF_DATABASE_URL', 'postgresql://example:example@' + host + '/test?sslmode=require');
+    vi.stubEnv('VERCEL_ENV', 'production');
+  });
+
+  it('returns the patient booking capability with a strict session and an existing verified wallet', async () => {
+    mockQueries(() => [waiting()]);
+    const request = new Request(site + '/api/appointments?role=patient', { headers: { host: 'www.trustleaf.org' } });
+
+    const response = await list(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const payload = await response.json();
+    expect(payload).toMatchObject({ canBook: true, appointments: [{ id: 11, status: 'scheduled' }] });
+    expect(payload.appointments[0]).not.toHaveProperty('patient_user_id');
+    expect(mocks.user).toHaveBeenCalledWith(request, { strict: true });
+    expect(mocks.wallet).toHaveBeenCalledWith(expect.anything(), patient.userId, patient.email, { existingOnly: true });
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('returns the safe wallet-verification error when regular booking cannot identify the patient', async () => {
+    mocks.wallet.mockRejectedValue(new DoctorAuthorizationError('needs_wallet', 409));
+
+    const response = await list(new Request(site + '/api/appointments?role=patient', { headers: { host: 'www.trustleaf.org' } }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'needs_wallet' });
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('books a regular slot and safely reuses the same reservation on an identical retry', async () => {
+    mocks.sql.mockResolvedValueOnce([{ id: 10 }]).mockResolvedValueOnce([{ id: 11 }]).mockResolvedValueOnce([{ id: 10 }]);
+    const rows = [[], [{ date: input.date, time: input.timeSlot, slot_minutes: 45 }], [waiting()], [waiting()], [waiting()]];
+    mockQueries(() => rows.shift() ?? []);
+
+    const first = await create(ordinaryRequest(input));
+    const retry = await create(ordinaryRequest(input));
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(201);
+    expect((await first.json()).appointment).toMatchObject({ id: 11, status: 'scheduled', booking: null });
+    expect((await retry.json()).appointment.id).toBe(11);
+    const insertions = mocks.sql.mock.calls.filter(([statement]) => statement.join(' ').includes('INSERT INTO appointments'));
+    expect(insertions).toHaveLength(1);
+    expect(insertions[0][0].join(' ')).toContain('booked_slot_minutes');
+    expect(insertions[0].at(-1)).toBe(45);
+    expect(mocks.sql.mock.calls[0][0].join(' ')).toMatch(/FOR UPDATE/i);
+    expect(mocks.connectionQuery.mock.calls.filter(([statement]) => statement === 'COMMIT')).toHaveLength(2);
+    expectNoAttestation();
+  });
+
+  it('rejects a competing appointment on the same slot under the doctor lock', async () => {
+    mocks.sql.mockResolvedValueOnce([{ id: 10 }]);
+    mockQueries(() => [{ ...waiting(), patient_user_id: 'did:privy:someoneelse' }]);
+
+    const response = await create(ordinaryRequest(input));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'slot_not_available' });
+    expect(mocks.sql.mock.calls[0][0].join(' ')).toMatch(/FOR UPDATE/i);
+    expect(allQueries()).not.toMatch(/INSERT\s+INTO\s+appointments/i);
+    expect(mocks.connectionQuery).toHaveBeenLastCalledWith('ROLLBACK');
+    expectNoAttestation();
+  });
+
+  it('denies a regular retry for a historically protected appointment even when its scope is inactive', async () => {
+    mocks.sql.mockResolvedValueOnce([{ id: 10 }]);
+    mockQueries(() => [waiting()], 'a'.repeat(64));
+
+    const response = await create(ordinaryRequest(input));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'private_rx_scope_rejected' });
+    expect(allQueries()).not.toMatch(/INSERT\s+INTO\s+appointments/i);
+    expect(mocks.connectionQuery).toHaveBeenLastCalledWith('ROLLBACK');
+    expectNoAttestation();
+  });
+
+  it('lets the patient attend and the verified doctor start and complete without creating any Rx booking', async () => {
+    const done = { ...started(), status: 'completed', completed_at: stamp };
+    mockQueries(statement => {
+      if (/UPDATE appointments/i.test(statement)) {
+        if (statement.includes('attendance_at=') || statement.includes('attendance_at =')) return [attended()];
+        if (/SET status='in_progress'/i.test(statement)) return [started()];
+        if (/SET status='completed'/i.test(statement)) return [done];
+      }
+      return rows.shift() ?? [];
+    });
+    const rows = [[waiting()], [attended()], [attended()], [started()], [started()]];
+    mocks.sql.mockResolvedValueOnce([done]);
+
+    const attend = await patch('attend');
+    mocks.user.mockResolvedValue(doctor);
+    const start = await patch('start');
+    const complete = await patch('complete');
+
+    expect([attend.status, start.status, complete.status]).toEqual([200, 200, 200]);
+    expect(await attend.json()).toMatchObject({ bookingPending: false, appointment: { status: 'scheduled', attendance_at: stamp, started_at: null } });
+    expect(await start.json()).toMatchObject({ bookingPending: false, appointment: { status: 'in_progress', started_at: stamp } });
+    expect(await complete.json()).toMatchObject({ bookingPending: false, appointment: { status: 'completed', completed_at: stamp, booking: null } });
+    expect(allQueries()).toMatch(/FOR UPDATE OF a/i);
+    const startWrite = mocks.query.mock.calls.find(([statement]) => /UPDATE appointments a SET status='in_progress'/i.test(statement));
+    expect(startWrite?.[0]).toMatch(/a\.attendance_at\s*<=\s*NOW\(\)/i);
+    expect(startWrite?.[0]).toMatch(/a\.attendance_user_id\s*=\s*a\.patient_user_id/i);
+    expect(startWrite?.[0]).toContain("AT TIME ZONE 'America/Santiago'");
+    expect(startWrite?.[1]).toEqual([11, doctor.userId]);
+    expect(mocks.wallet).toHaveBeenCalledWith(expect.anything(), doctor.userId, doctor.email, { existingOnly: true });
+    expectNoAttestation();
+  });
+
+  it('allows patient cancellation before the start and declines after the start', async () => {
+    const rows = [[waiting()], [started()]];
+    mockQueries(() => rows.shift() ?? []);
+    mocks.sql.mockResolvedValueOnce([{ id: 11 }]);
+
+    const cancelled = await patch('cancel');
+    const denied = await patch('cancel');
+
+    expect(cancelled.status).toBe(202);
+    expect(await cancelled.json()).toMatchObject({ state: 'cancelled', onchainRevoked: false, appointment: { status: 'cancelled' } });
+    expect(denied.status).toBe(409);
+    expect(await denied.json()).toEqual({ error: 'consultation_not_open' });
+    expectNoAttestation();
+  });
+
+  it.each([
+    { label: 'wrong actor', session: patient, row: attended(), error: 'wrong_consultation_role', status: 403 },
+    { label: 'missing attendance', session: doctor, row: waiting(), error: 'consultation_attendance_required', status: 409 },
+    { label: 'different attendee', session: doctor, row: { ...attended(), attendance_user_id: doctor.userId }, error: 'consultation_attendance_required', status: 409 },
+    { label: 'different wallet', session: doctor, row: { ...attended(), doctor_wallet_id: 'another-wallet' }, error: 'appointment_wallet_changed', status: 403 },
+    { label: 'inactive doctor', session: doctor, row: attended(), error: 'doctor_not_authorized', status: 403 },
+    { label: 'attached Rx booking', session: doctor, row: { ...attended(), booking: booking(), has_rx_booking: true }, error: 'appointment_has_prescription_booking', status: 409 },
+  ])('rejects an ordinary start with $label before writes', async ({ label, session, row, error, status }) => {
+    mocks.user.mockResolvedValue(session);
+    mockQueries(() => [row]);
+    if (label === 'inactive doctor') mocks.registry.mockResolvedValue({ authorized: false });
+
+    const response = await patch('start');
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+    expect(allQueries()).toMatch(/FOR UPDATE OF a/i);
+    expect(allQueries()).not.toMatch(/UPDATE\s+appointments\s+(?:a\s+)?SET/i);
+    expect(mocks.connectionQuery).toHaveBeenLastCalledWith('ROLLBACK');
+    expectNoAttestation();
+  });
+});
+
 describe('server-validated agenda',()=>{
+  it('uses stored booking duration to exclude intersecting hosted slots after a grid change', async () => {
+    mocks.query.mockResolvedValueOnce([{ date: '2026-09-14', time: '09:00', slot_minutes: 30 }]);
+
+    await availableAppointmentSlots(sql(), doctor.email, '2026-09-14', false, { protectHosted: true });
+
+    const [statement] = mocks.query.mock.calls[0];
+    expect(statement).toContain('COALESCE(a.booked_slot_minutes,');
+    expect(statement).toMatch(/booked\.clock_time\s*<\s*slot\+make_interval/i);
+    expect(statement).toMatch(/>\s*slot\)/i);
+  });
   it('returns the next date and search limit without patient details',async()=>{
     mocks.query.mockResolvedValueOnce([{date:'2026-09-14',time:'09:00',slot_minutes:30,patient_name:'private'}]).mockResolvedValueOnce([{search_until:'2026-12-10'}]);
     const result=await availableAppointmentSlots(sql(),doctor.email,'2026-09-11',true);

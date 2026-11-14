@@ -4,6 +4,8 @@ import { getDb, getDbConnection, sqlForConnection } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { isApprovedDoctor } from '@/lib/doctor-access';
+import { appointmentAttendanceConfirmedSql, appointmentCheckInOpenSql, publicAppointment } from '@/lib/prescription-booking';
+import { classifyHostedAppointment } from '@/lib/regular-appointments';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/private-chain';
 import { encryptPrescription, decryptPrescription, prescriptionCommitment } from '../../scripts/lib/private-prescription.mjs';
@@ -24,7 +26,11 @@ export async function privateActorWallet(actor:AuthedUser) {
   return verifiedWallet(getDb(),actor.userId,actor.email);
 }
 export async function loadPrivateContext(client:PoolClient,actor:AuthedUser,appointmentId:number,lock=false) {
-  const {rows}=await client.query(`SELECT a.*,d.name AS doctor_name,d.id AS doctor_id FROM appointments a
+  const {rows}=await client.query(`SELECT a.*,d.name AS doctor_name,d.id AS doctor_id,
+    to_char(a.date,'YYYY-MM-DD') AS date,
+    (${appointmentCheckInOpenSql}) AS check_in_open,
+    (${appointmentAttendanceConfirmedSql}) AS attendance_verified
+    FROM appointments a
     JOIN doctors d ON LOWER(d.email)=LOWER(a.doctor_email)
     WHERE a.id=$1 AND (a.patient_email=$2 OR a.doctor_email=$2) ${lock?'FOR UPDATE OF a':''}`,[appointmentId,actor.email]);
   const appointment=rows[0];
@@ -78,12 +84,38 @@ export async function prescriptionView(row:PrivateRow,appointment:PrivateRow,cha
     expired:Number(row.expires_at)<=Date.now()/1000,doctorName:appointment.doctor_name??'Médico de prueba',patientName:appointment.patient_name??'Paciente de prueba',
     expiresAt:Number(row.expires_at),transactionHash:row.transaction_hash??null,operation:row.operation?publicOperation(row.operation):null};
 }
-export async function readPrivateConsultation(actor:AuthedUser,id:number) {
-  const wallet=await privateActorWallet(actor),client=await getDbConnection();
+export async function readPrivateConsultation(actor:AuthedUser,id:number,regular=false) {
+  if (!actor.email) throw new PrivateFlowError('verified_email_required',403);
+  const wallet=regular
+    ? await verifiedWallet(getDb(),actor.userId,actor.email,{existingOnly:true})
+    : await privateActorWallet(actor);
+  const client=await getDbConnection();
   try {
     const {appointment,booking,prescription}=await loadPrivateContext(client,actor,id);
     const actorRole=actor.email===appointment.doctor_email?'doctor':'patient';
     if(appointment[`${actorRole}_wallet`]!==wallet.address||appointment[`${actorRole}_wallet_id`]!==wallet.walletId)throw new PrivateFlowError('appointment_wallet_changed',403);
+    const sql=sqlForConnection(client);
+    const classification=regular?await classifyHostedAppointment(sql,{actor,appointmentId:id}):null;
+    const regularAppointment=classification?.kind==='regular'&&!booking&&!prescription;
+    const scheduled=appointment.status==='scheduled', inProgress=appointment.status==='in_progress';
+    const scopedAppointment=classification?.kind==='scoped';
+    const appointmentActions=regular?{
+      attend:(regularAppointment||scopedAppointment)&&actorRole==='patient'&&(scheduled||inProgress)&&
+        !appointment.attendance_at&&appointment.check_in_open===true,
+      start:(regularAppointment||scopedAppointment)&&actorRole==='doctor'&&scheduled&&
+        appointment.attendance_verified===true&&appointment.check_in_open===true,
+      cancel:regularAppointment&&actorRole==='patient'&&scheduled&&!appointment.started_at,
+      complete:regularAppointment&&actorRole==='doctor'&&inProgress&&!!appointment.started_at&&appointment.started_by===actor.userId,
+    }:undefined;
+    if(appointmentActions?.start||appointmentActions?.complete) {
+      const approved=await isApprovedDoctor(sql,Number(appointment.doctor_id),{...wallet,userId:actor.userId,email:actor.email});
+      if(!approved){appointmentActions.start=false;appointmentActions.complete=false;}
+    }
+    const appointmentView={...publicAppointment(appointment),attended_at:appointment.attendance_at};
+    if(regularAppointment) return {
+      appointment:appointmentView, appointmentMode:'regular' as const, appointmentActions,
+      booking:null, consent:{status:'absent',validUntil:null}, prescription:null, operations:[],
+    };
     const chain=createPrivateChain();await chain.verifyDeployment();
     if(booking && (actor.userId===(actor.email===appointment.doctor_email?booking.doctor_user_id:booking.patient_requested_by))===false)throw new PrivateFlowError('booking_identity_changed',403);
     if(booking && wallet.address!==(actor.email===appointment.doctor_email?booking.doctor_wallet:booking.patient_wallet))throw new PrivateFlowError('booking_identity_changed',403);
@@ -99,7 +131,8 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number) {
     const operationRows=(await client.query('SELECT * FROM private_operations WHERE appointment_id=$1 AND actor_user_id=$2 ORDER BY created_at DESC LIMIT 20',[id,actor.userId])).rows;
     const operations=operationRows.map(publicOperation);
     if(prescription)prescription.operation=operationRows.find(o=>o.prescription_id===prescription.id);
-    return {appointment:{...appointment,attended_at:appointment.attendance_at},booking:publicBooking,consent,
+    return {appointment:appointmentView,booking:publicBooking,consent,
+      ...(classification?{appointmentMode:classification.kind==='regular'?'legacy' as const:'scoped' as const,appointmentActions}:{}),
       prescription:prescription?await prescriptionView(prescription,appointment,chain):null,operations};
   } finally {client.release();}
 }

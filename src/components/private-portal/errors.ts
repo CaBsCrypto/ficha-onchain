@@ -20,6 +20,8 @@ const messages: Record<string, string> = {
   booking_not_ready: 'Se requieren asistencia, inicio de consulta y reserva acreditada y vigente. Actualiza su estado.',
   slot_not_available: 'Ese horario ya no está disponible. Elige otro.',
   consultation_outside_checkin_window: 'La asistencia y el inicio se habilitan el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).',
+  consultation_attendance_required: 'Espera a que el paciente confirme su asistencia para iniciar la consulta.',
+  appointment_has_prescription_booking: 'La consulta tiene una reserva vinculada a una receta. Actualiza su estado antes de continuar.',
   consultation_not_open: 'La consulta está finalizada, cancelada o con cancelación pendiente. Actualiza su estado.',
   doctor_not_authorized: 'La autorización del médico no está vigente. El administrador debe revisarla antes de continuar.',
   distinct_participants_required: 'El médico y el paciente deben utilizar cuentas de prueba distintas.',

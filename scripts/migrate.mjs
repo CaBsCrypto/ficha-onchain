@@ -14,7 +14,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { databaseConnectionString } from './lib/database-connection.mjs';
 import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs';
 import { CLINICAL_RESILIENCE_SCHEMA_SQL } from './lib/clinical-resilience-schema.mjs';
-import { HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
+import { APPOINTMENT_DURATION_SCHEMA_SQL, HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
 import { assertHostedCaptureOperator } from './lib/hosted-capture-store.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
@@ -98,6 +98,7 @@ step("appointments", async () => {
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS attendance_at TIMESTAMPTZ`;
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS started_by TEXT`;
   await sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`;
+  await sql.query(APPOINTMENT_DURATION_SCHEMA_SQL);
 });
 
 step("appointments: no double-booking", async () => {
