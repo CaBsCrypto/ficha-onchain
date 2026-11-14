@@ -152,6 +152,109 @@ describe('active private signing components with controlled Privy and HTTP', () 
     expect(provider.signRawHash).not.toHaveBeenCalled();
   });
 
+  it('shows attendance and Start now across both ordinary appointment views by polling', async () => {
+    const appointment = {
+      id: 123, date: '2026-09-10', time_slot: '10:00', type: 'Presencial',
+      patient_email: 'patient@example.test', patient_name: 'Test patient',
+      doctor_email: 'doctor@example.test', doctor_name: 'Test doctor',
+    };
+    let windowOpen = false;
+    let attended = false;
+    let started = false;
+    let completed = false;
+    const state = () => ({
+      ...appointment,
+      status: completed ? 'completed' : started ? 'in_progress' : 'scheduled',
+      attendance_at: attended ? '2026-09-10T12:00:00Z' : null,
+      started_at: started ? '2026-09-10T12:01:00Z' : null,
+    });
+    transport = ({ url, method, body }) => {
+      if (url.startsWith('/api/appointments?role=')) return Response.json({ appointments: [state()], canBook: false });
+      if (url === '/api/private-consultations/123') return Response.json({
+        appointment: state(), appointmentMode: 'regular',
+        appointmentActions: { attend: windowOpen && !attended, start: windowOpen && attended && !started, cancel: !started, complete: started && !completed },
+        booking: null, consent: { status: 'absent' }, operations: [],
+      });
+      if (url === '/api/appointments' && method === 'PATCH') {
+        if (body?.action === 'attend') attended = true;
+        if (body?.action === 'start') started = true;
+        if (body?.action === 'complete') completed = true;
+        return Response.json({ appointment: state(), bookingPending: false });
+      }
+      throw new Error('Unexpected controlled request during ordinary appointment');
+    };
+    window.localStorage.setItem('ficha-lang', 'en');
+    await act(async () => root.render(createElement(LanguageProvider, {
+      children: createElement('div', null,
+        createElement('div', { 'data-view': 'patient' }, createElement(PrivateConsultations, { role: 'patient' })),
+        createElement('div', { 'data-view': 'doctor' }, createElement(PrivateConsultations, { role: 'doctor' }))),
+    })));
+    const patient = container.querySelector('[data-view="patient"]')!;
+    const doctor = container.querySelector('[data-view="doctor"]')!;
+    expect(patient.textContent).not.toContain('Book an appointment');
+    await click('Open appointment', patient);
+    await click('Open appointment', doctor);
+    expect(patient.textContent).toContain('Appointment #123');
+    expect(patient.textContent).not.toContain('Test appointment');
+    expect(button('Confirm my attendance', patient).disabled).toBe(true);
+    expect(button('Cancel appointment', patient).disabled).toBe(false);
+    expect(doctor.textContent).toContain('Waiting for patient attendance');
+    expect(doctor.textContent).not.toContain('Start now');
+    expect(doctor.textContent).not.toContain('Cancel appointment');
+    expect(container.textContent).not.toMatch(/Stellar booking|Permission to issue one prescription|Prepare a private prescription/);
+
+    windowOpen = true;
+    await tick();
+    await click('Confirm my attendance', patient);
+    expect(patient.textContent).toContain('Patient attendanceConfirmed');
+    await tick();
+    expect(doctor.textContent).toContain('Patient ready');
+    expect(button('Start now', doctor).disabled).toBe(false);
+    await click('Start now', doctor);
+    expect(doctor.textContent).toContain('Appointment started');
+    await tick();
+    expect(patient.textContent).toContain('Appointment started');
+    expect(patient.textContent).not.toContain('Cancel appointment');
+    await click('Complete appointment', doctor);
+    await tick();
+    expect(patient.textContent).toContain('Appointment completed');
+    expect(doctor.textContent).toContain('Appointment completed');
+    expect(requests('PATCH', '/api/appointments').map(call => call.body)).toEqual([
+      { id: 123, action: 'attend' }, { id: 123, action: 'start' }, { id: 123, action: 'complete' },
+    ]);
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+  });
+
+  it('localizes an updated server denial and refreshes the doctor appointment', async () => {
+    let attended = true;
+    const appointment = {
+      id: 123, status: 'scheduled', date: '2026-09-10', time_slot: '10:00', type: 'Presencial',
+      patient_email: 'patient@example.test', patient_name: 'Test patient',
+      doctor_email: 'doctor@example.test', doctor_name: 'Test doctor',
+    };
+    transport = ({ url, method }) => {
+      if (url === '/api/appointments?role=doctor') return Response.json({ appointments: [appointment] });
+      if (url === '/api/private-consultations/123') return Response.json({
+        appointment: { ...appointment, attendance_at: attended ? '2026-09-10T12:00:00Z' : null },
+        appointmentMode: 'regular', appointmentActions: { attend: false, start: attended, cancel: false, complete: false },
+        booking: null, consent: { status: 'absent' }, operations: [],
+      });
+      if (url === '/api/appointments' && method === 'PATCH') {
+        attended = false;
+        return Response.json({ error: 'consultation_attendance_required' }, { status: 409 });
+      }
+      throw new Error('Unexpected controlled request for denied start');
+    };
+    await act(async () => root.render(createElement(PrivateConsultations, { role: 'doctor' })));
+    await click('Abrir consulta');
+    expect(container.textContent).toContain('Paciente listo');
+    await click('Iniciar ahora');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Espera a que el paciente confirme su asistencia');
+    expect(container.textContent).toContain('Esperando confirmación de asistencia');
+    expect(container.textContent).not.toContain('Iniciar ahora');
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+  });
+
   it('shows the exact sponsored mint fee in English before an explicit Privy confirmation', async () => {
     const now = Math.floor(Date.now() / 1000);
     const pending = {

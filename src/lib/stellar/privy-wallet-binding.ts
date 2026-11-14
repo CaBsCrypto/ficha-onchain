@@ -11,12 +11,13 @@ export interface WalletProvider {
   };
 }
 /** Persist a claim before creation. Never retry an uncertain create response. */
-export async function resolveStellarWallet(sql: Sql, provider: WalletProvider, appId: string, userId: string, allowCreate = false): Promise<{walletId:string;address:string;chain:'stellar';created:false}> {
+export async function resolveStellarWallet(sql: Sql, provider: WalletProvider, appId: string, userId: string, allowCreate = false, options: { existingOnly?: boolean } = {}): Promise<{walletId:string;address:string;chain:'stellar';created:false}> {
   const rows = await sql<Binding>`SELECT wallet_id, address FROM privy_stellar_wallet_bindings WHERE app_id=${appId} AND user_id=${userId}`;
   const linked = (await provider.getUser(userId)).linkedAccounts.filter(w => w.type === 'wallet' && w.chainType === 'stellar');
   // A saved association never makes a newly ambiguous provider identity safe to use.
   if (linked.length > 1) throw new WalletBindingError('wallet_binding_ambiguous');
   const saved = rows[0];
+  if (options.existingOnly && !saved?.wallet_id) throw new WalletBindingError('wallet_creation_required');
   let wallet: Wallet | undefined;
   if (saved?.wallet_id) {
     wallet = linked.find(w => w.id === saved.wallet_id && w.address === saved.address);
@@ -35,6 +36,8 @@ export async function resolveStellarWallet(sql: Sql, provider: WalletProvider, a
   if (!wallet.id || !wallet.address || !StrKey.isValidEd25519PublicKey(wallet.address)) throw new WalletBindingError('wallet_invalid');
   const actual = await provider.walletApi.getWallet({ id: wallet.id });
   if (actual.id !== wallet.id || actual.address !== wallet.address || actual.chainType !== 'stellar') throw new WalletBindingError('wallet_binding_changed');
+  const result = { walletId: wallet.id, address: wallet.address, chain: 'stellar', created: false } as const;
+  if (options.existingOnly) return result;
   const stored = await sql<Binding>`INSERT INTO privy_stellar_wallet_bindings (app_id,user_id,wallet_id,address)
     VALUES (${appId},${userId},${wallet.id},${wallet.address})
     ON CONFLICT (app_id,user_id) DO UPDATE SET wallet_id=EXCLUDED.wallet_id,address=EXCLUDED.address
@@ -42,5 +45,5 @@ export async function resolveStellarWallet(sql: Sql, provider: WalletProvider, a
       OR (privy_stellar_wallet_bindings.wallet_id=EXCLUDED.wallet_id AND privy_stellar_wallet_bindings.address=EXCLUDED.address)
     RETURNING wallet_id,address`;
   if (!stored.length) throw new WalletBindingError('wallet_binding_changed');
-  return { walletId: wallet.id, address: wallet.address, chain: 'stellar', created: false };
+  return result;
 }

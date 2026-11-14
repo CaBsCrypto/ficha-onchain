@@ -20,11 +20,12 @@ import { isApprovedDoctor } from '@/lib/doctor-access';
 import { NextResponse } from "next/server";
 import { dbNotConfiguredResponse } from "@/lib/api/errors";
 import { getDb } from "@/lib/db";
-import { requireUser, unauthorized } from "@/lib/auth/privy-auth";
+import { requireUser, unauthorized, type AuthedUser } from "@/lib/auth/privy-auth";
 import { isSameOrigin } from '@/lib/auth/same-origin';
-import { assertPrivateEnvironment } from '@/lib/private-config';
-import { resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
-import { bookingTransaction, BookingPreparationError } from '@/lib/prescription-booking';
+import { assertPrivateEnvironment, PrivateFlowError } from '@/lib/private-config';
+import { resolveDoctor } from '@/lib/doctor-authorizations';
+import { bookingTransaction, BookingPreparationError, retainBookedAppointmentDurations } from '@/lib/prescription-booking';
+import { regularAppointmentsEnabled } from '@/lib/regular-appointments';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ interface Block {
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 function fail(err: unknown) {
+  if (err instanceof PrivateFlowError) return NextResponse.json({ error: err.message }, { status: err.status });
   const dbDown = dbNotConfiguredResponse(err);
   if (dbDown) return dbDown;
   console.error("[doctor/availability]", err);
@@ -76,7 +78,15 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const actor = await requireUser(request); if (!actor?.email) return unauthorized();
+  let regular: boolean;
+  let actor: AuthedUser | null;
+  try {
+    regular = regularAppointmentsEnabled(request);
+    actor = regular ? await requireUser(request, { strict: true }) : await requireUser(request);
+  } catch (err) {
+    return fail(err);
+  }
+  if (!actor?.email) return unauthorized();
   if (!isSameOrigin(request)) return NextResponse.json({error:'forbidden'},{status:403});
   let body: { doctorEmail?: string; blocks?: unknown };
   try {
@@ -137,15 +147,17 @@ export async function PUT(request: Request) {
     const rows = await bookingTransaction(async sql => {
       const [record] = await sql`SELECT id FROM doctors WHERE LOWER(email)=${doctorEmail} FOR UPDATE`;
       if (!record) throw new BookingPreparationError('doctor_not_found',403);
-      const doctor = await resolveDoctor(sql,Number(record.id));
+      const doctor = regular ? await resolveDoctor(sql, Number(record.id), { existingOnly: true })
+        : await resolveDoctor(sql, Number(record.id));
       if (doctor.userId!==actor.userId || !(await isApprovedDoctor(sql,Number(doctor.doctor.id),{...doctor,email:String(doctor.doctor.email)})))
         throw new BookingPreparationError('doctor_not_authorized',403);
+      if (regular) await retainBookedAppointmentDurations(sql, doctorEmail);
       await sql`DELETE FROM doctor_availability WHERE LOWER(doctor_email) = ${doctorEmail}`;
       for (const b of blocks) await sql`INSERT INTO doctor_availability (doctor_email,weekday,start_time,end_time,slot_minutes)
         VALUES (${doctorEmail},${b.weekday},${b.start_time},${b.end_time},${b.slot_minutes})`;
       return sql`SELECT id,weekday,TO_CHAR(start_time,'HH24:MI') AS start_time,TO_CHAR(end_time,'HH24:MI') AS end_time,slot_minutes
         FROM doctor_availability WHERE LOWER(doctor_email)=${doctorEmail} ORDER BY weekday,start_time`;
-    });
+    }, regular ? 'regular' : undefined);
     return NextResponse.json({ data: rows });
   } catch (err) {
     if (err instanceof BookingPreparationError) return NextResponse.json({error:err.code},{status:err.status});

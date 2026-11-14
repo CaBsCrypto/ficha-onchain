@@ -124,13 +124,27 @@ it('rejects another protected appointment under lock before checking wallets or 
 
 it('lets the exact doctor start an attended appointment and creates only its native booking queue record', async () => {
   m.user.mockResolvedValue(doctor);
-  m.query.mockResolvedValueOnce([row({ status: 'scheduled', started_at: null, started_by: null })]).mockResolvedValueOnce([row()])
+  m.query.mockResolvedValueOnce([row({ status: 'scheduled', started_at: null, started_by: null })]).mockResolvedValueOnce([row()]).mockResolvedValueOnce([row()])
     .mockResolvedValueOnce([row({ booking: booking({ state: 'prepared' }) })]);
-  m.sql.mockResolvedValueOnce([row()]).mockResolvedValueOnce([booking({ state: 'prepared' })]);
+  m.sql.mockResolvedValueOnce([booking({ state: 'prepared' })]);
   const result = await change(request('appointments', { id: 14, action: 'start' }, 'PATCH'));
   expect(result.status).toBe(200); expect((await result.json()).bookingPending).toBe(true);
   expect(m.sql.mock.calls.filter(([query]) => query.join(' ').includes('INSERT INTO prescription_booking_requests'))).toHaveLength(1);
   expect(m.connectionQuery).toHaveBeenLastCalledWith('COMMIT'); expect(m.legacyGate).not.toHaveBeenCalled();
+});
+
+it('does not start or enqueue the scoped appointment with attendance from the wrong participant', async () => {
+  m.user.mockResolvedValue(doctor);
+  m.query.mockResolvedValue([row({ status: 'scheduled', started_at: null, started_by: null, attendance_user_id: doctor.userId })]);
+
+  const result = await change(request('appointments', { id: 14, action: 'start' }, 'PATCH'));
+
+  expect(result.status).toBe(409);
+  expect(await result.json()).toEqual({ error: 'consultation_attendance_required' });
+  expect(m.query.mock.calls[0][0]).toMatch(/FOR UPDATE OF a/i);
+  expect(m.query).toHaveBeenCalledTimes(1);
+  expect(m.sql).not.toHaveBeenCalled();
+  expect(m.connectionQuery).toHaveBeenLastCalledWith('ROLLBACK');
 });
 
 it('the appointment phase cannot prepare a prescription, consent or confirm any signature', async () => {

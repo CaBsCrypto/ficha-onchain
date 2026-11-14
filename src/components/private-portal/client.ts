@@ -2,6 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { portalErrorMessage } from './errors';
+
+export class PortalApiError extends Error {
+  constructor(public readonly code: string, status: number) {
+    super(portalErrorMessage(code, status));
+  }
+}
+
 export async function portalApi<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try { response = await authedFetch(url, { cache: 'no-store', ...init }); }
@@ -9,7 +16,7 @@ export async function portalApi<T>(url: string, init?: RequestInit): Promise<T> 
   const body = await response.json().catch(() => null);
   if (!response.ok || !body) {
     const code = body && typeof body.error === 'string' ? body.error : '';
-    throw new Error(portalErrorMessage(code, response.status));
+    throw new PortalApiError(code, response.status);
   }
   return body as T;
 }

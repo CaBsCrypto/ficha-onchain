@@ -17,6 +17,14 @@ function setup(count = 0) {
   return {sql,provider,create,wallets,run:(create=false)=>resolveStellarWallet(sql,provider,'app','user',create)};
 }
  describe('persistent Stellar wallet association',()=>{
+  it('verifies an already saved binding without a write',async()=>{
+    const {provider,wallets}=setup(1);
+    const sql=vi.fn().mockResolvedValue([{wallet_id:wallets[0].id,address:wallets[0].address}]);
+    const result=await resolveStellarWallet(sql as unknown as Sql,provider,'app','user',false,{existingOnly:true});
+    expect(result.address).toBe(wallets[0].address);
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(sql.mock.calls[0][0][0]).toContain('SELECT');
+  });
   it('reuses one existing wallet on every login',async()=>{const s=setup(1);expect(await s.run()).toEqual(await s.run());expect(s.create).not.toHaveBeenCalled();});
   it('does not create on GET-style lookup',async()=>{const s=setup();await expect(s.run()).rejects.toThrow('wallet_creation_required');expect(s.create).not.toHaveBeenCalled();});
   it('blocks ambiguous legacy identities',async()=>{const s=setup(4);await expect(s.run(true)).rejects.toThrow('wallet_binding_ambiguous');expect(s.create).not.toHaveBeenCalled();});
