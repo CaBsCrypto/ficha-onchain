@@ -5,13 +5,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
 import { DoctorClinicalHistory } from '@/components/private-portal/DoctorClinicalHistory';
 import { readClinicalDownload } from '@/components/private-portal/clinical-client';
-import type { ClinicalSnapshot, ClinicalVersion } from '@/types/clinical';
-const deps = vi.hoisted(() => ({ fetch: vi.fn(), sign: vi.fn(), userId: 'did:privy:doctor' }));
+import type { ClinicalOperation, ClinicalSnapshot, ClinicalVersion, DoctorClinicalRecordAccess } from '@/types/clinical';
+const deps = vi.hoisted(() => ({
+  fetch: vi.fn(), sign: vi.fn(), userId: 'did:privy:doctor', records: [] as DoctorClinicalRecordAccess[],
+  router: { push: vi.fn(), replace: vi.fn() }, setBlocked: vi.fn(), blocked: false,
+}));
+vi.mock('next/navigation', () => ({ useRouter: () => deps.router }));
+vi.mock('@/components/private-portal/DoctorClinicalInbox', () => ({
+  useDoctorClinicalInbox: () => ({
+    data: { records: deps.records, notifications: [] }, loading: false, error: '', refresh: vi.fn(),
+    setRecordNavigationBlocked: deps.setBlocked,
+    canNavigateToRecord: (id?: string) => !deps.blocked && (id === undefined || deps.records.some(record => record.historyId === id)),
+  }),
+}));
 vi.mock('@privy-io/react-auth/extended-chains', () => ({ useSignRawHash: () => ({ signRawHash: deps.sign }) }));
 vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: deps.fetch }));
 vi.mock('@privy-io/react-auth', () => ({ usePrivy: () => ({ ready: true, authenticated: true, user: { id: deps.userId } }) }));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({ usePortalWallet: () => ({ walletId: 'doctor-wallet', address: 'G' + 'D'.repeat(55) }) }));
 const HISTORY = 'a'.repeat(64), SECOND = 'b'.repeat(64), RX = '50c4f168-e3c3-4480-b015-43b4a589007f';
+const primary = { historyId: HISTORY, patientLabel: 'Paciente Alfa', canRead: true, canAppend: true };
+const secondary = { historyId: SECOND, patientLabel: null, canRead: true, canAppend: true };
 const receipt = 'e'.repeat(64), author = 'G' + 'D'.repeat(55);
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const note = { title: 'Control sintético', text: 'Nota médica sintética', eventDate: null };
@@ -22,23 +35,84 @@ async function mount(node: React.ReactNode) { const host = document.createElemen
 const button = (host: HTMLElement, text: string) => [...host.querySelectorAll('button')].find(value => value.textContent === text)!;
 async function input(node: HTMLInputElement | HTMLTextAreaElement, value: string) { const prototype = node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; await act(async () => { Object.getOwnPropertyDescriptor(prototype,'value')!.set!.call(node,value); node.dispatchEvent(new Event('input',{bubbles:true})); }); }
 async function submit(form: HTMLFormElement) { await act(async () => { form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); }); }
-async function selectHistory(host: HTMLElement, id: string) { await input(host.querySelector<HTMLInputElement>('#doctor-history-id')!,id); await submit(host.querySelector('form')!); }
-beforeEach(() => { vi.clearAllMocks(); deps.userId='did:privy:doctor'; (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true; HTMLElement.prototype.scrollIntoView=vi.fn(); HTMLDialogElement.prototype.showModal=vi.fn(); });
+const openRecord = (host: HTMLElement, name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="Abrir ficha · ${name}"]`)!;
+async function selectHistory(view: Awaited<ReturnType<typeof mount>>, id: string) {
+  await act(async () => openRecord(view.host, id === HISTORY ? primary.patientLabel : 'Ficha compartida 2').click());
+  expect(deps.router.push).toHaveBeenLastCalledWith(`/doctor?tab=historial&record=${id}&lang=es`, { scroll: false });
+  await act(async () => view.root.render(createElement(DoctorClinicalHistory, { requestedRecord: id })));
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  deps.userId = 'did:privy:doctor';
+  deps.records = [primary, secondary];
+  deps.blocked = false;
+  deps.setBlocked.mockImplementation((value: boolean) => { deps.blocked = value; });
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+  HTMLElement.prototype.scrollIntoView=vi.fn();
+  HTMLDialogElement.prototype.showModal=vi.fn();
+});
 afterEach(async () => { for(const {root,host} of roots) { await act(async () => root.unmount()); host.remove(); } roots=[]; vi.unstubAllGlobals(); });
 describe('doctor clinical context and independent capabilities', () => {
- it('requires a patient supplied opaque code and never enumerates histories', async () => {
+ it('opens only records in the verified list and handles a record without a patient label', async () => {
+  deps.records = [{ ...primary, canAppend: false }, secondary];
   deps.fetch.mockResolvedValue(response(snapshot(true,false,[version()])));
-  const {host}=await mount(createElement(DoctorClinicalHistory)); expect(deps.fetch).not.toHaveBeenCalled();
-  await selectHistory(host,'someone@example.com'); expect(deps.fetch).not.toHaveBeenCalled(); expect(host.querySelector('[role="alert"]')).not.toBeNull();
-  await selectHistory(host,HISTORY); expect(deps.fetch.mock.calls[0][0]).toBe(`/api/private-clinical-history?historyId=${HISTORY}`);
+  const view = await mount(createElement(DoctorClinicalHistory, { requestedRecord: 'f'.repeat(64) }));
+  const { host } = view;
+  expect(deps.fetch).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('No tienes acceso');
+  expect(openRecord(host, 'Ficha compartida 2')).not.toBeNull();
+  await selectHistory(view, HISTORY);
+  expect(deps.fetch.mock.calls[0][0]).toBe(`/api/private-clinical-history?historyId=${HISTORY}`);
   expect(host.textContent).toContain(note.text); expect(button(host,'Agregar antecedente o archivo')).toBeUndefined(); expect(button(host,'Corregir mi aporte')).toBeUndefined();
-  expect(host.querySelector('#clinical-share-id')).toBeNull(); expect(deps.sign).not.toHaveBeenCalled();
+  expect(host.querySelector('#doctor-history-id')).toBeNull();
+  await act(async () => button(host, 'Cerrar ficha').click());
+  expect(deps.router.push).toHaveBeenLastCalledWith('/doctor?tab=historial&lang=es', { scroll: false });
+  expect(deps.sign).not.toHaveBeenCalled();
  });
  it('keeps append only access free of the timeline and correction metadata', async () => {
   deps.fetch.mockResolvedValue(response(snapshot(false,true)));
   const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));
   expect(host.querySelector('ol')).toBeNull(); expect(host.querySelector('#clinical-filter')).toBeNull(); expect(host.textContent).toContain('no consultar su historial');
   await act(async () => button(host,'Agregar antecedente o archivo').click()); expect(host.querySelector('textarea')).not.toBeNull(); expect(host.textContent).toContain('autoría médica');
+ });
+ it('drops the previous timeline as soon as the verified list loses read access and rechecks the same record', async () => {
+  let finish!: (result: ReturnType<typeof response>) => void;
+  deps.fetch.mockResolvedValueOnce(response(snapshot(true, true, [version()])))
+    .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const { host, root } = await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY }));
+  expect(host.textContent).toContain(note.text);
+  expect(button(host, 'Corregir mi aporte')).toBeDefined();
+  deps.records = [{ ...primary, canRead: false }, secondary];
+  await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })));
+  expect(host.textContent).not.toContain(note.text);
+  expect(button(host, 'Corregir mi aporte')).toBeUndefined();
+  expect(deps.fetch.mock.calls.map(([path]) => path)).toEqual(Array(2).fill(`/api/private-clinical-history?historyId=${HISTORY}`));
+  await act(async () => finish(response(snapshot(false, true))));
+  expect(host.textContent).toContain('no consultar su historial');
+  expect(button(host, 'Agregar antecedente o archivo')).toBeDefined();
+ });
+ it('keeps the exact observed pending attempt available after withdrawal without restoring chart access', async () => {
+  const attempt: ClinicalOperation = { id: '477eb3d6-b443-422e-910f-0aeab92eba09', action: 'append_version',
+    state: 'submitted', expiresAt: 1800000000, transactionHash: receipt, errorCode: null };
+  const statusPath = '/api/private-clinical-operations/' + attempt.id;
+  deps.fetch.mockImplementation(path => Promise.resolve(path === statusPath
+    ? response({ operation: { ...attempt, state: 'confirmed' } })
+    : response({ ...snapshot(true, true, [version()]), operations: [attempt] })));
+  const { host, root } = await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY }));
+  expect(host.textContent).toContain(note.text);
+  expect(deps.blocked).toBe(true);
+  deps.records = [secondary];
+  await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })));
+  expect(host.textContent).toContain('No tienes acceso a esta ficha');
+  expect(host.textContent).not.toContain(note.text);
+  expect(button(host, 'Agregar antecedente o archivo')).toBeUndefined();
+  await act(async () => button(host, 'Consultar intento pendiente').click());
+  await act(async () => button(host, 'Consultar confirmación').click());
+  expect(deps.fetch.mock.calls.map(([path]) => path)).toEqual([`/api/private-clinical-history?historyId=${HISTORY}`, statusPath]);
+  expect(deps.fetch.mock.calls.every(([, init]) => (init?.method ?? 'GET') === 'GET')).toBe(true);
+  expect(deps.blocked).toBe(false);
+  expect(host.textContent).not.toContain(note.text);
+  expect(deps.sign).not.toHaveBeenCalled();
  });
  it('rejects history contents delivered without a read capability', async () => {
   deps.fetch.mockResolvedValue(response(snapshot(false,true,[version()]))); const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));
@@ -50,24 +124,29 @@ describe('doctor clinical context and independent capabilities', () => {
  });
  it('clears a draft and the selected history immediately when the account changes', async () => {
   deps.fetch.mockImplementation(path=>Promise.resolve(response(snapshot(true,true,[],path.includes(SECOND)?SECOND:HISTORY))));
-  const {host,root}=await mount(createElement(DoctorClinicalHistory)); await selectHistory(host,HISTORY); await act(async () => button(host,'Agregar antecedente o archivo').click());
+  const view = await mount(createElement(DoctorClinicalHistory));
+  const {host,root}=view; await selectHistory(view,HISTORY); await act(async () => button(host,'Agregar antecedente o archivo').click());
   await input(host.querySelector('textarea')!,'Private draft of previous patient');
-  await selectHistory(host,SECOND); expect(host.querySelector('textarea')).toBeNull(); expect(host.textContent).not.toContain('Private draft');
-  deps.userId='did:privy:other-doctor'; await act(async () => root.render(createElement(DoctorClinicalHistory))); expect(host.querySelector<HTMLInputElement>('#doctor-history-id')!.value).toBe(''); expect(host.querySelector('ol')).toBeNull();
+  await selectHistory(view,SECOND); expect(host.querySelector('textarea')).toBeNull(); expect(host.textContent).not.toContain('Private draft');
+  deps.userId='did:privy:other-doctor'; deps.records = [];
+  await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: SECOND })));
+  expect(host.textContent).not.toContain(primary.patientLabel); expect(host.querySelector('ol')).toBeNull();
  });
  it('revokes a local file preview when switching to another patient history', async () => {
   const revoke=vi.fn(); class BrowserURL extends URL { static createObjectURL=vi.fn().mockReturnValue('blob:patient-a'); static revokeObjectURL=revoke; } vi.stubGlobal('URL',BrowserURL);
   deps.fetch.mockImplementation(path=>Promise.resolve(response(snapshot(true,true,[],path.includes(SECOND)?SECOND:HISTORY))));
-  const {host}=await mount(createElement(DoctorClinicalHistory)); await selectHistory(host,HISTORY); await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const view = await mount(createElement(DoctorClinicalHistory));
+  const {host}=view; await selectHistory(view,HISTORY); await act(async()=>button(host,'Agregar antecedente o archivo').click());
   await act(async()=>host.querySelector<HTMLInputElement>('input[value="file"]')!.click());
   const bytes=new TextEncoder().encode('%PDF-1.7\nSynthetic\n%%EOF\n'); const file=new File([bytes],'private-patient-a.pdf',{type:'application/pdf'}); Object.defineProperty(file,'arrayBuffer',{value:async()=>bytes.buffer});
   const upload=host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(upload,'files',{value:[file]});await act(async()=>upload.dispatchEvent(new Event('change',{bubbles:true})));
-  expect(host.querySelector('a[download]')!.getAttribute('href')).toBe('blob:patient-a'); await selectHistory(host,SECOND);
+  expect(host.querySelector('a[download]')!.getAttribute('href')).toBe('blob:patient-a'); await selectHistory(view,SECOND);
   expect(revoke).toHaveBeenCalledWith('blob:patient-a'); expect(host.querySelector('a[download]')).toBeNull();expect(host.textContent).not.toContain('private-patient-a.pdf');
  });
- it('shows only patient sharing information for the owning screen', async () => {
+ it('explains the notification on the owning screen without displaying the sharing code', async () => {
   const data=snapshot(); delete data.context; deps.fetch.mockResolvedValue(response(data)); const {host}=await mount(createElement(ClinicalHistory));
-  expect(host.querySelector<HTMLInputElement>('#clinical-share-id')!.value).toBe(HISTORY); expect(host.textContent).toContain('también debes habilitar su permiso');
+  expect(host.querySelector('#clinical-share-id')).toBeNull(); expect(host.textContent).not.toContain(HISTORY);
+  expect(host.textContent).toContain('el médico recibirá un aviso y podrá abrir tu ficha desde su portal');
  });
 });
 describe('clinical prescription links and immutable doctor attempts', () => {
@@ -79,21 +158,24 @@ describe('clinical prescription links and immutable doctor attempts', () => {
    if(path==='/api/private-clinical-operations') { prepared=JSON.parse(init.body); return Promise.resolve(response({operation:{id:prepared.requestId,action:'append_version',state:'awaiting_signature',expiresAt:1900000000,transactionHash:null,errorCode:null,signing:{address:author,hash:'f'.repeat(64),network:'testnet',expiresAt:1900000000}}})); }
    return Promise.resolve(response(snapshot()));
   });
-  const {host}=await mount(createElement(DoctorClinicalHistory)); await selectHistory(host,HISTORY); await act(async()=>button(host,'Agregar antecedente o archivo').click());
-  const form=host.querySelectorAll('form')[1]; await input(form.querySelector('input:not([type])')!,'Control'); await input(form.querySelector('textarea')!,'Evolución sintética');
+  const {host}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })); await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const form=host.querySelector('form')!; await input(form.querySelector('input:not([type])')!,'Control'); await input(form.querySelector('textarea')!,'Evolución sintética');
   await act(async()=>button(host,'Vincular una receta existente').click()); expect(deps.fetch.mock.calls.some(call=>call[0]===`/api/private-clinical-history/prescriptions?historyId=${HISTORY}`)).toBe(true);
   await act(async()=>{const select=form.querySelector('select')!; select.value=RX;select.dispatchEvent(new Event('change',{bubbles:true}));});
   await submit(form); expect(host.textContent).toContain('Receta vinculada: 42'); await act(async()=>button(host,'Preparar firma').click());
   expect(prepared).toMatchObject({action:'append_version',historyId:HISTORY,note:{title:'Control',text:'Evolución sintética',prescriptionId:RX}});
-  expect(host.querySelector<HTMLInputElement>('#doctor-history-id')!.disabled).toBe(true); expect(deps.sign).not.toHaveBeenCalled();
+  expect(openRecord(host, 'Ficha compartida 2').disabled).toBe(true); expect(deps.sign).not.toHaveBeenCalled();
   expect(deps.fetch.mock.calls.filter(call=>(call[1]?.method??'GET')==='POST')).toHaveLength(1);
  });
  it('keeps history switching locked after an uncertain preparation without preparing a second intent', async () => {
   const bodies:any[]=[];
   deps.fetch.mockImplementation((path,init)=>{if(path==='/api/private-clinical-operations'){bodies.push(JSON.parse(init.body));return Promise.reject(new Error('Lost response'));}return Promise.resolve(response(snapshot()));});
-  const {host}=await mount(createElement(DoctorClinicalHistory));await selectHistory(host,HISTORY);await act(async()=>button(host,'Agregar antecedente o archivo').click());
-  const form=host.querySelectorAll('form')[1];await input(form.querySelector('input:not([type])')!,'Control');await input(form.querySelector('textarea')!,'Una sola preparación');await submit(form);await act(async()=>button(host,'Preparar firma').click());
-  expect(host.querySelector<HTMLInputElement>('#doctor-history-id')!.disabled).toBe(true);expect(button(host,'Cambiar de ficha').disabled).toBe(true);expect(button(host,'Cerrar ficha').disabled).toBe(true);expect(host.textContent).toContain('Preparación sin resultado comprobado');expect(bodies).toHaveLength(1);expect(bodies[0].historyId).toBe(HISTORY);expect(deps.sign).not.toHaveBeenCalled();
+  const {host,root}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY }));await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const form=host.querySelector('form')!;await input(form.querySelector('input:not([type])')!,'Control');await input(form.querySelector('textarea')!,'Una sola preparación');await submit(form);await act(async()=>button(host,'Preparar firma').click());
+  expect(openRecord(host,'Ficha compartida 2').disabled).toBe(true);expect(button(host,'Cerrar ficha').disabled).toBe(true);expect(host.textContent).toContain('Preparación sin resultado comprobado');expect(bodies).toHaveLength(1);expect(bodies[0].historyId).toBe(HISTORY);expect(deps.sign).not.toHaveBeenCalled();
+  await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: SECOND })));
+  expect(deps.router.replace).toHaveBeenLastCalledWith(`/doctor?tab=historial&record=${HISTORY}&lang=es`, { scroll: false });
+  expect(deps.fetch.mock.calls.every(([path]) => !String(path).includes(SECOND))).toBe(true);
  });
  it('clears previously verified content when a doctor context disappears during preparation', async () => {
   deps.fetch.mockImplementation(path=>Promise.resolve(path==='/api/private-clinical-operations'?response({error:'clinical_context_unavailable'},404):response(snapshot(true,true,[version()]))));

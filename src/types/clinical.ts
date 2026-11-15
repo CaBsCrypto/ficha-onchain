@@ -42,6 +42,25 @@ export interface ClinicalGrant {
   /** Latest verified consultation start times for this doctor, as ISO UTC timestamps. */
   previousVisitStarts?: string[];
 }
+export interface DoctorClinicalRecordAccess {
+  historyId: string;
+  patientLabel: string | null;
+  canRead: boolean;
+  canAppend: boolean;
+}
+export interface DoctorClinicalNotification {
+  id: string;
+  kind: 'access_granted' | 'access_changed' | 'access_withdrawn';
+  at: string;
+  historyId: string | null;
+  patientLabel: string | null;
+  canRead: boolean;
+  canAppend: boolean;
+}
+export interface DoctorClinicalInbox {
+  records: DoctorClinicalRecordAccess[];
+  notifications: DoctorClinicalNotification[];
+}
 export interface ClinicalPermissionAppointment {
   appointmentId: number;
   doctorId: number;

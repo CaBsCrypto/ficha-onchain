@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import { authedFetch } from '@/lib/auth/authed-fetch';
-import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
+import { WalletBoundary, usePortalWallet } from '@/components/private-portal/WalletBoundary';
 import { DoctorDraftRecovery } from '@/components/private-portal/DoctorDraftRecovery';
+import { DoctorClinicalBell, DoctorClinicalInboxProvider } from '@/components/private-portal/DoctorClinicalInbox';
 
 const shellCopy = {
   es: {
@@ -182,17 +183,21 @@ function MobileBottomNav() {
 
 // ── Doctor shell ──────────────────────────────────────────────────────────────
 function DoctorShell({ children, authorization }: { children: React.ReactNode; authorization: PrivateDoctorStatus }) {
-  const { logout } = usePrivy();
+  const { logout, user } = usePrivy();
+  const wallet = usePortalWallet();
   const email = usePrivyEmail();
   const language = usePortalLanguage();
   const labels = shellCopy[language];
   const validity = new Date((authorization.authorization.validUntil ?? 0) * 1000);
+  const inboxIdentity = user?.id && wallet.chain === 'stellar' && wallet.address === authorization.wallet
+    ? JSON.stringify([user.id, wallet.walletId, wallet.address]) : null;
 
   return (
+    <DoctorClinicalInboxProvider identity={inboxIdentity}>
     <div className="min-h-screen bg-[#f8fafc]">
       {/* Sticky header */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-1 px-3 sm:h-16 sm:gap-4 sm:px-6">
           {/* Logo + badge */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight">
@@ -208,11 +213,11 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
             </span>
           </div>
 
-          {/* Right side: profile link + logout */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <DoctorClinicalBell />
             <Link
               href="/doctor?tab=perfil"
-              className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+              className="flex items-center gap-2 rounded-xl px-1 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 sm:px-2.5"
               title={labels.profile}
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-600">
@@ -224,7 +229,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
             </Link>
             <button
               onClick={() => void logout()}
-              className="rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              className="rounded-xl px-1.5 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600 sm:px-3"
             >
               {labels.signOut}
             </button>
@@ -252,6 +257,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
         <MobileBottomNav />
       </Suspense>
     </div>
+    </DoctorClinicalInboxProvider>
   );
 }
 
