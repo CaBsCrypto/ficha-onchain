@@ -39,6 +39,14 @@ export interface ClinicalVersion {
 export interface ClinicalGrant {
   doctorId: number; doctorName: string; address: string; authorized: boolean;
   canRead: boolean; canAppend: boolean; revision: number;
+  /** Latest verified consultation start times for this doctor, as ISO UTC timestamps. */
+  previousVisitStarts?: string[];
+}
+export interface ClinicalPermissionAppointment {
+  appointmentId: number;
+  doctorId: number;
+  date: string;
+  startedAt: string;
 }
 export interface ClinicalSnapshot {
   draftsEnabled?: boolean;
@@ -47,6 +55,8 @@ export interface ClinicalSnapshot {
   writes: Record<ClinicalAction, boolean>;
   /** Incomplete doctor directory checks never stand in for verified permissions. */
   grantsUnavailable?: boolean;
+  /** Patient-only context for focusing a verified permission card. */
+  permissionAppointment?: ClinicalPermissionAppointment | null;
   history: { id: string; patient: string; createdAt: number; creationTransactionHash?: string | null } | null;
   entries: ClinicalVersion[]; grants: ClinicalGrant[]; operations: ClinicalOperation[];
   verifiedAt: string;

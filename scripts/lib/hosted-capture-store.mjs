@@ -60,6 +60,8 @@ export const assertHostedCaptureWeb = (env = process.env) => assertHostedCapture
 export const assertHostedCaptureOperator = (env = process.env) => assertHostedCaptureEnvironment(env, false);
 export const assertRegularAppointmentWeb = (env = process.env) =>
   assertHostedCaptureEnvironment(env, true, env.TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED === 'true');
+export const assertRegularClinicalWeb = (env = process.env) =>
+  assertHostedCaptureEnvironment(env, true, env.TRUSTLEAF_REGULAR_CLINICAL_ENABLED === 'true');
 
 function parse(bytes) {
   check(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= 8192);
