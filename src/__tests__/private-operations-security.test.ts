@@ -11,7 +11,7 @@ import { isPrivatePortalPath } from '@/lib/private-routes';
 const mocks=vi.hoisted(()=>({connection:vi.fn(),wallet:vi.fn(),doctor:vi.fn(),chain:vi.fn()}));
 // Synthetic cryptographic fixtures opt in explicitly; real gate behavior is tested separately.
 vi.mock('../../scripts/lib/sponsorship-write-gate.mjs',()=>({assertUnintegratedSponsorship:()=>{}}));
-vi.mock('@/lib/db',()=>({getDb:vi.fn(()=>({})),getDbConnection:mocks.connection,sqlForConnection:vi.fn(()=>({}))}));
+vi.mock('@/lib/db',()=>({getDb:vi.fn(()=>({})),getDbConnection:mocks.connection,sqlForConnection:vi.fn(()=>({query:async()=>[]}))}));
 vi.mock('@/lib/doctor-authorizations',()=>({verifiedWallet:mocks.wallet,readPrivateDoctor:mocks.doctor,
   DoctorAuthorizationError:class extends Error{status=409;}}));
 vi.mock('@/lib/stellar/private-chain',async()=>({...await vi.importActual<typeof import('@/lib/stellar/private-chain')>('@/lib/stellar/private-chain'),createPrivateChain:mocks.chain}));
@@ -124,7 +124,7 @@ describe('chain reads',()=>{
   });
 });
 
-function database(f:ReturnType<typeof saved>) {
+function database(f:ReturnType<typeof saved>, { regular = false } = {}) {
   const row=f.row,events:string[]=[];
   const e=row.expected as ExpectedOperation;
   const appointment:any={id:1,doctor_email:actors.doctor.email,patient_email:actors.patient.email,doctor_user_id:actors.doctor.userId,patient_user_id:actors.patient.userId,
@@ -147,7 +147,7 @@ function database(f:ReturnType<typeof saved>) {
       events.push(sql.startsWith('UPDATE private_operations SET signed_xdr')?'persist':sql);
       if(sql==='COMMIT'){afterCommit?.();return {rows:[],rowCount:0};}
       if(sql.startsWith('SELECT a.*'))return {rows:[appointment],rowCount:1};
-      if(sql.startsWith('SELECT * FROM prescription_booking_requests'))return {rows:[booking],rowCount:1};
+       if(sql.startsWith('SELECT * FROM prescription_booking_requests'))return {rows:regular?[]:[booking],rowCount:regular?0:1};
       if(sql.startsWith('SELECT * FROM private_prescriptions'))return {rows:prescription?[prescription]:[],rowCount:prescription?1:0};
       if(sql.startsWith('SELECT appointment_id FROM private_prescriptions'))return {rows:[{appointment_id:1}],rowCount:1};
       if(sql.startsWith('SELECT * FROM private_operations'))return {rows:values.length>1&&sql.includes('actor_user_id')&&values[1]!==row.actor_user_id?[]:[row],rowCount:1};
@@ -294,6 +294,22 @@ describe('persistent owner operations',()=>{
   it('email reuse cannot read a consultation belonging to another DID before accreditation',async()=>{
     const f=saved(),d=database(f);d.appointment.patient_user_id='did:privy:previous-user';
     await expect(readPrivateConsultation(f.actor,1)).rejects.toThrow('consultation_not_found');
+  });
+
+  it('offers record access only to the patient after verified attendance and doctor start',async()=>{
+    vi.stubEnv('TRUSTLEAF_REGULAR_CLINICAL_ENABLED','true');
+    const f=saved(),{appointment,chain}=database(f,{regular:true});
+    const canManage = async (actor = f.actor) =>
+      (await readPrivateConsultation(actor,1,true)).canManageClinicalPermissions;
+
+    appointment.clinical_appointment_verified=false;
+    expect(await canManage()).toBe(false);
+    appointment.clinical_appointment_verified=true;
+    expect(await canManage()).toBe(true);
+    expect(await canManage(actors.doctor)).toBe(false);
+    appointment.status='completed';
+    expect(await canManage()).toBe(false);
+    expect(chain.verifyDeployment).not.toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,4 @@
-/** Restricted clinical writes: expiring creation or a bounded patient demo.
+/** Restricted clinical writes for explicitly enabled Testnet policies.
  * Neither mode enables ordinary private writes. */
 import { Keypair, Networks, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { ClinicalAction } from '@/types/clinical';
@@ -9,6 +9,7 @@ import { databaseConnectionString } from '@/lib/database-config';
 import { rehearsalConfigured, currentClinicalRehearsal, assertClinicalRehearsalFee, type RehearsalPolicy } from './rehearsal';
 import { captureAction, captureRequestId, clinicalCaptureConfigured, loadClinicalCapture, type ClinicalCapturePlan } from './capture';
 import { hostedClinicalActor, hostedClinicalPolicy, type HostedClinicalPolicy } from './hosted';
+import { regularClinicalPolicy, regularClinicalRequestConfigured, type RegularClinicalPolicy, type RegularClinicalTarget } from './regular';
 
 const VARIABLES = ['TRUSTLEAF_CLINICAL_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_CREATE_ONCE_UNTIL'] as const;
 const HOSTED_VARIABLES = ['TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER', 'TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL'] as const;
@@ -17,7 +18,7 @@ export type ClinicalCreateOncePolicy = { wallet: string; relayer: string; until:
   { wallet: string; relayer: string; mode: 'patient_demo'; allowlist: string } |
   { wallet: string; relayer: string; mode: 'rehearsal'; until: number; plan: RehearsalPolicy } |
   { wallet: string; relayer: string; mode: 'capture'; until: number; plan: ClinicalCapturePlan } |
-  HostedClinicalPolicy;
+  HostedClinicalPolicy | RegularClinicalPolicy;
 export const CLINICAL_PATIENT_DEMO_VARIABLES = ['TRUSTLEAF_CLINICAL_PATIENT_DEMO_ENABLED', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_WALLETS', 'TRUSTLEAF_CLINICAL_PATIENT_DEMO_RELAYER'] as const;
 export const CLINICAL_PATIENT_DEMO_MAX_OPERATIONS = 20;
 const denied = () => new PrivateFlowError('clinical_create_once_scope_rejected', 403);
@@ -52,14 +53,14 @@ function patientDemoScope(action: ClinicalAction, wallet: string): ClinicalCreat
 }
 
 /** Presentation capability only; every mutation still checks the policy again. */
-export function clinicalWriteCapabilities(wallet: string): Record<ClinicalAction, boolean> {
+export function clinicalWriteCapabilities(wallet: string, target: RegularClinicalTarget = 'owner'): Record<ClinicalAction, boolean> {
   const allowed = (action: ClinicalAction) => {
-    try { assertClinicalWriteScope(action, wallet); return true; } catch { return false; }
+    try { assertClinicalWriteScope(action, wallet, target); return true; } catch { return false; }
   };
   return { create_history: allowed('create_history'), append_version: allowed('append_version'), set_permissions: allowed('set_permissions') };
 }
 
-export function assertClinicalWriteScope(action: ClinicalAction, wallet: string): ClinicalCreateOncePolicy | null {
+export function assertClinicalWriteScope(action: ClinicalAction, wallet: string, target: RegularClinicalTarget = 'owner'): ClinicalCreateOncePolicy | null {
   const hosted = hostedClinicalActor(wallet);
   if (hosted) {
     assertClinicalEnvironment();
@@ -76,6 +77,10 @@ export function assertClinicalWriteScope(action: ClinicalAction, wallet: string)
     const plan = currentClinicalRehearsal();
     if (!plan || (wallet === plan.patient.address ? action !== 'set_permissions' : wallet === plan.doctor.address ? action !== 'append_version' : true)) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
     return Object.freeze({ mode: 'rehearsal', wallet, relayer: plan.relayer, until: plan.until, plan });
+  }
+  if (regularClinicalRequestConfigured() &&
+      ((action === 'set_permissions' && target === 'owner') || (action === 'append_version' && target === 'doctor'))) {
+    return regularClinicalPolicy(wallet, action);
   }
   if (!clinicalCreateOnceConfigured()) { assertClinicalEnvironment(true); return null; }
   assertClinicalEnvironment();
@@ -106,6 +111,13 @@ export function assertClinicalWriteScope(action: ClinicalAction, wallet: string)
 /** Check the real fee bump budget before asking for the patient signature. */
 export function assertClinicalCreateOnceFee(policy: ClinicalCreateOncePolicy | null, unsigned: Transaction, requestId?: string) {
   if (!policy) return;
+  if (policy.mode === 'regular') {
+    const current = regularClinicalPolicy(policy.wallet, policy.action);
+    if (current.relayer !== policy.relayer || unsigned.source !== policy.wallet) throw denied();
+    try { clinicalWebFeeQuote(unsigned); }
+    catch { throw new PrivateFlowError('clinical_fee_budget_exceeded', 503); }
+    return;
+  }
   if (policy.mode === 'rehearsal') {
     const current = assertClinicalWriteScope(policy.wallet === policy.plan.patient.address ? 'set_permissions' : 'append_version', policy.wallet);
     if (current?.mode !== 'rehearsal' || current.plan.policyHash !== policy.plan.policyHash) throw denied();

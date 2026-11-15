@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import { canAuthorizeIssuance } from './state';
@@ -76,6 +77,8 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     : (scheduled || inProgress) && (data?.appointmentActions?.cancel ?? data?.consent.status !== 'consumed');
   const canComplete = role === 'doctor' && inProgress &&
     (data?.appointmentActions?.complete ?? (!regular && data?.prescription?.rxId != null));
+  const canManageClinicalPermissions = role === 'patient' && !error && inProgress && !!attended &&
+    !!appointment?.started_at && data?.canManageClinicalPermissions === true;
   const mintReady = !regular && !!data && inProgress && !!attended && data.booking?.state === 'confirmed' &&
     !data.booking.cancellation_requested_at && Number(data.booking.valid_until) * 1000 > Date.now() && data.consent.status === 'active' && Number(data.consent.validUntil ?? 0) * 1000 > Date.now();
   return <section data-patient-detail={role === "patient" ? "" : undefined} className="space-y-5">
@@ -98,6 +101,10 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         {appointment.status === 'completed' && <p className="mt-3 font-semibold text-slate-600">{english ? "Appointment completed" : "Consulta finalizada"}</p>}
       </div>
       <div data-patient-actions={role === "patient" ? "" : undefined} className="flex flex-wrap gap-3">
+        {canManageClinicalPermissions && <Link href={{ pathname: '/patient', query: { tab: 'historial', appointmentId: id, lang: language } }}
+          className="inline-flex min-h-11 items-center rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
+          {english ? 'Manage record access' : 'Gestionar acceso a mi ficha'}
+        </Link>}
         {needsAttendance && <button disabled={unavailable || !canAttend} onClick={() => void appointmentAction('attend')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{english ? "Confirm my attendance" : "Confirmar mi asistencia"}</button>}
         {role === 'doctor' && scheduled && attended && <button disabled={unavailable || !canStart} onClick={() => void appointmentAction('start')} className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{english ? "Start now" : "Iniciar ahora"}</button>}
         {canCancel && <button disabled={unavailable || (!regular && data.booking?.state === 'cancel_requested')} onClick={() => void appointmentAction('cancel')} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-40">{regular ? (english ? 'Cancel appointment' : 'Cancelar consulta') : (english ? 'Request cancellation' : 'Solicitar cancelación')}</button>}

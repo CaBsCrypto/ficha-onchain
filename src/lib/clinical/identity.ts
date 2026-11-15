@@ -6,11 +6,13 @@ import { verifiedWallet } from '@/lib/doctor-authorizations';
 import { PrivateFlowError } from '@/lib/private-config';
 
 /** Email verifies the current provider session; it is never the history owner key. */
-export async function resolveClinicalActor(actor: AuthedUser): Promise<ClinicalActor> {
+export async function resolveClinicalActor(actor: AuthedUser, options?: { existingOnly?: boolean }): Promise<ClinicalActor> {
   if (!/^did:privy:[A-Za-z0-9_-]+$/.test(actor.userId) || !actor.email?.trim()) {
     throw new PrivateFlowError('clinical_identity_required', 403);
   }
-  const wallet = await verifiedWallet(getDb(), actor.userId, actor.email);
+  const wallet = options?.existingOnly
+    ? await verifiedWallet(getDb(), actor.userId, actor.email, options)
+    : await verifiedWallet(getDb(), actor.userId, actor.email);
   return { userId: actor.userId, walletId: wallet.walletId, address: wallet.address };
 }
 

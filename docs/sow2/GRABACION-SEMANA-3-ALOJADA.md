@@ -15,6 +15,10 @@ Las ocho escenas se graban desde cero con la pareja sintética aprobada, en dos 
 
 Las reservas ordinarias usan la agenda semanal y el interruptor de servidor `TRUSTLEAF_REGULAR_APPOINTMENTS_ENABLED=true` en Production. Antes de activarlo en `trustleaf-demo`, aplica `node scripts/hosted-capture.mjs --env-file $operator migrate-appointments` al Neon aislado. Conserva `TRUSTLEAF_PRIVATE_WRITES_ENABLED=false`. La asistencia habilita `Iniciar ahora` (`Start now`) para el médico asignado. Una cita ordinaria registra su estado en Neon. Para la toma 06 se usa la franja excepcional y las fases de atestación y emisión que se describen abajo.
 
+### Continuación con la ficha de Semana 2
+
+Configura `TRUSTLEAF_REGULAR_CLINICAL_ENABLED=true` sólo en Production de `trustleaf-demo`, con el patrocinio clínico y el Neon Testnet del paso 2. El paciente reserva una cita nueva y confirma asistencia. Después de `Start now`, abre `Manage record access`, verifica el médico y la fecha de la consulta, elige lectura y agregado y firma en Privy. Coteja el recibo y los estados verificados. El médico abre la ficha existente y agrega la nota. Verifica su recibo y la nota visible desde el portal del paciente.
+
 En PowerShell 7 con Node 22, `$operator` es el archivo privado de configuración y `$evidence` el directorio privado de la grabación. Ambos son rutas absolutas. Ejecuta desde la raíz del clon con el SHA publicado.
 
 ```powershell

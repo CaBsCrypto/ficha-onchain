@@ -173,6 +173,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
       if (url === '/api/private-consultations/123') return Response.json({
         appointment: state(), appointmentMode: 'regular',
         appointmentActions: { attend: windowOpen && !attended, start: windowOpen && attended && !started, cancel: !started, complete: started && !completed },
+        canManageClinicalPermissions: true,
         booking: null, consent: { status: 'absent' }, operations: [],
       });
       if (url === '/api/appointments' && method === 'PATCH') {
@@ -196,6 +197,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     await click('Open appointment', doctor);
     expect(patient.textContent).toContain('Appointment #123');
     expect(patient.textContent).not.toContain('Test appointment');
+    expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(button('Confirm my attendance', patient).disabled).toBe(true);
     expect(button('Cancel appointment', patient).disabled).toBe(false);
     expect(doctor.textContent).toContain('Waiting for patient attendance');
@@ -207,6 +209,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     await tick();
     await click('Confirm my attendance', patient);
     expect(patient.textContent).toContain('Patient attendanceConfirmed');
+    expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
     await tick();
     expect(doctor.textContent).toContain('Patient ready');
     expect(button('Start now', doctor).disabled).toBe(false);
@@ -214,10 +217,15 @@ describe('active private signing components with controlled Privy and HTTP', () 
     expect(doctor.textContent).toContain('Appointment started');
     await tick();
     expect(patient.textContent).toContain('Appointment started');
+    const access = patient.querySelector('a[href*="appointmentId"]');
+    expect(access?.textContent).toBe('Manage record access');
+    expect(access?.getAttribute('href')).toBe('/patient?tab=historial&appointmentId=123&lang=en');
+    expect(doctor.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(patient.textContent).not.toContain('Cancel appointment');
     await click('Complete appointment', doctor);
     await tick();
     expect(patient.textContent).toContain('Appointment completed');
+    expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(doctor.textContent).toContain('Appointment completed');
     expect(requests('PATCH', '/api/appointments').map(call => call.body)).toEqual([
       { id: 123, action: 'attend' }, { id: 123, action: 'start' }, { id: 123, action: 'complete' },

@@ -29,6 +29,7 @@ export function hostedCaptureWebConfigured(env?: NodeJS.ProcessEnv): boolean;
 export function assertHostedCaptureWeb(env?: NodeJS.ProcessEnv): HostedCaptureEnvironment;
 export function assertHostedCaptureOperator(env?: NodeJS.ProcessEnv): HostedCaptureEnvironment;
 export function assertRegularAppointmentWeb(env?: NodeJS.ProcessEnv): HostedCaptureEnvironment;
+export function assertRegularClinicalWeb(env?: NodeJS.ProcessEnv): HostedCaptureEnvironment;
 export function readHostedCaptureActive(client: HostedCaptureClient): Promise<HostedCaptureSnapshot | null>;
 export function readHostedCaptureBySha(client: HostedCaptureClient, sha256: string): Promise<HostedCaptureSnapshot | null>;
 export function readHostedCaptureByRequest(client: HostedCaptureClient, requestId: string): Promise<HostedCaptureSnapshot | null>;

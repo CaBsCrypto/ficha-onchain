@@ -5,12 +5,13 @@ import { Account, BASE_FEE, Keypair, Networks, SorobanDataBuilder, Transaction, 
 import { CLINICAL_CONTRACT, assertClinicalUnsigned, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import type { ClinicalAction, ClinicalActor, ClinicalExpected, ClinicalPrepareRequest } from '@/types/clinical';
 
-const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), factory: vi.fn(), sponsor: vi.fn(), aggregate: vi.fn(), doctor: vi.fn(), seal: vi.fn(), context: vi.fn(), rx: vi.fn(), chain: {} as Record<string, any> }));
+const m = vi.hoisted(() => ({ connection: vi.fn(), query: vi.fn(), factory: vi.fn(), sponsor: vi.fn(), aggregate: vi.fn(), doctor: vi.fn(), approved: vi.fn(), seal: vi.fn(), context: vi.fn(), rx: vi.fn(), chain: {} as Record<string, any> }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/clinical/doctor-context', () => ({ clinicalDoctorContext: m.context }));
 vi.mock('@/lib/clinical/prescriptions', () => ({ clinicalPrescriptionReference: m.rx }));
 vi.mock('@/lib/db', () => ({ getDbConnection: m.connection, getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
+vi.mock('@/lib/doctor-onboarding', () => ({ isDoctorLocallyApproved: m.approved }));
 vi.mock('@/lib/clinical/history', () => ({ clinicalPreparedOperation: (_actor: unknown, r: Record<string, any>) => ({ id: r.id, action: r.action, state: r.state, expiresAt: Number(r.expires_at), transactionHash: r.transaction_hash ?? null, errorCode: r.error_code ?? null }) }));
 vi.mock('@/lib/clinical/config', () => ({ CLINICAL_ID: 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U', assertClinicalEnvironment: (write = false) => { if (write && process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
 vi.mock('@/lib/private-config', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/private-config')>(), assertPrivateWrites: () => { if (process.env.TRUSTLEAF_PRIVATE_WRITES_ENABLED !== 'true') throw Error('private_writes_paused'); } }));
@@ -23,6 +24,7 @@ vi.mock('@/lib/clinical/rehearsal-budget',()=>({assertClinicalRehearsalBudget:(.
 import * as writeScope from '@/lib/clinical/create-once';
 import * as rehearsalFunctions from '@/lib/clinical/rehearsal';
 import { cancelClinicalOperation, prepareClinicalOperation, reconcileClinicalOperation, signClinicalOperation } from '@/lib/clinical/operations';
+import { withRegularClinicalRequest } from '@/lib/clinical/regular';
 import { sealClinicalVersion } from '../../scripts/lib/clinical-crypto.mjs';
 import type { ClinicalCapturePlan } from '@/lib/clinical/capture';
 
@@ -53,7 +55,7 @@ function fixture(ownHistory = false) {
   const state = { row: null as Record<string, any> | null, history: ownHistory ? { history_id: historyId, owner_user_id: actor.userId, wallet_id: actor.walletId, patient_wallet: actor.address, contract_id: CLINICAL_CONTRACT, network: 'testnet', transaction_hash: '1'.repeat(64) } : null,
     versions: {} as Record<string, any>, draft: null as Record<string, any> | null, head: null as { author: string; headVersion: number } | null,
     version: null as Record<string, any> | null, receipt: 'NOT_FOUND', wrongReceipt: false, historyPatient: actor.address,
-    quotaRows: [] as Array<{id:string}>, queue: '', rpcFailure: false, failStorage: false, events: [] as string[], releaseCount: 0 };
+    quotaRows: [] as Array<{id:string}>, protectedRequest: false, queue: '', rpcFailure: false, failStorage: false, events: [] as string[], releaseCount: 0 };
   let transaction: { row: typeof state.row; history: typeof state.history; versions: typeof state.versions; draft: typeof state.draft } | null = null;
   const savedPoints = new Map<string, typeof transaction>();
   const query = vi.fn(async (sql: string, values: any[] = []) => {
@@ -66,6 +68,8 @@ function fixture(ownHistory = false) {
     if (q.startsWith('ROLLBACK TO SAVEPOINT ')) { Object.assign(state, clone(savedPoints.get(q.slice(22)))); return { rows: [] }; }
     if (q.startsWith('RELEASE SAVEPOINT ')) { savedPoints.delete(q.slice(18)); return { rows: [] }; }
     if (q.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (q.startsWith('SELECT 1 FROM hosted_capture_requests')) return { rows: state.protectedRequest ? [{}] : [] };
+    if (q.startsWith('SELECT sha256,phase FROM hosted_capture_activations')) return { rows: [] };
     if (q.startsWith('SELECT commitment FROM doctor_authorization_requests')) return {rows:[{commitment:'c'.repeat(64)}]};
     if (q.startsWith('SELECT to_regclass')) return { rows: [{ relation: values[0] }] };
     if (q.startsWith("SELECT id FROM clinical_web_operations WHERE source_wallet=")) return { rows: [...state.quotaRows, ...(state.row ? [{ id: state.row.id }] : [])] };
@@ -152,6 +156,108 @@ beforeEach(() => {
   vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'test-kek');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+function regularClinical() {
+  const host = 'ep-jolly-haze-ahpi0708-pooler.c-3.us-east-1.aws.neon.tech';
+  const environment = {
+    TRUSTLEAF_REGULAR_CLINICAL_ENABLED: 'true', TRUSTLEAF_PRIVATE_WRITES_ENABLED: 'false',
+    TRUSTLEAF_ENV: 'test', VERCEL_ENV: 'production', NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
+    TRUSTLEAF_DATABASE_URL: 'postgresql://fixture:fixture@' + host + '/test?sslmode=require', TRUSTLEAF_DB_HOST: host,
+  };
+  for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+  m.doctor.mockResolvedValue({
+    address: doctor.publicKey(), userId: 'did:privy:synthetic_doctor', walletId: 'verified_doctor_wallet',
+    doctor: { id: 7, email: 'doctor@example.test', status: 'active' },
+  });
+  m.approved.mockResolvedValue(true);
+  return withRegularClinicalRequest;
+}
+
+describe('regular isolated Testnet clinical permission operations', () => {
+  const grant: ClinicalPrepareRequest = {
+    requestId: ID, action: 'set_permissions', doctorId: 7, canRead: true, canAppend: true, expectedRevision: 0,
+  };
+
+  it('lets the owner prepare one grant, sign once and reconcile the same hash after disabling new writes', async () => {
+    const f = fixture(true);
+    const run = regularClinical();
+    await run(() => prepareClinicalOperation(user, actor, grant));
+    await run(() => prepareClinicalOperation(user, actor, grant));
+    await expect(run(() => prepareClinicalOperation(user, actor, { ...grant, canRead: false }))).rejects.toThrow('clinical_request_conflict');
+    expect(f.state.row?.expected).toMatchObject({ historyId, patient: actor.address, doctor: doctor.publicKey(), expectedRevision: 0 });
+    expect(m.doctor).toHaveBeenCalledWith(expect.anything(), grant.doctorId, { existingOnly: true });
+    expect(m.chain.prepare).toHaveBeenCalledOnce();
+    expect(m.sponsor).not.toHaveBeenCalled();
+
+    const result = await run(() => signClinicalOperation(user, actor, ID, testSignature()));
+    const { signed_xdr: envelope, transaction_hash: hash } = f.state.row!;
+    expect(result.operation).toMatchObject({ state: 'submitted', transactionHash: hash });
+    expect(m.chain.submit).toHaveBeenCalledExactlyOnceWith(envelope);
+    expect(m.sponsor).toHaveBeenCalledOnce();
+    m.chain.submit.mockClear();
+    vi.stubEnv('TRUSTLEAF_REGULAR_CLINICAL_ENABLED', 'false');
+
+    expect((await reconcileClinicalOperation(actor, ID)).operation).toMatchObject({ state: 'submitted', transactionHash: hash });
+    f.state.receipt = 'SUCCESS';
+    expect((await reconcileClinicalOperation(actor, ID)).operation).toMatchObject({ state: 'confirmed', transactionHash: hash });
+    expect(m.chain.receipt).toHaveBeenLastCalledWith(hash);
+    expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.sponsor).toHaveBeenCalledOnce();
+  });
+
+  it('allows a real full withdrawal after registry expiry and does not reauthorize the doctor', async () => {
+    const f = fixture(true);
+    const run = regularClinical();
+    m.chain.grant.mockResolvedValue({ revision: 4, canRead: true, canAppend: true });
+    m.chain.doctorAuthorized.mockResolvedValue(false);
+    m.approved.mockResolvedValue(false);
+
+    await run(() => prepareClinicalOperation(user, actor, { ...grant, canRead: false, canAppend: false, expectedRevision: 4 }));
+    await run(() => signClinicalOperation(user, actor, ID, testSignature()));
+
+    expect(f.state.row?.expected).toMatchObject({ canRead: false, canAppend: false, expectedRevision: 4 });
+    expect(f.state.row?.state).toBe('submitted');
+    expect(m.chain.doctorAuthorized).not.toHaveBeenCalled();
+    expect(m.approved).not.toHaveBeenCalled();
+  });
+
+  it.each(['sign', 'retry'] as const)('blocks %s when the exact request ID is reserved for hosted capture', async action => {
+    const f = fixture(true);
+    const run = regularClinical();
+    await run(() => prepareClinicalOperation(user, actor, grant));
+    if (action === 'retry') await run(() => signClinicalOperation(user, actor, ID, testSignature()));
+    const original = clone(f.state.row);
+    m.sponsor.mockClear();
+    m.chain.submit.mockClear();
+    f.state.protectedRequest = true;
+
+    await expect(run(() => action === 'sign' ? signClinicalOperation(user, actor, ID, testSignature())
+      : reconcileClinicalOperation(actor, ID, true, user))).rejects.toThrow('clinical_access_denied');
+
+    expect(f.state.row).toEqual(original);
+    expect(m.sponsor).not.toHaveBeenCalled();
+    expect(m.chain.submit).not.toHaveBeenCalled();
+  });
+
+  it.each(['unapproved doctor', 'expired registry', 'wrong owner wallet', 'capture request', 'stale revision'])(
+    'does not prepare a grant with %s', async failure => {
+      const f = fixture(true);
+      const run = regularClinical();
+      if (failure === 'unapproved doctor') m.approved.mockResolvedValue(false);
+      if (failure === 'expired registry') m.chain.doctorAuthorized.mockResolvedValue(false);
+      if (failure === 'capture request') f.state.protectedRequest = true;
+      if (failure === 'stale revision') m.chain.grant.mockResolvedValue({ revision: 1, canRead: false, canAppend: false });
+      const currentActor = failure === 'wrong owner wallet' ? { ...actor, walletId: 'different-wallet' } : actor;
+
+      await expect(run(() => prepareClinicalOperation(user, currentActor, grant))).rejects.toThrow(/doctor_not_authorized|clinical_wallet_changed|clinical_access_denied|clinical_permission_conflict/);
+      expect(f.state.row).toBeNull();
+      expect(f.state.events).toContain('ROLLBACK');
+      expect(m.chain.prepare).not.toHaveBeenCalled();
+      expect(m.sponsor).not.toHaveBeenCalled();
+      expect(m.chain.submit).not.toHaveBeenCalled();
+    },
+  );
+});
 
 describe.each(['local', 'hosted'])('single authorized %s history creation', mode => {
   function scoped() {
@@ -567,6 +673,25 @@ describe('medical append uses the author wallet and the selected patient permiss
     m.context.mockResolvedValue({ historyId: selectedHistory, doctorId: 7, canRead: false, canAppend: true, grantRevision: 3 });
     return f;
   }
+  it('uses the existing approved doctor with append-only rights and keeps the original hash after withdrawal', async () => {
+    const f = medicalFixture();
+    const run = regularClinical();
+    await run(() => prepareClinicalOperation(user, actor, medicalInput));
+    expect(m.context).toHaveBeenCalledWith(user, actor, selectedHistory, m.chain, true);
+    expect(f.state.row?.expected).toMatchObject({ patient: doctor.publicKey(), author: actor.address, expectedGrantRevision: 3 });
+    expect(JSON.stringify(f.state.row)).not.toContain(note.text);
+    await run(() => signClinicalOperation(user, actor, ID, testSignature()));
+    const original = clone(f.state.row);
+    m.chain.submit.mockClear();
+    m.context.mockResolvedValue({ doctorId: 7, canRead: true, canAppend: false, grantRevision: 4 });
+
+    const result = await run(() => reconcileClinicalOperation(actor, ID, true, user));
+
+    expect(result.operation.errorCode).toBe('clinical_retry_unavailable');
+    expect(f.state.row).toEqual(original);
+    expect(m.chain.submit).not.toHaveBeenCalled();
+    expect(m.sponsor).toHaveBeenCalledOnce();
+  });
   it('prepares and signs an append-only doctor note without reading patient content', async () => {
     const f = medicalFixture();
     await prepareClinicalOperation(user, actor, medicalInput);

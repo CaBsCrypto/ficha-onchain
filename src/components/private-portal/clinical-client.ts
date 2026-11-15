@@ -522,8 +522,9 @@ export function useClinicalOperation(identity: string, address: string, rehearsa
   }, [controller, state.operation?.id, state.operation?.state, state.busy]);
   return { ...state, controller };
 }
-export function useClinicalSnapshot(identity: string, historyId?: string, language: PortalLanguage = 'es') {
-  const scope = historyId === undefined ? identity : `${identity}:history:${historyId}`;
+export function useClinicalSnapshot(identity: string, historyId?: string, language: PortalLanguage = 'es', appointmentId?: number) {
+  const scope = historyId !== undefined ? `${identity}:history:${historyId}`
+    : appointmentId !== undefined ? `${identity}:appointment:${appointmentId}` : identity;
   const languageRef = useRef(language);
   languageRef.current = language;
   const [view, setView] = useState<{ identity: string; data: ClinicalSnapshot | null; loading: boolean; error: string }>({ identity: '', data: null, loading: true, error: '' });
@@ -533,7 +534,8 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
     if (!identity) { setView({ identity: scope, data: null, loading: false, error: '' }); return; }
     let alive = true; const abort = new AbortController();
     setView({ identity: scope, data: null, loading: true, error: '' });
-    const path = clinicalHistoryPath(historyId);
+    const basePath = clinicalHistoryPath(historyId);
+    const path = historyId === undefined && appointmentId !== undefined ? `${basePath}?appointmentId=${appointmentId}` : basePath;
     void clinicalRead((signal, trace) => clinicalApi<ClinicalSnapshot>(path, { signal }, trace), abort.signal, path, CLINICAL_SNAPSHOT_READ_TIMEOUT_MS).then(data => {
       if (!data || !Array.isArray(data.entries) || !Array.isArray(data.grants) || !Array.isArray(data.operations) || !Number.isFinite(Date.parse(data.verifiedAt))) throw new ClinicalClientError(503, 'clinical_history_unavailable');
       if (historyId !== undefined && (data.history?.id !== historyId || data.context?.role !== 'doctor' || typeof data.context.canRead !== 'boolean' || typeof data.context.canAppend !== 'boolean' || !Number.isSafeInteger(data.context.grantRevision) || !data.context.canRead && data.entries.length > 0)) throw new ClinicalClientError(503, 'clinical_history_unavailable');
@@ -545,7 +547,7 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
       setView({ identity: scope, data: null, loading: false, error: localizedClinicalError(error, locale, locale === 'en' ? 'We could not verify the clinical record.' : 'No pudimos verificar el historial.') });
     });
     return () => { alive = false; abort.abort(); };
-  }, [identity, historyId, revision]);
+  }, [identity, historyId, appointmentId, revision, scope]);
   return { ...(view.identity === scope ? view : { identity: scope, data: null, loading: !!identity, error: '' }), refresh };
 }
 export function clinicalHistoryPath(historyId?: string, suffix = '') {

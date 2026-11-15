@@ -5,8 +5,10 @@ import { clinicalSponsorshipQuoteView } from './sponsorship';
 import { getDb } from '@/lib/db';
 import { requireUser, type AuthedUser } from '@/lib/auth/privy-auth';
 import { resolveDoctor } from '@/lib/doctor-authorizations';
-import { PrivateFlowError, REGISTRY_PRIVATE, PRIVATE_ADMIN } from '@/lib/private-config';
-import type { ClinicalActor, ClinicalSnapshot, ClinicalVersion, ClinicalGrant, ClinicalOperation, ClinicalOperationReview } from '@/types/clinical';
+import { PrivateFlowError, REGISTRY_PRIVATE, PRIVATE_ADMIN, PRIVY_APP } from '@/lib/private-config';
+import { appointmentStartedByDoctorSql } from '@/lib/prescription-booking';
+import type { ClinicalActor, ClinicalSnapshot, ClinicalVersion, ClinicalGrant, ClinicalOperation, ClinicalOperationReview,
+  ClinicalPermissionAppointment } from '@/types/clinical';
 import { createClinicalChainReader } from '../../../scripts/lib/clinical-chain-read.mjs';
 import { readClinicalVersion } from '../../../scripts/lib/clinical-read.mjs';
 import { clinicalNeonStore } from '../../../scripts/lib/clinical-neon-store.mjs';
@@ -22,6 +24,7 @@ import { rehearsalConfigured, clinicalRehearsalView } from './rehearsal';
 import { clinicalCaptureConfigured, clinicalCaptureView } from './capture';
 import { hostedClinicalActor, hostedClinicalView } from './hosted';
 import { clinicalReadStage, type ClinicalReadTrace } from './read-trace';
+import { regularClinicalRequestConfigured } from './regular';
 
 export function clinicalStorageClient() { return { query: async (sql: string, values?: unknown[]) => ({ rows: await getDb().query(sql, values) }) }; }
 export async function ownClinicalHistory(actor: ClinicalActor, chain = createClinicalWebChain()) {
@@ -85,13 +88,16 @@ export async function clinicalOperations(actor: ClinicalActor, historyId?: strin
 /** A caller supplies only an opaque locator. No patient enumeration or wallet input. */
 export function clinicalReadQuery(request: Request, document = false) {
   const params = new URL(request.url).searchParams;
-  const allowed = document ? ['historyId', 'entryId', 'version'] : ['historyId'];
+  const allowed = document ? ['historyId', 'entryId', 'version'] : ['historyId', 'appointmentId'];
   if ([...params.keys()].some(key => !allowed.includes(key)) || allowed.some(key => params.getAll(key).length > 1)) {
     throw new PrivateFlowError('clinical_request_invalid', 400);
   }
   const historyId = params.get('historyId') ?? undefined;
   if (historyId !== undefined && !/^[a-f0-9]{64}$/.test(historyId)) throw new PrivateFlowError('clinical_request_invalid', 400);
-  return { params, historyId };
+  const selectedAppointment = params.get('appointmentId');
+  if (selectedAppointment !== null && (historyId !== undefined || !/^[1-9][0-9]{0,9}$/.test(selectedAppointment) ||
+    Number(selectedAppointment) > 2_147_483_647)) throw new PrivateFlowError('clinical_request_invalid', 400);
+  return { params, historyId, appointmentId: selectedAppointment === null ? undefined : Number(selectedAppointment) };
 }
 type DoctorReadContext = Awaited<ReturnType<typeof clinicalDoctorContext>>;
 export type ClinicalReadTarget = NonNullable<Awaited<ReturnType<typeof ownClinicalHistory>>> & { context?: DoctorReadContext };
@@ -192,9 +198,9 @@ export async function clinicalDocument(request: Request, actor: ClinicalActor, h
     getKeyring: async () => clinicalKeyring().keyring,
   });
 }
-export async function clinicalGrants(historyId: string, onUnavailable?: () => void, chain = createClinicalWebChain()): Promise<ClinicalGrant[]> {
+async function verifiedClinicalGrants(historyId: string, onUnavailable: (() => void) | undefined, chain: ReturnType<typeof createClinicalWebChain>) {
   const rows = await getDb().query('SELECT id,name FROM doctors ORDER BY name,id LIMIT 200');
-  const result: ClinicalGrant[] = [];
+  const result: { grant: ClinicalGrant; doctor: Awaited<ReturnType<typeof resolveDoctor>> }[] = [];
   for (const row of rows) {
     let doctor;
     try { doctor = await resolveDoctor(getDb(), Number(row.id)); }
@@ -209,8 +215,9 @@ export async function clinicalGrants(historyId: string, onUnavailable?: () => vo
       const grant = await chain.grant(historyId, doctor.address);
       const authorized = await chain.doctorAuthorized(doctor.address);
       if (!authorized && !grant) continue;
-      result.push({ doctorId: Number(row.id), doctorName: String(row.name), address: doctor.address, authorized: authorized && doctor.doctor.status === 'active',
-        canRead: grant?.canRead ?? false, canAppend: grant?.canAppend ?? false, revision: grant?.revision ?? 0 });
+      result.push({ doctor, grant: { doctorId: Number(row.id), doctorName: String(row.name), address: doctor.address,
+        authorized: authorized && doctor.doctor.status === 'active', canRead: grant?.canRead ?? false,
+        canAppend: grant?.canAppend ?? false, revision: grant?.revision ?? 0 } });
     } catch (error) {
       // The patient's content was independently verified as owner. An unrelated
       // directory entry cannot authorize access, or invalidate that content.
@@ -221,20 +228,91 @@ export async function clinicalGrants(historyId: string, onUnavailable?: () => vo
   }
   return result;
 }
-export async function clinicalSnapshot(request: Request, user: AuthedUser, actor: ClinicalActor, historyId?: string, trace?: ClinicalReadTrace): Promise<ClinicalSnapshot> {
+
+export async function clinicalGrants(historyId: string, onUnavailable?: () => void, chain = createClinicalWebChain()): Promise<ClinicalGrant[]> {
+  return (await verifiedClinicalGrants(historyId, onUnavailable, chain)).map(({ grant }) => grant);
+}
+
+async function patientAppointmentPermissions(user: AuthedUser, actor: ClinicalActor,
+  verifiedGrants: Awaited<ReturnType<typeof verifiedClinicalGrants>>, appointmentId?: number): Promise<Pick<ClinicalSnapshot, 'grants' | 'permissionAppointment'>> {
+  const unfocused = appointmentId === undefined ? {} : { permissionAppointment: null };
+  const grants = verifiedGrants.map(({ grant }) => grant);
+  const targets = verifiedGrants.flatMap(({ grant, doctor }) => doctor.userId && doctor.walletId && doctor.doctor.email
+    ? [{ doctor_id: grant.doctorId, email: doctor.doctor.email, user_id: doctor.userId, wallet_id: doctor.walletId,
+      address: grant.address, authorized: grant.authorized }] : []);
+  if (!user.email || user.userId !== actor.userId || targets.length === 0) return { grants, ...unfocused };
+
+  let rows: { kind: 'focus' | 'prior'; doctor_id: number; appointment_id: number | null; visit_date: string; started_at: Date | string | null }[];
+  try {
+    rows = await getDb().query(`WITH verified_visits AS (
+      SELECT a.id AS appointment_id,a.doctor_id,a.status,a.started_at,
+        target.authorized AND d.status='active' AS doctor_authorized,
+        TO_CHAR(a.started_at AT TIME ZONE 'America/Santiago','YYYY-MM-DD') AS visit_date
+      FROM appointments a
+      JOIN jsonb_to_recordset($5::jsonb) AS target(doctor_id integer,email text,user_id text,wallet_id text,address text,authorized boolean)
+        ON target.doctor_id=a.doctor_id AND target.email=a.doctor_email AND target.user_id=a.doctor_user_id
+          AND target.wallet_id=a.doctor_wallet_id AND target.address=a.doctor_wallet
+      JOIN doctors d ON d.id=a.doctor_id AND LOWER(d.email)=target.email
+      JOIN privy_stellar_wallet_bindings b ON b.app_id=$7 AND b.user_id=target.user_id
+        AND b.wallet_id=target.wallet_id AND b.address=target.address
+      WHERE a.patient_user_id=$1 AND a.patient_email=$2 AND a.patient_wallet_id=$3 AND a.patient_wallet=$4
+        AND (${appointmentStartedByDoctorSql}) AND a.date=(a.started_at AT TIME ZONE 'America/Santiago')::date
+        AND ((a.status='in_progress' AND a.completed_at IS NULL) OR
+          (a.status='completed' AND a.completed_at>=a.started_at AND a.completed_at<=NOW()))
+    ), focus AS (
+      SELECT * FROM verified_visits WHERE appointment_id=$6::integer AND status='in_progress' AND doctor_authorized
+    ), ranked_visits AS (
+      SELECT v.*, ROW_NUMBER() OVER (PARTITION BY v.doctor_id ORDER BY v.started_at DESC,v.appointment_id DESC) AS visit_rank
+      FROM verified_visits v
+      WHERE NOT EXISTS (SELECT 1 FROM focus f WHERE v.doctor_id=f.doctor_id AND v.started_at>=f.started_at)
+    )
+    SELECT 'focus' AS kind,doctor_id,appointment_id,visit_date,started_at FROM focus
+    UNION ALL SELECT 'prior',doctor_id,NULL,visit_date,started_at FROM ranked_visits WHERE visit_rank<=5
+    ORDER BY kind,doctor_id,started_at DESC`,
+    [actor.userId, user.email, actor.walletId, actor.address, JSON.stringify(targets), appointmentId ?? null, PRIVY_APP]);
+  } catch {
+    // The verified clinical record and its grants remain useful without appointment metadata.
+    return { grants, ...unfocused };
+  }
+
+  const priorStarts = new Map(targets.map(target => [target.doctor_id, [] as string[]]));
+  let permissionAppointment: ClinicalPermissionAppointment | null = null;
+  for (const row of rows) {
+    const starts = priorStarts.get(row.doctor_id);
+    if (!starts || !/^\d{4}-\d{2}-\d{2}$/.test(row.visit_date) || row.started_at === null) continue;
+    const startedAt = new Date(row.started_at);
+    if (!Number.isFinite(startedAt.getTime())) continue;
+    if (row.kind === 'prior' && starts.length < 5) starts.push(startedAt.toISOString());
+    if (row.kind === 'focus' && row.appointment_id !== null && row.appointment_id === appointmentId) {
+      permissionAppointment = {
+        appointmentId: row.appointment_id, doctorId: row.doctor_id, date: row.visit_date, startedAt: startedAt.toISOString(),
+      };
+    }
+  }
+  return {
+    grants: grants.map(grant => priorStarts.has(grant.doctorId) ? { ...grant, previousVisitStarts: priorStarts.get(grant.doctorId) } : grant),
+    ...(appointmentId === undefined ? {} : { permissionAppointment }),
+  };
+}
+
+export async function clinicalSnapshot(request: Request, user: AuthedUser, actor: ClinicalActor, historyId?: string,
+  trace?: ClinicalReadTrace, appointmentId?: number): Promise<ClinicalSnapshot> {
   const draftsEnabled = true;
   const hosted = hostedClinicalActor(actor.address);
-  const capabilities = clinicalWriteCapabilities(actor.address);
+  const chain = createClinicalWebChain();
+  const own = await clinicalReadStage(trace, 'target', () => clinicalReadTarget(user, actor, historyId, chain));
+  const capabilities = clinicalWriteCapabilities(actor.address, own?.context ? 'doctor' : 'owner');
   const writes = hosted && historyId && hosted.snapshot.historyId !== historyId
     ? { create_history: false, append_version: false, set_permissions: false }
     : capabilities;
-  const chain = createClinicalWebChain();
-  const own = await clinicalReadStage(trace, 'target', () => clinicalReadTarget(user, actor, historyId, chain));
   const operations = await clinicalReadStage(trace, 'ops', () => clinicalOperations(actor, own?.history.id ?? null));
   const rehearsal = hosted ? hostedClinicalView(actor, own?.history.id)
     : own ? (clinicalCaptureConfigured() ? clinicalCaptureView(actor, own.history.id) : clinicalRehearsalView(actor, own.history.id)) : undefined;
-  const doctorCanWrite = !clinicalCreateOnceConfigured(actor.address) || rehearsalConfigured() || ((!!hosted || clinicalCaptureConfigured()) && !!rehearsal);
-  if (!own) return { draftsEnabled, writes, ...(hosted && rehearsal ? { rehearsal } : {}), history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
+  const doctorCanWrite = regularClinicalRequestConfigured() || !clinicalCreateOnceConfigured(actor.address) || rehearsalConfigured() ||
+    ((!!hosted || clinicalCaptureConfigured()) && !!rehearsal);
+  if (!own) return { draftsEnabled, writes, ...(hosted && rehearsal ? { rehearsal } : {}),
+    ...(appointmentId === undefined ? {} : { permissionAppointment: null }),
+    history: null, entries: [], grants: [], operations, verifiedAt: new Date().toISOString() };
   if (own.context && !own.context.canRead) {
     await clinicalReadStage(trace, 'finalcontext', () => clinicalConfirmReadTarget(request, actor, own, chain));
     return { draftsEnabled, writes: { create_history: false, set_permissions: false, append_version: doctorCanWrite && writes.append_version && own.context.canAppend },
@@ -344,6 +422,10 @@ export async function clinicalSnapshot(request: Request, user: AuthedUser, actor
   }
   const creationTransactionHash = await clinicalReadStage(trace, 'receipt', () => clinicalCreationReceipt(actor, own.history.id, own.row.transaction_hash, chain));
   let grantsUnavailable = false;
-  const grants = await clinicalReadStage(trace, 'finalcontext', () => clinicalGrants(own.history.id, () => { grantsUnavailable = true; }, chain));
-  return { draftsEnabled, writes, rehearsal, history: { ...own.history, creationTransactionHash }, entries, grants, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
+  const permissions = await clinicalReadStage(trace, 'finalcontext', async () => {
+    const grants = await verifiedClinicalGrants(own.history.id, () => { grantsUnavailable = true; }, chain);
+    return patientAppointmentPermissions(user, actor, grants, appointmentId);
+  });
+  return { draftsEnabled, writes, rehearsal, history: { ...own.history, creationTransactionHash }, entries,
+    ...permissions, grantsUnavailable, operations, verifiedAt: new Date().toISOString() };
 }

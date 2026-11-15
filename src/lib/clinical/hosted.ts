@@ -29,7 +29,8 @@ const sameActor = (a: ClinicalActor, b: ClinicalActor) =>
 const overlapsActor = (a: ClinicalActor, b: ClinicalActor) =>
   a.userId === b.userId || a.walletId === b.walletId || a.address === b.address;
 
-export async function withHostedClinicalRequest<T>(request: Request, actor: ClinicalActor, work: () => Promise<T>): Promise<T> {
+export async function withHostedClinicalRequest<T>(request: Request, actor: ClinicalActor, work: () => Promise<T>,
+  options?: { allowRegularFallback?: boolean }): Promise<T> {
   if (!hostedCaptureWebConfigured()) return work();
   const environment = assertHostedCaptureWeb();
   const client = await getDbConnection();
@@ -40,6 +41,8 @@ export async function withHostedClinicalRequest<T>(request: Request, actor: Clin
   const canonicalRequest = snapshot.origin === environment.origin &&
     request.headers.get('host') === new URL(environment.origin).host &&
     (request.method === 'GET' || request.headers.get('origin') === environment.origin);
+  // The regular mutation lock still rejects staged and historical request IDs.
+  if (options?.allowRegularFallback && canonicalRequest && snapshot.expiresAt <= Math.floor(Date.now() / 1000)) return work();
   return hostedRequest.run({ snapshot, actor, canonicalRequest }, work);
 }
 

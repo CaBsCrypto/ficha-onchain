@@ -1,8 +1,8 @@
 'use client';
 import { usePortalLanguage } from '@/hooks/useLanguage';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
-import type { ClinicalGrant, ClinicalOperation, ClinicalVersion } from '@/types/clinical';
+import type { ClinicalGrant, ClinicalOperation, ClinicalPermissionAppointment, ClinicalVersion } from '@/types/clinical';
 import { usePortalWallet } from './WalletBoundary';
 import { localDate, appointmentDate } from './client';
 import { ReceiptLink } from './Operation';
@@ -303,8 +303,12 @@ function entryCalendarDate(language: PortalLanguage, date: string) {
 
 export interface ClinicalPermissionsProps {
   grants: ClinicalGrant[]; disabled: boolean; readOnly?: boolean; onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>;
+  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>;
 }
-export interface ClinicalHistoryProps { renderPermissions?: (props: ClinicalPermissionsProps) => ReactNode; historyId?: string; onPendingChange?: (pending: boolean) => void }
+export interface ClinicalHistoryProps {
+  renderPermissions?: (props: ClinicalPermissionsProps) => ReactNode; historyId?: string; permissionAppointmentId?: number;
+  onPendingChange?: (pending: boolean) => void;
+}
 
 function ClinicalPreparedReview({ operation }: { operation: ClinicalOperation }) {
   const language = usePortalLanguage();
@@ -412,14 +416,14 @@ function VersionContent({ entry, onUnavailable, historyId }: { entry: ClinicalVe
     {entry.source === 'doctor' && <p className="mt-3 break-all text-sm text-slate-500">{text.authorWallet}: {entry.author}</p>}
   </div>;
 }
-export function ClinicalHistory({ renderPermissions, historyId, onPendingChange }: ClinicalHistoryProps = {}) {
+export function ClinicalHistory({ renderPermissions, historyId, permissionAppointmentId, onPendingChange }: ClinicalHistoryProps = {}) {
   const language = usePortalLanguage();
   const text = copy[language];
   const { ready, authenticated, user } = usePrivy();
   const wallet = usePortalWallet();
   const doctor = historyId !== undefined;
   const identity = ready && authenticated && user?.id ? `${user.id}:${wallet.walletId}:${wallet.address}${doctor ? `:doctor:${historyId}` : ''}` : '';
-  const snapshot = useClinicalSnapshot(identity, historyId, language);
+  const snapshot = useClinicalSnapshot(identity, historyId, language, permissionAppointmentId);
   const operation = useClinicalOperation(identity, wallet.address, snapshot.data?.rehearsal, language);
   const [editing, setEditing] = useState<ClinicalVersion | 'new' | null>(null);
   const [filter, setFilter] = useState('all');
@@ -434,6 +438,8 @@ export function ClinicalHistory({ renderPermissions, historyId, onPendingChange 
   const formOpener = useRef<HTMLButtonElement | null>(null);
   const signHeading = useRef<HTMLHeadingElement>(null);
   const operationHeading = useRef<HTMLHeadingElement>(null);
+  const appointmentHeading = useRef<HTMLHeadingElement>(null);
+  const focusedAppointment = useRef('');
   useEffect(() => { if (signReview) signHeading.current?.focus(); }, [signReview]);
   useEffect(() => { setEditing(null); setIndependentDraft(false); setFilter('all'); setActionError(''); setSignReview(false); setPreparedFocus(null); setSigningCheck({ key: '', status: 'idle' }); lastRefresh.current = ''; }, [identity]);
   useEffect(() => {
@@ -453,6 +459,19 @@ export function ClinicalHistory({ renderPermissions, historyId, onPendingChange 
     }
   }, [operation.operation?.id, operation.operation?.state, snapshot.refresh]);
   const data = operation.accessLost ? null : snapshot.data;
+  const permissionAppointment = data?.permissionAppointment;
+  const focusedPermission = !doctor && data?.history && permissionAppointment &&
+    permissionAppointment.appointmentId === permissionAppointmentId &&
+    Number.isFinite(Date.parse(permissionAppointment.startedAt)) &&
+    data.grants.some(grant => grant.doctorId === permissionAppointment.doctorId) ? permissionAppointment : undefined;
+  const appointmentFocusKey = focusedPermission ? [identity, focusedPermission.appointmentId, focusedPermission.doctorId].join(':') : '';
+  useEffect(() => {
+    if (permissionAppointmentId === undefined) focusedAppointment.current = '';
+    if (!appointmentFocusKey || focusedAppointment.current === appointmentFocusKey || !appointmentHeading.current) return;
+    focusedAppointment.current = appointmentFocusKey;
+    appointmentHeading.current.focus({ preventScroll: true });
+    appointmentHeading.current.scrollIntoView?.({ block: 'start' });
+  }, [appointmentFocusKey, permissionAppointmentId]);
   const pending = data?.operations.filter(op => ['awaiting_signature', 'submitted'].includes(op.state)) ?? [];
   const checkRequired = doctor && data?.rehearsal?.signingCheck === true;
   const checkScope = checkRequired ? { identity, address: wallet.address, historyId: historyId!, runId: data.rehearsal!.runId, until: data.rehearsal!.until } : null;
@@ -516,6 +535,10 @@ export function ClinicalHistory({ renderPermissions, historyId, onPendingChange 
   const chronology = [...groups.values()].map(versions => versions.sort((a, b) => b.version - a.version)).sort((a, b) => b[0].createdAt - a[0].createdAt);
   const shown = chronology.filter(([head]) => filter === 'all' || filter === 'notes' && !!head.note || filter === 'files' && !head.note || filter === 'mine' && (doctor ? head.author === wallet.address : head.source === 'patient') || filter === 'doctor' && head.source === 'doctor');
   const current = operation.operation;
+  const permissions = data?.history && !doctor && renderPermissions?.({
+    grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'),
+    appointment: focusedPermission, appointmentHeading, onPrepare: prepare,
+  });
   if (!identity) return <p role="status" className="text-sm text-slate-600">{text.signIn}</p>;
   return <section key={identity} className="space-y-5 pb-4" aria-labelledby="clinical-history-title">
     <header className="flex flex-wrap items-start justify-between gap-4">
@@ -562,6 +585,12 @@ export function ClinicalHistory({ renderPermissions, historyId, onPendingChange 
       </div>}
     </section> : null}
     {data && !doctor && !data.history && <section className="rounded-2xl border border-sky-200 bg-white p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">{text.startHistory}</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{text.startHistoryDescription}</p><button type="button" disabled={newBlocked || !canWrite('create_history')} onClick={() => void prepare({ action: 'create_history' }).catch(failure => setActionError(localizedClinicalError(failure, language, text.resultUnverified)))} className={`${button} mt-4 bg-sky-700 text-white`}>{text.prepareHistory}</button></section>}
+    {permissions && permissionAppointmentId !== undefined && <>
+      {!focusedPermission && <p role="status" className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">{language === 'en'
+        ? 'We could not verify the doctor for this appointment. You can manage access from your doctor permissions.'
+        : 'No pudimos verificar al médico de esta consulta. Puedes gestionar el acceso desde tus permisos para médicos.'}</p>}
+      {permissions}
+    </>}
     {data?.history && <>
       <section aria-labelledby="clinical-history-created-title" className="min-w-0 rounded-2xl border border-sky-200 bg-sky-50/50 p-4 sm:p-5">
         <h2 id="clinical-history-created-title" className="font-semibold text-slate-900">{doctor ? text.selectedHistory : text.historyCreated}</h2>
@@ -584,7 +613,7 @@ export function ClinicalHistory({ renderPermissions, historyId, onPendingChange 
         </li>)}
       </ol>}
       {data.grantsUnavailable && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">{text.grantsUnavailable}</p>}
-      {!doctor && renderPermissions?.({ grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'), onPrepare: prepare })}
+      {permissionAppointmentId === undefined && permissions}
     </>}
     {pending.filter(op => op.id !== current?.id).map(op => <section key={op.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4"><p className="text-sm font-semibold text-slate-800">{text[actionLabels[op.action]]} · {text[stateLabels[op.state]]}</p><button type="button" disabled={operation.busy || operation.uncertain} onClick={() => { operation.controller.reopen(op); setSignReview(false); }} className={`${button} mt-3 border border-sky-200 bg-white text-sky-800`}>{text.pendingAttempt}</button></section>)}
     {actionError && !current && !operation.uncertain && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{actionError}</p>}

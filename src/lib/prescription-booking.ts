@@ -54,6 +54,8 @@ export const appointmentCheckInOpenSql = `a.date=(NOW() AT TIME ZONE 'America/Sa
   AND a.date+(${bookedClockSql})<=(NOW() AT TIME ZONE 'America/Santiago')+INTERVAL '30 minutes'`;
 export const appointmentAttendanceConfirmedSql = `a.attendance_at IS NOT NULL AND a.attendance_at<=NOW()
   AND a.attendance_user_id=a.patient_user_id`;
+export const appointmentStartedByDoctorSql = `(${appointmentAttendanceConfirmedSql})
+  AND a.started_by=a.doctor_user_id AND a.started_at>=a.attendance_at AND a.started_at<=NOW()`;
 
 function bookedDurationSql(clock: string, protectHosted: boolean, unknownDuration: 30 | 240) {
   const gridDuration = `COALESCE((SELECT MAX(grid.slot_minutes) FROM doctor_availability grid

@@ -26,7 +26,7 @@ beforeEach(()=>{
   TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_WALLET:actor.address,TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_RELAYER:payer.publicKey(),TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_UNTIL:String(Math.floor(Date.now()/1000)+480)};
  for(const[key,value]of Object.entries(env))vi.stubEnv(key,value);
  for(const suffix of ['WALLET','RELAYER','UNTIL'])vi.stubEnv('TRUSTLEAF_CLINICAL_CREATE_ONCE_'+suffix,undefined);
- m.prepare.mockImplementation(async(_user,current,body)=>{assertClinicalWriteScope(body.action,current.address);return {prepared:true};});
+ m.prepare.mockImplementation(async(_user,current,body)=>{assertClinicalWriteScope(body.action,current.address,body.historyId?'doctor':'owner');return {prepared:true};});
 });
 afterEach(()=>vi.unstubAllEnvs());
 it('allows the opted-in HTTP creation while ordinary writes remain disabled',async()=>{
@@ -57,4 +57,41 @@ it('allows selected continuous patient creation and append through the real wrap
  expect(forbidden.status).toBe(403);expect(await forbidden.json()).toEqual({error:'clinical_create_once_scope_rejected'});
  m.actor.mockResolvedValue({...actor,address:payer.publicKey()});expect((await POST(request())).status).toBe(403);
  const work=vi.fn();expect((await clinicalApi(request(),work)).status).toBe(503);expect(work).not.toHaveBeenCalled();
+});
+
+const permissionInput = { ...input, action: 'set_permissions', doctorId: 2, canRead: true, canAppend: false, expectedRevision: 0 };
+function regularClinical() {
+  for (const suffix of ['WALLET', 'RELAYER', 'UNTIL']) vi.stubEnv('TRUSTLEAF_CLINICAL_HOSTED_CREATE_ONCE_' + suffix, undefined);
+  vi.stubEnv('TRUSTLEAF_REGULAR_CLINICAL_ENABLED', 'true');
+}
+
+it('passes only canonical regular requests to the action policy using strict existing identity twice', async () => {
+  regularClinical();
+  const regularRequest = request(permissionInput);
+  expect((await POST(regularRequest)).status).toBe(200);
+  expect(m.auth).toHaveBeenCalledTimes(2);
+  expect(m.auth).toHaveBeenCalledWith(regularRequest, { strict: true });
+  expect(m.actor.mock.calls.map(([, options]) => options)).toEqual([{ existingOnly: true }, { existingOnly: true }]);
+  expect((await POST(request())).status).toBe(503);
+  expect((await POST(request({ ...input, action: 'append_version', note: { title: 'Fixture', text: 'Synthetic', eventDate: null } }))).status).toBe(503);
+  const work = vi.fn();
+  expect((await clinicalApi(request(), work)).status).toBe(503);
+  expect(work).not.toHaveBeenCalled();
+});
+
+it.each([
+  { case: 'insecure same host origin', origin: 'http://www.trustleaf.org', status: 403 },
+  { case: 'foreign origin', origin: 'https://other.example.test', status: 403 },
+  { case: 'preview', env: ['VERCEL_ENV', 'preview'], status: 503 },
+  { case: 'write toggle already on', env: ['TRUSTLEAF_PRIVATE_WRITES_ENABLED', 'true'], status: 503 },
+  { case: 'wrong hosted database', env: ['TRUSTLEAF_DB_HOST', 'wrong.example.test'], status: 503 },
+])('denies regular writes for $case before resolving the actor', async ({ origin, env, status }) => {
+  regularClinical();
+  if (env) vi.stubEnv(env[0], env[1]);
+
+  const result = await POST(request(permissionInput, origin));
+
+  expect(result.status).toBe(status);
+  expect(m.actor).not.toHaveBeenCalled();
+  expect(m.prepare).not.toHaveBeenCalled();
 });
