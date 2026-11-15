@@ -3,6 +3,7 @@ import { Keypair } from '@stellar/stellar-sdk';
 import type { PoolClient } from '@neondatabase/serverless';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HostedCaptureSnapshot } from '../../scripts/lib/hosted-capture-store.mjs';
+import { clinicalApi } from '@/lib/clinical/api';
 import { assertClinicalWriteScope, clinicalCreateOnceConfigured } from '@/lib/clinical/create-once';
 import { deriveClinicalHistoryId } from '@/lib/clinical/chain';
 import { CLINICAL_ID } from '@/lib/clinical/config';
@@ -12,9 +13,12 @@ import {
 import { PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 
 const mocked = vi.hoisted(() => ({
-  active: vi.fn(), historical: vi.fn(), mutation: vi.fn(), recovery: vi.fn(),
+  active: vi.fn(), historical: vi.fn(), mutation: vi.fn(), recovery: vi.fn(), auth: vi.fn(), identity: vi.fn(),
   client: { query: vi.fn(), release: vi.fn() },
 }));
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: mocked.auth }));
+vi.mock('@/lib/clinical/identity', () => ({ resolveClinicalActor: mocked.identity }));
 vi.mock('@/lib/db', () => ({ getDbConnection: async () => mocked.client }));
 vi.mock('../../scripts/lib/hosted-capture-store.mjs', async importOriginal => ({
   ...await importOriginal<typeof import('../../scripts/lib/hosted-capture-store.mjs')>(),
@@ -41,8 +45,7 @@ const baseRunId = randomUUID();
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const client = mocked.client as unknown as PoolClient;
 
-function snapshot(phase: HostedCaptureSnapshot['phase'], overrides = {}) {
-  const openedAt = Math.floor(Date.now() / 1000) - 1;
+function snapshot(phase: HostedCaptureSnapshot['phase'], overrides = {}, openedAt = Math.floor(Date.now() / 1000) - 1) {
   const until = openedAt + 600;
   const pair = { patient, doctor, historyId, doctorId, relayer: payer.publicKey() };
   const requestId = randomUUID();
@@ -150,6 +153,53 @@ describe('hosted clinical phase policy', () => {
       if (!policy || !('hosted' in policy)) throw new Error('expected hosted policy');
       await expect(lockHostedClinicalPolicy(client, policy, requestId)).rejects.toThrow('clinical_rehearsal_scope_rejected');
     });
+  });
+
+  it.each([
+    { actor: patient, action: 'set_permissions', target: 'owner' },
+    { actor: doctor, action: 'append_version', target: 'doctor' },
+  ] as const)('restores the opted-in regular $action after the matching capture expires', async ({ actor, action, target }) => {
+    vi.stubEnv('TRUSTLEAF_REGULAR_CLINICAL_ENABLED', 'true');
+    mocked.auth.mockResolvedValue({ userId: actor.userId, email: 'synthetic@example.test' });
+    mocked.identity.mockResolvedValue(actor);
+    const active = snapshot('grant-note');
+    mocked.active.mockResolvedValue(active.scope);
+    const work = async () => ({ mode: assertClinicalWriteScope(action, actor.address, target)?.mode });
+    const scoped = await clinicalApi(request(), work, { allowCreateOnce: true });
+    expect(await scoped.json()).toEqual({ mode: 'capture' });
+
+    const elapsed = snapshot('grant-note', {}, Math.floor(Date.now() / 1000) - 601);
+    mocked.active.mockResolvedValue(elapsed.scope);
+    const regular = await clinicalApi(request(), async () => {
+      expect(hostedClinicalView(actor, historyId)).toBeUndefined();
+      return work();
+    }, { allowCreateOnce: true });
+    expect(await regular.json()).toEqual({ mode: 'regular' });
+
+    await withHostedClinicalRequest(request(), actor, async () => {
+      expect(() => assertClinicalWriteScope(action, actor.address, target)).toThrow('clinical_rehearsal_expired');
+    });
+  });
+
+  it('settles only the original capture receipt after the canonical request returns to regular mode', async () => {
+    vi.stubEnv('TRUSTLEAF_REGULAR_CLINICAL_ENABLED', 'true');
+    mocked.auth.mockResolvedValue({ userId: doctor.userId, email: 'synthetic@example.test' });
+    mocked.identity.mockResolvedValue(doctor);
+    const { scope, requestId } = snapshot('grant-note', {}, Math.floor(Date.now() / 1000) - 601);
+    mocked.active.mockResolvedValue(scope);
+    mocked.historical.mockResolvedValue(scope);
+    const expected = { historyId, patient: patient.address, operationId: 'a'.repeat(64) };
+
+    const result = await clinicalApi(request(), async () => {
+      await expect(assertHostedClinicalRecovery(client, doctor, requestId, 'append_version', expected, true))
+        .rejects.toThrow('clinical_rehearsal_scope_rejected');
+      await assertHostedClinicalRecovery(client, doctor, requestId, 'append_version', expected, false);
+      return { receipt: 'checked' };
+    }, { allowCreateOnce: true });
+
+    expect(result.status).toBe(200);
+    expect(mocked.recovery).toHaveBeenCalledWith(client, requestId, scope.sha256);
+    expect(mocked.mutation).not.toHaveBeenCalled();
   });
 
   it('can settle the historical request but cannot reopen it after the active phase ends', async () => {

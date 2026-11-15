@@ -18,7 +18,7 @@ vi.mock('../../scripts/lib/clinical-read.mjs', async importOriginal => {
     const document = await actual.readClinicalVersion(...args); m.documents.push(document.content); return document;
   } };
 });
-import { clinicalDocument, clinicalGrants, clinicalOperations, clinicalPublicOperation, clinicalSnapshot, ownClinicalHistory } from '@/lib/clinical/history';
+import { clinicalDocument, clinicalGrants, clinicalOperations, clinicalPublicOperation, clinicalReadQuery, clinicalSnapshot, ownClinicalHistory } from '@/lib/clinical/history';
 
 // Deterministic local identities and encryption keys; no Testnet or database calls.
 const patient = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 51));
@@ -29,7 +29,7 @@ const user = { userId: actor.userId, email: 'history@example.test' };
 const historyId = deriveClinicalHistoryId(actor.address), operationId = '7'.repeat(64);
 const entryId = deriveClinicalEntryId(historyId, actor.address, operationId);
 const keyring = { 'history-test': '9'.repeat(64) };
-const request = () => new Request('http://localhost/api/private-clinical-history', { headers: { Authorization: 'Bearer local-synthetic-credential' } });
+const request = (query = '') => new Request(`http://localhost/api/private-clinical-history${query}`, { headers: { Authorization: 'Bearer local-synthetic-credential' } });
 function fixture(author = patient) {
   const state = { own: { history_id: historyId, owner_user_id: actor.userId, wallet_id: actor.walletId, patient_wallet: actor.address, contract_id: CLINICAL_CONTRACT, network: 'testnet', transaction_hash: '1'.repeat(64) } as Record<string, any> | null,
     contexts: [] as Record<string, any>[], stored: [] as Record<string, any>[], operations: [] as Record<string, any>[], chainVersions: [] as Record<string, any>[],
@@ -260,6 +260,86 @@ describe('clinical patient-managed permissions', () => {
   it('does not mark a blocked app doctor authorized even when registry authorization is still current', async () => {
     const f = fixture(); f.state.doctors = [{ id: 1, name: 'Blocked' }]; m.doctor.mockResolvedValue({ address: doctor.publicKey(), doctor: { status: 'revoked' } });
     const grants = await clinicalGrants(historyId); expect(grants[0].authorized).toBe(false);
+  });
+});
+
+describe('patient-only appointment context for clinical permissions', () => {
+  const selected = '?appointmentId=10';
+  const boundDoctor = { userId: 'did:privy:history_doctor', walletId: 'verifiedDoctorWallet',
+    address: doctor.publicKey(), doctor: { id: 4, email: 'doctor-verified@example.test', status: 'active' } };
+  function fixtureWithDoctor(rows: Record<string, unknown>[] | Error) {
+    const f = fixture();
+    f.state.doctors = [{ id: 4, name: 'Verified doctor' }];
+    m.doctor.mockResolvedValue(boundDoctor);
+    const existingQuery = m.query.getMockImplementation()!;
+    m.query.mockImplementation(async (statement: string, values?: unknown[]) => {
+      if (!statement.startsWith('WITH verified_visits')) return existingQuery(statement, values);
+      if (rows instanceof Error) throw rows;
+      return rows;
+    });
+    return f;
+  }
+
+  it.each(['?appointmentId=', '?appointmentId=0', '?appointmentId=01', '?appointmentId=1.5', '?appointmentId=2147483648',
+    '?appointmentId=10&appointmentId=11', `?historyId=${historyId}&appointmentId=10`])('rejects invalid or ambiguous focus %s', query => {
+    expect(() => clinicalReadQuery(request(query))).toThrow('clinical_request_invalid');
+  });
+
+  it('accepts a canonical appointment ID only on the owner snapshot query', () => {
+    expect(clinicalReadQuery(request(selected))).toMatchObject({ appointmentId: 10, historyId: undefined });
+    expect(() => clinicalReadQuery(request(selected), true)).toThrow('clinical_request_invalid');
+  });
+
+  it('returns a verified focus and previous same-day visits without exposing the appointment actor bindings', async () => {
+    fixtureWithDoctor([
+      { kind: 'focus', doctor_id: 4, appointment_id: 10, visit_date: '2026-10-19', started_at: new Date('2026-10-20T01:15:00Z') },
+      { kind: 'prior', doctor_id: 4, appointment_id: null, visit_date: '2026-10-19', started_at: '2026-10-19T20:45:00Z' },
+      { kind: 'prior', doctor_id: 4, appointment_id: null, visit_date: '2026-10-19', started_at: '2026-10-19T18:10:00Z' },
+    ]);
+    const response = await clinicalSnapshot(request(selected), user, actor, undefined, undefined, 10);
+    expect(response.permissionAppointment).toEqual({ appointmentId: 10, doctorId: 4, date: '2026-10-19', startedAt: '2026-10-20T01:15:00.000Z' });
+    expect(response.grants[0]).toMatchObject({ doctorId: 4, address: doctor.publicKey(),
+      previousVisitStarts: ['2026-10-19T20:45:00.000Z', '2026-10-19T18:10:00.000Z'] });
+    expect(JSON.stringify(response)).not.toContain(boundDoctor.walletId);
+    expect(JSON.stringify(response)).not.toContain(boundDoctor.doctor.email);
+    const [proofSql, values] = m.query.mock.calls.find(([statement]) => statement.startsWith('WITH verified_visits'))!;
+    expect(values.slice(0, 4)).toEqual([actor.userId, user.email, actor.walletId, actor.address]);
+    expect(JSON.parse(values[4])).toEqual([{ doctor_id: 4, email: boundDoctor.doctor.email, user_id: boundDoctor.userId,
+      wallet_id: boundDoctor.walletId, address: boundDoctor.address, authorized: true }]);
+    expect(values[5]).toBe(10);
+    expect(proofSql).toContain('target.wallet_id=a.doctor_wallet_id AND target.address=a.doctor_wallet');
+    expect(proofSql).toContain('a.attendance_user_id=a.patient_user_id');
+    expect(proofSql).toContain('a.started_by=a.doctor_user_id');
+    expect(proofSql).toContain('a.started_at<=NOW()');
+    expect(proofSql).toContain("a.status='completed' AND a.completed_at>=a.started_at AND a.completed_at<=NOW()");
+    expect(proofSql).toContain("appointment_id=$6::integer AND status='in_progress' AND doctor_authorized");
+    expect(proofSql).toContain('visit_rank<=5');
+  });
+
+  it('returns a neutral focus when unavailable while preserving the verified record and separate grant flags', async () => {
+    fixtureWithDoctor(new Error('private appointment diagnostics'));
+    const response = await clinicalSnapshot(request(selected), user, actor, undefined, undefined, 10);
+    expect(response.history?.id).toBe(historyId);
+    expect(response.permissionAppointment).toBeNull();
+    expect(response.grants[0]).toMatchObject({ doctorId: 4, canRead: false, canAppend: false, revision: 0 });
+    expect(response.grants[0]).not.toHaveProperty('previousVisitStarts');
+  });
+
+  it('omits focal context without a request and keeps a requested nonmatching focus neutral', async () => {
+    fixtureWithDoctor([]);
+    const normal = await clinicalSnapshot(request(), user, actor);
+    const missingFocus = await clinicalSnapshot(request(selected), user, actor, undefined, undefined, 10);
+    expect(normal).not.toHaveProperty('permissionAppointment');
+    expect(missingFocus.permissionAppointment).toBeNull();
+    expect(missingFocus.grants[0].previousVisitStarts).toEqual([]);
+  });
+
+  it('does not look up appointment context for a patient without a verified history', async () => {
+    const f = fixtureWithDoctor([]);
+    f.state.own = null;
+    const response = await clinicalSnapshot(request(selected), user, actor, undefined, undefined, 10);
+    expect(response).toMatchObject({ history: null, permissionAppointment: null, grants: [] });
+    expect(m.query.mock.calls.some(([statement]) => statement.startsWith('WITH verified_visits'))).toBe(false);
   });
 });
 

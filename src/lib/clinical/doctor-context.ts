@@ -3,6 +3,7 @@ import type { AuthedUser } from '@/lib/auth/privy-auth';
 import type { ClinicalActor } from '@/types/clinical';
 import { getDb } from '@/lib/db';
 import { resolveDoctor } from '@/lib/doctor-authorizations';
+import { isDoctorLocallyApproved } from '@/lib/doctor-onboarding';
 import { PrivateFlowError } from '@/lib/private-config';
 import { CLINICAL_ID } from './config';
 import { createClinicalWebChain } from './chain';
@@ -10,28 +11,31 @@ import { createClinicalWebChain } from './chain';
 const denied = () => new PrivateFlowError('clinical_context_unavailable', 404);
 
 /** Resolve the current app doctor from the verified session and wallet only. */
-export async function clinicalDoctorIdentity(user: AuthedUser, actor: ClinicalActor) {
+export async function clinicalDoctorIdentity(user: AuthedUser, actor: ClinicalActor, requireExistingApproval = false) {
   if (user.userId !== actor.userId || !user.email) throw denied();
   const sql = getDb();
   const candidates = await sql.query('SELECT id FROM doctors WHERE LOWER(email)=$1 LIMIT 2', [user.email.toLowerCase()]);
   if (candidates.length !== 1) throw denied();
-  const doctor = await resolveDoctor(sql, Number(candidates[0].id));
+  const doctorId = Number(candidates[0].id);
+  const doctor = requireExistingApproval
+    ? await resolveDoctor(sql, doctorId, { existingOnly: true }) : await resolveDoctor(sql, doctorId);
   if (Number(doctor.doctor.id) !== Number(candidates[0].id) || !Number.isSafeInteger(Number(doctor.doctor.id)) || Number(doctor.doctor.id) < 1 ||
       doctor.userId !== actor.userId || doctor.walletId !== actor.walletId || doctor.address !== actor.address ||
       String(doctor.doctor.email).toLowerCase() !== user.email.toLowerCase() || doctor.doctor.status !== 'active') throw denied();
-  return { doctorId: Number(doctor.doctor.id) };
+  if (requireExistingApproval && !await isDoctorLocallyApproved(sql, doctorId, { ...actor, email: user.email.toLowerCase() })) throw denied();
+  return { doctorId };
 }
 /** A selected history is a locator, never authority. No patient directory,
  * clinical content, wallet supplied by the browser, or write capability here.
  * Document/append handlers must recheck this gate for their own action. */
-export async function clinicalDoctorContext(user: AuthedUser, actor: ClinicalActor, historyId: string, verifiedRequestChain?: ReturnType<typeof createClinicalWebChain>) {
+export async function clinicalDoctorContext(user: AuthedUser, actor: ClinicalActor, historyId: string, verifiedRequestChain?: ReturnType<typeof createClinicalWebChain>, requireExistingApproval = false) {
   if (!/^[a-f0-9]{64}$/.test(historyId)) throw new PrivateFlowError('clinical_request_invalid', 400);
   const sql = getDb();
   // Reuse deployment verification only within the caller's current request.
   // Every observe() still reads current identity, authorization and grant.
   const chain = verifiedRequestChain ?? createClinicalWebChain();
   async function observe() {
-    const doctor = await clinicalDoctorIdentity(user, actor);
+    const doctor = await clinicalDoctorIdentity(user, actor, requireExistingApproval);
     // Registry expiry/revocation is independent of the app's approved profile.
     if (!await chain.doctorAuthorized(actor.address)) throw denied();
     const rows = await sql.query(`SELECT history_id,patient_wallet FROM clinical_web_histories

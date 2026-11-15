@@ -438,6 +438,91 @@ describe('prepared history attempt focus', () => {
     expect(document.activeElement).toBe(review); expect(scroll).toHaveBeenCalledOnce();
     expect(deps.fetch.mock.calls.filter(call => call[0].endsWith('/sign'))).toHaveLength(0);
   });
+  it('focuses the verified appointment doctor and prepares the selected permissions for that doctor only', async () => {
+    const focalStart = '2026-10-09T13:00:00.000Z';
+    const oldest = '2026-09-01T13:00:00.000Z';
+    const latest = '2026-10-02T15:00:00.000Z';
+    const earlierSameDay = '2026-10-02T12:00:00.000Z';
+    const focal = { ...shared().grants[0], doctorName: 'Médico de la consulta', canRead: false };
+    const data: ClinicalSnapshot = {
+      ...shared(), permissionAppointment: { appointmentId: 42, doctorId: focal.doctorId, date: '2026-10-09', startedAt: focalStart },
+      grants: [
+        { ...focal, doctorId: 2, doctorName: 'Consulta antigua', previousVisitStarts: [oldest], address: 'G' + 'C'.repeat(55) },
+        focal,
+        { ...focal, doctorId: 3, doctorName: 'Consultas recientes', previousVisitStarts: [earlierSameDay, latest], address: 'G' + 'D'.repeat(55) },
+        { ...focal, doctorId: 4, doctorName: 'Otro médico', address: 'G' + 'E'.repeat(55) },
+        { ...focal, doctorId: 5, doctorName: 'Acceso existente', authorized: false, canRead: true, address: 'G' + 'F'.repeat(55) },
+      ],
+    };
+    deps.fetch.mockImplementation((path, init) => {
+      if (path === '/api/private-clinical-history?appointmentId=42') return Promise.resolve(response(data));
+      expect(path).toBe('/api/private-clinical-operations');
+      const body = JSON.parse(init.body);
+      expect(body).toMatchObject({ action: 'set_permissions', doctorId: focal.doctorId, expectedRevision: focal.revision, canRead: true, canAppend: true });
+      expect(body).not.toHaveProperty('appointmentId');
+      return Promise.resolve(response({ operation: op({ id: body.requestId, action: 'set_permissions' }) }));
+    });
+    const { host } = await mount(createElement(ClinicalHistory, { permissionAppointmentId: 42, renderPermissions: props => createElement(ClinicalPermissions, props) }));
+    expect(document.activeElement?.textContent?.trim()).toBe(focal.doctorName);
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    const form = document.activeElement!.closest('form')!;
+    expect(form.querySelector('time')?.dateTime).toBe(focalStart);
+    const previous = [...host.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === 'Consultas anteriores')!;
+    expect(previous.open).toBe(false);
+    expect([...previous.querySelectorAll('time')].map(time => time.dateTime)).toEqual([latest, earlierSameDay, oldest]);
+    const directory = [...host.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === 'Elegir un médico')!;
+    expect(directory.open).toBe(false);
+    expect(directory.textContent).toContain('Otro médico');
+    const active = [...host.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent?.includes('Acceso existente'))!;
+    expect(active.open).toBe(false);
+    expect(active.textContent).toContain('Retirar acceso');
+    const checkboxes = [...form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(checkboxes.map(input => input.checked)).toEqual([false, false]);
+    expect(form.querySelectorAll('button')).toHaveLength(1);
+    await act(async () => checkboxes[0].click());
+    await act(async () => checkboxes[1].click());
+    expect(checkboxes.map(input => input.checked)).toEqual([true, true]);
+    expect(deps.fetch).toHaveBeenCalledOnce();
+    await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+    expect(getButton(host, 'Confirmar con mi cuenta Privy')).toBeDefined();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+  it('filters the closed verified-doctor directory by name across case and accents', async () => {
+    const grant = { ...shared().grants[0], canRead: false, doctorName: 'Dra. Álvarez' };
+    const { host } = await mount(createElement(ClinicalPermissions, {
+      grants: [grant, { ...grant, doctorId: 8, doctorName: 'Dr. Soto', address: 'G' + 'C'.repeat(55) }],
+      disabled: false,
+      onPrepare: vi.fn(),
+    }));
+    const directory = host.querySelector('details')!;
+    expect(directory.open).toBe(false);
+    await act(async () => directory.querySelector('summary')!.click());
+    expect(directory.open).toBe(true);
+    const search = directory.querySelector<HTMLInputElement>('input[type="search"]')!;
+    expect(search.labels?.[0].textContent).toBe('Buscar por nombre');
+    const searchFor = async (value: string) => act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, value);
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await searchFor('  ALVAREZ ');
+    expect([...directory.querySelectorAll('h3')].map(heading => heading.textContent)).toEqual(['Dra. Álvarez']);
+    await searchFor('Carolina');
+    expect(directory.querySelector('[role="status"]')?.textContent).toBe('No encontramos médicos con ese nombre.');
+    await searchFor('');
+    expect([...directory.querySelectorAll('h3')].map(heading => heading.textContent)).toEqual(['Dra. Álvarez', 'Dr. Soto']);
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+  it('keeps generic permissions and avoids focus when the requested appointment is unverified', async () => {
+    deps.fetch.mockResolvedValue(response({
+      ...shared(), permissionAppointment: { appointmentId: 41, doctorId: 1, date: '2026-10-09', startedAt: '2026-10-09T13:00:00.000Z' },
+    }));
+    const { host } = await mount(createElement(ClinicalHistory, { permissionAppointmentId: 42, renderPermissions: props => createElement(ClinicalPermissions, props) }));
+    expect(host.textContent).toContain('No pudimos verificar al médico de esta consulta');
+    expect(host.textContent).toContain('Médicos con acceso');
+    expect(host.querySelector('form time')).toBeNull();
+    expect(scroll).not.toHaveBeenCalled();
+    expect(deps.fetch.mock.calls.map(call => call[0])).toEqual(['/api/private-clinical-history?appointmentId=42']);
+  });
   it('uses the same handoff for creating a history and for preparing a correction', async () => {
     let requestId = ''; let requestAction: ClinicalOperation['action'] = 'create_history';
     deps.fetch.mockImplementation((path, init) => {

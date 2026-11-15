@@ -1,9 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { Keypair } from '@stellar/stellar-sdk';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), doctor: vi.fn(), chain: {} as any }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), doctor: vi.fn(), approval: vi.fn(), chain: {} as any }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ getDb: () => ({ query: mocks.query }) }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: mocks.doctor }));
+vi.mock('@/lib/doctor-onboarding', () => ({ isDoctorLocallyApproved: mocks.approval }));
 vi.mock('@/lib/clinical/chain', () => ({ createClinicalWebChain: () => mocks.chain }));
 import { clinicalDoctorContext } from '@/lib/clinical/doctor-context';
 
@@ -21,6 +22,7 @@ beforeEach(() => {
   doctor = { doctor: { id: 7, email: user.email, status: 'active' }, userId: actor.userId,
     walletId: actor.walletId, address: actor.address };
   mocks.doctor.mockImplementation(async () => structuredClone(doctor));
+  mocks.approval.mockResolvedValue(true);
   mocks.query.mockImplementation(async (sql: string) => sql.includes('FROM doctors') ? [{ id: 7 }]
     : [{ history_id: historyId, patient_wallet: patientWallet }]);
   mocks.chain = { doctorAuthorized: vi.fn(async () => true),
@@ -56,6 +58,22 @@ it.each(['userId', 'walletId', 'address'])('rejects a changed verified doctor %s
 it('rejects an inactive local profile independently of the registry', async () => {
   doctor.doctor.status = 'pending';
   await expect(clinicalDoctorContext(user, actor, historyId)).rejects.toMatchObject({ status: 404 });
+});
+
+it('requires an existing doctor binding and local approval for ordinary clinical writes', async () => {
+  await clinicalDoctorContext(user, actor, historyId, undefined, true);
+
+  expect(mocks.doctor).toHaveBeenCalledTimes(2);
+  expect(mocks.doctor).toHaveBeenCalledWith(expect.anything(), 7, { existingOnly: true });
+  expect(mocks.approval).toHaveBeenCalledWith(expect.anything(), 7, { ...actor, email: user.email });
+});
+
+it('declines an ordinary contribution if local approval changes during the grant observations', async () => {
+  mocks.approval.mockResolvedValueOnce(true).mockResolvedValue(false);
+
+  await expect(clinicalDoctorContext(user, actor, historyId, undefined, true))
+    .rejects.toMatchObject({ message: 'clinical_context_unavailable', status: 404 });
+  expect(mocks.chain.grant).toHaveBeenCalledOnce();
 });
 
 it('does not silently choose between ambiguous doctor profiles', async () => {

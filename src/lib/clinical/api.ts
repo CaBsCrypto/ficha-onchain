@@ -9,6 +9,7 @@ import { assertClinicalWriteScope, clinicalCreateOnceConfigured } from './create
 import { rehearsalConfigured, currentClinicalRehearsal } from './rehearsal';
 import { clinicalCaptureConfigured, loadClinicalCapture, assertClinicalCaptureActor } from './capture';
 import { hostedClinicalActor, withHostedClinicalRequest } from './hosted';
+import { regularClinicalRequestEnabled, withRegularClinicalRequest } from './regular';
 import { CLINICAL_PREPARE_CAPABILITY_HEADER, CLINICAL_PREPARE_CAPABILITY_VERSION } from './client-contract';
 import { createServerClinicalReadTrace } from './read-trace-server';
 import { clinicalReadStage, emitClinicalReadTrace, type ClinicalReadTrace } from './read-trace';
@@ -28,14 +29,17 @@ export async function clinicalApi(request: Request, work: (user: AuthedUser, act
     if (options.requirePrepareClient && request.headers.get(CLINICAL_PREPARE_CAPABILITY_HEADER) !== CLINICAL_PREPARE_CAPABILITY_VERSION) {
       return respond(clinicalJson({ error: 'clinical_client_update_required' }, 409));
     }
+    const regular = (options.allowCreateOnce === true || options.hostedView === true) && regularClinicalRequestEnabled(request);
     assertClinicalEnvironment(request.method !== 'GET' && options.allowCreateOnce !== true && !options.offchainOnly);
-    const actor = await clinicalReadStage(trace, 'bind', () => resolveClinicalActor(user));
+    const identity = (current: AuthedUser) => regular
+      ? resolveClinicalActor(current, { existingOnly: true }) : resolveClinicalActor(current);
+    const actor = await clinicalReadStage(trace, 'bind', () => identity(user));
     const perform = async () => {
-      const scoped = request.method === 'POST' && options.allowCreateOnce === true && clinicalCreateOnceConfigured(actor.address);
+      const scoped = request.method === 'POST' && options.allowCreateOnce === true && (regular || clinicalCreateOnceConfigured(actor.address));
       assertClinicalEnvironment(request.method !== 'GET' && !scoped && !options.offchainOnly);
       // Legacy modes verify ingress as before. Hosted phase policy checks the
       // persisted request/actual action in the service under the SQL lock.
-      if (scoped && !options.offchainOnly && !hostedClinicalActor(actor.address)) {
+      if (scoped && !regular && !options.offchainOnly && !hostedClinicalActor(actor.address)) {
         if (clinicalCaptureConfigured()) {
           const plan = loadClinicalCapture();
           if (!plan) throw new PrivateFlowError('clinical_rehearsal_scope_rejected', 403);
@@ -45,13 +49,14 @@ export async function clinicalApi(request: Request, work: (user: AuthedUser, act
       }
       return clinicalReadStage(trace, 'work', () => trace ? work(user, actor, trace) : work(user, actor));
     };
+    const execute = () => regular ? withRegularClinicalRequest(perform) : perform();
     const result = options.allowCreateOnce || options.hostedView
-      ? await withHostedClinicalRequest(request, actor, perform)
-      : await perform();
+      ? await withHostedClinicalRequest(request, actor, execute, { allowRegularFallback: regular })
+      : await execute();
     // Do not deliver content after a changed/expired session or wallet association.
     const current = await clinicalReadStage(trace, 'final_auth', () => requireUser(request, { strict: true }));
     if (!current || current.userId !== actor.userId) return respond(clinicalJson({ error: 'unauthorized' }, 401));
-    const binding = await clinicalReadStage(trace, 'final_bind', () => resolveClinicalActor(current));
+    const binding = await clinicalReadStage(trace, 'final_bind', () => identity(current));
     if (binding.walletId !== actor.walletId || binding.address !== actor.address) return respond(clinicalJson({ error: 'clinical_identity_changed' }, 403));
     return respond(result instanceof Response ? result : clinicalJson(result));
   } catch (error) {

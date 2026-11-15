@@ -4,7 +4,7 @@ import { getDb, getDbConnection, sqlForConnection } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, readPrivateDoctor } from '@/lib/doctor-authorizations';
 import { isApprovedDoctor } from '@/lib/doctor-access';
-import { appointmentAttendanceConfirmedSql, appointmentCheckInOpenSql, publicAppointment } from '@/lib/prescription-booking';
+import { appointmentAttendanceConfirmedSql, appointmentCheckInOpenSql, appointmentStartedByDoctorSql, publicAppointment } from '@/lib/prescription-booking';
 import { classifyHostedAppointment } from '@/lib/regular-appointments';
 import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, RX_PRIVATE } from '@/lib/private-config';
 import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/private-chain';
@@ -29,7 +29,9 @@ export async function loadPrivateContext(client:PoolClient,actor:AuthedUser,appo
   const {rows}=await client.query(`SELECT a.*,d.name AS doctor_name,d.id AS doctor_id,
     to_char(a.date,'YYYY-MM-DD') AS date,
     (${appointmentCheckInOpenSql}) AS check_in_open,
-    (${appointmentAttendanceConfirmedSql}) AS attendance_verified
+    (${appointmentAttendanceConfirmedSql}) AS attendance_verified,
+    (${appointmentStartedByDoctorSql} AND a.doctor_id=d.id AND a.doctor_wallet_id IS NOT NULL
+      AND a.doctor_wallet IS NOT NULL) AS clinical_appointment_verified
     FROM appointments a
     JOIN doctors d ON LOWER(d.email)=LOWER(a.doctor_email)
     WHERE a.id=$1 AND (a.patient_email=$2 OR a.doctor_email=$2) ${lock?'FOR UPDATE OF a':''}`,[appointmentId,actor.email]);
@@ -99,6 +101,9 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number,regular
     const regularAppointment=classification?.kind==='regular'&&!booking&&!prescription;
     const scheduled=appointment.status==='scheduled', inProgress=appointment.status==='in_progress';
     const scopedAppointment=classification?.kind==='scoped';
+    const canManageClinicalPermissions = process.env.TRUSTLEAF_REGULAR_CLINICAL_ENABLED === 'true' &&
+      actorRole === 'patient' && inProgress && appointment.clinical_appointment_verified === true &&
+      (regularAppointment || scopedAppointment);
     const appointmentActions=regular?{
       attend:(regularAppointment||scopedAppointment)&&actorRole==='patient'&&(scheduled||inProgress)&&
         !appointment.attendance_at&&appointment.check_in_open===true,
@@ -113,7 +118,7 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number,regular
     }
     const appointmentView={...publicAppointment(appointment),attended_at:appointment.attendance_at};
     if(regularAppointment) return {
-      appointment:appointmentView, appointmentMode:'regular' as const, appointmentActions,
+      appointment:appointmentView, appointmentMode:'regular' as const, appointmentActions, canManageClinicalPermissions,
       booking:null, consent:{status:'absent',validUntil:null}, prescription:null, operations:[],
     };
     const chain=createPrivateChain();await chain.verifyDeployment();
@@ -132,7 +137,7 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number,regular
     const operations=operationRows.map(publicOperation);
     if(prescription)prescription.operation=operationRows.find(o=>o.prescription_id===prescription.id);
     return {appointment:appointmentView,booking:publicBooking,consent,
-      ...(classification?{appointmentMode:classification.kind==='regular'?'legacy' as const:'scoped' as const,appointmentActions}:{}),
+      ...(classification?{appointmentMode:classification.kind==='regular'?'legacy' as const:'scoped' as const,appointmentActions,canManageClinicalPermissions}:{}),
       prescription:prescription?await prescriptionView(prescription,appointment,chain):null,operations};
   } finally {client.release();}
 }

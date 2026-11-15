@@ -33,6 +33,7 @@ export interface ConsultationState {
   appointment: PrivateAppointment; booking: PrivateBooking | null;
   appointmentMode?: 'regular' | 'scoped' | 'legacy';
   appointmentActions?: Record<AppointmentAction, boolean>;
+  canManageClinicalPermissions?: boolean;
   consent: { status: 'absent' | 'active' | 'expired' | 'consumed'; validUntil?: number | null };
   prescription?: PrivatePrescription | null; operations: PrivateOperation[];
 }
