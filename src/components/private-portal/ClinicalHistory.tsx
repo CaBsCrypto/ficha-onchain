@@ -129,8 +129,7 @@ const spanish = {
   prepareHistory: 'Preparar mi historial',
   selectedHistory: 'Ficha seleccionada y permisos comprobados',
   historyCreated: 'Historial clínico creado',
-  shareCode: 'Código para compartir tu ficha con un médico',
-  shareHelp: 'Copia este código y compártelo con tu médico. El código identifica la ficha; también debes habilitar su permiso para consultar o agregar aportes.',
+  shareHelp: 'Cuando confirmes un permiso, el médico recibirá un aviso y podrá abrir tu ficha desde su portal.',
   noPermission: 'sin permiso',
   created: 'Creado',
   creationReceipt: 'Ver transacción de creación en Stellar Testnet',
@@ -264,8 +263,7 @@ const english: typeof spanish = {
   prepareHistory: 'Prepare my clinical record',
   selectedHistory: 'Selected record and verified permissions',
   historyCreated: 'Clinical record created',
-  shareCode: 'Code to share your record with a doctor',
-  shareHelp: 'Copy this code and share it with your doctor. It identifies the record. Grant the doctor permission separately to read or add information.',
+  shareHelp: 'Once you confirm access, the doctor will receive a notification and can open your record in their portal.',
   noPermission: 'not granted',
   created: 'Created',
   creationReceipt: 'View record creation on Stellar Testnet',
@@ -314,6 +312,7 @@ export interface ClinicalPermissionsProps {
 export interface ClinicalHistoryProps {
   renderPermissions?: (props: ClinicalPermissionsProps) => ReactNode; historyId?: string; permissionAppointmentId?: number;
   onPendingChange?: (pending: boolean) => void;
+  doctorAccess?: { canRead: boolean; canAppend: boolean } | null;
 }
 
 function ClinicalPreparedReview({ operation }: { operation: ClinicalOperation }) {
@@ -422,21 +421,28 @@ function VersionContent({ entry, onUnavailable, historyId }: { entry: ClinicalVe
     {entry.source === 'doctor' && <p className="mt-3 break-all text-sm text-slate-500">{text.authorWallet}: {entry.author}</p>}
   </div>;
 }
-export function ClinicalHistory({ renderPermissions, historyId, permissionAppointmentId, onPendingChange }: ClinicalHistoryProps = {}) {
+const isPending = (operation: ClinicalOperation) => operation.state === 'awaiting_signature' || operation.state === 'submitted';
+
+export function ClinicalHistory({ renderPermissions, historyId, permissionAppointmentId, onPendingChange, doctorAccess }: ClinicalHistoryProps = {}) {
   const language = usePortalLanguage();
   const text = copy[language];
   const { ready, authenticated, user } = usePrivy();
   const wallet = usePortalWallet();
   const doctor = historyId !== undefined;
   const identity = ready && authenticated && user?.id ? `${user.id}:${wallet.walletId}:${wallet.address}${doctor ? `:doctor:${historyId}` : ''}` : '';
-  const snapshot = useClinicalSnapshot(identity, historyId, language, permissionAppointmentId);
+  const directoryUnavailable = doctor && doctorAccess === null;
+  const lookupIdentity = !identity || directoryUnavailable ? '' : doctorAccess
+    ? [identity, doctorAccess.canRead, doctorAccess.canAppend].join(':') : identity;
+  const snapshot = useClinicalSnapshot(lookupIdentity, historyId, language, permissionAppointmentId);
   const operation = useClinicalOperation(identity, wallet.address, snapshot.data?.rehearsal, language);
+  const current = operation.operation;
   const [editing, setEditing] = useState<ClinicalVersion | 'new' | null>(null);
   const [filter, setFilter] = useState('all');
   const [independentDraft, setIndependentDraft] = useState(false);
   const [actionError, setActionError] = useState('');
   const [signReview, setSignReview] = useState(false);
   const [preparedFocus, setPreparedFocus] = useState<{ identity: string; operationId: string } | null>(null);
+  const [knownPending, setKnownPending] = useState<{ identity: string; operations: ClinicalOperation[] } | null>(null);
   const [signingCheck, setSigningCheck] = useState<{ key: string; status: ClinicalSigningCheckStatus }>({ key: '', status: 'idle' });
   const signingScope = useRef('');
   const lastRefresh = useRef('');
@@ -464,15 +470,16 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
       lastRefresh.current = `${current.id}:${current.state}`; setEditing(null); setSignReview(false); snapshot.refresh();
     }
   }, [operation.operation?.id, operation.operation?.state, snapshot.refresh]);
-  const data = operation.accessLost ? null : snapshot.data;
-  const historyUnavailable = !!(snapshot.error || snapshot.archived || operation.accessLost);
+  const data = operation.accessLost || directoryUnavailable ? null : snapshot.data;
+  const historyUnavailable = !!(snapshot.error || snapshot.archived || operation.accessLost ||
+    doctor && doctorAccess !== undefined && !data);
   useEffect(() => {
     if (!historyUnavailable) return;
     setEditing(null);
     setIndependentDraft(false);
     setSignReview(false);
     setPreparedFocus(null);
-  }, [historyUnavailable]);
+  }, [historyUnavailable, lookupIdentity]);
   const permissionAppointment = data?.permissionAppointment;
   const focusedPermission = !doctor && data?.history && permissionAppointment &&
     permissionAppointment.appointmentId === permissionAppointmentId &&
@@ -486,7 +493,18 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     appointmentHeading.current.focus({ preventScroll: true });
     appointmentHeading.current.scrollIntoView?.({ block: 'start' });
   }, [appointmentFocusKey, permissionAppointmentId]);
-  const pending = data?.operations.filter(op => ['awaiting_signature', 'submitted'].includes(op.state)) ?? [];
+  useEffect(() => {
+    if (!doctor || !data) return;
+    // Keep enough data to recover the exact attempt without its review
+    // content or signing payload if the record becomes unavailable.
+    setKnownPending({ identity, operations: data.operations.filter(isPending).map(op => ({
+      id: op.id, action: op.action, state: op.state, expiresAt: op.expiresAt, transactionHash: op.transactionHash, errorCode: op.errorCode,
+    })) });
+  }, [data, doctor, identity]);
+  const pending = (data ? data.operations.filter(isPending)
+    : doctor && !operation.accessLost && knownPending?.identity === identity ? knownPending.operations : [])
+    .filter(op => op.id !== current?.id);
+  const hasPending = pending.length > 0 || !!current && isPending(current);
   const checkRequired = doctor && data?.rehearsal?.signingCheck === true;
   const checkScope = checkRequired ? { identity, address: wallet.address, historyId: historyId!, runId: data.rehearsal!.runId, until: data.rehearsal!.until } : null;
   const checkKey = checkScope ? clinicalSigningCheckScopeKey(checkScope) : '';
@@ -505,10 +523,11 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     else if (checkKey) setSigningCheck(value => value.key === checkKey ? value : { key: checkKey, status: 'idle' });
   }, [operation.accessLost, !!data, checkRequired, checkKey]);
   const blocked = snapshot.loading || historyUnavailable || !data || operation.busy || operation.uncertain;
-  const newBlocked = blocked || checkBusy || signingCheckBlocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state);
-  const canRead = !doctor || data?.context?.role === 'doctor' && data.context.canRead;
-  const canAppend = !doctor || data?.context?.role === 'doctor' && data.context.canAppend;
-  useEffect(() => { onPendingChange?.(checkBusy || operation.busy || operation.uncertain || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state)); }, [onPendingChange, checkBusy, operation.busy, operation.uncertain, pending.length, operation.operation?.state]);
+  const newBlocked = blocked || checkBusy || signingCheckBlocked || hasPending;
+  const canRead = !doctor || data?.context?.role === 'doctor' && data.context.canRead && doctorAccess?.canRead !== false;
+  const canAppend = !doctor || data?.context?.role === 'doctor' && data.context.canAppend && doctorAccess?.canAppend !== false;
+  useEffect(() => { onPendingChange?.(checkBusy || operation.busy || operation.uncertain || hasPending); },
+    [onPendingChange, checkBusy, operation.busy, operation.uncertain, hasPending]);
   const canWrite = (action: ClinicalOperation['action']) => data?.writes?.[action] === true && (!doctor || action === 'append_version' && canAppend);
   const readOnly = !(['create_history', 'append_version', 'set_permissions'] as const).some(canWrite);
   async function prepare(input: ClinicalIntent) {
@@ -548,7 +567,6 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   for (const entry of canRead ? data?.entries ?? [] : []) groups.set(entry.entryId, [...(groups.get(entry.entryId) ?? []), entry]);
   const chronology = [...groups.values()].map(versions => versions.sort((a, b) => b.version - a.version)).sort((a, b) => b[0].createdAt - a[0].createdAt);
   const shown = chronology.filter(([head]) => filter === 'all' || filter === 'notes' && !!head.note || filter === 'files' && !head.note || filter === 'mine' && (doctor ? head.author === wallet.address : head.source === 'patient') || filter === 'doctor' && head.source === 'doctor');
-  const current = operation.operation;
   const canCheckCurrentAttempt = operation.uncertain || current?.state === 'awaiting_signature' || current?.state === 'submitted';
   const permissions = data?.history && !doctor && renderPermissions?.({
     grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'),
@@ -562,10 +580,10 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     </header>
     {!historyUnavailable && <ClinicalDraftWorkspace key={identity + ':drafts'} identity={identity} currentHistoryId={data?.history?.id}
       role={doctor ? 'doctor' : 'patient'} canPublish={!newBlocked && canWrite('append_version')}
-      disabled={operation.busy || operation.uncertain || pending.length > 0}
+      disabled={operation.busy || operation.uncertain || hasPending}
       onPrepare={prepare} onReopen={id => void reopenDraftPublication(id)} />}
-    {doctor && historyId && !historyUnavailable && <section aria-label={text.privateDrafting} className="space-y-3">
-      {!independentDraft && <button type="button" disabled={operation.busy || operation.uncertain || pending.length > 0 || !!data?.context && !data.context.canAppend} onClick={() => setIndependentDraft(true)} className={button + ' border border-sky-200 bg-white text-sky-800'}>{text.writePrivateDraft}</button>}
+    {doctor && historyId && !historyUnavailable && doctorAccess?.canAppend !== false && <section aria-label={text.privateDrafting} className="space-y-3">
+      {!independentDraft && <button type="button" disabled={operation.busy || operation.uncertain || hasPending || !!data?.context && !data.context.canAppend} onClick={() => setIndependentDraft(true)} className={button + ' border border-sky-200 bg-white text-sky-800'}>{text.writePrivateDraft}</button>}
       {independentDraft && <ClinicalDraftEntryForm key={identity + ':independent'} identity={identity} target={{ historyId }} historyId={historyId} role="doctor"
         disabled={operation.busy || operation.uncertain} readOnly={!canWrite('append_version') || blocked}
         disablePrescriptionLookup={!data || !canRead}
@@ -576,7 +594,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
       <p className="mt-2">{text.archivedRecovery}</p>
     </div> : (snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">{text.earlierInformation} {operation.accessLost ? doctor ? text.recheckDoctorAccess : text.signInAgain : text.refreshHistory}</p></div>}
     {data && (readOnly || data.history && !canWrite('append_version') && !canWrite('set_permissions')) && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">{doctor && canRead && !canAppend ? text.readOnly : data.history ? data.draftsEnabled ? text.publishingDisabled : text.demoReadOnly : text.demoCreateDisabled}</p>}
-    {checkScope && canWrite('append_version') && <ClinicalSigningCheck key={checkKey} scope={checkScope} verified={checkPassed} disabled={blocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state)} onStatusChange={checkStatus} />}
+    {checkScope && canWrite('append_version') && <ClinicalSigningCheck key={checkKey} scope={checkScope} verified={checkPassed} disabled={blocked || hasPending} onStatusChange={checkStatus} />}
     {snapshot.loading && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">{text.loading}</p>}
     {(data && current || canCheckCurrentAttempt) && <section aria-label={text.currentAttempt} className={`space-y-3 rounded-xl border p-4 ${current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-sky-200 bg-sky-50'}`}>
       <h2 ref={operationHeading} tabIndex={-1} className="font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{current ? `${text[actionLabels[current.action]]} · ${current.state === 'cancelled' && current.errorCode === 'signature_request_expired' ? text.signatureExpired : text[stateLabels[current.state]]}` : text.preparationUnverified}</h2>
@@ -614,7 +632,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     {data?.history && <>
       <section aria-labelledby="clinical-history-created-title" className="min-w-0 rounded-2xl border border-sky-200 bg-sky-50/50 p-4 sm:p-5">
         <h2 id="clinical-history-created-title" className="font-semibold text-slate-900">{doctor ? text.selectedHistory : text.historyCreated}</h2>
-        {!doctor && <div className="mt-4 space-y-2"><label htmlFor="clinical-share-id" className="block text-sm font-medium text-slate-700">{text.shareCode}</label><input id="clinical-share-id" readOnly value={data.history.id} onFocus={event => event.currentTarget.select()} className="min-h-11 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 font-mono text-sm text-slate-700" /><p className="text-sm text-slate-600">{text.shareHelp}</p></div>}
+        {!doctor && <p className="mt-3 text-sm text-slate-600">{text.shareHelp}</p>}
         {doctor && <p className="mt-2 text-sm text-slate-700">{text.read}: {canRead ? text.readAllowed : text.noPermission} · {text.append}: {canAppend ? text.appendAllowed : text.noPermission}</p>}
         {canRead && <p className="mt-2 text-sm text-slate-600">{text.created}: {recordDate(language, data.history.createdAt)} · {text.chileTime}</p>}
         {canRead && (data.history.creationTransactionHash && /^[a-f0-9]{64}$/i.test(data.history.creationTransactionHash)
@@ -635,7 +653,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
       {data.grantsUnavailable && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">{text.grantsUnavailable}</p>}
       {permissionAppointmentId === undefined && permissions}
     </>}
-    {pending.filter(op => op.id !== current?.id).map(op => <section key={op.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4"><p className="text-sm font-semibold text-slate-800">{text[actionLabels[op.action]]} · {text[stateLabels[op.state]]}</p><button type="button" disabled={operation.busy || operation.uncertain} onClick={() => { operation.controller.reopen(op); setSignReview(false); }} className={`${button} mt-3 border border-sky-200 bg-white text-sky-800`}>{text.pendingAttempt}</button></section>)}
+    {pending.map(op => <section key={op.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4"><p className="text-sm font-semibold text-slate-800">{text[actionLabels[op.action]]} · {text[stateLabels[op.state]]}</p><button type="button" disabled={operation.busy || operation.uncertain} onClick={() => { operation.controller.reopen(op); setSignReview(false); }} className={`${button} mt-3 border border-sky-200 bg-white text-sky-800`}>{text.pendingAttempt}</button></section>)}
     {actionError && !current && !operation.uncertain && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{actionError}</p>}
     <p className="max-w-prose text-xs leading-relaxed text-slate-500">{text.demoNotice}</p>
   </section>;

@@ -33,6 +33,13 @@ Con la ficha de Semana 2, `GET /api/private-clinical-history` devolvió HTTP 503
 | Recuperación | Reproducir con pruebas controladas pérdida de respuesta, doble clic, firma cancelada, cambio de cuenta, autorización vencida, TTL y fallo de RPC. Confirmar que la conciliación conserva el intento y que una recarga no devuelve datos de una sesión anterior. Distinguir las pruebas de estado persistido de las simulaciones. |
 | Publicación y accesibilidad | Registrar SHA, build, fecha, comandos y resultados de CI y pruebas, incluidas omisiones. Cotejar red, base aislada y escrituras generales apagadas. Comprobar lectura autenticada antes y después del despliegue y documentar la reversión. Revisar móvil, escritorio, teclado y zoom al 200 %. |
 
+### Fichas compartidas y notificaciones
+
+1. Mantener abiertos los dos perfiles. Desde la ficha del Paciente, conceder lectura, agregado o ambos al Médico elegido. Comprobar que la ficha aparece en **Fichas compartidas** tras el recibo confirmado y que llega un aviso en la campana.
+2. Abrir la ficha desde la lista o el aviso. Comprobar que una ficha con sólo agregado permite aportar y mantiene ocultos los antecedentes. Repetir con lectura sola y con ambos permisos. Cotejar cada derecho mostrado con el permiso vigente.
+3. Cambiar un permiso y después retirar ambos. La campana debe distinguir concesión, cambio y retiro. Verificar que la ficha retirada desaparece de la lista y que al reabrir un enlace anterior se deniega el acceso. Probar con dos perfiles médicos distintos y con una operación aún pendiente de confirmar.
+4. Abrir la campana y la lista en móvil y con teclado. Verificar que los avisos y la ficha seleccionada se limpian al cambiar de cuenta.
+
 ## Regresión de la candidata
 
 - Node 22.23.5. Pasaron 2.277 pruebas de aplicación, 873 de servicios privados y 19 de captura y receta.

@@ -10,8 +10,12 @@ import { DoctorClinicalHistory } from '@/components/private-portal/DoctorClinica
 import { PrivatePrescriptions } from '@/components/private-portal/Prescriptions';
 function DoctorPageContent() {
   const english = usePortalLanguage() === 'en';
-  const tab = useSearchParams().get('tab') ?? 'inicio';
-  if (tab === 'historial') return <DoctorClinicalHistory />;
+  const params = useSearchParams();
+  const tab = params.get('tab') ?? 'inicio';
+  if (tab === 'historial') {
+    const records = params.getAll('record');
+    return <DoctorClinicalHistory requestedRecord={records.length > 1 ? null : records[0]} />;
+  }
   if (tab === 'consultas') return <PrivateConsultations role="doctor" />;
   if (tab === 'recetas') return <PrivatePrescriptions role="doctor" />;
   if (tab === 'disponibilidad') return <DisponibilidadTab />;

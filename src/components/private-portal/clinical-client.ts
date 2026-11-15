@@ -45,7 +45,7 @@ const messages: Record<string, string> = {
   clinical_rehearsal_expired: 'La ventana del ensayo venció. Consulta el mismo intento pendiente; no prepares ni firmes otro.',
   clinical_rehearsal_order_conflict: 'Este paso aún no corresponde o ya se realizó. Consulta los recibos antes de continuar.',
   clinical_rehearsal_unavailable: 'No pudimos comprobar el alcance del ensayo. Las nuevas firmas permanecen bloqueadas.',
-  clinical_context_unavailable: 'No pudimos comprobar el acceso a esta ficha. Revisa el código, tu autorización médica y el permiso del paciente.',
+  clinical_context_unavailable: 'No pudimos comprobar el acceso a esta ficha. Actualiza tus fichas compartidas y revisa tu autorización médica y el permiso del paciente.',
   clinical_access_denied: 'El acceso a esta ficha ya no está autorizado. No se mostrará el contenido anterior.',
   clinical_prescription_verification_unavailable: 'No pudimos comprobar el acceso y estado de la receta. Vuelve a consultar sin emitirla de nuevo.',
   clinical_doctor_unauthorized: 'Tu autorización médica no está vigente. No se mostrará la ficha ni se prepararán aportes.',
@@ -72,7 +72,7 @@ const messages: Record<string, string> = {
 };
 const englishMessages: Record<string, string> = {
   network_unavailable: 'The connection is unavailable. Check your connection and try again.',
-  clinical_context_unavailable: 'We could not verify access to this clinical record. Check the record code, your doctor authorization and the patient’s permissions.',
+  clinical_context_unavailable: 'We could not verify access to this record. Refresh your shared records and check your medical authorization and the patient’s permissions.',
   clinical_access_denied: 'Access to this clinical record is no longer authorized. Its contents are hidden.',
   clinical_doctor_unauthorized: 'Your doctor authorization is inactive. You cannot view the clinical record or prepare entries.',
   clinical_permission_denied: 'The patient has not granted this access. Ask the patient to check their permissions.',

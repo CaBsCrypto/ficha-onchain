@@ -16,7 +16,7 @@ import { clinicalReadStage, emitClinicalReadTrace, type ClinicalReadTrace } from
 
 export const clinicalJson = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'no-store', 'Vary': 'Authorization' } });
 /** Auth failures and provider exceptions never carry provider payloads into the response. */
-export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor, trace?: ClinicalReadTrace) => Promise<unknown>, options: { allowCreateOnce?: boolean; offchainOnly?: boolean; requirePrepareClient?: boolean; hostedView?: boolean } = {}) {
+export async function clinicalApi(request: Request, work: (user: AuthedUser, actor: ClinicalActor, trace?: ClinicalReadTrace) => Promise<unknown>, options: { allowCreateOnce?: boolean; offchainOnly?: boolean; requirePrepareClient?: boolean; hostedView?: boolean; existingOnly?: boolean } = {}) {
   const diagnostic = createServerClinicalReadTrace(request), trace = diagnostic?.trace;
   const respond = (response: Response) => { emitClinicalReadTrace(trace, 'respond', 'ok'); return response; };
   emitClinicalReadTrace(trace, 'ingress', 'start');
@@ -31,7 +31,7 @@ export async function clinicalApi(request: Request, work: (user: AuthedUser, act
     }
     const regular = (options.allowCreateOnce === true || options.hostedView === true) && regularClinicalRequestEnabled(request);
     assertClinicalEnvironment(request.method !== 'GET' && options.allowCreateOnce !== true && !options.offchainOnly);
-    const identity = (current: AuthedUser) => regular
+    const identity = (current: AuthedUser) => regular || options.existingOnly
       ? resolveClinicalActor(current, { existingOnly: true }) : resolveClinicalActor(current);
     const actor = await clinicalReadStage(trace, 'bind', () => identity(user));
     const perform = async () => {
@@ -56,6 +56,9 @@ export async function clinicalApi(request: Request, work: (user: AuthedUser, act
     // Do not deliver content after a changed/expired session or wallet association.
     const current = await clinicalReadStage(trace, 'final_auth', () => requireUser(request, { strict: true }));
     if (!current || current.userId !== actor.userId) return respond(clinicalJson({ error: 'unauthorized' }, 401));
+    if (options.existingOnly && current.email?.toLowerCase() !== user.email?.toLowerCase()) {
+      return respond(clinicalJson({ error: 'clinical_identity_changed' }, 403));
+    }
     const binding = await clinicalReadStage(trace, 'final_bind', () => identity(current));
     if (binding.walletId !== actor.walletId || binding.address !== actor.address) return respond(clinicalJson({ error: 'clinical_identity_changed' }, 403));
     return respond(result instanceof Response ? result : clinicalJson(result));
