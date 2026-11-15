@@ -15,7 +15,7 @@ import { clinicalNeonStore } from '../../../scripts/lib/clinical-neon-store.mjs'
 import { CLINICAL_ID, CLINICAL_WASM } from './config';
 import { resolveClinicalActor, assertClinicalOwner } from './identity';
 import { clinicalKeyring } from './keys';
-import { createClinicalWebChain, assertClinicalSavedEnvelope, type ClinicalSavedEnvelope } from './chain';
+import { ClinicalRecordArchiveEvidence, createClinicalWebChain, assertClinicalSavedEnvelope, type ClinicalSavedEnvelope } from './chain';
 import { clinicalNote } from './input';
 import { clinicalCreateOnceConfigured, clinicalWriteCapabilities } from './create-once';
 import { clinicalDoctorContext, clinicalDoctorIdentity } from './doctor-context';
@@ -299,7 +299,10 @@ export async function clinicalSnapshot(request: Request, user: AuthedUser, actor
   trace?: ClinicalReadTrace, appointmentId?: number): Promise<ClinicalSnapshot> {
   const draftsEnabled = true;
   const hosted = hostedClinicalActor(actor.address);
-  const chain = createClinicalWebChain();
+  // Only the owner path looks up the caller's immutable SQL binding before its
+  // getter runs. Doctors and document routes keep the generic read boundary.
+  const ownerArchive = historyId === undefined ? { ownerArchive: actor.address } : undefined;
+  const chain = createClinicalWebChain(undefined, ownerArchive);
   const own = await clinicalReadStage(trace, 'target', () => clinicalReadTarget(user, actor, historyId, chain));
   const capabilities = clinicalWriteCapabilities(actor.address, own?.context ? 'doctor' : 'owner');
   const writes = hosted && historyId && hosted.snapshot.historyId !== historyId
@@ -347,7 +350,7 @@ export async function clinicalSnapshot(request: Request, user: AuthedUser, actor
     if (failed) return;
     try {
       if (request.signal.aborted) throw new PrivateFlowError('clinical_history_unavailable', 503);
-      const versionChain = workerIndex === 0 ? chain : createClinicalWebChain();
+      const versionChain = workerIndex === 0 ? chain : createClinicalWebChain(undefined, ownerArchive);
       const reader = createClinicalChainReader({ network: 'testnet', contractId: CLINICAL_ID, registryId: REGISTRY_PRIVATE,
         wasmHash: CLINICAL_WASM, readerAddress: PRIVATE_ADMIN }, { requestScoped: true });
       while (!failed && next < rows.length) {
@@ -373,6 +376,11 @@ export async function clinicalSnapshot(request: Request, user: AuthedUser, actor
         ]);
         const document = documentResult.status === 'fulfilled' ? documentResult.value : undefined;
         try {
+          // The document service intentionally normalizes all storage/read
+          // errors. Its generic error must not hide independently pinned proof.
+          if (evidenceResult.status === 'rejected' && evidenceResult.reason instanceof ClinicalRecordArchiveEvidence) {
+            throw evidenceResult.reason;
+          }
           if (documentResult.status === 'rejected') throw documentResult.reason;
           if (evidenceResult.status === 'rejected') throw evidenceResult.reason;
           if (failed || request.signal.aborted) {

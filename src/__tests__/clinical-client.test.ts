@@ -9,6 +9,7 @@ import { CLINICAL_READ_TIMEOUT_MS, CLINICAL_SNAPSHOT_READ_TIMEOUT_MS, ClinicalCl
 import { ClinicalEntryForm } from '@/components/private-portal/ClinicalEntryForm';
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
 import { ClinicalPermissions } from '@/components/private-portal/ClinicalPermissions';
+import { LanguageProvider } from '@/hooks/useLanguage';
 
 const deps = vi.hoisted(() => ({ fetch: vi.fn(), sign: vi.fn(async () => ({ signature: '0x' + '7'.repeat(128) })), userId: 'did:privy:patient1' }));
 vi.mock('@privy-io/react-auth/extended-chains', () => ({ useSignRawHash: () => ({ signRawHash: deps.sign }) }));
@@ -678,6 +679,74 @@ it('shows incomplete permission verification separately from verified owner entr
  expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Sólo mostramos los estados verificados');
  expect(host.querySelector('input[type="checkbox"]')).toBeNull();expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
  expect(deps.sign).not.toHaveBeenCalled();expect(deps.fetch).toHaveBeenCalledOnce();
+});
+
+describe('archived clinical record recovery', () => {
+  const button = (host: HTMLElement, title: string) => [...host.querySelectorAll('button')].find(item => item.textContent === title);
+
+  it('hides prior chart and review on an owner archive and keeps the exact pending attempt available to check', async () => {
+    const pending = op();
+    const history = { ...snapshot([version()]), operations: [pending] };
+    let archived = false;
+    deps.fetch.mockImplementation(path => {
+      if (path === '/api/private-clinical-history') {
+        return Promise.resolve(archived ? response({ error: 'clinical_record_archived' }, 503) : response(history));
+      }
+      if (path === '/api/private-clinical-operations/' + ID) return Promise.resolve(response({ operation: pending }));
+      throw Error('unexpected archive request');
+    });
+    const { host } = await mount(createElement(ClinicalHistory));
+    await act(async () => button(host, 'Consultar intento pendiente')!.click());
+    await act(async () => button(host, 'Revisar confirmación')!.click());
+    expect(host.textContent).toContain(note.text);
+    expect(host.querySelector('[aria-label="Revisión del cambio preparado"]')).not.toBeNull();
+    expect(button(host, 'Confirmar con mi cuenta Privy')).toBeDefined();
+
+    archived = true;
+    await act(async () => button(host, 'Actualizar')!.click());
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Tu ficha está archivada en Stellar Testnet');
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Solicita la recuperación al equipo de TrustLeaf');
+    expect(host.textContent).not.toContain(note.text);
+    expect(host.querySelector('[aria-label="Revisión del cambio preparado"]')).toBeNull();
+    expect(button(host, 'Confirmar con mi cuenta Privy')).toBeUndefined();
+    expect(button(host, 'Agregar antecedente o archivo')).toBeUndefined();
+    await act(async () => button(host, 'Consultar confirmación')!.click());
+    expect(deps.fetch.mock.calls.at(-1)?.[0]).toBe('/api/private-clinical-operations/' + ID);
+    expect(host.textContent).not.toContain(note.text);
+
+    archived = false;
+    await act(async () => button(host, 'Actualizar')!.click());
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain(note.text);
+    expect(button(host, 'Confirmar con mi cuenta Privy')).toBeUndefined();
+    expect(deps.fetch.mock.calls.every(call => (call[1]?.method ?? 'GET') === 'GET')).toBe(true);
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { historyId: undefined, status: 503, error: 'clinical_chain_unavailable', expected: 'No pudimos comprobar el registro en Stellar.' },
+    { historyId: undefined, status: 403, error: 'clinical_access_denied', expected: 'El acceso a esta ficha ya no está autorizado.' },
+    { historyId: '9'.repeat(64), status: 503, error: 'clinical_record_archived', expected: 'Puedes actualizar para volver a comprobar el historial.' },
+  ])('keeps $error with status $status separate from the owner archive notice', async ({ historyId, status, error, expected }) => {
+    deps.fetch.mockResolvedValue(response({ error }, status));
+    const { host } = await mount(createElement(ClinicalHistory, { historyId }));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(expected);
+    expect(host.textContent).not.toContain('Tu ficha está archivada');
+    expect(host.textContent).not.toContain('Solicita la recuperación');
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+
+  it('shows the English recovery message and enables only a manual record refresh', async () => {
+    window.localStorage.setItem('ficha-lang', 'en');
+    deps.fetch.mockResolvedValue(response({ error: 'clinical_record_archived' }, 503));
+    try {
+      const { host } = await mount(createElement(LanguageProvider, { children: createElement(ClinicalHistory) }));
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain('Your record is archived on Stellar Testnet');
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain('Once they confirm recovery, select Refresh');
+      expect([...host.querySelectorAll('button')].map(item => item.textContent)).toEqual(['Refresh']);
+      expect(deps.fetch).toHaveBeenCalledOnce();
+    } finally { window.localStorage.removeItem('ficha-lang'); }
+  });
 });
 
 describe('history creation card', () => {

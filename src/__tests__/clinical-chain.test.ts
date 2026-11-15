@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { Account, Address, Asset, BASE_FEE, Contract, FeeBumpTransaction, Keypair, Memo, Networks, Operation,
   SorobanDataBuilder, Transaction, TransactionBuilder, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
-import { CLINICAL_CONTRACT, CLINICAL_WASM, assertClinicalSavedEnvelope, assertClinicalUnsigned, clinicalInvocation,
+import { CLINICAL_CONTRACT, CLINICAL_WASM, ClinicalRecordArchiveEvidence, assertClinicalSavedEnvelope, assertClinicalUnsigned, clinicalInvocation,
   createClinicalWebChain, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
 import { PRIVATE_ADMIN, REGISTRY_PRIVATE } from '@/lib/private-config';
 import type { ClinicalAction, ClinicalExpected } from '@/types/clinical';
@@ -156,12 +156,14 @@ describe('clinical invocation and owner boundary', () => {
 });
 
 function fixture() {
+  type Archive = { method: string; keys: xdr.LedgerKey[]; legacy?: boolean; indices?: number[]; parsed?: boolean };
   const state = { ledger: 100, failure: '', restore: false, auth: [] as xdr.SorobanAuthorizationEntry[], missing: '',
     missingAccount: '', wrongNetwork: false, code: CLINICAL_WASM, head: 1, authorized: true, commitment: '5'.repeat(64),
     clinicalTtl: 500 as number | undefined, registryTtl: 500 as number | undefined, archived: [] as number[], extensionV1: false, malformedData: false,
     history: { history_id: Buffer.from(historyId, 'hex'), patient: patient.publicKey(), created_at: BigInt(1) },
     authorization: { commitment: Buffer.from('6'.repeat(64), 'hex'), schema_version: 1, version: 4, valid_until: BigInt(1800086400), revoked: false } as Record<string, any>,
-    proofDigest: '', proofCommitment: '', proofKind: 'Version', calls: [] as string[], sent: [] as string[] };
+    proofDigest: '', proofCommitment: '', proofKind: 'Version', calls: [] as string[], sent: [] as string[], archive: null as Archive | null,
+    nullEntry: false };
   const server = {
     getNetwork: vi.fn(async () => ({ passphrase: state.wrongNetwork ? Networks.PUBLIC : Networks.TESTNET })),
     getLedgerEntries: vi.fn(async (key: xdr.LedgerKey) => {
@@ -183,24 +185,110 @@ function fixture() {
       const method = invocation!.functionName().toString(); state.calls.push(method);
       if (state.failure || state.missing === method) return { latestLedger: state.ledger, error: state.failure || 'HostError: Error(Contract, #1)' };
       const values: Record<string, unknown> = { interface_version: 1, get_registry: REGISTRY_PRIVATE, get_admin: PRIVATE_ADMIN,
-        get_history: state.history, get_history_for_patient: state.history, get_entry: { author: patient.publicKey(), head_version: state.head },
+        get_history: state.history, get_history_for_patient: state.history, get_entry: state.nullEntry ? null : { author: patient.publicKey(), head_version: state.head },
         get_grant: { can_read: true, can_append: false, revision: BigInt(1) }, get_authorization: state.authorization, is_authorized: state.authorized,
         get_version: { author: patient.publicKey(), commitment: Buffer.from(state.commitment, 'hex'), previous_commitment: null, version: 1, created_at: BigInt(2) } };
       const appendPayload = xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('append'), new Address(CLINICAL_CONTRACT).toScVal(),
         clinicalInvocation('append_version', append).body().invokeHostFunctionOp().hostFunction().invokeContract().args()[0]]);
       values.get_operation = { digest: Buffer.from(state.proofDigest || createHash('sha256').update(appendPayload.toXDR()).digest('hex'), 'hex'),
         outcome: [state.proofKind, { ...(values.get_version as object), commitment: Buffer.from(state.proofCommitment || state.commitment, 'hex') }] };
-      const data = new SorobanDataBuilder().build();
+      const archive = state.archive?.method === method ? state.archive : null;
+      const data = new SorobanDataBuilder().setReadWrite(archive?.keys ?? []).build();
       if (state.extensionV1 || state.archived.length) data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({ archivedSorobanEntries: state.archived })));
-      const result = { latestLedger: state.ledger, transactionData: state.malformedData ? {} : new SorobanDataBuilder(data), result: { auth: state.auth, retval: nativeToScVal(values[method], { type: method === 'interface_version' ? 'u32' : undefined }) } };
+      if (archive && !archive.legacy) data.ext(new xdr.SorobanTransactionDataExt(1, new xdr.SorobanResourcesExtV0({
+        archivedSorobanEntries: archive.indices ?? archive.keys.map((_, index) => index),
+      })));
+      const result = { _parsed: archive?.parsed ?? true, latestLedger: state.ledger, transactionData: state.malformedData ? {} : new SorobanDataBuilder(data), result: { auth: state.auth, retval: nativeToScVal(values[method], { type: method === 'interface_version' ? 'u32' : undefined }) } };
+      if (archive?.legacy) return { ...result, restorePreamble: { transactionData: new SorobanDataBuilder().setReadWrite(archive.keys) } };
       return state.restore ? { ...result, restorePreamble: { transactionData: {} } } : result;
     }),
     prepareTransaction: vi.fn(async (tx: Transaction) => tx),
     getTransaction: vi.fn(async () => ({ status: 'NOT_FOUND' })),
     sendTransaction: vi.fn(async (tx: FeeBumpTransaction) => { state.sent.push(tx.toXDR()); return { status: 'PENDING', hash: tx.hash().toString('hex') }; }),
   };
-  return { state, server, chain: createClinicalWebChain(server as unknown as Parameters<typeof createClinicalWebChain>[0]) };
+  const provider = server as unknown as Parameters<typeof createClinicalWebChain>[0];
+  return { state, server, chain: createClinicalWebChain(provider), ownerChain: createClinicalWebChain(provider, { ownerArchive: patient.publicKey() }) };
 }
+
+function recordKey(tag: string, args: xdr.ScVal[], contract = CLINICAL_CONTRACT, persistent = true) {
+  return xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+    contract: new Address(contract).toScAddress(),
+    key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(tag), ...args]),
+    durability: persistent ? xdr.ContractDataDurability.persistent() : xdr.ContractDataDurability.temporary(),
+  }));
+}
+
+describe('owner-scoped clinical archive evidence', () => {
+  const history = nativeToScVal(Buffer.from(historyId, 'hex'));
+  const entry = nativeToScVal(Buffer.from(append.entryId!, 'hex'));
+  const owner = new Address(patient.publicKey()).toScVal();
+  const historyKey = recordKey('History', [history]);
+  const patientKey = recordKey('Patient', [owner]);
+
+  it.each([
+    { label: 'History and Patient', keys: [historyKey, patientKey] },
+    { label: 'only History', keys: [historyKey] },
+    { label: 'only Patient', keys: [patientKey] },
+    { label: 'legacy restore footprint', keys: [historyKey, patientKey], legacy: true },
+  ])('identifies $label for the exact owner while ordinary chain reads remain generic', async ({ keys, legacy }) => {
+    const f = fixture();
+    f.state.archive = { method: 'get_history', keys, legacy };
+    await expect(f.ownerChain.history(historyId)).rejects.toBeInstanceOf(ClinicalRecordArchiveEvidence);
+    await expect(f.chain.history(historyId)).rejects.toThrow('clinical_chain_unavailable');
+    expect(f.server.sendTransaction).not.toHaveBeenCalled();
+    expect(f.server.prepareTransaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'unrelated key mixed into the selected footprint', keys: [historyKey, recordKey('Patient', [new Address(doctor.publicKey()).toScVal()])] },
+    { label: 'wrong contract', keys: [recordKey('History', [history], REGISTRY_PRIVATE)] },
+    { label: 'temporary key', keys: [recordKey('History', [history], CLINICAL_CONTRACT, false)] },
+    { label: 'duplicated key', keys: [historyKey, historyKey] },
+    { label: 'invalid archive index', keys: [historyKey], indices: [1] },
+    { label: 'unsorted archive indices', keys: [historyKey, patientKey], indices: [1, 0] },
+    { label: 'unparsed RPC result', keys: [historyKey], parsed: false },
+  ])('keeps a generic failure for $label', async ({ keys, indices, parsed }) => {
+    const f = fixture();
+    f.state.archive = { method: 'get_history', keys, indices, parsed };
+    await expect(f.ownerChain.history(historyId)).rejects.toThrow('clinical_chain_unavailable');
+  });
+
+  it('does not let a mismatched history result, lagging ledger or provider failure label one of the owner records as archived', async () => {
+    const f = fixture();
+    await f.ownerChain.verifyDeployment();
+    f.state.archive = { method: 'get_history', keys: [historyKey] };
+    f.state.ledger = 99;
+    await expect(f.ownerChain.history(historyId)).rejects.toThrow('clinical_chain_unavailable');
+    f.state.ledger = 101;
+    f.state.history.patient = doctor.publicKey();
+    await expect(f.ownerChain.history(historyId)).rejects.toThrow('clinical_chain_unavailable');
+    f.server.simulateTransaction.mockRejectedValueOnce(new Error('provider unavailable'));
+    await expect(f.ownerChain.history(historyId)).rejects.toThrow('clinical_chain_unavailable');
+  });
+
+  it('recognizes archive evidence on owned entry, version and exact append receipt getters', async () => {
+    const f = fixture();
+    f.state.archive = { method: 'get_entry', keys: [recordKey('Entry', [history, entry])] };
+    await expect(f.ownerChain.entry(historyId, append.entryId!)).rejects.toBeInstanceOf(ClinicalRecordArchiveEvidence);
+    f.state.archive = { method: 'get_version', keys: [recordKey('Version', [history, entry, nativeToScVal(1, { type: 'u32' })])] };
+    await expect(f.ownerChain.version(historyId, append.entryId!, 1)).rejects.toBeInstanceOf(ClinicalRecordArchiveEvidence);
+    f.state.archive = { method: 'get_operation', keys: [recordKey('Operation', [owner, nativeToScVal(Buffer.from(append.operationId, 'hex'))])] };
+    await expect(f.ownerChain.verifyRecordedOperation('append_version', append)).rejects.toBeInstanceOf(ClinicalRecordArchiveEvidence);
+    f.state.proofDigest = 'a'.repeat(64);
+    await expect(f.ownerChain.verifyRecordedOperation('append_version', append)).rejects.toThrow('clinical_chain_unavailable');
+  });
+
+  it('rejects an archived entry with a null result and preserves exact Missing as absence', async () => {
+    const f = fixture();
+    f.state.archive = { method: 'get_entry', keys: [recordKey('Entry', [history, entry])] };
+    f.state.nullEntry = true;
+    await expect(f.ownerChain.entry(historyId, append.entryId!)).rejects.toThrow('clinical_chain_unavailable');
+
+    f.state.archive = null;
+    f.state.missing = 'get_entry';
+    await expect(f.ownerChain.entry(historyId, append.entryId!)).resolves.toBeNull();
+  });
+});
 
 describe('clinical Testnet RPC boundary', () => {
   it('reuses only the simulation source within a request and builds from fresh Account instances', async () => {
