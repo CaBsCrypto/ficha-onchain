@@ -47,9 +47,13 @@ describe('human confirmation after preparing an exact clinical intent',()=>{
   expect(host.querySelector('[aria-label="Revisión del cambio preparado"]')?.textContent).toContain(note.text);
   expect(deps.sign).not.toHaveBeenCalled();expect(deps.fetch.mock.calls.filter(c=>c[0].endsWith('/sign'))).toHaveLength(0);
   await act(async()=>button(host,'Confirmar con mi cuenta Privy')!.click());
-  expect(deps.sign).toHaveBeenCalledOnce();expect(host.textContent).toContain('El cambio sigue pendiente.');expect(host.textContent).not.toContain('El cambio está confirmado.');
+  expect(deps.sign).toHaveBeenCalledOnce();
+  expect(host.textContent).toContain('Usa «Consultar confirmación» para comprobar este mismo intento.');
+  expect(host.querySelector('a[href*="stellar.expert"]')?.textContent).toBe('Ver transacción pendiente en Stellar Testnet');
+  expect(host.textContent).not.toContain('El cambio está confirmado.');
   await act(async()=>vi.advanceTimersByTimeAsync(2500));
   expect(host.textContent).toContain('El cambio está confirmado.');expect(button(host,'Confirmar con mi cuenta Privy')).toBeUndefined();
+  expect(host.textContent).not.toContain('Ver transacción pendiente en Stellar Testnet');
   expect(deps.fetch.mock.calls.filter(c=>c[0]==='/api/private-clinical-operations')).toHaveLength(1);expect(deps.fetch.mock.calls.filter(c=>c[0].endsWith('/sign'))).toHaveLength(1);
  });
  it('keeps recovered attempts behind explicit review without creating or signing another intent',async()=>{

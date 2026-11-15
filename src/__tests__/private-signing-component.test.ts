@@ -199,6 +199,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     expect(patient.textContent).not.toContain('Test appointment');
     expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(button('Confirm my attendance', patient).disabled).toBe(true);
+    expect(patient.textContent).toContain('starting 30 minutes before the appointment (Chile time)');
     expect(button('Cancel appointment', patient).disabled).toBe(false);
     expect(doctor.textContent).toContain('Waiting for patient attendance');
     expect(doctor.textContent).not.toContain('Start now');
@@ -210,6 +211,12 @@ describe('active private signing components with controlled Privy and HTTP', () 
     await click('Confirm my attendance', patient);
     expect(patient.textContent).toContain('Patient attendanceConfirmed');
     expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
+    expect(patient.textContent).not.toContain('Confirm attendance on the scheduled day');
+    windowOpen = false;
+    await tick();
+    expect(button('Start now', doctor).disabled).toBe(true);
+    expect(doctor.textContent).toContain('Starting requires verified attendance and active medical authorization.');
+    windowOpen = true;
     await tick();
     expect(doctor.textContent).toContain('Patient ready');
     expect(button('Start now', doctor).disabled).toBe(false);

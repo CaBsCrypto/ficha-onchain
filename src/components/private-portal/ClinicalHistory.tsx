@@ -95,6 +95,8 @@ const spanish = {
   recheckDoctorAccess: 'Cierra esta ficha y vuelve a comprobar tu cuenta y los permisos antes de continuar.',
   signInAgain: 'Vuelve a ingresar con Privy antes de continuar.',
   refreshHistory: 'Puedes actualizar para volver a comprobar el historial.',
+  archivedTitle: 'Tu ficha está archivada en Stellar Testnet',
+  archivedRecovery: 'Solicita la recuperación al equipo de TrustLeaf. Cuando el equipo la confirme, selecciona «Actualizar» para volver a verificar tu ficha. Las firmas están deshabilitadas durante la recuperación.',
   readOnly: 'Tienes permiso de sólo lectura. Puedes consultar el historial y descargar sus archivos privados, sin agregar ni corregir aportes.',
   publishingDisabled: 'Las publicaciones están deshabilitadas. Puedes consultar los antecedentes verificados y guardar borradores privados sin firmar ni enviar transacciones.',
   demoReadOnly: 'Las confirmaciones están deshabilitadas en esta demostración. Puedes consultar tu historial y explorar los formularios con borradores temporales, sin guardar ni enviar transacciones.',
@@ -103,8 +105,9 @@ const spanish = {
   currentAttempt: 'Intento clínico actual',
   signatureExpired: 'Solicitud de firma vencida',
   preparationUnverified: 'Preparación sin resultado comprobado',
-  uncertain: 'No recibimos un resultado verificable. Consultaremos el mismo intento; no prepares ni firmes otro.',
-  pendingNotice: 'El cambio sigue pendiente. Puedes recargar y consultar este mismo intento; todavía no está confirmado.',
+  uncertain: 'El resultado sigue sin verificar. Usa «Consultar confirmación» para recuperar el estado del mismo intento.',
+  pendingNotice: 'La confirmación en Stellar sigue pendiente. Usa «Consultar confirmación» para comprobar este mismo intento.',
+  pendingTransaction: 'Ver transacción pendiente en Stellar Testnet',
   confirmedNotice: 'El cambio está confirmado. Puedes revisar su recibo en Stellar Testnet.',
   signatureRequestExpires: 'Esta solicitud de firma vence',
   signingConditions: 'La firma requiere contenido y cotización verificados y vigentes. Puedes consultar este mismo intento o cancelar la firma pendiente.',
@@ -227,6 +230,8 @@ const english: typeof spanish = {
   recheckDoctorAccess: 'Close this record and check your account and permissions before continuing.',
   signInAgain: 'Sign in again with Privy before continuing.',
   refreshHistory: 'Refresh to check the record again.',
+  archivedTitle: 'Your record is archived on Stellar Testnet',
+  archivedRecovery: 'Ask the TrustLeaf team to recover your record. Once they confirm recovery, select Refresh to verify it again. Signing is disabled during recovery.',
   readOnly: 'You have read-only access. You can view the record and download its private files. Adding and correcting entries are unavailable.',
   publishingDisabled: 'Publishing is disabled. You can view verified entries and save private drafts without signing or sending transactions.',
   demoReadOnly: 'Confirmations are disabled in this demo. You can view your record and try the forms with temporary drafts. These drafts are not saved or sent.',
@@ -235,8 +240,9 @@ const english: typeof spanish = {
   currentAttempt: 'Current clinical operation',
   signatureExpired: 'Signature request expired',
   preparationUnverified: 'Preparation result unverified',
-  uncertain: 'We did not receive a verifiable result. Check this same attempt before preparing or signing anything else.',
-  pendingNotice: 'The change is still pending. Refresh and check this same attempt for confirmation.',
+  uncertain: 'The result is unverified. Use Check confirmation to recover the status of this same attempt.',
+  pendingNotice: 'This transaction is awaiting confirmation on Stellar. Use Check confirmation to verify this same attempt.',
+  pendingTransaction: 'View pending transaction on Stellar Testnet',
   confirmedNotice: 'The change is confirmed. You can view its receipt on Stellar Testnet.',
   signatureRequestExpires: 'This signature request expires',
   signingConditions: 'Signing requires verified content and a valid fee quote. You can check this attempt or cancel the pending signature.',
@@ -459,6 +465,14 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     }
   }, [operation.operation?.id, operation.operation?.state, snapshot.refresh]);
   const data = operation.accessLost ? null : snapshot.data;
+  const historyUnavailable = !!(snapshot.error || snapshot.archived || operation.accessLost);
+  useEffect(() => {
+    if (!historyUnavailable) return;
+    setEditing(null);
+    setIndependentDraft(false);
+    setSignReview(false);
+    setPreparedFocus(null);
+  }, [historyUnavailable]);
   const permissionAppointment = data?.permissionAppointment;
   const focusedPermission = !doctor && data?.history && permissionAppointment &&
     permissionAppointment.appointmentId === permissionAppointmentId &&
@@ -490,7 +504,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     if (operation.accessLost || data && !checkRequired) setSigningCheck({ key: '', status: 'idle' });
     else if (checkKey) setSigningCheck(value => value.key === checkKey ? value : { key: checkKey, status: 'idle' });
   }, [operation.accessLost, !!data, checkRequired, checkKey]);
-  const blocked = snapshot.loading || !!snapshot.error || !data || operation.busy || operation.uncertain || operation.accessLost;
+  const blocked = snapshot.loading || historyUnavailable || !data || operation.busy || operation.uncertain;
   const newBlocked = blocked || checkBusy || signingCheckBlocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state);
   const canRead = !doctor || data?.context?.role === 'doctor' && data.context.canRead;
   const canAppend = !doctor || data?.context?.role === 'doctor' && data.context.canAppend;
@@ -535,6 +549,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   const chronology = [...groups.values()].map(versions => versions.sort((a, b) => b.version - a.version)).sort((a, b) => b[0].createdAt - a[0].createdAt);
   const shown = chronology.filter(([head]) => filter === 'all' || filter === 'notes' && !!head.note || filter === 'files' && !head.note || filter === 'mine' && (doctor ? head.author === wallet.address : head.source === 'patient') || filter === 'doctor' && head.source === 'doctor');
   const current = operation.operation;
+  const canCheckCurrentAttempt = operation.uncertain || current?.state === 'awaiting_signature' || current?.state === 'submitted';
   const permissions = data?.history && !doctor && renderPermissions?.({
     grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'),
     appointment: focusedPermission, appointmentHeading, onPrepare: prepare,
@@ -545,33 +560,38 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
       <div className="min-w-0"><h1 id="clinical-history-title" className="text-2xl font-semibold tracking-tight text-slate-900">{text.record}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{doctor ? text.doctorDescription : text.patientDescription}</p></div>
       <button type="button" disabled={snapshot.loading || operation.busy || checkBusy} onClick={snapshot.refresh} className={`${button} border border-slate-200 bg-white text-slate-700`}>{snapshot.loading ? text.checking : text.refresh}</button>
     </header>
-    <ClinicalDraftWorkspace key={identity + ':drafts'} identity={identity} currentHistoryId={data?.history?.id}
+    {!historyUnavailable && <ClinicalDraftWorkspace key={identity + ':drafts'} identity={identity} currentHistoryId={data?.history?.id}
       role={doctor ? 'doctor' : 'patient'} canPublish={!newBlocked && canWrite('append_version')}
       disabled={operation.busy || operation.uncertain || pending.length > 0}
-      onPrepare={prepare} onReopen={id => void reopenDraftPublication(id)} />
-    {doctor && historyId && !operation.accessLost && <section aria-label={text.privateDrafting} className="space-y-3">
+      onPrepare={prepare} onReopen={id => void reopenDraftPublication(id)} />}
+    {doctor && historyId && !historyUnavailable && <section aria-label={text.privateDrafting} className="space-y-3">
       {!independentDraft && <button type="button" disabled={operation.busy || operation.uncertain || pending.length > 0 || !!data?.context && !data.context.canAppend} onClick={() => setIndependentDraft(true)} className={button + ' border border-sky-200 bg-white text-sky-800'}>{text.writePrivateDraft}</button>}
       {independentDraft && <ClinicalDraftEntryForm key={identity + ':independent'} identity={identity} target={{ historyId }} historyId={historyId} role="doctor"
         disabled={operation.busy || operation.uncertain} readOnly={!canWrite('append_version') || blocked}
         disablePrescriptionLookup={!data || !canRead}
         onPrepare={prepare} onCancel={() => setIndependentDraft(false)} />}
     </section>}
-    {(snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">{text.earlierInformation} {operation.accessLost ? doctor ? text.recheckDoctorAccess : text.signInAgain : text.refreshHistory}</p></div>}
+    {snapshot.archived && !operation.accessLost ? <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+      <h2 className="font-semibold">{text.archivedTitle}</h2>
+      <p className="mt-2">{text.archivedRecovery}</p>
+    </div> : (snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">{text.earlierInformation} {operation.accessLost ? doctor ? text.recheckDoctorAccess : text.signInAgain : text.refreshHistory}</p></div>}
     {data && (readOnly || data.history && !canWrite('append_version') && !canWrite('set_permissions')) && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">{doctor && canRead && !canAppend ? text.readOnly : data.history ? data.draftsEnabled ? text.publishingDisabled : text.demoReadOnly : text.demoCreateDisabled}</p>}
     {checkScope && canWrite('append_version') && <ClinicalSigningCheck key={checkKey} scope={checkScope} verified={checkPassed} disabled={blocked || pending.length > 0 || !!operation.operation && ['awaiting_signature', 'submitted'].includes(operation.operation.state)} onStatusChange={checkStatus} />}
     {snapshot.loading && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">{text.loading}</p>}
-    {current || operation.uncertain ? <section aria-label={text.currentAttempt} className={`space-y-3 rounded-xl border p-4 ${current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-sky-200 bg-sky-50'}`}>
+    {(data && current || canCheckCurrentAttempt) && <section aria-label={text.currentAttempt} className={`space-y-3 rounded-xl border p-4 ${current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-sky-200 bg-sky-50'}`}>
       <h2 ref={operationHeading} tabIndex={-1} className="font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{current ? `${text[actionLabels[current.action]]} · ${current.state === 'cancelled' && current.errorCode === 'signature_request_expired' ? text.signatureExpired : text[stateLabels[current.state]]}` : text.preparationUnverified}</h2>
       {operation.uncertain && <p className="text-sm leading-relaxed text-slate-700">{text.uncertain}</p>}
       {current?.state === 'submitted' && <p role="status" className="text-sm leading-relaxed text-slate-700">{text.pendingNotice}</p>}
       {current?.state === 'confirmed' && <p role="status" className="text-sm leading-relaxed text-emerald-900">{text.confirmedNotice}</p>}
-      {current?.state === 'awaiting_signature' && <p className="text-sm leading-relaxed text-slate-700">{text.signatureRequestExpires}: {recordDate(language, current.expiresAt)} · {text.chileTime}</p>}
-      {current?.state === 'awaiting_signature' && <ClinicalPreparedReview operation={current} />}
-      {current?.state === 'awaiting_signature' && !operation.canSign && <p className="text-sm leading-relaxed text-slate-700">{text.signingConditions}</p>}
+      {data && current?.state === 'awaiting_signature' && <>
+        <p className="text-sm leading-relaxed text-slate-700">{text.signatureRequestExpires}: {recordDate(language, current.expiresAt)} · {text.chileTime}</p>
+        <ClinicalPreparedReview operation={current} />
+        {!operation.canSign && <p className="text-sm leading-relaxed text-slate-700">{text.signingConditions}</p>}
+      </>}
       {(operation.error || actionError) && <p role="alert" className="text-sm leading-relaxed text-rose-800">{operation.error || actionError}</p>}
-      {current && <ReceiptLink hash={current.transactionHash} />}
+      {data && current && <ReceiptLink hash={current.transactionHash} label={current.state === 'submitted' ? text.pendingTransaction : undefined} />}
       <div className="flex flex-col flex-wrap gap-3 sm:flex-row">
-        {(operation.uncertain || current && ['awaiting_signature', 'submitted'].includes(current.state)) && <button type="button" disabled={operation.busy || operation.accessLost} onClick={() => void act('check')} className={`${button} border border-sky-200 bg-white text-sky-800`}>{text.checkConfirmation}</button>}
+        {canCheckCurrentAttempt && <button type="button" disabled={operation.busy || operation.accessLost} onClick={() => void act('check')} className={`${button} border border-sky-200 bg-white text-sky-800`}>{text.checkConfirmation}</button>}
         {!readOnly && !current && operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('prepareSaved')} className={`${button} border border-sky-200 bg-white text-sky-800`}>{text.resumePreparation}</button>}
         {!readOnly && current?.state === 'submitted' && !operation.uncertain && <button type="button" disabled={operation.busy} onClick={() => void act('retry')} className={`${button} border border-sky-200 bg-white text-sky-800`}>{text.retrySubmission}</button>}
         {!readOnly && current?.state === 'awaiting_signature' && !operation.uncertain && <>
@@ -583,7 +603,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
         <h2 ref={signHeading} tabIndex={-1} className="font-semibold text-slate-900">{text[actionLabels[current.action]]}</h2><p className="text-sm leading-relaxed text-slate-700">{text.confirmPrefix} {current.action === 'create_history' ? text.confirmCreate : current.action === 'set_permissions' ? text.confirmPermissions : text.confirmContribution} {text.confirmSuffix}</p>
         <div className="flex flex-col gap-3 sm:flex-row"><button type="button" disabled={operation.busy || blocked} onClick={() => void act('sign')} className={`${button} bg-sky-700 text-white`}>{operation.busy ? text.confirming : text.confirmPrivy}</button><button type="button" disabled={operation.busy} onClick={() => { setSignReview(false); signButton.current?.focus(); }} className={`${button} border border-sky-200 bg-white text-sky-800`}>{text.back}</button></div>
       </div>}
-    </section> : null}
+    </section>}
     {data && !doctor && !data.history && <section className="rounded-2xl border border-sky-200 bg-white p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">{text.startHistory}</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{text.startHistoryDescription}</p><button type="button" disabled={newBlocked || !canWrite('create_history')} onClick={() => void prepare({ action: 'create_history' }).catch(failure => setActionError(localizedClinicalError(failure, language, text.resultUnverified)))} className={`${button} mt-4 bg-sky-700 text-white`}>{text.prepareHistory}</button></section>}
     {permissions && permissionAppointmentId !== undefined && <>
       {!focusedPermission && <p role="status" className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">{language === 'en'

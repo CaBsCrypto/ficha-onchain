@@ -7,7 +7,7 @@ import { PRIVATE_ADMIN, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private
 import type { ClinicalAction, ClinicalExpected } from '@/types/clinical';
 import { validateClinicalContext } from '../../../scripts/lib/clinical-crypto.mjs';
 import { clinicalWebFeeQuote, assertClinicalWebSponsoredFee, CLINICAL_WEB_SPONSOR_BASE_FEE } from '../../../scripts/lib/clinical-web-fee-policy.mjs';
-import { clinicalTtlMetadataUsable, clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
+import { clinicalArchivedLedgerKeys, clinicalTtlMetadataUsable, clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
 import { clinicalRpcUrl } from '../../../scripts/lib/clinical-rpc.mjs';
 
 export const CLINICAL_CONTRACT = 'CCI3KHWKIVGURS2LAI5VJ5C7EHL6O76MHNCWCVDZWWRIEBXHSLLG4L4U';
@@ -150,6 +150,16 @@ export function assertClinicalSavedEnvelope(row: ClinicalSavedEnvelope, options:
 
 type ClinicalRpc = Pick<rpc.Server, 'getNetwork' | 'getLedgerEntries' | 'getAccount' | 'simulateTransaction' | 'prepareTransaction' | 'sendTransaction' | 'getTransaction'>;
 export interface ClinicalHistory { id: string; patient: string; createdAt: number }
+/** Internal signal. The owner snapshot route alone may expose its safe code. */
+export class ClinicalRecordArchiveEvidence extends Error {}
+
+function clinicalStorageKey(tag: 'History' | 'Patient' | 'Entry' | 'Version' | 'Operation', ...args: xdr.ScVal[]) {
+  return xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+    contract: new Address(CLINICAL_CONTRACT).toScAddress(),
+    key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(tag), ...args]),
+    durability: xdr.ContractDataDurability.persistent(),
+  }));
+}
 function fields(value: unknown, expected: string[]): asserts value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Object.keys(value).length !== expected.length || expected.some(key => !Object.hasOwn(value, key))) throw unavailable();
 }
@@ -161,11 +171,34 @@ function historyValue(value: unknown, id?: string, patient?: string): ClinicalHi
   if (actual.id !== deriveClinicalHistoryId(actual.patient) || (id && actual.id !== id) || (patient && actual.patient !== patient)) throw unavailable();
   return actual;
 }
-export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clinicalRpcUrl())) {
+
+function entryValue(value: unknown) {
+  fields(value, ['author', 'head_version']); wallet(String(value.author));
+  return { author: String(value.author), headVersion: number(value.head_version, 1, 0xffff_ffff) };
+}
+
+function versionValue(value: unknown, history: ClinicalHistory, entryId: string, version: number) {
+  fields(value, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
+  if (number(value.version, 1) !== version) throw unavailable();
+  const context = validateClinicalContext({ schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT,
+    historyId: history.id, entryId, patient: history.patient, author: value.author, version,
+    previousCommitment: value.previous_commitment === null ? null : hex32(value.previous_commitment) });
+  return { context, commitment: hex32(value.commitment), createdAt: number(value.created_at), state: 'confirmed' as const };
+}
+
+type ArchiveCheck = { keys: xdr.LedgerKey[]; verify: (value: unknown) => unknown };
+
+export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clinicalRpcUrl()), options?: { ownerArchive?: string }) {
+  const ownerAddress = options?.ownerArchive;
+  const ownerHistoryId = ownerAddress === undefined ? null : deriveClinicalHistoryId(ownerAddress);
+  function historyArchiveKeys(id: string) {
+    if (ownerAddress === undefined || id !== ownerHistoryId) return [];
+    return [clinicalStorageKey('History', bytes(id)), clinicalStorageKey('Patient', wallet(ownerAddress))];
+  }
   let observedLedger = 0;
   let readAccount: Promise<{ address: string; sequence: string }> | undefined;
   let verified: Promise<{ network: 'testnet'; contractId: string; registryId: string; wasmHash: string; interfaceVersion: 1; ledger: number }> | undefined;
-  async function read(contract: string, method: string, args: xdr.ScVal[] = [], missing = false): Promise<unknown> {
+  async function read(contract: string, method: string, args: xdr.ScVal[] = [], missing = false, archive?: ArchiveCheck): Promise<unknown> {
     // One simulation source per chain instance/request. Never share its mutable
     // Account with a builder, or reuse this source for transaction preparation.
     const source = await (readAccount ??= server.getAccount(PRIVATE_ADMIN).then(account => {
@@ -177,6 +210,15 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
     for (let attempt = 0; attempt < 3; attempt++) {
       const sim = await server.simulateTransaction(tx);
       const ledger = number(sim.latestLedger, 1);
+      if (archive?.keys.length && ledger <= 0xffff_ffff && ledger >= observedLedger) {
+        const archived = clinicalArchivedLedgerKeys(sim);
+        if (archived.length && archived.every(key => archive.keys.some(expected => expected.toXDR().equals(key.toXDR()))) &&
+            rpc.Api.isSimulationSuccess(sim) && sim.result) {
+          archive.verify(scValToNative(sim.result.retval));
+          observedLedger = ledger;
+          throw new ClinicalRecordArchiveEvidence();
+        }
+      }
       if ('restorePreamble' in sim) throw unavailable();
       if (rpc.Api.isSimulationError(sim)) {
         if (ledger < observedLedger) throw unavailable();
@@ -228,8 +270,17 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
     } catch { throw unavailable(); }
   }
   function ensure() { return verified ??= verify().catch(error => { verified = undefined; throw error; }); }
-  async function checked<T>(fn: () => Promise<T>): Promise<T> { try { await ensure(); return await fn(); } catch { throw unavailable(); } }
-  async function history(id: string) { return checked(async () => historyValue(await read(CLINICAL_CONTRACT, 'get_history', [bytes(id)]), id)); }
+  async function checked<T>(fn: () => Promise<T>): Promise<T> {
+    try { await ensure(); return await fn(); }
+    catch (error) {
+      if (error instanceof ClinicalRecordArchiveEvidence) throw error;
+      throw unavailable();
+    }
+  }
+  async function history(id: string) {
+    return checked(async () => historyValue(await read(CLINICAL_CONTRACT, 'get_history', [bytes(id)], false,
+      { keys: historyArchiveKeys(id), verify: value => historyValue(value, id, ownerAddress) }), id));
+  }
   return {
     verifyDeployment: ensure,
     deriveHistoryId: deriveClinicalHistoryId,
@@ -241,10 +292,11 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
     }),
     entry: (historyId: string, entryId: string) => checked(async () => {
       await history(historyId);
-      const value = await read(CLINICAL_CONTRACT, 'get_entry', [bytes(historyId), bytes(entryId)], true);
-      if (value === null) return null;
-      fields(value, ['author', 'head_version']); wallet(String(value.author));
-      return { author: String(value.author), headVersion: number(value.head_version, 1, 0xffff_ffff) };
+      const args = [bytes(historyId), bytes(entryId)];
+      const keys = historyArchiveKeys(historyId);
+      if (keys.length) keys.push(clinicalStorageKey('Entry', ...args));
+      const value = await read(CLINICAL_CONTRACT, 'get_entry', args, true, { keys, verify: entryValue });
+      return value === null ? null : entryValue(value);
     }),
     grant: (historyId: string, doctor: string) => checked(async () => {
       await history(historyId);
@@ -256,13 +308,11 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
     }),
     version: (historyId: string, entryId: string, version: number) => checked(async () => {
       const h = await history(historyId);
-      const value = await read(CLINICAL_CONTRACT, 'get_version', [bytes(historyId), bytes(entryId), nativeToScVal(number(version, 1, 0xffff_ffff), { type: 'u32' })]);
-      fields(value, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
-      if (number(value.version, 1) !== version) throw unavailable();
-      const context = validateClinicalContext({ schemaVersion: 1, network: 'testnet', contractId: CLINICAL_CONTRACT,
-        historyId, entryId, patient: h.patient, author: value.author, version,
-        previousCommitment: value.previous_commitment === null ? null : hex32(value.previous_commitment) });
-      return { context, commitment: hex32(value.commitment), createdAt: number(value.created_at), state: 'confirmed' as const };
+      const args = [bytes(historyId), bytes(entryId), nativeToScVal(number(version, 1, 0xffff_ffff), { type: 'u32' })];
+      const keys = historyArchiveKeys(historyId);
+      if (keys.length) keys.push(clinicalStorageKey('Version', ...args));
+      const verify = (value: unknown) => versionValue(value, h, entryId, version);
+      return verify(await read(CLINICAL_CONTRACT, 'get_version', args, false, { keys, verify }));
     }),
     /** Durable contract receipt, independent of RPC transaction retention.
      * The database may only reach confirmed after an exact successful envelope.
@@ -273,24 +323,29 @@ export function createClinicalWebChain(server: ClinicalRpc = new rpc.Server(clin
         ? [xdr.ScVal.scvSymbol('create'), new Address(CLINICAL_CONTRACT).toScVal(), wallet(expected.patient), bytes(expected.historyId), bytes(expected.operationId)]
         : [xdr.ScVal.scvSymbol(action === 'append_version' ? 'append' : 'grant'), new Address(CLINICAL_CONTRACT).toScVal(), invocation.args()[0]];
       const digest = createHash('sha256').update(xdr.ScVal.scvVec(payload).toXDR()).digest('hex');
-      const value = await read(CLINICAL_CONTRACT, 'get_operation', [wallet(action === 'append_version' ? expected.author! : expected.patient), bytes(expected.operationId)]);
-      fields(value, ['digest', 'outcome']);
-      if (hex32(value.digest) !== digest || !Array.isArray(value.outcome) || value.outcome.length !== 2) throw unavailable();
-      const [kind, result] = value.outcome;
-      if (action === 'create_history') {
-        if (kind !== 'History') throw unavailable();
-        historyValue(result, expected.historyId, expected.patient);
-      } else if (action === 'set_permissions') {
-        fields(result, ['can_read', 'can_append', 'revision']);
-        if (kind !== 'Permissions' || result.can_read !== expected.canRead || result.can_append !== expected.canAppend ||
-            number(result.revision, 1) !== expected.expectedRevision! + 1) throw unavailable();
-      } else {
-        fields(result, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
-        if (kind !== 'Version' || result.author !== expected.author || hex32(result.commitment) !== expected.commitment ||
-            number(result.version, 1) !== expected.expectedVersion! + 1 ||
-            (result.previous_commitment === null ? null : hex32(result.previous_commitment)) !== expected.previousCommitment) throw unavailable();
-        number(result.created_at);
+      const args = [wallet(action === 'append_version' ? expected.author! : expected.patient), bytes(expected.operationId)];
+      const keys = action === 'append_version' && expected.historyId === ownerHistoryId && expected.patient === ownerAddress
+        ? [clinicalStorageKey('Operation', ...args)] : [];
+      function verify(value: unknown) {
+        fields(value, ['digest', 'outcome']);
+        if (hex32(value.digest) !== digest || !Array.isArray(value.outcome) || value.outcome.length !== 2) throw unavailable();
+        const [kind, result] = value.outcome;
+        if (action === 'create_history') {
+          if (kind !== 'History') throw unavailable();
+          historyValue(result, expected.historyId, expected.patient);
+        } else if (action === 'set_permissions') {
+          fields(result, ['can_read', 'can_append', 'revision']);
+          if (kind !== 'Permissions' || result.can_read !== expected.canRead || result.can_append !== expected.canAppend ||
+              number(result.revision, 1) !== expected.expectedRevision! + 1) throw unavailable();
+        } else {
+          fields(result, ['author', 'commitment', 'previous_commitment', 'version', 'created_at']);
+          if (kind !== 'Version' || result.author !== expected.author || hex32(result.commitment) !== expected.commitment ||
+              number(result.version, 1) !== expected.expectedVersion! + 1 ||
+              (result.previous_commitment === null ? null : hex32(result.previous_commitment)) !== expected.previousCommitment) throw unavailable();
+          number(result.created_at);
+        }
       }
+      verify(await read(CLINICAL_CONTRACT, 'get_operation', args, false, { keys, verify }));
       return true;
     }),
     /** Canonical live registry metadata for a specifically bounded rehearsal. */

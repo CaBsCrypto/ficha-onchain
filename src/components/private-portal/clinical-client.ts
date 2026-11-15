@@ -527,7 +527,7 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
     : appointmentId !== undefined ? `${identity}:appointment:${appointmentId}` : identity;
   const languageRef = useRef(language);
   languageRef.current = language;
-  const [view, setView] = useState<{ identity: string; data: ClinicalSnapshot | null; loading: boolean; error: string }>({ identity: '', data: null, loading: true, error: '' });
+  const [view, setView] = useState<{ identity: string; data: ClinicalSnapshot | null; loading: boolean; error: string; archived?: true }>({ identity: '', data: null, loading: true, error: '' });
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => { setView({ identity: scope, data: null, loading: true, error: '' }); setRevision(n => n + 1); }, [scope]);
   useEffect(() => {
@@ -543,6 +543,11 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
       if (alive) setView({ identity: scope, data, loading: false, error: '' });
     }).catch(error => {
       if (!alive) return;
+      if (historyId === undefined && error instanceof ClinicalClientError &&
+          error.status === 503 && error.code === 'clinical_record_archived') {
+        setView({ identity: scope, data: null, loading: false, error: '', archived: true });
+        return;
+      }
       const locale = languageRef.current;
       setView({ identity: scope, data: null, loading: false, error: localizedClinicalError(error, locale, locale === 'en' ? 'We could not verify the clinical record.' : 'No pudimos verificar el historial.') });
     });

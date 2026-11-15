@@ -110,8 +110,12 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         {canCancel && <button disabled={unavailable || (!regular && data.booking?.state === 'cancel_requested')} onClick={() => void appointmentAction('cancel')} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-40">{regular ? (english ? 'Cancel appointment' : 'Cancelar consulta') : (english ? 'Request cancellation' : 'Solicitar cancelación')}</button>}
         {canComplete && <button disabled={unavailable} onClick={() => void appointmentAction('complete')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-40">{english ? "Complete appointment" : "Finalizar consulta"}</button>}
       </div>
-      {!unavailable && needsAttendance && !canAttend && <p className="text-sm text-slate-600">{english ? 'Attendance confirmation is currently unavailable.' : 'La confirmación de asistencia no está disponible en este momento.'}</p>}
-      {!unavailable && role === 'doctor' && scheduled && attended && !canStart && <p className="text-sm text-slate-600">{english ? 'Starting this appointment is currently unavailable.' : 'El inicio de esta consulta no está disponible en este momento.'}</p>}
+      {!unavailable && needsAttendance && !canAttend && <p className="text-sm text-slate-600">{english
+        ? 'Confirm attendance on the scheduled day, starting 30 minutes before the appointment (Chile time).'
+        : 'Confirma tu asistencia el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).'}</p>}
+      {!unavailable && role === 'doctor' && scheduled && attended && !canStart && <p className="text-sm text-slate-600">{english
+        ? 'Starting requires verified attendance and active medical authorization. The window opens 30 minutes before the appointment on the scheduled day (Chile time).'
+        : 'Para iniciar necesitas asistencia verificada y autorización médica vigente. El inicio se habilita el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).'}</p>}
       {actionError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{actionError}</p>}
       {!regular && <>
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

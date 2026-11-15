@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, BASE_FEE, Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
-import { CLINICAL_CONTRACT, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
+import { CLINICAL_CONTRACT, ClinicalRecordArchiveEvidence, clinicalInvocation, deriveClinicalEntryId, deriveClinicalHistoryId, sponsorClinicalSignature } from '@/lib/clinical/chain';
+import { PRIVATE_ADMIN, PRIVY_APP, PrivateFlowError, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import { sealClinicalVersion } from '../../scripts/lib/clinical-crypto.mjs';
 import type { ClinicalActor, ClinicalExpected } from '@/types/clinical';
 
@@ -10,7 +11,7 @@ vi.mock('@/lib/db', () => ({ getDb: () => ({ query: m.query }) }));
 vi.mock('@/lib/auth/privy-auth', () => ({ requireUser: m.auth }));
 vi.mock('@/lib/doctor-authorizations', () => ({ resolveDoctor: m.doctor }));
 vi.mock('@/lib/clinical/identity', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/identity')>(), resolveClinicalActor: m.actor }));
-vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: () => { m.chainFactory(); return m.chain; } }));
+vi.mock('@/lib/clinical/chain', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/clinical/chain')>(), createClinicalWebChain: (...args: unknown[]) => { m.chainFactory(...args); return m.chain; } }));
 vi.mock('../../scripts/lib/clinical-chain-read.mjs', () => ({ createClinicalChainReader: () => { m.readerFactory(); return m.reader; } }));
 vi.mock('../../scripts/lib/clinical-read.mjs', async importOriginal => {
   const actual = await importOriginal<typeof import('../../scripts/lib/clinical-read.mjs')>();
@@ -19,6 +20,7 @@ vi.mock('../../scripts/lib/clinical-read.mjs', async importOriginal => {
   } };
 });
 import { clinicalDocument, clinicalGrants, clinicalOperations, clinicalPublicOperation, clinicalReadQuery, clinicalSnapshot, ownClinicalHistory } from '@/lib/clinical/history';
+import { GET as getClinicalHistory } from '@/app/api/private-clinical-history/route';
 
 // Deterministic local identities and encryption keys; no Testnet or database calls.
 const patient = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 51));
@@ -102,6 +104,88 @@ beforeEach(() => {
   vi.resetAllMocks(); m.documents = []; vi.stubEnv('RELAYER_SECRET', payer.secret()); vi.stubEnv('TRUSTLEAF_CLINICAL_KEYRING', JSON.stringify(keyring)); vi.stubEnv('TRUSTLEAF_CLINICAL_ACTIVE_KEY_ID', 'history-test');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+describe('owner snapshot archive response', () => {
+  beforeEach(() => {
+    const host = 'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech';
+    const environment = {
+      TRUSTLEAF_ENV: 'local', TRUSTLEAF_DB_HOST: host, TRUSTLEAF_DATABASE_URL: 'postgres://fixture:fixture@' + host + '/test',
+      VERCEL_ENV: '', TRUSTLEAF_HOSTED_CAPTURE_ENABLED: 'false', TRUSTLEAF_PRIVATE_WRITES_ENABLED: 'false',
+      PRIVY_APP_ID: PRIVY_APP, NEXT_PUBLIC_PRIVY_APP_ID: PRIVY_APP, DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID: REGISTRY_PRIVATE,
+      PRESCRIPTION_PRIVATE_CONTRACT_ID: RX_PRIVATE, DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY: PRIVATE_ADMIN, BOOKING_AUTHORITY_PUBLIC_KEY: PRIVATE_ADMIN,
+      NEXT_PUBLIC_STELLAR_NETWORK: 'testnet', NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+      TRUSTLEAF_CLINICAL_WEB_ENABLED: 'true', CLINICAL_HISTORY_PRIVATE_CONTRACT_ID: CLINICAL_CONTRACT,
+    };
+    for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+  });
+
+  it('returns only the sanitized archive status after both owner identity checks', async () => {
+    fixture();
+    m.chain.history.mockRejectedValue(new ClinicalRecordArchiveEvidence('PRIVATE DIAGNOSTIC'));
+
+    const response = await getClinicalHistory(request('?appointmentId=42'));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ error: 'clinical_record_archived' });
+    expect(m.chainFactory).toHaveBeenCalledWith(undefined, { ownerArchive: actor.address });
+    expect(m.auth).toHaveBeenCalledTimes(2);
+    expect(m.actor).toHaveBeenCalledTimes(2);
+    expect(m.readerFactory).not.toHaveBeenCalled();
+  });
+
+  it.each(['expired session', 'changed wallet'])('discards the archive signal after a %s', async condition => {
+    fixture();
+    m.chain.history.mockRejectedValue(new ClinicalRecordArchiveEvidence());
+    if (condition === 'expired session') m.auth.mockResolvedValueOnce(user).mockResolvedValueOnce(null);
+    else m.actor.mockResolvedValueOnce(actor).mockResolvedValueOnce({ ...actor, walletId: 'now-different' });
+
+    const response = await getClinicalHistory(request());
+
+    expect(response.status).toBe(condition === 'expired session' ? 401 : 403);
+    expect(await response.text()).not.toContain('clinical_record_archived');
+  });
+
+  it('does not expose another owner’s archival marker or reinterpret provider failure', async () => {
+    const f = fixture();
+    m.chain.history.mockRejectedValue(new ClinicalRecordArchiveEvidence());
+    f.state.own!.owner_user_id = 'did:privy:somebody_else';
+
+    const rejected = await getClinicalHistory(request());
+    expect(rejected.status).toBe(403);
+    expect(await rejected.text()).not.toContain('clinical_record_archived');
+    expect(m.chain.history).not.toHaveBeenCalled();
+
+    f.state.own!.owner_user_id = actor.userId;
+    m.chain.history.mockRejectedValue(new PrivateFlowError('clinical_chain_unavailable', 503));
+    const unavailable = await getClinicalHistory(request());
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: 'clinical_chain_unavailable' });
+  });
+
+  it('propagates verified archive of a required version whose document also failed to load', async () => {
+    const f = fixture();
+    f.addVersion();
+    f.state.encryptedFailure = true;
+    m.chain.version.mockRejectedValue(new ClinicalRecordArchiveEvidence());
+
+    const response = await getClinicalHistory(request());
+
+    expect(await response.json()).toEqual({ error: 'clinical_record_archived' });
+    expect(m.documents).toHaveLength(0);
+  });
+
+  it('keeps the verified history available when only the optional creation receipt is unavailable', async () => {
+    const f = fixture();
+    f.addCreation();
+    m.chain.verifyRecordedOperation.mockRejectedValue(new PrivateFlowError('clinical_chain_unavailable', 503));
+
+    const response = await getClinicalHistory(request());
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).history).toMatchObject({ id: historyId, creationTransactionHash: null });
+  });
+});
 
 describe('clinical history identity and response boundaries', () => {
   it('looks up the stable Privy owner and rechecks the live history wallet', async () => {
