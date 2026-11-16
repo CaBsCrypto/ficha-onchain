@@ -58,6 +58,19 @@ En Edge, Tab llevó el foco visible a **Gestionar acceso a mi ficha**, a ambos p
 
 Las 22 pruebas enfocadas de barras, acceso y campana pasaron con respuestas controladas. Cubren la suspensión, el rechazo del resultado anterior, la conservación del bloqueo de un intento pendiente, el vencimiento de la consulta a la bandeja y la hora de Chile. La comprobación visual en navegador se registra por separado. Para este pase usar datos sintéticos y respuestas controladas en las acciones que requieren firma. Cualquier firma real en Stellar Testnet requiere autorización específica del usuario y su confirmación en Privy.
 
+### Pulido previo a la grabación
+
+Usar la publicación del PR #158 (`d77a0a8`) como referencia visual. Comparar con el SHA candidato en la misma consulta, perfil, idioma y estado; guardar capturas equivalentes a 320 px CSS y en escritorio. Tratar esas capturas con datos sintéticos como evidencia de interfaz. Registrar aparte lo observado con las sesiones autenticadas en el dominio publicado.
+
+| Responsable | Comprobación para autorizar el inicio de la grabación |
+| --- | --- |
+| QA de interfaz | En consulta, comprobar que se identifica a la otra persona, se reconoce el siguiente paso y se distingue la disponibilidad de la ficha de la acción de finalizar. En permisos, comprobar el médico enfocado, la fecha, la confirmación vigente y el regreso a la misma consulta. |
+| QA de interfaz | En el portal médico, comparar campana y **Mi cuenta** en ambos anchos y en español e inglés. Leer tipo de aviso, hora de Chile en formato de 24 horas y permisos. Revisar avisos de retiro, enlaces antiguos, consulta temporalmente indisponible y retorno de foco por teclado. Confirmar el cierre de sesión desde **Mi cuenta** y que un intento que requiere conciliación mantiene bloqueado el cambio de ficha desde la campana. **Mi cuenta** sigue disponible para cerrar sesión. |
+| Operación | Cotejar SHA, build y CI, sesiones separadas y consulta, ficha, permisos y recibos existentes en Stellar Testnet. Hacer primero un ensayo de lectura. Si falta un resultado verificable o la interfaz muestra un intento pendiente, comprobar el mismo intento y registrar su estado antes de continuar. |
+| Responsable de captura | Validar encuadre e idioma antes de registrar el recorrido. Ante una operación nueva, dejar el alcance, importe y vencimiento revisados y pausar la captura antes de cualquier código o firma. El usuario confirma en Privy. Retomar en el resultado y anotar el minuto y la referencia privada al recibo. |
+
+Registrar el pase sólo cuando el SHA candidato, el recorrido visual y las comprobaciones de lectura tengan evidencia. Dejar como pendiente el paso exacto que requiera una confirmación real, con su responsable y la próxima comprobación. Las mejoras ajenas al recorrido clínico se llevan a una revisión posterior.
+
 ## Regresión anterior al rediseño
 
 - Node 22.23.5. Pasaron 2.277 pruebas de aplicación, 873 de servicios privados y 19 de captura y receta.

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } fr
 import { usePrivy } from '@privy-io/react-auth';
 import type { ClinicalGrant, ClinicalOperation, ClinicalPermissionAppointment, ClinicalVersion } from '@/types/clinical';
 import { usePortalWallet } from './WalletBoundary';
-import { localDate, appointmentDate } from './client';
+import { localDate, appointmentDate, chileDateTime } from './client';
 import { ReceiptLink } from './Operation';
 import { DocumentView } from './DocumentView';
 import { prescriptionLabel } from './state';
@@ -67,13 +67,14 @@ const spanish = {
   quoteExpired: 'La cotización venció. La firma permanece deshabilitada; consulta o cancela este mismo intento.',
   quoteUnavailable: 'No pudimos verificar la cotización de este intento. La firma permanece deshabilitada.',
   fileUnverified: 'No pudimos verificar el archivo.',
-  download: 'Descargar',
-  checkingFile: 'Comprobando archivo…',
-  prepareDownload: 'Verificar para descargar',
+  downloadPdf: 'Descargar PDF',
+  downloadImage: 'Descargar imagen',
+  checkingFile: 'Comprobando acceso al archivo…',
+  prepareDownload: 'Preparar descarga',
+  fileReady: 'Archivo listo para descargar.',
   addedByPatient: 'Aportado por paciente',
   addedByYou: 'Aportado por ti',
   recordedByDoctor: 'Registrado por médico',
-  recorded: 'Registrado',
   pdfFile: 'Archivo PDF',
   imageFile: 'Archivo de imagen',
   prescriptionNumber: 'Receta #',
@@ -154,7 +155,7 @@ const spanish = {
   noEntries: 'Aún no hay antecedentes ni archivos. Agrega tu primer aporte cuando quieras.',
   chronology: 'Cronología de antecedentes',
   correct: 'Corregir mi aporte',
-  show: 'Ver',
+  entryDetails: 'Detalles',
   previousVersion: 'versión anterior',
   previousVersions: 'versiones anteriores',
   grantsUnavailable: 'No pudimos comprobar algunos médicos o sus permisos. Sólo mostramos los estados verificados; los demás controles no están disponibles. Puedes actualizar para volver a consultar.',
@@ -205,13 +206,14 @@ const english: typeof spanish = {
   quoteExpired: 'The quote expired. Signing is disabled. Check or cancel this attempt.',
   quoteUnavailable: 'We could not verify the quote for this attempt. Signing is disabled.',
   fileUnverified: 'We could not verify the file.',
-  download: 'Download',
-  checkingFile: 'Checking file…',
-  prepareDownload: 'Verify for download',
+  downloadPdf: 'Download PDF',
+  downloadImage: 'Download image',
+  checkingFile: 'Verifying access to the file…',
+  prepareDownload: 'Prepare download',
+  fileReady: 'File ready to download.',
   addedByPatient: 'Added by the patient',
   addedByYou: 'Added by you',
   recordedByDoctor: 'Recorded by the doctor',
-  recorded: 'Recorded',
   pdfFile: 'PDF file',
   imageFile: 'Image file',
   prescriptionNumber: 'Prescription #',
@@ -292,7 +294,7 @@ const english: typeof spanish = {
   noEntries: 'There are no entries or files yet. Add your first contribution when you’re ready.',
   chronology: 'Clinical record timeline',
   correct: 'Correct my contribution',
-  show: 'View',
+  entryDetails: 'Details',
   previousVersion: 'previous version',
   previousVersions: 'previous versions',
   grantsUnavailable: 'We could not verify some doctors or their permissions. Only verified results and controls are shown. Refresh to check again.',
@@ -317,7 +319,7 @@ function entryCalendarDate(language: PortalLanguage, date: string) {
 
 export interface ClinicalPermissionsProps {
   grants: ClinicalGrant[]; disabled: boolean; readOnly?: boolean; onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>;
-  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>;
+  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>; appointmentReturn?: ReactNode;
 }
 export interface ClinicalHistoryProps {
   renderPermissions?: (props: ClinicalPermissionsProps) => ReactNode; historyId?: string; permissionAppointmentId?: number;
@@ -411,9 +413,14 @@ function ClinicalDownload({ entry, onUnavailable, historyId }: { entry: Clinical
       if (alive.current) setReadyUrl('');
     }, 1500);
   }
-  return <div className="mt-3 space-y-2">
-    {readyUrl ? <a ref={link} href={readyUrl} download={entry.fileName} onClick={downloaded} className="inline-flex min-h-11 max-w-full items-center break-all rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-800 underline focus-visible:outline-2 focus-visible:outline-sky-600">{text.download} {entry.fileName}</a> :
-      <button type="button" disabled={busy} onClick={() => void prepareDownload()} className={`${button} border border-sky-200 bg-sky-50 text-sky-800`}>{busy ? text.checkingFile : text.prepareDownload}</button>}
+  const downloadLabel = entry.mediaType === 'application/pdf' ? text.downloadPdf : text.downloadImage;
+  return <div className="mt-2 space-y-2">
+    {readyUrl ? <>
+      <p role="status" className="text-xs text-emerald-800">{text.fileReady}</p>
+      <a ref={link} href={readyUrl} download={entry.fileName} aria-label={`${downloadLabel} · ${entry.fileName}`} onClick={downloaded}
+        className="inline-flex min-h-11 max-w-full items-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{downloadLabel}</a>
+    </> : <button type="button" disabled={busy} onClick={() => void prepareDownload()}
+      className={`${button} border border-sky-200 bg-white text-sky-800`}>{busy ? text.checkingFile : text.prepareDownload}</button>}
     {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
   </div>;
 }
@@ -422,11 +429,11 @@ function VersionContent({ entry, onUnavailable, historyId }: { entry: ClinicalVe
   const text = copy[language];
   return <div className="min-w-0">
     <h3 className="break-words text-base font-semibold text-slate-900">{entry.title}</h3>
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
       <span>{entry.source === 'patient' ? historyId ? text.addedByPatient : text.addedByYou : text.recordedByDoctor}</span>
       <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{text.version} {entry.version}</span>
+      <time dateTime={new Date(entry.createdAt * 1000).toISOString()}>{chileDateTime(entry.createdAt, language)} · {text.chileTime}</time>
     </div>
-    <p className="mt-2 text-sm text-slate-600">{text.recorded}: {recordDate(language, entry.createdAt)} · {text.chileTime}</p>
     {entry.note ? <><p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{entry.note.text}</p>{entry.note.eventDate && <p className="mt-3 text-sm text-slate-500">{text.entryDate}: {entryCalendarDate(language, entry.note.eventDate)}</p>}</> :
       <div className="mt-3 rounded-xl bg-slate-50 p-3 sm:p-4">
         <p className="text-sm font-medium text-slate-600">{entry.mediaType === 'application/pdf' ? text.pdfFile : text.imageFile}</p>
@@ -435,11 +442,12 @@ function VersionContent({ entry, onUnavailable, historyId }: { entry: ClinicalVe
       </div>}
     {entry.prescription && <section aria-label={text.linkedPrescription} className="mt-4 space-y-2 rounded-xl border border-sky-100 bg-sky-50/40 p-3"><p className="text-sm font-semibold text-slate-800">{entry.prescription.rxId ? `${text.prescriptionNumber}${entry.prescription.rxId}` : text.preparedDocument} · {text.consultation} {entry.prescription.appointmentId}</p><p className="text-sm text-slate-600">{prescriptionLabel(entry.prescription, language)} · {text.expires}: {recordDate(language, entry.prescription.expiresAt)}</p><DocumentView key={entry.prescription.id} id={entry.prescription.id} prescription={entry.prescription} /><ReceiptLink hash={entry.prescription.transactionHash} label={text.prescriptionReceipt} /></section>}
     {entry.prescriptionUnavailable && <p role="status" className="mt-3 text-sm text-slate-600">{text.prescriptionUnavailable}</p>}
-    {(entry.transactionHash || entry.source === 'doctor') && <details className="mt-2 text-sm">
-      <summary className="min-h-11 cursor-pointer content-center font-medium text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{text.verificationDetails}</summary>
-      {entry.source === 'doctor' && <p className="break-all text-slate-600">{text.authorWallet}: {entry.author}</p>}
-      <ReceiptLink hash={entry.transactionHash} />
-    </details>}
+  </div>;
+}
+function VersionEvidence({ entry, authorLabel }: { entry: ClinicalVersion; authorLabel: string }) {
+  return <div className="text-sm">
+    {entry.source === 'doctor' && <p className="break-all text-slate-600">{authorLabel}: {entry.author}</p>}
+    <ReceiptLink hash={entry.transactionHash} />
   </div>;
 }
 const isPending = (operation: ClinicalOperation) => operation.state === 'awaiting_signature' || operation.state === 'submitted';
@@ -512,7 +520,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     if (!appointmentFocusKey || focusedAppointment.current === appointmentFocusKey || !appointmentHeading.current) return;
     focusedAppointment.current = appointmentFocusKey;
     appointmentHeading.current.focus({ preventScroll: true });
-    appointmentHeading.current.scrollIntoView?.({ block: 'start' });
+    appointmentHeading.current.closest('form')?.scrollIntoView?.({ block: 'start' });
   }, [appointmentFocusKey, permissionAppointmentId]);
   useEffect(() => {
     if (!doctor || !data) return;
@@ -589,13 +597,17 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   const chronology = [...groups.values()].map(versions => versions.sort((a, b) => b.version - a.version)).sort((a, b) => b[0].createdAt - a[0].createdAt);
   const shown = chronology.filter(([head]) => filter === 'all' || filter === 'notes' && !!head.note || filter === 'files' && !head.note || filter === 'mine' && (doctor ? head.author === wallet.address : head.source === 'patient') || filter === 'doctor' && head.source === 'doctor');
   const canCheckCurrentAttempt = operation.uncertain || current?.state === 'awaiting_signature' || current?.state === 'submitted';
+  const navigationPending = operation.busy || operation.uncertain || hasPending;
+  const appointmentReturn = focusedPermission && (navigationPending
+    ? <button type="button" disabled className={`${button} border border-slate-200 bg-white text-slate-700`}>{text.goToAppointment}</button>
+    : <Link href={consultationHref('patient', language, focusedPermission.appointmentId)}
+      className={`${button} inline-flex items-center px-0 text-sky-800 underline-offset-4 hover:underline`} prefetch={false}>{text.goToAppointment}</Link>);
   const permissions = data?.history && !doctor && renderPermissions?.({
     grants: data.grants, disabled: newBlocked || !canWrite('set_permissions'), readOnly: !canWrite('set_permissions'),
-    appointment: focusedPermission, appointmentHeading, onPrepare: prepare,
+    appointment: focusedPermission, appointmentHeading, appointmentReturn, onPrepare: prepare,
   });
   const role = doctor ? 'doctor' : 'patient';
   const surface = `rounded-2xl border border-slate-200 bg-white p-4 ${doctor ? '' : 'sm:p-6'}`;
-  const navigationPending = operation.busy || operation.uncertain || hasPending;
   const editorProps: ClinicalEntryFormProps | null = editing && {
     correction: typeof editing === 'string' ? null : editing,
     initialKind: typeof editing === 'string' ? editing : undefined,
@@ -606,10 +618,6 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   const editorKey = typeof editing === 'object' && editing ? `${editing.entryId}:${editing.version}` : editing;
   if (!identity) return <p role="status" className="text-sm text-slate-600">{text.signIn}</p>;
   return <section key={identity} className="space-y-6 pb-4" aria-labelledby="clinical-history-title">
-    {focusedPermission && (navigationPending
-      ? <button type="button" disabled className={`${button} border border-slate-200 bg-white text-slate-700`}>{text.goToAppointment}</button>
-      : <Link href={consultationHref('patient', language, focusedPermission.appointmentId)}
-        className={`${button} inline-flex items-center px-0 text-sky-800 underline-offset-4 hover:underline`} prefetch={false}>{text.goToAppointment}</Link>)}
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
         <h1 id="clinical-history-title" className="break-words text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
@@ -709,7 +717,20 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
           : <ol aria-labelledby="clinical-timeline-title" className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
         {shown.map(([head, ...previous]) => <li key={head.entryId} className={`min-w-0 p-4 ${doctor ? '' : 'sm:p-6'}`}><VersionContent entry={head} onUnavailable={snapshot.refresh} historyId={historyId} />
           {canAppend && head.canCorrect && (!doctor || head.author === wallet.address) && <button type="button" disabled={newBlocked || head.prescriptionUnavailable} onClick={event => { formOpener.current = event.currentTarget; setEditing(head); }} className={`${button} mt-3 border border-sky-200 text-sky-800`}>{text.correct}</button>}
-          {previous.length > 0 && <details className="mt-3 border-t border-slate-100 pt-2"><summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">{text.show} {previous.length} {previous.length === 1 ? text.previousVersion : text.previousVersions}</summary><div className="mt-2 space-y-5 border-l-2 border-sky-100 pl-4">{previous.map(entry => <VersionContent key={entry.version} entry={entry} onUnavailable={snapshot.refresh} historyId={historyId} />)}</div></details>}
+          {(head.transactionHash || head.source === 'doctor' || previous.length > 0) && <details className="mt-3 border-t border-slate-100">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">
+              {text.entryDetails}{previous.length > 0 && <span className="ml-2 font-normal text-slate-600">
+                {' '}{previous.length} {previous.length === 1 ? text.previousVersion : text.previousVersions}
+              </span>}
+            </summary>
+            <VersionEvidence entry={head} authorLabel={text.authorWallet} />
+            {previous.length > 0 && <div className="mt-2 space-y-5 border-l-2 border-sky-100 pl-4">
+              {previous.map(entry => <div key={entry.version} className="space-y-2">
+                <VersionContent entry={entry} onUnavailable={snapshot.refresh} historyId={historyId} />
+                <VersionEvidence entry={entry} authorLabel={text.authorWallet} />
+              </div>)}
+            </div>}
+          </details>}
         </li>)}
         </ol>}
       </section>}

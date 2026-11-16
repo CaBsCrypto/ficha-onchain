@@ -122,12 +122,19 @@ describe('authenticated doctor notification tray', () => {
     expect(panel(host).textContent).toContain('Access granted');
     expect(panel(host).textContent).toContain('Permissions changed');
     expect(panel(host).textContent).toContain('Chile time');
+    const firstTime = panel(host).querySelector('time')!;
+    expect(firstTime.dateTime).toBe('2026-11-15T18:10:00.000Z');
+    expect(firstTime.textContent).toContain('15:10');
+    expect(firstTime.textContent).not.toMatch(/[AP]M/i);
     const withdrawn = [...panel(host).querySelectorAll('li')].find(item => item.textContent?.includes('Access withdrawn'))!;
     expect(withdrawn.querySelector('a')).toBeNull();
     expect(withdrawn.textContent).not.toContain(grant.patientLabel);
     const links = [...panel(host).querySelectorAll('a')];
     expect(links.map(link => link.getAttribute('href'))).toEqual(Array(2).fill('/doctor?tab=historial&record=' + historyId + '&lang=en'));
     expect(current.canNavigateToRecord(historyId)).toBe(true);
+    expect(current.canNavigateToRecord(historyId, 24)).toBe(true);
+    expect(current.canNavigateToRecord(historyId, 25)).toBe(false);
+    expect(current.canNavigateToRecord(undefined, 24)).toBe(false);
     expect(current.canNavigateToRecord()).toBe(true);
     expect(current.canNavigateToRecord('b'.repeat(64))).toBe(false);
 
@@ -144,6 +151,19 @@ describe('authenticated doctor notification tray', () => {
     await act(async () => link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(panel(host).hidden).toBe(true);
     expect(document.activeElement).toBe(bell(host));
+  });
+
+  it('retains record-only navigation when a newly verified inbox drops the exact appointment', async () => {
+    transport.fetch.mockResolvedValueOnce(Response.json(sample)).mockResolvedValueOnce(Response.json({
+      ...sample, records: [{ ...sample.records[0], activeAppointmentIds: [13] }],
+    }));
+    await mount();
+    expect(current.canNavigateToRecord(historyId, 24)).toBe(true);
+    const canNavigate = current.canNavigateToRecord;
+    await focus();
+    expect(canNavigate(historyId, 24)).toBe(false);
+    expect(canNavigate(historyId, 13)).toBe(true);
+    expect(canNavigate(historyId)).toBe(true);
   });
 
   it('drops previous labels, rights and links when verification fails or returns malformed data', async () => {

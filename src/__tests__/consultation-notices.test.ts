@@ -6,16 +6,19 @@ import { ConsultationDetail } from '@/components/private-portal/ConsultationDeta
 const state = vi.hoisted(() => ({
   data: null as any, operation: null as any, loading: false,
   records: [] as { historyId: string; activeAppointmentIds: number[] }[], blocked: false,
+  inboxLoading: false, inboxError: '', inboxEnabled: true, inboxRefresh: vi.fn(),
 }));
 vi.mock('@/components/private-portal/DoctorClinicalInbox', () => ({
   useDoctorClinicalInbox: () => ({
-    enabled: true, data: { records: state.records, notifications: [] }, error: '', recordNavigationBlocked: state.blocked,
-    canNavigateToRecord: () => !state.blocked,
+    enabled: state.inboxEnabled, data: state.inboxLoading ? null : { records: state.records, notifications: [] },
+    loading: state.inboxLoading, error: state.inboxError, recordNavigationBlocked: state.blocked,
+    canNavigateToRecord: () => !state.blocked, refresh: state.inboxRefresh,
   }),
 }));
-vi.mock('@/components/private-portal/client', () => ({
+vi.mock('@/components/private-portal/client', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/private-portal/client')>(),
   usePortalData: () => ({ data: state.data, loading: state.loading, refresh: vi.fn() }),
-  appointmentDate: (date: string) => date, localDate: () => 'synthetic date', jsonBody: vi.fn(), portalApi: vi.fn(),
+  localDate: () => 'synthetic date', jsonBody: vi.fn(), portalApi: vi.fn(),
 }));
 vi.mock('@/components/private-portal/Operation', () => ({
   usePrivateOperation: () => ({ operation: state.operation, run: vi.fn() }),
@@ -34,6 +37,10 @@ beforeEach(() => {
   state.loading = false;
   state.records = [];
   state.blocked = false;
+  state.inboxLoading = false;
+  state.inboxError = '';
+  state.inboxEnabled = true;
+  state.inboxRefresh.mockClear();
   state.data = { appointment: { date:'2026-09-17', status:'in_progress' }, consent:{status:'consumed'},
     operations:[state.operation], prescription:{ rxId:'12', operation:state.operation } };
 });
@@ -75,6 +82,49 @@ it('links only the authorized doctor’s exact verified appointment to a shared 
   state.blocked = false;
   await render('patient');
   expect(box.querySelector('a[href*="record="]')).toBeNull();
+});
+it('distinguishes a still-unverified inbox, a failed lookup, and an empty result', async () => {
+  const historyId = 'a'.repeat(64);
+  state.data.appointment = { ...state.data.appointment, started_at: '2026-09-17T13:00:00Z', attended_at: '2026-09-17T12:40:00Z' };
+  state.inboxLoading = true;
+  await render();
+  expect(box.textContent).toContain('Comprobando acceso a la ficha…');
+  expect(box.querySelector('a[href*="record="]')).toBeNull();
+
+  state.inboxLoading = false;
+  state.inboxError = 'clinical_inbox_unavailable';
+  state.records = [{ historyId, activeAppointmentIds: [7] }];
+  await render();
+  expect(box.querySelector('[role="alert"]')?.textContent).toContain('No pudimos comprobar el acceso a la ficha.');
+  expect(box.querySelector('a[href*="record="]')).toBeNull();
+  await act(async () => [...box.querySelectorAll('button')].find(button => button.textContent === 'Volver a comprobar')!.click());
+  expect(state.inboxRefresh).toHaveBeenCalledOnce();
+
+  state.inboxError = '';
+  state.records = [{ historyId, activeAppointmentIds: [8] }];
+  await render();
+  expect(box.textContent).toContain('Pídele al paciente que comparta su ficha para esta consulta.');
+  expect(box.querySelector('a[href*="record="]')).toBeNull();
+});
+it('keeps a pending operation above and protects the shared record link', async () => {
+  state.data.appointment = { ...state.data.appointment, patient_name: 'Paciente de prueba', started_at: '2026-09-17T13:05:00Z',
+    attended_at: '2026-09-17T12:40:00Z' };
+  state.records = [{ historyId: 'a'.repeat(64), activeAppointmentIds: [7] }];
+  state.operation = { id: 'mint', action: 'mint', state: 'submitted' };
+  await render();
+  expect(box.querySelector('h1')?.textContent).toBe('Paciente de prueba');
+  expect(box.textContent).toContain('Consulta en curso');
+  expect(box.textContent).toContain('10:05');
+  expect(box.textContent).toContain('Consulta la operación pendiente antes de abrir la ficha.');
+  expect(box.querySelector('a[href*="record="]')).toBeNull();
+
+  state.operation = null;
+  await render();
+  const link = box.querySelector('a[href*="record="]');
+  const details = box.querySelector('details');
+  expect(link?.textContent).toBe('Abrir ficha compartida');
+  expect(details?.open).toBe(false);
+  expect(link!.compareDocumentPosition(details!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 it('shows the server-supplied opening in Chile time before attendance is allowed', async () => {
   state.operation = null;
