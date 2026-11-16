@@ -15,7 +15,7 @@ const spanish = {
   notGranted: 'sin conceder',
   observedFor: 'Permisos consultados para',
   chooseFor: 'Elegir permisos para',
-  readHistory: 'Leer mi historial',
+  readHistory: 'Lectura',
   readHelp: 'Consultar antecedentes y abrir sus archivos privados.',
   appendHistory: 'Agregar información',
   appendHelp: 'Añadir sus propios aportes; no editar lo que tú agregaste.',
@@ -26,8 +26,8 @@ const spanish = {
   independent: 'Lectura y agregado son independientes. La selección sólo cambia tus permisos después de firmar y confirmar.',
   reset: 'Restablecer selección',
   preparing: 'Preparando cambio…',
-  reviewChange: 'Revisar cambio de permisos',
-  title: 'Permisos para médicos',
+  reviewChange: 'Revisar cambios',
+  title: 'Permisos del médico',
   description: 'Tú eliges quién puede leer y quién puede agregar información a tu historial.',
   empty: 'Sin médicos con estado verificado disponibles en esta consulta.',
   withdrawalNotice: 'Retirar permisos impide nuevos accesos por TrustLeaf. No elimina copias que el médico ya haya descargado.',
@@ -43,6 +43,8 @@ const spanish = {
   searchDoctor: 'Buscar por nombre',
   noDoctorMatches: 'No encontramos médicos con ese nombre.',
   removeAccess: 'Retirar acceso',
+  verified: 'Permisos vigentes',
+  verificationDetails: 'Identidad verificada',
 };
 const english: typeof spanish = {
   reviewNotice: 'Review the change and sign to confirm it.',
@@ -53,7 +55,7 @@ const english: typeof spanish = {
   notGranted: 'not granted',
   observedFor: 'Verified permissions for',
   chooseFor: 'Choose permissions for',
-  readHistory: 'Read my record',
+  readHistory: 'Read record',
   readHelp: 'View entries and open their private files.',
   appendHistory: 'Add information',
   appendHelp: 'Add their own entries. Your entries stay as you wrote them.',
@@ -64,7 +66,7 @@ const english: typeof spanish = {
   independent: 'Reading and adding are separate permissions. Changes take effect after you sign and they are confirmed.',
   reset: 'Reset selection',
   preparing: 'Preparing change…',
-  reviewChange: 'Review permission change',
+  reviewChange: 'Review changes',
   title: 'Doctor permissions',
   description: 'Choose who can read and who can add information to your record.',
   empty: 'No doctors with verified status are available in this view.',
@@ -81,6 +83,8 @@ const english: typeof spanish = {
   searchDoctor: 'Search by name',
   noDoctorMatches: 'No doctors match that name.',
   removeAccess: 'Remove access',
+  verified: 'Current permissions',
+  verificationDetails: 'Verified identity',
 };
 const copy = { es: spanish, en: english };
 
@@ -168,44 +172,40 @@ function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOn
     } catch (failure) { setError(language === 'en' ? permissionErrorInEnglish(failure) : clinicalPermissionError(failure)); }
     finally { flight.current = false; setPreparing(false); }
   }
-  return <form onSubmit={review} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-    <div className="flex flex-wrap items-start justify-between gap-2">
+  return <form onSubmit={review} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+    <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
-        {appointment && <p className="mb-1 text-sm font-medium text-sky-800">{text.currentAppointment}</p>}
         <h3 ref={appointmentHeading} tabIndex={appointment ? -1 : undefined}
-          className="scroll-mt-24 break-words font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
+          className="scroll-mt-24 break-words text-lg font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
           {grant.doctorName}
         </h3>
         {appointment && <p className="mt-2 text-sm text-slate-600">{text.startedAt}{' '}
           <time dateTime={appointment.startedAt}>{localDate(Date.parse(appointment.startedAt) / 1000, language)}</time> · {text.chileTime}
         </p>}
-        <p className="mt-1 break-all text-xs text-slate-500" title={grant.address}>
-          <span aria-hidden="true">Wallet: {shortAddress}</span><span className="sr-only">{text.doctorWallet}: {grant.address}</span>
-        </p>
       </div>
       <span className={`max-w-full rounded-full px-3 py-1 text-xs font-medium ${grant.authorized ? 'bg-sky-50 text-sky-800' : 'bg-amber-50 text-amber-800'}`}>
         {grant.authorized ? text.activeAuthorization : text.inactiveAuthorization}
       </span>
     </div>
     {previousStarts.length > 0 && <AppointmentTimes starts={previousStarts} language={language} />}
-    <p className="text-sm leading-6 text-slate-600" id={`${id}-observed`}>
-      {permissionStatus(grant, text)}
-    </p>
-    <fieldset disabled={busy || readOnly} aria-describedby={`${id}-observed ${id}-help`} className="space-y-2">
-      <legend className="mb-2 text-sm font-medium text-slate-900">{readOnly ? text.observedFor : text.chooseFor} {grant.doctorName}</legend>
-      <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-200">
+    <p className="sr-only" id={`${id}-observed`}>{permissionStatus(grant, text)}</p>
+    <fieldset disabled={busy || readOnly} aria-describedby={`${id}-observed ${id}-help`} className="min-w-0 divide-y divide-slate-200 rounded-xl border border-slate-200">
+      <legend className="sr-only">{readOnly ? text.observedFor : text.chooseFor} {grant.doctorName}</legend>
+      <label className="grid min-h-11 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 p-3 focus-within:outline-2 focus-within:outline-sky-600 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <input type="checkbox" checked={readOnly ? grant.canRead : draft.canRead} disabled={readOnly || busy || (!grant.authorized && !draft.canRead)}
           onChange={event => { setDraft(current => ({ ...current, canRead: event.target.checked })); setError(null); setNotice(false); }}
-          className="mt-1 h-4 w-4 shrink-0 accent-sky-600" />
+          className="mt-1 h-5 w-5 shrink-0 accent-sky-700" />
         <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">{text.readHistory}</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">{text.readHelp}</span></span>
+          <span className="mt-1 block text-sm leading-5 text-slate-600">{text.readHelp}</span></span>
+        <span aria-hidden="true" className={`col-start-2 w-fit rounded-md px-2 py-0.5 text-xs font-medium sm:col-start-auto ${grant.canRead ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{text.verified} · {grant.canRead ? text.readGranted : text.notGranted}</span>
       </label>
-      <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-200">
+      <label className="grid min-h-11 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 p-3 focus-within:outline-2 focus-within:outline-sky-600 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <input type="checkbox" checked={readOnly ? grant.canAppend : draft.canAppend} disabled={readOnly || busy || (!grant.authorized && !draft.canAppend)}
           onChange={event => { setDraft(current => ({ ...current, canAppend: event.target.checked })); setError(null); setNotice(false); }}
-          className="mt-1 h-4 w-4 shrink-0 accent-sky-600" />
+          className="mt-1 h-5 w-5 shrink-0 accent-sky-700" />
         <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">{text.appendHistory}</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">{text.appendHelp}</span></span>
+          <span className="mt-1 block text-sm leading-5 text-slate-600">{text.appendHelp}</span></span>
+        <span aria-hidden="true" className={`col-start-2 w-fit rounded-md px-2 py-0.5 text-xs font-medium sm:col-start-auto ${grant.canAppend ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{text.verified} · {grant.canAppend ? text.appendGranted : text.notGranted}</span>
       </label>
     </fieldset>
     {!readOnly && !grant.authorized && hasAccess && <div>
@@ -223,9 +223,13 @@ function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOn
     {!readOnly && error && <p role="alert" className="text-sm leading-6 text-rose-700">{error}</p>}
     {!readOnly && notice && <p role="status" className="text-sm leading-6 text-sky-800">{text.reviewNotice}</p>}
     {!readOnly && (canReview || draft.canRead !== grant.canRead || draft.canAppend !== grant.canAppend) ? <button type="button" disabled={busy} onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(false); }} className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">{text.reset}</button> : null}
-    <button type="submit" disabled={readOnly || busy || !canReview} className={`${controlClass} w-full sm:w-auto`}>
+    <button type="submit" disabled={readOnly || busy || !canReview} className="min-h-11 w-full rounded-xl bg-[#0369a1] px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
       {preparing ? text.preparing : text.reviewChange}
     </button>
+    <details className="border-t border-slate-200 text-sm text-slate-600">
+      <summary className="min-h-11 cursor-pointer content-center font-medium text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{text.verificationDetails}</summary>
+      <p className="break-all" title={grant.address}><span aria-hidden="true">{text.doctorWallet}: {shortAddress}</span><span className="sr-only">{text.doctorWallet}: {grant.address}</span></p>
+    </details>
   </form>;
 }
 export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare, appointment, appointmentHeading }: ClinicalPermissionsProps) {
@@ -257,14 +261,16 @@ export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare, app
       {text.empty}
     </p> : <>
       {focalDoctor && doctorForm(focalDoctor, { appointment, appointmentHeading })}
-      {active.length > 0 && <section aria-labelledby={`${id}-active`} className="space-y-2">
-        <h3 id={`${id}-active`} className="text-sm font-semibold text-slate-900">{text.doctorsWithAccess}</h3>
-        {active.map(doctor => <details key={doctor.grant.doctorId} className="rounded-xl border border-slate-200 bg-white">
+      {active.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white">
+        <summary className={summaryClass}>{text.doctorsWithAccess}</summary>
+        <div className="divide-y divide-slate-200 px-4 pb-3">
+        {active.map(doctor => <details key={doctor.grant.doctorId}>
           <summary className={summaryClass}>{doctor.grant.doctorName} <span className="ml-1 break-words font-normal text-slate-600">
             · {permissionStatus(doctor.grant, text)}</span></summary>
           {doctorForm(doctor)}
         </details>)}
-      </section>}
+        </div>
+      </details>}
       {previous.length > 0 && <details className="rounded-xl border border-slate-200 bg-white">
         <summary className={summaryClass}>{text.previousAppointments}</summary>
         <div className="grid min-w-0 gap-3 p-3 sm:grid-cols-2">

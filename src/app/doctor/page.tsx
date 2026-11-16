@@ -1,22 +1,26 @@
 'use client';
 import { Suspense } from 'react';
 import { usePortalLanguage } from '@/hooks/useLanguage';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DisponibilidadTab } from '@/components/doctor/DisponibilidadTab';
 import { PerfilTab } from '@/components/doctor/PerfilTab';
 import { PortalHome } from '@/components/private-portal/Home';
 import { PrivateConsultations } from '@/components/private-portal/Consultations';
 import { DoctorClinicalHistory } from '@/components/private-portal/DoctorClinicalHistory';
 import { PrivatePrescriptions } from '@/components/private-portal/Prescriptions';
+import { consultationHref, readConsultationId } from '@/components/private-portal/appointment-navigation';
 function DoctorPageContent() {
-  const english = usePortalLanguage() === 'en';
+  const language = usePortalLanguage();
+  const english = language === 'en';
+  const router = useRouter();
   const params = useSearchParams();
   const tab = params.get('tab') ?? 'inicio';
   if (tab === 'historial') {
     const records = params.getAll('record');
     return <DoctorClinicalHistory requestedRecord={records.length > 1 ? null : records[0]} />;
   }
-  if (tab === 'consultas') return <PrivateConsultations role="doctor" />;
+  if (tab === 'consultas') return <PrivateConsultations role="doctor" appointmentId={readConsultationId(params)}
+    onNavigate={id => router.push(consultationHref('doctor', language, id))} />;
   if (tab === 'recetas') return <PrivatePrescriptions role="doctor" />;
   if (tab === 'disponibilidad') return <DisponibilidadTab />;
   if (tab === 'perfil') return <PerfilTab />;

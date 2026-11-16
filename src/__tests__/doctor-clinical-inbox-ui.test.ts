@@ -13,7 +13,7 @@ const historyId = 'a'.repeat(64);
 const inboxPath = '/api/doctor/clinical-inbox';
 const grant = { historyId, patientLabel: 'Paciente de Prueba', canRead: true, canAppend: false };
 const sample: DoctorClinicalInbox = {
-  records: [grant],
+  records: [{ ...grant, activeAppointmentIds: [13, 24] }],
   notifications: [
     { ...grant, id: '1'.repeat(64), kind: 'access_granted', at: '2026-11-15T18:10:00.000Z' },
     { ...grant, id: '2'.repeat(64), kind: 'access_changed', at: '2026-11-15T18:00:00.000Z' },
@@ -94,6 +94,7 @@ describe('authenticated doctor notification tray', () => {
 
     await act(async () => first.resolve(Response.json(sample)));
     expect(host.querySelector('[data-records]')?.textContent).toBe(grant.patientLabel);
+    expect(current.data?.records[0].activeAppointmentIds).toEqual([13, 24]);
     expect(bell(host)?.getAttribute('aria-label')).toContain('3 sin leer');
     await tick(5000);
     expect(transport.fetch).toHaveBeenCalledTimes(2);
@@ -120,6 +121,7 @@ describe('authenticated doctor notification tray', () => {
     expect(bell(host)?.getAttribute('aria-expanded')).toBe('true');
     expect(panel(host).textContent).toContain('Access granted');
     expect(panel(host).textContent).toContain('Permissions changed');
+    expect(panel(host).textContent).toContain('Chile time');
     const withdrawn = [...panel(host).querySelectorAll('li')].find(item => item.textContent?.includes('Access withdrawn'))!;
     expect(withdrawn.querySelector('a')).toBeNull();
     expect(withdrawn.textContent).not.toContain(grant.patientLabel);
@@ -129,8 +131,10 @@ describe('authenticated doctor notification tray', () => {
     expect(current.canNavigateToRecord()).toBe(true);
     expect(current.canNavigateToRecord('b'.repeat(64))).toBe(false);
 
+    await act(async () => links[0].focus());
     await act(async () => current.setRecordNavigationBlocked(true));
     expect(panel(host).querySelector('a')).toBeNull();
+    expect(document.activeElement).toBe(bell(host));
     expect(panel(host).textContent).toContain('Check or finish the pending operation before switching records.');
     expect(current.canNavigateToRecord(historyId)).toBe(false);
     expect(current.canNavigateToRecord()).toBe(false);
@@ -145,7 +149,7 @@ describe('authenticated doctor notification tray', () => {
   it('drops previous labels, rights and links when verification fails or returns malformed data', async () => {
     transport.fetch.mockResolvedValueOnce(Response.json(sample))
       .mockResolvedValueOnce(Response.json({ error: 'unavailable' }, { status: 503 }))
-      .mockResolvedValueOnce(Response.json({ ...sample, records: [] }))
+      .mockResolvedValueOnce(Response.json({ ...sample, records: [{ ...sample.records[0], activeAppointmentIds: [13, 13] }] }))
       .mockResolvedValueOnce(Response.json(sample));
     const { host } = await mount();
     await open(host);
@@ -163,6 +167,54 @@ describe('authenticated doctor notification tray', () => {
     await tick(5000);
     expect(panel(host).textContent).toContain(grant.patientLabel);
     expect(panel(host).querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('masks a selected inbox immediately on suspension and keeps pending recovery locked while revalidating', async () => {
+    const old = deferredResponse();
+    const resumed = deferredResponse();
+    transport.fetch.mockResolvedValueOnce(Response.json(sample)).mockReturnValueOnce(old.promise).mockReturnValueOnce(resumed.promise);
+    const { host } = await mount();
+    await open(host);
+    expect(panel(host).querySelector('a')).not.toBeNull();
+    await act(async () => current.setRecordNavigationBlocked(true));
+    await focus();
+    const oldSignal = transport.fetch.mock.calls[1][1].signal as AbortSignal;
+    visibility = 'hidden';
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(oldSignal.aborted).toBe(true);
+    expect(current.data).toBeNull();
+    expect(host.textContent).not.toContain(grant.patientLabel);
+
+    visibility = 'visible';
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(transport.fetch).toHaveBeenCalledTimes(3);
+    expect(current.recordNavigationBlocked).toBe(true);
+    expect(current.canNavigateToRecord()).toBe(false);
+    expect(panel(host).querySelector('a')).toBeNull();
+    await act(async () => old.resolve(Response.json(sample)));
+    expect(current.data).toBeNull();
+
+    await act(async () => resumed.resolve(Response.json({ records: [], notifications: [sample.notifications[2]] })));
+    expect(panel(host).textContent).toContain('Acceso retirado');
+    expect(panel(host).querySelector('a')).toBeNull();
+    expect(current.recordNavigationBlocked).toBe(true);
+  });
+
+  it('uses compatible per-request abort with a deadline and recovers after a timed-out read', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => { throw Error('unavailable'); });
+    const any = vi.spyOn(AbortSignal, 'any').mockImplementation(() => { throw Error('unavailable'); });
+    const stalled = deferredResponse();
+    transport.fetch.mockReturnValueOnce(stalled.promise).mockImplementation(async () => Response.json(sample));
+    const { host } = await mount();
+    await open(host);
+    const signal = transport.fetch.mock.calls[0][1].signal as AbortSignal;
+    await tick(20_000);
+    expect(signal.aborted).toBe(true);
+    expect(panel(host).textContent).toContain('No pudimos comprobar');
+    await tick(1000);
+    expect(current.data?.records[0].historyId).toBe(historyId);
+    expect(timeout).not.toHaveBeenCalled();
+    expect(any).not.toHaveBeenCalled();
   });
 
   it('keeps read marks per identity and aborts an old session read before showing the next inbox', async () => {

@@ -11,16 +11,20 @@ import { authedFetch } from '@/lib/auth/authed-fetch';
 import { WalletBoundary, usePortalWallet } from '@/components/private-portal/WalletBoundary';
 import { DoctorDraftRecovery } from '@/components/private-portal/DoctorDraftRecovery';
 import { DoctorClinicalBell, DoctorClinicalInboxProvider } from '@/components/private-portal/DoctorClinicalInbox';
+import { localDate } from '@/components/private-portal/client';
+import styles from '@/components/private-portal/patient-mobile.module.css';
 
 const shellCopy = {
   es: {
     title: 'Portal del médico', portal: 'Portal Médico', profile: 'Mi perfil', signOut: 'Cerrar sesión',
-    home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas clínicas', prescriptions: 'Recetas',
+    home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas compartidas', shortRecords: 'Fichas', prescriptions: 'Recetas',
+    navigation: 'Menú del médico', mobileNavigation: 'Menú móvil del médico', chileTime: 'Hora de Chile',
     authorized: 'Autorización confirmada', validUntil: 'Vigente hasta', pending: 'Hay una solicitud administrativa pendiente de confirmación.',
   },
   en: {
     title: 'Doctor portal', portal: 'Doctor portal', profile: 'My profile', signOut: 'Sign out',
-    home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Clinical records', prescriptions: 'Prescriptions',
+    home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Shared records', shortRecords: 'Records', prescriptions: 'Prescriptions',
+    navigation: 'Doctor navigation', mobileNavigation: 'Mobile doctor navigation', chileTime: 'Chile time',
     authorized: 'Authorization confirmed', validUntil: 'Valid until', pending: 'An administrative request is awaiting confirmation.',
   },
 };
@@ -85,6 +89,7 @@ function IconClock({ className }: { className?: string }) {
 interface NavItem {
   href: string;
   label: string;
+  mobileLabel?: string;
   icon: React.ReactNode;
   tab: string;
 }
@@ -100,7 +105,7 @@ function useDoctorNav() {
     { href: '/doctor?tab=inicio', label: labels.home, icon: <IconHome className="h-5 w-5" />, tab: 'inicio' },
     { href: '/doctor?tab=consultas', label: labels.appointments, icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
     { href: '/doctor?tab=disponibilidad', label: labels.availability, icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
-    { href: '/doctor?tab=historial', label: labels.records, icon: <IconDoc className="h-5 w-5" />, tab: 'historial' },
+    { href: '/doctor?tab=historial', label: labels.records, mobileLabel: labels.shortRecords, icon: <IconDoc className="h-5 w-5" />, tab: 'historial' },
     { href: '/doctor?tab=recetas', label: labels.prescriptions, icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
   ];
 
@@ -118,25 +123,26 @@ function SidebarNav() {
   const labels = shellCopy[usePortalLanguage()];
   return (
     <aside className="hidden md:flex md:w-56 md:shrink-0 md:flex-col">
-      <div className="sticky top-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{labels.portal}</p>
+          <p className="text-xs font-semibold text-slate-600">{labels.portal}</p>
         </div>
-        <nav className="flex flex-col p-2">
+        <nav aria-label={labels.navigation} className="flex flex-col gap-1 p-2">
           {items.map((item) => {
             const active = isActive(item);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                  styles.focusable, 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                   active
-                    ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/30'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                    ? 'bg-sky-100 font-semibold text-sky-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800',
                 )}
               >
-                <span className={cn('shrink-0', active ? 'text-white' : 'text-slate-400')}>
+                <span aria-hidden="true" className={cn('shrink-0', active ? 'text-sky-800' : 'text-slate-600')}>
                   {item.icon}
                 </span>
                 {item.label}
@@ -152,27 +158,22 @@ function SidebarNav() {
 // ── Mobile bottom nav ─────────────────────────────────────────────────────────
 function MobileBottomNav() {
   const { items, isActive } = useDoctorNav();
+  const labels = shellCopy[usePortalLanguage()];
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white shadow-[0_-1px_12px_rgba(0,0,0,0.06)] md:hidden">
-      <div className="mx-auto flex max-w-3xl">
+    <nav aria-label={labels.mobileNavigation} className={cn(styles.mobileNav, 'fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 md:hidden')}>
+      <div className={styles.mobileNavList}>
         {items.map((item) => {
           const active = isActive(item);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                'relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
-                active ? 'text-sky-500' : 'text-slate-400 hover:text-slate-700',
-              )}
+              aria-label={item.mobileLabel ? item.label : undefined}
+              aria-current={active ? 'page' : undefined}
+              className={cn(styles.mobileNavItem, styles.focusable)}
             >
-              {active && (
-                <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-sky-500" />
-              )}
-              <span className={cn('flex h-8 w-8 items-center justify-center rounded-xl transition-all', active ? 'bg-sky-50' : '')}>
-                {item.icon}
-              </span>
-              <span className={active ? 'font-semibold text-sky-500' : ''}>{item.label}</span>
+              <span aria-hidden="true" className="shrink-0">{item.icon}</span>
+              <span className="min-w-0 max-w-full">{item.mobileLabel ?? item.label}</span>
             </Link>
           );
         })}
@@ -188,27 +189,27 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
   const email = usePrivyEmail();
   const language = usePortalLanguage();
   const labels = shellCopy[language];
-  const validity = new Date((authorization.authorization.validUntil ?? 0) * 1000);
+  const validity = authorization.authorization.validUntil;
   const inboxIdentity = user?.id && wallet.chain === 'stellar' && wallet.address === authorization.wallet
     ? JSON.stringify([user.id, wallet.walletId, wallet.address]) : null;
 
   return (
     <DoctorClinicalInboxProvider identity={inboxIdentity}>
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="min-h-screen bg-canvas text-ink">
       {/* Sticky header */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-1 px-3 sm:h-16 sm:gap-4 sm:px-6">
           {/* Logo + badge */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-white shadow-sm">
+            <Link href="/" className={cn(styles.focusable, 'flex min-h-11 items-center gap-2 rounded-md text-base font-semibold tracking-tight')}>
+              <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-[#0369a1] text-white">
                 <span className="text-xs font-bold">T</span>
               </span>
               <span className="text-slate-900">
-                Trust<span className="text-sky-500">Leaf</span>
+                Trust<span className="text-[#0369a1]">Leaf</span>
               </span>
             </Link>
-            <span className="hidden rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
+            <span className="hidden rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900 sm:inline-flex">
               {labels.portal}
             </span>
           </div>
@@ -217,7 +218,8 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
             <DoctorClinicalBell />
             <Link
               href="/doctor?tab=perfil"
-              className="flex items-center gap-2 rounded-xl px-1 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 sm:px-2.5"
+              className={cn(styles.focusable, 'flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 sm:px-2.5')}
+              aria-label={labels.profile}
               title={labels.profile}
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-600">
@@ -229,7 +231,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
             </Link>
             <button
               onClick={() => void logout()}
-              className="rounded-xl px-1.5 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600 sm:px-3"
+              className={cn(styles.focusable, 'min-h-11 rounded-xl px-1.5 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-800 sm:px-3')}
             >
               {labels.signOut}
             </button>
@@ -238,17 +240,22 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
       </header>
 
       {/* Layout: sidebar + main content */}
-      <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8 md:px-6">
         <Suspense>
           <SidebarNav />
         </Suspense>
-        <main className="min-w-0 flex-1 pb-28 md:pb-6">
-          <div role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            <p className="font-semibold">{labels.authorized} · Stellar Testnet</p>
-            <p className="mt-1">{labels.validUntil} {language === 'en' ? validity.toLocaleString('en-US', { timeZone: 'America/Santiago' }) : validity.toLocaleString('es-CL')}.</p>
-            {authorization.pendingRequest && ['pending', 'submitted'].includes(authorization.pendingRequest.state) && <p className="mt-1">{labels.pending}</p>}
-          </div>
+        <main className={cn(styles.shellMain, 'min-w-0 flex-1 md:pb-6')}>
+          {authorization.pendingRequest && ['pending', 'submitted'].includes(authorization.pendingRequest.state) &&
+            <p role="status" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{labels.pending}</p>}
           {children}
+          <details className="mt-6 rounded-2xl border border-slate-200 bg-white text-sm">
+            <summary className={cn(styles.focusable, 'min-h-11 cursor-pointer rounded-2xl px-4 py-3 font-medium text-emerald-900')}>
+              {labels.authorized} · Stellar Testnet
+            </summary>
+            {validity && <p className="px-4 pb-4 text-slate-600">{labels.validUntil}{' '}
+              <time dateTime={new Date(validity * 1000).toISOString()}>{localDate(validity, language)}</time> · {labels.chileTime}
+            </p>}
+          </details>
         </main>
       </div>
 

@@ -1,12 +1,20 @@
 .portal { --patient-accent: #0369a1; }
 .mobileOnly { display: none; }
-@media (max-width: 767px) {
+.focusable:focus-visible { outline: 2px solid #0369a1; outline-offset: 2px; }
+.notificationPanel {
+  /* Reserve 64px for the header and 96px for the mobile navigation. */
+  max-height: min(70dvh, 26rem, calc(100dvh - 4rem - 6rem - env(safe-area-inset-bottom, 0px)));
+}
+@media (width >= 48rem) {
+  .notificationPanel { max-height: min(70dvh, 26rem); }
+}
+@media (width < 48rem) {
   .mobileOnly { display: block; }
-  .portal { background: #f5f8fb; color: #163047; font-size: 16px; line-height: 1.5; }
+  .portal { background: var(--color-canvas); color: var(--color-ink); font-size: 16px; line-height: 1.5; }
   .portal [data-patient-desktop] { display: none; }
   .portal header > div { flex-wrap: nowrap; min-height: 64px; gap: 8px; padding: 8px 16px; }
   .portal [data-patient-account-link] { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border-radius: 14px; background: #edf7fc; color: #075985; font-size: 14px; font-weight: 600; }
-  .portal main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .shellMain { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   .portal main h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.035em; font-weight: 700; }
   .portal main h2 { font-size: 18px; line-height: 1.35; }
   .portal main h3 { font-size: 18px; }
@@ -18,10 +26,30 @@
   .portal main button { line-height: 1.4; }
   .portal main a { min-height: 44px; display: inline-flex; align-items: center; }
   .portal :is(a, button, input, select, summary):focus-visible { outline: 3px solid #0284c7; outline-offset: 3px; }
-  .portal [data-patient-navigation] { padding-bottom: env(safe-area-inset-bottom); background: #fff; box-shadow: 0 -4px 24px #16304708; }
-  .portal [data-patient-navigation] nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px 12px; }
-  .portal [data-patient-navigation] a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 56px; padding: 6px 2px; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; color: #52677a; border-radius: 14px; }
-  .portal [data-patient-navigation] a[aria-current=page] { color: #0369a1; background: #e8f5fc; box-shadow: none; }
+  .mobileNav {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    background: #fff;
+    box-shadow: 0 -4px 24px #16304708;
+  }
+  .mobileNavList { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px; }
+  .mobileNavItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    min-width: 0;
+    min-height: 56px;
+    padding: 6px 2px;
+    border-radius: 12px;
+    color: #475569;
+    text-align: center;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .mobileNavItem[aria-current=page] { color: #075985; background: #e0f2fe; font-weight: 600; }
   .portal [data-patient-home] { display: grid; gap: 20px; }
   .portal [data-patient-home] > p { color: #52677a; }
   .portal [data-patient-home-card] { display: flex; align-items: center; gap: 16px; padding: 22px 18px; border: 1px solid #dce8ef; border-radius: 20px; background: white; box-shadow: 0 3px 12px #16304704; }

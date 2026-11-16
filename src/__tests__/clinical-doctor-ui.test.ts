@@ -23,8 +23,8 @@ vi.mock('@/lib/auth/authed-fetch', () => ({ authedFetch: deps.fetch }));
 vi.mock('@privy-io/react-auth', () => ({ usePrivy: () => ({ ready: true, authenticated: true, user: { id: deps.userId } }) }));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({ usePortalWallet: () => ({ walletId: 'doctor-wallet', address: 'G' + 'D'.repeat(55) }) }));
 const HISTORY = 'a'.repeat(64), SECOND = 'b'.repeat(64), RX = '50c4f168-e3c3-4480-b015-43b4a589007f';
-const primary = { historyId: HISTORY, patientLabel: 'Paciente Alfa', canRead: true, canAppend: true };
-const secondary = { historyId: SECOND, patientLabel: null, canRead: true, canAppend: true };
+const primary = { historyId: HISTORY, patientLabel: 'Paciente Alfa', canRead: true, canAppend: true, activeAppointmentIds: [] };
+const secondary = { historyId: SECOND, patientLabel: null, canRead: true, canAppend: true, activeAppointmentIds: [] };
 const receipt = 'e'.repeat(64), author = 'G' + 'D'.repeat(55);
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const note = { title: 'Control sintético', text: 'Nota médica sintética', eventDate: null };
@@ -63,7 +63,7 @@ describe('doctor clinical context and independent capabilities', () => {
   expect(openRecord(host, 'Ficha compartida 2')).not.toBeNull();
   await selectHistory(view, HISTORY);
   expect(deps.fetch.mock.calls[0][0]).toBe(`/api/private-clinical-history?historyId=${HISTORY}`);
-  expect(host.textContent).toContain(note.text); expect(button(host,'Agregar antecedente o archivo')).toBeUndefined(); expect(button(host,'Corregir mi aporte')).toBeUndefined();
+  expect(host.textContent).toContain(note.text); expect(button(host,'Nueva nota')).toBeUndefined(); expect(button(host,'Corregir mi aporte')).toBeUndefined();
   expect(host.querySelector('#doctor-history-id')).toBeNull();
   await act(async () => button(host, 'Cerrar ficha').click());
   expect(deps.router.push).toHaveBeenLastCalledWith('/doctor?tab=historial&lang=es', { scroll: false });
@@ -73,7 +73,13 @@ describe('doctor clinical context and independent capabilities', () => {
   deps.fetch.mockResolvedValue(response(snapshot(false,true)));
   const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));
   expect(host.querySelector('ol')).toBeNull(); expect(host.querySelector('#clinical-filter')).toBeNull(); expect(host.textContent).toContain('no consultar su historial');
-  await act(async () => button(host,'Agregar antecedente o archivo').click()); expect(host.querySelector('textarea')).not.toBeNull(); expect(host.textContent).toContain('autoría médica');
+  const attach = button(host, 'Adjuntar PDF o imagen');
+  await act(async () => attach.click());
+  expect(host.querySelector('input[type="file"]')).not.toBeNull();
+  expect(host.querySelector('textarea')).toBeNull();
+  await act(async () => button(host, 'Cerrar').click());
+  expect(document.activeElement).toBe(attach);
+  await act(async () => button(host,'Nueva nota').click()); expect(host.querySelector('textarea')).not.toBeNull(); expect(host.textContent).toContain('autoría médica');
  });
  it('drops the previous timeline as soon as the verified list loses read access and rechecks the same record', async () => {
   let finish!: (result: ReturnType<typeof response>) => void;
@@ -89,7 +95,7 @@ describe('doctor clinical context and independent capabilities', () => {
   expect(deps.fetch.mock.calls.map(([path]) => path)).toEqual(Array(2).fill(`/api/private-clinical-history?historyId=${HISTORY}`));
   await act(async () => finish(response(snapshot(false, true))));
   expect(host.textContent).toContain('no consultar su historial');
-  expect(button(host, 'Agregar antecedente o archivo')).toBeDefined();
+  expect(button(host, 'Nueva nota')).toBeDefined();
  });
  it('keeps the exact observed pending attempt available after withdrawal without restoring chart access', async () => {
   const attempt: ClinicalOperation = { id: '477eb3d6-b443-422e-910f-0aeab92eba09', action: 'append_version',
@@ -105,7 +111,7 @@ describe('doctor clinical context and independent capabilities', () => {
   await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })));
   expect(host.textContent).toContain('No tienes acceso a esta ficha');
   expect(host.textContent).not.toContain(note.text);
-  expect(button(host, 'Agregar antecedente o archivo')).toBeUndefined();
+  expect(button(host, 'Nueva nota')).toBeUndefined();
   await act(async () => button(host, 'Consultar intento pendiente').click());
   await act(async () => button(host, 'Consultar confirmación').click());
   expect(deps.fetch.mock.calls.map(([path]) => path)).toEqual([`/api/private-clinical-history?historyId=${HISTORY}`, statusPath]);
@@ -125,7 +131,7 @@ describe('doctor clinical context and independent capabilities', () => {
  it('clears a draft and the selected history immediately when the account changes', async () => {
   deps.fetch.mockImplementation(path=>Promise.resolve(response(snapshot(true,true,[],path.includes(SECOND)?SECOND:HISTORY))));
   const view = await mount(createElement(DoctorClinicalHistory));
-  const {host,root}=view; await selectHistory(view,HISTORY); await act(async () => button(host,'Agregar antecedente o archivo').click());
+  const {host,root}=view; await selectHistory(view,HISTORY); await act(async () => button(host,'Nueva nota').click());
   await input(host.querySelector('textarea')!,'Private draft of previous patient');
   await selectHistory(view,SECOND); expect(host.querySelector('textarea')).toBeNull(); expect(host.textContent).not.toContain('Private draft');
   deps.userId='did:privy:other-doctor'; deps.records = [];
@@ -136,7 +142,7 @@ describe('doctor clinical context and independent capabilities', () => {
   const revoke=vi.fn(); class BrowserURL extends URL { static createObjectURL=vi.fn().mockReturnValue('blob:patient-a'); static revokeObjectURL=revoke; } vi.stubGlobal('URL',BrowserURL);
   deps.fetch.mockImplementation(path=>Promise.resolve(response(snapshot(true,true,[],path.includes(SECOND)?SECOND:HISTORY))));
   const view = await mount(createElement(DoctorClinicalHistory));
-  const {host}=view; await selectHistory(view,HISTORY); await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const {host}=view; await selectHistory(view,HISTORY); await act(async()=>button(host,'Nueva nota').click());
   await act(async()=>host.querySelector<HTMLInputElement>('input[value="file"]')!.click());
   const bytes=new TextEncoder().encode('%PDF-1.7\nSynthetic\n%%EOF\n'); const file=new File([bytes],'private-patient-a.pdf',{type:'application/pdf'}); Object.defineProperty(file,'arrayBuffer',{value:async()=>bytes.buffer});
   const upload=host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(upload,'files',{value:[file]});await act(async()=>upload.dispatchEvent(new Event('change',{bubbles:true})));
@@ -158,7 +164,7 @@ describe('clinical prescription links and immutable doctor attempts', () => {
    if(path==='/api/private-clinical-operations') { prepared=JSON.parse(init.body); return Promise.resolve(response({operation:{id:prepared.requestId,action:'append_version',state:'awaiting_signature',expiresAt:1900000000,transactionHash:null,errorCode:null,signing:{address:author,hash:'f'.repeat(64),network:'testnet',expiresAt:1900000000}}})); }
    return Promise.resolve(response(snapshot()));
   });
-  const {host}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })); await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const {host}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY })); await act(async()=>button(host,'Nueva nota').click());
   const form=host.querySelector('form')!; await input(form.querySelector('input:not([type])')!,'Control'); await input(form.querySelector('textarea')!,'Evolución sintética');
   await act(async()=>button(host,'Vincular una receta existente').click()); expect(deps.fetch.mock.calls.some(call=>call[0]===`/api/private-clinical-history/prescriptions?historyId=${HISTORY}`)).toBe(true);
   await act(async()=>{const select=form.querySelector('select')!; select.value=RX;select.dispatchEvent(new Event('change',{bubbles:true}));});
@@ -170,7 +176,7 @@ describe('clinical prescription links and immutable doctor attempts', () => {
  it('keeps history switching locked after an uncertain preparation without preparing a second intent', async () => {
   const bodies:any[]=[];
   deps.fetch.mockImplementation((path,init)=>{if(path==='/api/private-clinical-operations'){bodies.push(JSON.parse(init.body));return Promise.reject(new Error('Lost response'));}return Promise.resolve(response(snapshot()));});
-  const {host,root}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY }));await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const {host,root}=await mount(createElement(DoctorClinicalHistory, { requestedRecord: HISTORY }));await act(async()=>button(host,'Nueva nota').click());
   const form=host.querySelector('form')!;await input(form.querySelector('input:not([type])')!,'Control');await input(form.querySelector('textarea')!,'Una sola preparación');await submit(form);await act(async()=>button(host,'Preparar firma').click());
   expect(openRecord(host,'Ficha compartida 2').disabled).toBe(true);expect(button(host,'Cerrar ficha').disabled).toBe(true);expect(host.textContent).toContain('Preparación sin resultado comprobado');expect(bodies).toHaveLength(1);expect(bodies[0].historyId).toBe(HISTORY);expect(deps.sign).not.toHaveBeenCalled();
   await act(async () => root.render(createElement(DoctorClinicalHistory, { requestedRecord: SECOND })));
@@ -179,7 +185,7 @@ describe('clinical prescription links and immutable doctor attempts', () => {
  });
  it('clears previously verified content when a doctor context disappears during preparation', async () => {
   deps.fetch.mockImplementation(path=>Promise.resolve(path==='/api/private-clinical-operations'?response({error:'clinical_context_unavailable'},404):response(snapshot(true,true,[version()]))));
-  const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));expect(host.textContent).toContain(note.text);await act(async()=>button(host,'Agregar antecedente o archivo').click());
+  const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));expect(host.textContent).toContain(note.text);await act(async()=>button(host,'Nueva nota').click());
   const form=host.querySelector('form')!;await input(form.querySelector('input:not([type])')!,'Control');await input(form.querySelector('textarea')!,'Preparación sintética');await submit(form);await act(async()=>button(host,'Preparar firma').click());
   expect(host.textContent).not.toContain(note.text);expect(host.querySelector('ol')).toBeNull();expect(host.querySelector('form')).toBeNull();expect(host.textContent).toContain('Cierra esta ficha y vuelve a comprobar');expect(deps.sign).not.toHaveBeenCalled();
  });
@@ -193,7 +199,7 @@ describe('clinical prescription links and immutable doctor attempts', () => {
   deps.fetch.mockImplementation(path=>Promise.resolve(response(path.includes('/prescriptions')?{prescriptions:[existing]}:snapshot(true,true,[version({prescription:existing})]))));
   const {host}=await mount(createElement(ClinicalHistory,{historyId:HISTORY}));
   const linked=host.querySelector('section[aria-label="Receta vinculada"]')!;expect(linked.textContent).toContain(`${label} · Vence:`);if(status!=='Active') expect(linked.textContent).not.toContain('Vencida');
-  await act(async()=>button(host,'Agregar antecedente o archivo').click());await act(async()=>button(host,'Vincular una receta existente').click());
+  await act(async()=>button(host,'Nueva nota').click());await act(async()=>button(host,'Vincular una receta existente').click());
   const option=host.querySelector(`option[value="${RX}"]`)!;expect(option.textContent).toContain(`· ${label}`);if(status!=='Active') expect(option.textContent).not.toContain('Vencida');expect(deps.sign).not.toHaveBeenCalled();
  });
  it('retains unavailable recipe links as closed references without exposing their document', async () => {

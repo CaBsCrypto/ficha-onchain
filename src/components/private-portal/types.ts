@@ -34,6 +34,7 @@ export interface ConsultationState {
   appointmentMode?: 'regular' | 'scoped' | 'legacy';
   appointmentActions?: Record<AppointmentAction, boolean>;
   canManageClinicalPermissions?: boolean;
+  checkIn?: { opensAt: string; state: 'upcoming' | 'open' | 'closed' } | null;
   consent: { status: 'absent' | 'active' | 'expired' | 'consumed'; validUntil?: number | null };
   prescription?: PrivatePrescription | null; operations: PrivateOperation[];
 }

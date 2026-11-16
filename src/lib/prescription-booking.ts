@@ -50,8 +50,11 @@ export const validBookingTime = (value: unknown): value is string => typeof valu
 
 const bookedClockSql = `CASE WHEN a.time_slot ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN a.time_slot::time END`;
 /** The caller's SQL must alias the appointment row as `a`. */
+export const appointmentCheckInOpensAtSql = `CASE WHEN (${bookedClockSql}) IS NOT NULL THEN
+  GREATEST(a.date::timestamp AT TIME ZONE 'America/Santiago',
+    ((a.date+(${bookedClockSql})) AT TIME ZONE 'America/Santiago')-INTERVAL '30 minutes') END`;
 export const appointmentCheckInOpenSql = `a.date=(NOW() AT TIME ZONE 'America/Santiago')::date
-  AND a.date+(${bookedClockSql})<=(NOW() AT TIME ZONE 'America/Santiago')+INTERVAL '30 minutes'`;
+  AND (${appointmentCheckInOpensAtSql})<=NOW()`;
 export const appointmentAttendanceConfirmedSql = `a.attendance_at IS NOT NULL AND a.attendance_at<=NOW()
   AND a.attendance_user_id=a.patient_user_id`;
 export const appointmentStartedByDoctorSql = `(${appointmentAttendanceConfirmedSql})

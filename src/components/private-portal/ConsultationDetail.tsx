@@ -7,6 +7,7 @@ import { appointmentDate, jsonBody, localDate, portalApi, PortalApiError, usePor
 import { ConfirmationButton, OperationNotice, ReceiptLink, usePrivateOperation, type ReviewSponsorshipQuote } from './Operation';
 import { PrescriptionCard } from './Prescriptions';
 import { testPatientLabel } from './test-patient-label';
+import { useDoctorClinicalInbox } from './DoctorClinicalInbox';
 import type { AppointmentAction, ConsultationState, PortalRole, PrescriptionDocument, PrivatePrescription } from './types';
 
 const bookingLabels: Record<'es' | 'en', Record<string, string>> = {
@@ -18,11 +19,14 @@ const consentLabels = {
   en: { absent: 'No issuance permission', active: 'Permission active', expired: 'Permission expired', consumed: 'Permission used for this prescription' },
 };
 const fieldClass = 'mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100';
+const primaryButton = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0369a1] px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700';
+const secondaryButton = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700';
 
 export function ConsultationDetail({ id, role, onBack }: { id: number; role: PortalRole; onBack: () => void }) {
   const language = usePortalLanguage();
   const english = language === 'en';
   const { data, error, loading, refresh } = usePortalData<ConsultationState>(`/api/private-consultations/${id}`);
+  const inbox = useDoctorClinicalInbox();
   const regular = data?.appointmentMode === 'regular';
   const { run, busy, operation, error: operationError } = usePrivateOperation(regular ? null : data?.operations?.[0]);
   const [saving, setSaving] = useState(false);
@@ -61,7 +65,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     <div className="h-44 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" aria-hidden />
     <p className="text-sm text-slate-500">{english ? 'Checking the appointment…' : 'Consultando la cita…'}</p>
   </section>;
-  const appointment = data?.appointment;
+  const appointment = error ? undefined : data?.appointment;
   const patientName = appointment?.patient_name || appointment?.patient_email;
   const patientLabel = regular ? patientName : testPatientLabel(patientName ?? '', english);
   const attended = appointment?.attended_at ?? appointment?.attendance_at;
@@ -79,19 +83,31 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     (data?.appointmentActions?.complete ?? (!regular && data?.prescription?.rxId != null));
   const canManageClinicalPermissions = role === 'patient' && !error && inProgress && !!attended &&
     !!appointment?.started_at && data?.canManageClinicalPermissions === true;
+  const matchingRecords = role === 'doctor' && inProgress && attended && appointment?.started_at && !inbox.error
+    ? inbox.data?.records.filter(record => record.activeAppointmentIds?.includes(id)) : undefined;
+  const recordId = matchingRecords?.length === 1 ? matchingRecords[0].historyId : undefined;
+  const canOpenSharedRecord = !!recordId && /^[a-f0-9]{64}$/.test(recordId) && !unavailable &&
+    !inbox.recordNavigationBlocked && inbox.canNavigateToRecord(recordId);
+  const checkInOpening = data?.checkIn?.state === 'upcoming' ? Date.parse(data.checkIn.opensAt) : NaN;
+  const checkInDate = Number.isFinite(checkInOpening) ? new Intl.DateTimeFormat(english ? 'en-US' : 'es-CL',
+    { dateStyle: 'long', timeStyle: 'short', hourCycle: 'h23', timeZone: 'America/Santiago' }).format(checkInOpening) : null;
+  const waitingForDoctor = role === 'patient' && !!attended && scheduled;
+  const waitingForPermission = role === 'doctor' && inProgress && !!attended && !!appointment?.started_at &&
+    inbox.enabled && !!inbox.data && !inbox.error && matchingRecords?.length === 0;
   const mintReady = !regular && !!data && inProgress && !!attended && data.booking?.state === 'confirmed' &&
     !data.booking.cancellation_requested_at && Number(data.booking.valid_until) * 1000 > Date.now() && data.consent.status === 'active' && Number(data.consent.validUntil ?? 0) * 1000 > Date.now();
-  return <section data-patient-detail={role === "patient" ? "" : undefined} className="space-y-5">
-    <button onClick={onBack} disabled={busy || saving || issuing} className="text-sm font-semibold text-sky-700 hover:underline">{english ? "← Back to my appointments" : "← Volver a mis consultas"}</button>
-    {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{english ? 'Could not verify this appointment.' : error} <button onClick={refresh} className="font-semibold underline">{english ? "Refresh status" : "Actualizar estado"}</button></div>}
+  const card = 'rounded-2xl border border-slate-200 bg-white p-4' + (role === 'patient' ? ' sm:p-6' : '');
+  return <section data-patient-detail={role === 'patient' ? '' : undefined} className="space-y-6">
+    <button type="button" onClick={onBack} disabled={busy || saving || issuing} className="min-h-11 text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-sky-700">{english ? '← Back to my appointments' : '← Volver a mis consultas'}</button>
+    {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{english ? 'Could not verify this appointment.' : error} <button type="button" onClick={refresh} className="min-h-11 font-semibold underline">{english ? 'Refresh status' : 'Actualizar estado'}</button></div>}
     {data && appointment && <>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">{regular ? (english ? 'Appointment' : 'Consulta') : (english ? 'Test appointment' : 'Consulta de prueba')} #{id}</h1>
-        <p className="mt-2 text-sm text-slate-600">{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong><br />{english ? 'Patient' : 'Paciente'}: <strong>{patientLabel}</strong></p>
-        <p className="mt-2 text-sm text-slate-500">{role === 'patient' ? appointmentDate(appointment.date, language) : appointment.date.slice(0, 10)} · {appointment.time_slot} · {english ? "Chile time" : "Hora de Chile"}</p>
+      <div className={card}>
+        <h1 className="text-[26px] font-semibold leading-tight text-slate-900">{regular ? (english ? 'Appointment' : 'Consulta') : (english ? 'Test appointment' : 'Consulta de prueba')} #{id}</h1>
+        <p className="mt-2 text-lg font-semibold text-slate-900">{role === 'patient' ? appointment.doctor_name || appointment.doctor_email : patientLabel}</p>
+        <p className="mt-1 text-sm text-slate-600">{appointmentDate(appointment.date, language)} · {appointment.time_slot} · {english ? 'Chile time' : 'Hora de Chile'}</p>
         <div data-patient-progress aria-live="polite" className={`mt-4 grid gap-3 ${regular ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-          <Status title={english ? "Patient attendance" : "Asistencia del paciente"} value={attendanceLabel(language, role, scheduled, !!attended)} />
-          <Status title={english ? "Doctor started appointment" : "Inicio por el médico"} value={appointment.started_at ? (english ? 'Appointment started' : 'Consulta iniciada') : (english ? 'Pending' : 'Pendiente')} />
+          <Status confirmed={!!attended} title={english ? 'Patient attendance' : 'Asistencia del paciente'} value={attendanceLabel(language, role, scheduled, !!attended)} />
+          <Status confirmed={!!appointment.started_at} title={english ? 'Doctor started appointment' : 'Inicio por el médico'} value={appointment.started_at ? (english ? 'Appointment started' : 'Consulta iniciada') : (english ? 'Pending' : 'Pendiente')} />
           {!regular && <Status title={english ? "Stellar booking" : "Reserva Stellar"} value={data.booking ? bookingLabels[language][data.booking.state] ?? (english ? 'Checking status' : 'Verificando estado') : (english ? 'Awaiting attendance and start' : 'Esperando asistencia e inicio')} />}
         </div>
         {!regular && <ReceiptLink hash={data.booking?.attestation_hash ?? data.booking?.transaction_hash} />}
@@ -99,24 +115,37 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         {appointment.status === 'cancelled' && <p className="mt-3 font-semibold text-rose-700">{english ? "Appointment cancelled" : "Consulta cancelada"}</p>}
         {appointment.status === 'cancel_requested' && <p role="status" className="mt-3 text-sm font-semibold text-amber-700">{english ? "Cancellation requested. The appointment will show as cancelled after confirmation." : "Cancelación solicitada. Esperamos la confirmación antes de mostrar la reserva como cancelada."}</p>}
         {appointment.status === 'completed' && <p className="mt-3 font-semibold text-slate-600">{english ? "Appointment completed" : "Consulta finalizada"}</p>}
+        <div data-patient-actions={role === 'patient' ? '' : undefined} className="mt-4 flex flex-wrap gap-3 empty:hidden">
+          {canManageClinicalPermissions && !unavailable && <Link
+            href={{ pathname: '/patient', query: { tab: 'historial', appointmentId: id, lang: language } }}
+            prefetch={false} className={primaryButton}>{english ? 'Manage record access' : 'Gestionar acceso a mi ficha'}</Link>}
+          {needsAttendance && <button type="button" disabled={unavailable || !canAttend} onClick={() => void appointmentAction('attend')} className={primaryButton}>{english ? 'Confirm my attendance' : 'Confirmar mi asistencia'}</button>}
+          {role === 'doctor' && scheduled && attended && <button type="button" disabled={unavailable || !canStart} onClick={() => void appointmentAction('start')} className={primaryButton}>{english ? 'Start now' : 'Iniciar ahora'}</button>}
+          {canOpenSharedRecord && <Link href={'/doctor?tab=historial&record=' + recordId + '&lang=' + language}
+            prefetch={false} className={primaryButton} onNavigate={event => {
+              if (!inbox.canNavigateToRecord(recordId)) event.preventDefault();
+            }}>{english ? 'Open shared record' : 'Abrir ficha compartida'}</Link>}
+          {canComplete && <button type="button" disabled={unavailable} onClick={() => void appointmentAction('complete')} className={secondaryButton}>{english ? 'Complete appointment' : 'Finalizar consulta'}</button>}
+          {canCancel && <button type="button" disabled={unavailable || (!regular && data.booking?.state === 'cancel_requested')} onClick={() => void appointmentAction('cancel')}
+            className="inline-flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-700 disabled:opacity-40">
+            {regular ? (english ? 'Cancel appointment' : 'Cancelar consulta') : (english ? 'Request cancellation' : 'Solicitar cancelación')}
+          </button>}
+        </div>
+        {!unavailable && needsAttendance && !canAttend && <p className="mt-3 text-sm text-amber-800">{checkInDate
+          ? (english ? `Confirm attendance from ${checkInDate} (Chile time).` : `Confirma tu asistencia desde el ${checkInDate} (hora de Chile).`)
+          : data.checkIn?.state === 'closed' ? (english ? 'The attendance window has closed.' : 'El plazo para confirmar tu asistencia ya terminó.')
+          : (english ? 'Confirm attendance on the scheduled day, starting 30 minutes before the appointment (Chile time).'
+            : 'Confirma tu asistencia el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).')}</p>}
+        {!unavailable && role === 'doctor' && scheduled && attended && !canStart && <p className="mt-3 text-sm text-amber-800">{checkInDate
+          ? (english ? `You can start from ${checkInDate} (Chile time), with active medical authorization.`
+            : `Podrás iniciar desde el ${checkInDate} (hora de Chile), con autorización médica vigente.`)
+          : data.checkIn?.state === 'closed' ? (english ? 'The start window has closed.' : 'El plazo para iniciar la consulta ya terminó.')
+          : (english ? 'Starting requires verified attendance and active medical authorization.'
+            : 'Para iniciar necesitas asistencia verificada y autorización médica vigente.')}</p>}
+        {waitingForDoctor && <p className="mt-3 text-sm text-amber-800">{english ? 'The doctor has not started the appointment yet.' : 'El médico aún no inicia la consulta.'}</p>}
+        {waitingForPermission && <p className="mt-3 text-sm text-amber-800">{english ? 'The patient’s record access has not been verified for this appointment.' : 'Aún no hay acceso verificado a la ficha del paciente para esta consulta.'}</p>}
+        {actionError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{actionError}</p>}
       </div>
-      <div data-patient-actions={role === "patient" ? "" : undefined} className="flex flex-wrap gap-3">
-        {canManageClinicalPermissions && <Link href={{ pathname: '/patient', query: { tab: 'historial', appointmentId: id, lang: language } }}
-          className="inline-flex min-h-11 items-center rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
-          {english ? 'Manage record access' : 'Gestionar acceso a mi ficha'}
-        </Link>}
-        {needsAttendance && <button disabled={unavailable || !canAttend} onClick={() => void appointmentAction('attend')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{english ? "Confirm my attendance" : "Confirmar mi asistencia"}</button>}
-        {role === 'doctor' && scheduled && attended && <button disabled={unavailable || !canStart} onClick={() => void appointmentAction('start')} className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{english ? "Start now" : "Iniciar ahora"}</button>}
-        {canCancel && <button disabled={unavailable || (!regular && data.booking?.state === 'cancel_requested')} onClick={() => void appointmentAction('cancel')} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-40">{regular ? (english ? 'Cancel appointment' : 'Cancelar consulta') : (english ? 'Request cancellation' : 'Solicitar cancelación')}</button>}
-        {canComplete && <button disabled={unavailable} onClick={() => void appointmentAction('complete')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-40">{english ? "Complete appointment" : "Finalizar consulta"}</button>}
-      </div>
-      {!unavailable && needsAttendance && !canAttend && <p className="text-sm text-slate-600">{english
-        ? 'Confirm attendance on the scheduled day, starting 30 minutes before the appointment (Chile time).'
-        : 'Confirma tu asistencia el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).'}</p>}
-      {!unavailable && role === 'doctor' && scheduled && attended && !canStart && <p className="text-sm text-slate-600">{english
-        ? 'Starting requires verified attendance and active medical authorization. The window opens 30 minutes before the appointment on the scheduled day (Chile time).'
-        : 'Para iniciar necesitas asistencia verificada y autorización médica vigente. El inicio se habilita el día de la consulta, desde 30 minutos antes de la hora reservada (hora de Chile).'}</p>}
-      {actionError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{actionError}</p>}
       {!regular && <>
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-semibold text-slate-900">{english ? "Permission to issue one prescription" : "Permiso para una emisión"}</h2>
@@ -187,6 +216,9 @@ function appointmentActionError(failure: unknown, language: 'en' | 'es') {
   }
   return 'Could not confirm the change.';
 }
-function Status({ title, value }: { title: string; value: string }) {
-  return <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{title}</p><p className="mt-1 text-sm font-semibold text-slate-700">{value}</p></div>;
+function Status({ title, value, confirmed = false }: { title: string; value: string; confirmed?: boolean }) {
+  return <div className={'rounded-xl p-3 ' + (confirmed ? 'bg-emerald-50' : 'bg-slate-50')}>
+    <p className="text-sm text-slate-600">{title}</p>
+    <p className={'mt-1 text-sm font-semibold ' + (confirmed ? 'text-emerald-800' : 'text-slate-800')}>{value}</p>
+  </div>;
 }

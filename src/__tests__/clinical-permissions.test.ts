@@ -83,8 +83,8 @@ describe('clinical permission accessible presentation', () => {
   it('labels independent native checkboxes and distinguishes observed permissions from the draft', () => {
     const html = render([{ ...grant, canRead: true }]);
     expect(html.match(/type="checkbox"/g)).toHaveLength(2);
-    expect(html).toContain('Leer mi historial'); expect(html).toContain('Agregar información');
-    expect(html).toContain('Permisos consultados'); expect(html).toContain('Revisar cambio de permisos');
+    expect(html).toContain('Lectura'); expect(html).toContain('Agregar información');
+    expect(html).toContain('Permisos consultados'); expect(html).toContain('Revisar cambios');
     expect(html).not.toContain('Permisos actualizados');
   });
   it('disables the fieldset when the parent has an operation or verification failure', () => {
