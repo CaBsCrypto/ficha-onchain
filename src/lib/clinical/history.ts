@@ -82,7 +82,16 @@ export async function clinicalOperations(actor: ClinicalActor, historyId?: strin
   // A null target is the no-history view: expose only this patient's creation intent.
   const scope = historyId === null ? " AND action='create_history' AND expected->>'patient'=$5" : historyId ? " AND expected->>'historyId'=$5" : '';
   const values = historyId === null ? [actor.address] : historyId ? [historyId] : [];
-  const rows = await getDb().query(`SELECT * FROM clinical_web_operations WHERE actor_user_id=$1 AND wallet_id=$2 AND source_wallet=$3 AND contract_id=$4${scope} ORDER BY created_at DESC LIMIT 50`, [actor.userId, actor.walletId, actor.address, CLINICAL_ID, ...values]);
+  // Only unsigned attempts can expose a verified review and need its envelope.
+  const reviewable = "state='awaiting_signature' AND signed_xdr IS NULL AND transaction_hash IS NULL";
+  const rows = await getDb().query(`SELECT id,action,state,expires_at,transaction_hash,error_code,
+      actor_user_id,wallet_id,source_wallet,contract_id,network,signing_hash,
+      CASE WHEN state='awaiting_signature' THEN signed_xdr END AS signed_xdr,
+      CASE WHEN ${reviewable} THEN expected END AS expected,
+      CASE WHEN ${reviewable} THEN unsigned_xdr END AS unsigned_xdr,
+      CASE WHEN ${reviewable} THEN prepared_envelope END AS prepared_envelope
+    FROM clinical_web_operations WHERE actor_user_id=$1 AND wallet_id=$2 AND source_wallet=$3 AND contract_id=$4${scope}
+    ORDER BY created_at DESC LIMIT 50`, [actor.userId, actor.walletId, actor.address, CLINICAL_ID, ...values]);
   return Promise.all(rows.map(row => clinicalPreparedOperation(actor, row)));
 }
 /** A caller supplies only an opaque locator. No patient enumeration or wallet input. */
@@ -142,13 +151,16 @@ export async function clinicalVisibleNote(user: AuthedUser, actor: ClinicalActor
     throw error;
   }
 }
+const receiptColumns = 'action,method,state,contract_id,network,source_wallet,expected,unsigned_xdr,signing_hash,signed_xdr,transaction_hash';
+
 /** Link only an audited creation receipt, independently of the recent-intent
  * list. A missing historical receipt cannot invalidate a live owner history,
  * but it must never be replaced with an unverified database hash. */
 async function clinicalCreationReceipt(actor: ClinicalActor, historyId: string, hash: unknown, chain: ReturnType<typeof createClinicalWebChain>): Promise<string | null> {
   try {
     if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) return null;
-    const rows = await getDb().query(`SELECT * FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet'
+    const rows = await getDb().query(`SELECT ${receiptColumns},actor_user_id,wallet_id
+      FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet'
       AND action='create_history' AND state='confirmed' AND actor_user_id=$3 AND wallet_id=$4 AND source_wallet=$5 LIMIT 2`,
       [hash, CLINICAL_ID, actor.userId, actor.walletId, actor.address]);
     const operation = rows[0];
@@ -389,7 +401,8 @@ export async function clinicalSnapshot(request: Request, user: AuthedUser, actor
           }
           const evidence = evidenceResult.value;
           if (!evidence) throw new PrivateFlowError('clinical_history_unavailable', 503);
-          const [operation] = await clinicalReadStage(trace, 'receipt', () => getDb().query(`SELECT * FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet' AND state='confirmed'`, [row.transaction_hash, CLINICAL_ID]));
+          const [operation] = await clinicalReadStage(trace, 'receipt', () => getDb().query(`SELECT ${receiptColumns}
+            FROM clinical_web_operations WHERE transaction_hash=$1 AND contract_id=$2 AND network='testnet' AND state='confirmed'`, [row.transaction_hash, CLINICAL_ID]));
           if (!operation || operation.action !== 'append_version' || operation.source_wallet !== evidence.context.author ||
               operation.expected.operationId !== row.operation_id || operation.expected.commitment !== evidence.commitment || row.commitment !== evidence.commitment ||
               operation.expected.historyId !== own!.history.id || operation.expected.entryId !== entryId || operation.expected.expectedVersion+1 !== version) throw new PrivateFlowError('clinical_receipt_mismatch', 503);

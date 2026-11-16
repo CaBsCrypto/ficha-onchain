@@ -124,8 +124,25 @@ describe('canonical pending signing review',()=>{
   m.get.mockRejectedValue(Error('DO NOT EXPOSE provider credential'));const r=await clinicalPreparedOperation(actor,f.row);
   expect(r).not.toHaveProperty('review');expect(JSON.stringify(r)).not.toContain('credential');
  });
- it('does not add reservation lookups for the50 historical rows in a timeline',async()=>{
+ it('requests review material only for unsigned pending attempts',async()=>{
   const f=await fixture();m.get.mockClear();m.query.mockResolvedValue(Array.from({length:50},()=>({...f.row,state:'confirmed'})));
   expect(await clinicalOperations(actor,f.row.expected.historyId)).toHaveLength(50);expect(m.get).not.toHaveBeenCalled();
+  const [sql]=m.query.mock.calls[0];
+  expect(sql).not.toMatch(/SELECT\s+\*/i);
+  for(const field of ['expected','unsigned_xdr','prepared_envelope']){
+   expect(sql).toContain(`CASE WHEN state='awaiting_signature' AND signed_xdr IS NULL AND transaction_hash IS NULL THEN ${field} END AS ${field}`);
+  }
+  expect(sql).toContain("CASE WHEN state='awaiting_signature' THEN signed_xdr END AS signed_xdr");
+ });
+ it.each(['file','note'] as const)('keeps the verified original %s review and quote on the operation list',async kind=>{
+  const f=await fixture(kind);
+  const {created_at:_createdAt,...visibleRow}=f.row;
+  m.query.mockResolvedValue([visibleRow]);
+  const [operation]=await clinicalOperations(actor,f.row.expected.historyId);
+  expect(operation).toEqual(await clinicalPreparedOperation(actor,f.row));
+  expect(operation.review?.content.kind).toBe(kind);
+  expect(operation.sponsorship?.quoteExpiresAt).toBe(start+113);
+  m.get.mockResolvedValue(null);
+  await expect(clinicalOperations(actor,f.row.expected.historyId)).resolves.toEqual([clinicalPublicOperation(f.row)]);
  });
 });
