@@ -47,6 +47,7 @@ export interface DoctorClinicalRecordAccess {
   patientLabel: string | null;
   canRead: boolean;
   canAppend: boolean;
+  activeAppointmentIds: number[];
 }
 export interface DoctorClinicalNotification {
   id: string;
