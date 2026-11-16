@@ -16,14 +16,14 @@ import styles from '@/components/private-portal/patient-mobile.module.css';
 
 const shellCopy = {
   es: {
-    title: 'Portal del médico', portal: 'Portal Médico', profile: 'Mi perfil', signOut: 'Cerrar sesión',
+    title: 'Portal del médico', portal: 'Portal Médico', account: 'Mi cuenta', signOut: 'Cerrar sesión',
     home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas compartidas', prescriptions: 'Recetas',
     shortAppointments: 'Consultas', shortAvailability: 'Horarios', shortRecords: 'Fichas', shortPrescriptions: 'Recetas',
     navigation: 'Menú del médico', mobileNavigation: 'Menú móvil del médico', chileTime: 'Hora de Chile',
     authorized: 'Autorización confirmada', validUntil: 'Vigente hasta', pending: 'Hay una solicitud administrativa pendiente de confirmación.',
   },
   en: {
-    title: 'Doctor portal', portal: 'Doctor portal', profile: 'My profile', signOut: 'Sign out',
+    title: 'Doctor portal', portal: 'Doctor portal', account: 'My account', signOut: 'Sign out',
     home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Shared records', prescriptions: 'Prescriptions',
     shortAppointments: 'Visits', shortAvailability: 'Hours', shortRecords: 'Records', shortPrescriptions: 'Rx',
     navigation: 'Doctor navigation', mobileNavigation: 'Mobile doctor navigation', chileTime: 'Chile time',
@@ -186,11 +186,24 @@ function MobileBottomNav() {
   );
 }
 
+function DoctorAccountLink() {
+  const language = usePortalLanguage();
+  const { account } = shellCopy[language];
+  const selected = useSearchParams().get('tab') === 'perfil';
+  const className = cn(styles.focusable,
+    'inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl bg-sky-50 px-3 text-sm font-semibold text-sky-900 hover:bg-sky-100',
+    selected && 'bg-sky-100');
+  const content = <><span aria-hidden="true"><IconUsers className="h-5 w-5" /></span>{account}</>;
+  return <Link href={'/doctor?tab=perfil&lang=' + language}
+    aria-current={selected ? 'page' : undefined} className={className}>
+    {content}
+  </Link>;
+}
+
 // ── Doctor shell ──────────────────────────────────────────────────────────────
 function DoctorShell({ children, authorization }: { children: React.ReactNode; authorization: PrivateDoctorStatus }) {
-  const { logout, user } = usePrivy();
+  const { user } = usePrivy();
   const wallet = usePortalWallet();
-  const email = usePrivyEmail();
   const language = usePortalLanguage();
   const labels = shellCopy[language];
   const validity = authorization.authorization.validUntil;
@@ -220,25 +233,7 @@ function DoctorShell({ children, authorization }: { children: React.ReactNode; a
 
           <div className="flex items-center gap-1 sm:gap-3">
             <DoctorClinicalBell />
-            <Link
-              href="/doctor?tab=perfil"
-              className={cn(styles.focusable, 'flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 sm:px-2.5')}
-              aria-label={labels.profile}
-              title={labels.profile}
-            >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-600">
-                {(email ?? '?').charAt(0).toUpperCase()}
-              </span>
-              {email !== null && (
-                <span className="hidden max-w-[160px] truncate lg:block">{email}</span>
-              )}
-            </Link>
-            <button
-              onClick={() => void logout()}
-              className={cn(styles.focusable, 'min-h-11 rounded-xl px-1.5 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-800 sm:px-3')}
-            >
-              {labels.signOut}
-            </button>
+            <Suspense><DoctorAccountLink /></Suspense>
           </div>
         </div>
       </header>

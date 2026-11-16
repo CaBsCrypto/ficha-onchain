@@ -1,8 +1,8 @@
 'use client';
 import { usePortalLanguage } from '@/hooks/useLanguage';
-import { useId, useRef, useState, type Ref } from 'react';
+import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import type { ClinicalGrant, ClinicalPermissionAppointment, ClinicalPrepareRequest } from '@/types/clinical';
-import { localDate } from './client';
+import { chileDateTime } from './client';
 import { clinicalPermissionCanReview, clinicalPermissionChange, clinicalPermissionError,
   clinicalPermissionKey, initialClinicalPermissionDraft } from './clinical-permission-state';
 
@@ -15,15 +15,15 @@ const spanish = {
   notGranted: 'sin conceder',
   observedFor: 'Permisos consultados para',
   chooseFor: 'Elegir permisos para',
-  readHistory: 'Lectura',
-  readHelp: 'Consultar antecedentes y abrir sus archivos privados.',
+  readHistory: 'Leer mi ficha',
+  readHelp: 'Ver mis antecedentes y archivos.',
   appendHistory: 'Agregar información',
-  appendHelp: 'Añadir sus propios aportes; no editar lo que tú agregaste.',
+  appendHelp: 'Añadir sus propias notas y archivos.',
   readOnlyHelp: 'Estos controles muestran los permisos consultados. Confirmar cambios está deshabilitado en esta demostración.',
   independentReadOnly: 'Lectura y agregado son independientes. Conceder nuevos permisos requiere una autorización médica vigente.',
   withdrawBoth: 'Puedes retirar los permisos existentes desmarcando ambas opciones. No puedes conceder nuevos permisos a este médico.',
   withdrawOnly: 'Puedes retirar los permisos existentes. Para concederlos, el médico necesita una autorización vigente.',
-  independent: 'Lectura y agregado son independientes. La selección sólo cambia tus permisos después de firmar y confirmar.',
+  independent: 'Los cambios se aplican después de tu confirmación.',
   reset: 'Restablecer selección',
   preparing: 'Preparando cambio…',
   reviewChange: 'Revisar cambios',
@@ -34,8 +34,8 @@ const spanish = {
   doctorWallet: 'Wallet del médico',
   observedRead: 'Permisos consultados: lectura',
   observedAppend: 'agregado',
-  currentAppointment: 'Médico de esta consulta',
-  startedAt: 'Inicio de la consulta',
+  accessFor: (name: string) => `Acceso de ${name}`,
+  startedAt: 'Inicio',
   chileTime: 'Hora de Chile',
   doctorsWithAccess: 'Médicos con acceso',
   previousAppointments: 'Consultas anteriores',
@@ -43,7 +43,14 @@ const spanish = {
   searchDoctor: 'Buscar por nombre',
   noDoctorMatches: 'No encontramos médicos con ese nombre.',
   removeAccess: 'Retirar acceso',
-  verified: 'Permisos vigentes',
+  currentStatus: 'Estado actual',
+  active: 'Vigente',
+  inactive: 'Sin permiso',
+  pendingChanges: 'Cambios por confirmar',
+  grantChange: 'Conceder',
+  removeChange: 'Retirar',
+  readAccess: 'lectura',
+  appendAccess: 'permiso para agregar información',
   verificationDetails: 'Identidad verificada',
 };
 const english: typeof spanish = {
@@ -55,15 +62,15 @@ const english: typeof spanish = {
   notGranted: 'not granted',
   observedFor: 'Verified permissions for',
   chooseFor: 'Choose permissions for',
-  readHistory: 'Read record',
-  readHelp: 'View entries and open their private files.',
+  readHistory: 'Read my record',
+  readHelp: 'View my entries and files.',
   appendHistory: 'Add information',
-  appendHelp: 'Add their own entries. Your entries stay as you wrote them.',
+  appendHelp: 'Add their own notes and files.',
   readOnlyHelp: 'These controls show verified permissions. Confirming changes is disabled in this demo.',
   independentReadOnly: 'Reading and adding are separate permissions. Granting new permissions requires active medical authorization.',
   withdrawBoth: 'Clear both options to withdraw existing permissions. New permissions are unavailable for this doctor.',
   withdrawOnly: 'You can withdraw existing permissions. The doctor needs active authorization for you to grant permissions.',
-  independent: 'Reading and adding are separate permissions. Changes take effect after you sign and they are confirmed.',
+  independent: 'Changes take effect after you confirm.',
   reset: 'Reset selection',
   preparing: 'Preparing change…',
   reviewChange: 'Review changes',
@@ -74,8 +81,8 @@ const english: typeof spanish = {
   doctorWallet: 'Doctor’s wallet',
   observedRead: 'Verified permissions: read',
   observedAppend: 'add',
-  currentAppointment: 'Doctor for this appointment',
-  startedAt: 'Appointment started',
+  accessFor: (name: string) => `Access for ${name}`,
+  startedAt: 'Started',
   chileTime: 'Chile time',
   doctorsWithAccess: 'Doctors with access',
   previousAppointments: 'Previous appointments',
@@ -83,7 +90,14 @@ const english: typeof spanish = {
   searchDoctor: 'Search by name',
   noDoctorMatches: 'No doctors match that name.',
   removeAccess: 'Remove access',
-  verified: 'Current permissions',
+  currentStatus: 'Current access',
+  active: 'Granted',
+  inactive: 'No permission',
+  pendingChanges: 'Changes to confirm',
+  grantChange: 'Grant',
+  removeChange: 'Withdraw',
+  readAccess: 'read access',
+  appendAccess: 'permission to add information',
   verificationDetails: 'Verified identity',
 };
 const copy = { es: spanish, en: english };
@@ -119,7 +133,7 @@ function permissionErrorInEnglish(error: unknown) {
 type PreparePermission = (input: Omit<ClinicalPrepareRequest, 'requestId'>) => Promise<unknown>;
 export interface ClinicalPermissionsProps {
   grants: ClinicalGrant[]; disabled: boolean; readOnly?: boolean; onPrepare: PreparePermission;
-  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>;
+  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>; appointmentReturn?: ReactNode;
 }
 const controlClass = 'min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50';
 const summaryClass = 'min-h-11 cursor-pointer break-words rounded-xl px-4 py-3 text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600';
@@ -132,7 +146,7 @@ function visitStarts(grant: ClinicalGrant) {
 
 function AppointmentTimes({ starts, language }: { starts: string[]; language: 'en' | 'es' }) {
   return <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-    {starts.map(start => <li key={start}><time dateTime={start}>{localDate(Date.parse(start) / 1000, language)}</time></li>)}
+    {starts.map(start => <li key={start}><time dateTime={start}>{chileDateTime(Date.parse(start) / 1000, language)}</time></li>)}
   </ul>;
 }
 
@@ -144,10 +158,9 @@ function searchableDoctorName(value: string) {
   return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 }
 
-function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOnly, onPrepare, appointment, appointmentHeading }: {
-  grant: ClinicalGrant; previousStarts?: string[]; disabled: boolean; readOnly?: boolean; onPrepare: PreparePermission;
-  appointment?: ClinicalPermissionAppointment; appointmentHeading?: Ref<HTMLHeadingElement>;
-}) {
+function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOnly, onPrepare, appointment, appointmentHeading, appointmentReturn }: {
+  grant: ClinicalGrant; previousStarts?: string[];
+} & Omit<ClinicalPermissionsProps, 'grants'>) {
   const language = usePortalLanguage();
   const text = copy[language];
   const [draft, setDraft] = useState(() => initialClinicalPermissionDraft(grant));
@@ -160,6 +173,11 @@ function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOn
   const hasAccess = grant.canRead || grant.canAppend;
   const shortAddress = `${grant.address.slice(0, 8)}…${grant.address.slice(-8)}`;
   const withdrawalIncomplete = !grant.authorized && (draft.canRead || draft.canAppend);
+  const choices = [
+    { key: 'canRead', label: text.readHistory, help: text.readHelp, access: text.readAccess },
+    { key: 'canAppend', label: text.appendHistory, help: text.appendHelp, access: text.appendAccess },
+  ] as const;
+  const changes = choices.filter(({ key }) => draft[key] !== grant[key]);
   async function review(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (readOnly || busy || flight.current || !canReview) return;
@@ -172,42 +190,50 @@ function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOn
     } catch (failure) { setError(language === 'en' ? permissionErrorInEnglish(failure) : clinicalPermissionError(failure)); }
     finally { flight.current = false; setPreparing(false); }
   }
-  return <form onSubmit={review} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
-    <div className="flex flex-wrap items-start justify-between gap-3">
+  return <form onSubmit={review} className="min-w-0 scroll-mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+    {appointment && appointmentReturn}
+    <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
         <h3 ref={appointmentHeading} tabIndex={appointment ? -1 : undefined}
-          className="scroll-mt-24 break-words text-lg font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
-          {grant.doctorName}
+          className="break-words text-lg font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
+          {appointment ? text.accessFor(grant.doctorName) : grant.doctorName}
         </h3>
-        {appointment && <p className="mt-2 text-sm text-slate-600">{text.startedAt}{' '}
-          <time dateTime={appointment.startedAt}>{localDate(Date.parse(appointment.startedAt) / 1000, language)}</time> · {text.chileTime}
+        {appointment && <p className="mt-1 text-sm text-slate-600">{text.startedAt}{' '}
+          <time dateTime={appointment.startedAt}>{chileDateTime(Date.parse(appointment.startedAt) / 1000, language)}</time> · {text.chileTime}
         </p>}
       </div>
-      <span className={`max-w-full rounded-full px-3 py-1 text-xs font-medium ${grant.authorized ? 'bg-sky-50 text-sky-800' : 'bg-amber-50 text-amber-800'}`}>
-        {grant.authorized ? text.activeAuthorization : text.inactiveAuthorization}
-      </span>
+      {!grant.authorized && <span className="max-w-full rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">{text.inactiveAuthorization}</span>}
     </div>
     {previousStarts.length > 0 && <AppointmentTimes starts={previousStarts} language={language} />}
     <p className="sr-only" id={`${id}-observed`}>{permissionStatus(grant, text)}</p>
     <fieldset disabled={busy || readOnly} aria-describedby={`${id}-observed ${id}-help`} className="min-w-0 divide-y divide-slate-200 rounded-xl border border-slate-200">
       <legend className="sr-only">{readOnly ? text.observedFor : text.chooseFor} {grant.doctorName}</legend>
-      <label className="grid min-h-11 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 p-3 focus-within:outline-2 focus-within:outline-sky-600 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <input type="checkbox" checked={readOnly ? grant.canRead : draft.canRead} disabled={readOnly || busy || (!grant.authorized && !draft.canRead)}
-          onChange={event => { setDraft(current => ({ ...current, canRead: event.target.checked })); setError(null); setNotice(false); }}
-          className="mt-1 h-5 w-5 shrink-0 accent-sky-700" />
-        <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">{text.readHistory}</span>
-          <span className="mt-1 block text-sm leading-5 text-slate-600">{text.readHelp}</span></span>
-        <span aria-hidden="true" className={`col-start-2 w-fit rounded-md px-2 py-0.5 text-xs font-medium sm:col-start-auto ${grant.canRead ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{text.verified} · {grant.canRead ? text.readGranted : text.notGranted}</span>
-      </label>
-      <label className="grid min-h-11 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 p-3 focus-within:outline-2 focus-within:outline-sky-600 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <input type="checkbox" checked={readOnly ? grant.canAppend : draft.canAppend} disabled={readOnly || busy || (!grant.authorized && !draft.canAppend)}
-          onChange={event => { setDraft(current => ({ ...current, canAppend: event.target.checked })); setError(null); setNotice(false); }}
-          className="mt-1 h-5 w-5 shrink-0 accent-sky-700" />
-        <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900">{text.appendHistory}</span>
-          <span className="mt-1 block text-sm leading-5 text-slate-600">{text.appendHelp}</span></span>
-        <span aria-hidden="true" className={`col-start-2 w-fit rounded-md px-2 py-0.5 text-xs font-medium sm:col-start-auto ${grant.canAppend ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{text.verified} · {grant.canAppend ? text.appendGranted : text.notGranted}</span>
-      </label>
+      {choices.map(({ key, label, help }) => <label key={key}
+        className="flex min-h-11 cursor-pointer items-start gap-3 p-3 focus-within:outline-2 focus-within:outline-sky-600">
+        <input type="checkbox" checked={readOnly ? grant[key] : draft[key]} disabled={readOnly || busy || (!grant.authorized && !draft[key])}
+          onChange={event => { const checked = event.target.checked; setDraft(current => ({ ...current, [key]: checked })); setError(null); setNotice(false); }}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-sky-700" />
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-sm font-semibold text-slate-900">{label}</span>
+            <span aria-hidden="true" title={text.currentStatus} className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${grant[key] ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{grant[key] ? text.active : text.inactive}</span>
+          </span>
+          <span className="mt-0.5 block text-xs leading-5 text-slate-600">{help}</span>
+        </span>
+      </label>)}
     </fieldset>
+    {!readOnly && changes.length > 0 && !notice && <p role="status" className="text-sm text-slate-700">
+      <strong>{text.pendingChanges}</strong>{' '}
+      {changes.map(({ key, access }) => `${draft[key] ? text.grantChange : text.removeChange} ${access}`).join(' · ')}
+    </p>}
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="submit" disabled={readOnly || busy || !canReview} className="min-h-11 w-full rounded-xl bg-[#0369a1] px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+        {preparing ? text.preparing : text.reviewChange}
+      </button>
+      {!readOnly && changes.length > 0 && <button type="button" disabled={busy}
+        onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(false); }}
+        className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">{text.reset}</button>}
+    </div>
     {!readOnly && !grant.authorized && hasAccess && <div>
       <button type="button" disabled={busy || !draft.canRead && !draft.canAppend} className={controlClass}
         onClick={() => { setDraft({ canRead: false, canAppend: false }); setError(null); setNotice(false); }}>
@@ -215,24 +241,21 @@ function ClinicalDoctorPermission({ grant, previousStarts = [], disabled, readOn
       </button>
     </div>}
     {readOnly && <p className="text-xs leading-5 text-sky-800">{text.readOnlyHelp}</p>}
-    <p id={`${id}-help`} className="text-xs leading-5 text-slate-500">
+    <p id={`${id}-help`} className="text-xs leading-5 text-slate-600">
       {readOnly ? text.independentReadOnly : !grant.authorized ? withdrawalIncomplete ? text.withdrawBoth
         : text.withdrawOnly
         : text.independent}
     </p>
     {!readOnly && error && <p role="alert" className="text-sm leading-6 text-rose-700">{error}</p>}
     {!readOnly && notice && <p role="status" className="text-sm leading-6 text-sky-800">{text.reviewNotice}</p>}
-    {!readOnly && (canReview || draft.canRead !== grant.canRead || draft.canAppend !== grant.canAppend) ? <button type="button" disabled={busy} onClick={() => { setDraft(initialClinicalPermissionDraft(grant)); setError(null); setNotice(false); }} className="min-h-11 rounded-xl px-3 text-sm text-slate-600 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:opacity-50">{text.reset}</button> : null}
-    <button type="submit" disabled={readOnly || busy || !canReview} className="min-h-11 w-full rounded-xl bg-[#0369a1] px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
-      {preparing ? text.preparing : text.reviewChange}
-    </button>
     <details className="border-t border-slate-200 text-sm text-slate-600">
       <summary className="min-h-11 cursor-pointer content-center font-medium text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{text.verificationDetails}</summary>
+      <p>{grant.authorized ? text.activeAuthorization : text.inactiveAuthorization}</p>
       <p className="break-all" title={grant.address}><span aria-hidden="true">{text.doctorWallet}: {shortAddress}</span><span className="sr-only">{text.doctorWallet}: {grant.address}</span></p>
     </details>
   </form>;
 }
-export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare, appointment, appointmentHeading }: ClinicalPermissionsProps) {
+export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare, appointment, appointmentHeading, appointmentReturn }: ClinicalPermissionsProps) {
   const language = usePortalLanguage();
   const text = copy[language];
   const id = useId();
@@ -249,18 +272,18 @@ export function ClinicalPermissions({ grants, disabled, readOnly, onPrepare, app
   const searchTerm = searchableDoctorName(doctorSearch);
   const matchingDoctors = searchTerm ? directory.filter(({ grant }) => searchableDoctorName(grant.doctorName).includes(searchTerm)) : directory;
   function doctorForm({ grant }: typeof doctors[number],
-    context?: Pick<ClinicalPermissionsProps, 'appointment' | 'appointmentHeading'> & { previousStarts?: string[] }) {
+    context?: Pick<ClinicalPermissionsProps, 'appointment' | 'appointmentHeading' | 'appointmentReturn'> & { previousStarts?: string[] }) {
     return <ClinicalDoctorPermission key={clinicalPermissionKey(grant)} grant={grant} disabled={disabled}
       readOnly={readOnly} onPrepare={onPrepare} {...context} />;
   }
   return <section aria-labelledby={`${id}-title`} className="min-w-0 space-y-4">
-    <div><h2 id={`${id}-title`} className="text-lg font-semibold text-slate-900">{text.title}</h2>
+    <div className={focalDoctor ? 'sr-only' : ''}><h2 id={`${id}-title`} className="text-lg font-semibold text-slate-900">{text.title}</h2>
       <p className="mt-1 text-sm leading-6 text-slate-600">{text.description}</p>
     </div>
     {grants.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-sm leading-6 text-slate-500">
       {text.empty}
     </p> : <>
-      {focalDoctor && doctorForm(focalDoctor, { appointment, appointmentHeading })}
+      {focalDoctor && doctorForm(focalDoctor, { appointment, appointmentHeading, appointmentReturn })}
       {active.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white">
         <summary className={summaryClass}>{text.doctorsWithAccess}</summary>
         <div className="divide-y divide-slate-200 px-4 pb-3">

@@ -3,20 +3,31 @@ import { act, createElement, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DoctorLayout from '@/app/doctor/layout';
-const mock=vi.hoisted(()=>({fetch:vi.fn(),inbox:vi.fn(),logout:vi.fn(),replace:vi.fn(),user:{id:'did:privy:synthetic-doctor'},email:'doctor@example.test',wallet:'G'+'D'.repeat(55),tab:'inicio'}));
-vi.mock('@privy-io/react-auth',()=>({usePrivy:()=>({ready:true,authenticated:true,user:mock.user,logout:mock.logout})}));
+import { PerfilTab } from '@/components/doctor/PerfilTab';
+import { useDoctorClinicalInbox } from '@/components/private-portal/DoctorClinicalInbox';
+import { LanguageProvider } from '@/hooks/useLanguage';
+const mock=vi.hoisted(()=>({fetch:vi.fn(),inbox:vi.fn(),logout:vi.fn(),replace:vi.fn(),authenticated:true,user:{id:'did:privy:synthetic-doctor'},email:'doctor@example.test',wallet:'G'+'D'.repeat(55),tab:'inicio'}));
+vi.mock('@privy-io/react-auth',()=>({usePrivy:()=>({ready:true,authenticated:mock.authenticated,user:mock.user,logout:mock.logout})}));
 vi.mock('@/hooks/usePrivyEmail',()=>({usePrivyEmail:()=>mock.email}));
 vi.mock('@/lib/auth/authed-fetch',()=>({authedFetch:(path:string,init?:RequestInit)=>path==='/api/doctor/clinical-inbox'?mock.inbox(init):mock.fetch(path,init)}));
 vi.mock('@/components/private-portal/WalletBoundary',()=>({WalletBoundary:({children}:{children:React.ReactNode})=>children,
  usePortalWallet:()=>({address:mock.wallet,walletId:'test-verified-wallet',chain:'stellar'})}));
 vi.mock('@/components/private-portal/DoctorDraftRecovery',()=>({DoctorDraftRecovery:()=>null}));
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:mock.replace}),usePathname:()=>'/doctor',useSearchParams:()=>new URLSearchParams({tab:mock.tab})}));
-vi.mock('next/link',()=>({default:({children,...props}:any)=>createElement('a',props,children)}));
+vi.mock('next/link',()=>({default:({children,onNavigate:_,...props}:any)=>createElement('a',props,children)}));
 const response=(status=200)=>Response.json(status===200?{authorized:true,source:'private_registry',wallet:'G'+'D'.repeat(55),doctor:{id:10,name:'Synthetic doctor',email:mock.email,status:'active'},authorization:{status:'authorized',version:6,validUntil:Math.floor(Date.now()/1000)+86400}}:{error:'unauthorized'},{status});
 let views:Array<{root:Root;host:HTMLDivElement}>=[];
-async function mount(child:React.ReactNode=createElement('p',null,'Protected clinical panel')){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);views.push({root,host});await act(async()=>root.render(createElement(DoctorLayout,{children:child})));return{root,host};}
+async function mount(child: React.ReactNode = createElement('p', null, 'Protected clinical panel'), english = false) {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  views.push({ root, host });
+  const layout = createElement(DoctorLayout, { children: child });
+  await act(async () => root.render(english ? createElement(LanguageProvider, null, layout) : layout));
+  return { root, host };
+}
 const advance=async(ms:number)=>act(async()=>{await vi.advanceTimersByTimeAsync(ms);});
-beforeEach(()=>{vi.resetAllMocks();vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-01T20:00:00Z'));mock.user={id:'did:privy:synthetic-doctor'};mock.email='doctor@example.test';mock.wallet='G'+'D'.repeat(55);mock.tab='inicio';mock.inbox.mockImplementation(async()=>Response.json({records:[],notifications:[]}));(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;});
+beforeEach(()=>{vi.resetAllMocks();vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-01T20:00:00Z'));mock.user={id:'did:privy:synthetic-doctor'};mock.authenticated=true;mock.email='doctor@example.test';mock.wallet='G'+'D'.repeat(55);mock.tab='inicio';mock.inbox.mockImplementation(async()=>Response.json({records:[],notifications:[]}));(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;});
 afterEach(async()=>{for(const{root,host}of views){await act(async()=>root.unmount());host.remove();}views=[];vi.useRealTimers();});
 describe('doctor authorization failure backoff',()=>{
  it('backs off repeated failures to a bounded minute without mounting the clinical panel',async()=>{
@@ -72,4 +83,56 @@ describe('doctor authorization failure backoff',()=>{
     expect(format).toHaveBeenCalledWith('es-CL', { timeZone: 'America/Santiago' });
   } finally { format.mockRestore(); }
  });
+});
+
+describe('doctor account controls', () => {
+  it('keeps the email and sign out in My account and redirects through the existing login flow', async () => {
+    mock.tab = 'perfil';
+    mock.fetch.mockImplementation(async path => path === '/api/doctor/profile' ? Response.json({ data: null }) : response());
+    mock.logout.mockRejectedValueOnce(Error('unavailable')).mockResolvedValueOnce(undefined);
+    localStorage.setItem('ficha-lang', 'en');
+    const { host, root } = await mount(createElement(PerfilTab), true);
+    try {
+      const header = host.querySelector('header')!;
+      const accountLink = header.querySelector('a[href*="tab=perfil"]')!;
+      expect(accountLink?.textContent).toBe('My account');
+      expect(accountLink.getAttribute('href')).toBe('/doctor?tab=perfil&lang=en');
+      expect(accountLink.getAttribute('aria-current')).toBe('page');
+      expect(header.textContent).not.toContain(mock.email);
+      expect(header.textContent).not.toContain('Sign out');
+      const main = host.querySelector('main')!;
+      expect(main.querySelector('h1')?.textContent).toBe('My account');
+      expect(main.textContent).toContain(mock.email);
+      const signOut = [...main.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Sign out')!;
+      await act(async () => signOut.click());
+      expect(main.querySelector('[role="alert"]')?.textContent).toContain('Try again');
+      await act(async () => {
+        signOut.click();
+        signOut.click();
+      });
+      expect(mock.logout).toHaveBeenCalledTimes(2);
+      expect(signOut.disabled).toBe(true);
+      mock.authenticated = false;
+      await act(async () => root.render(createElement(LanguageProvider, null, createElement(DoctorLayout, { children: createElement(PerfilTab) }))));
+      expect(mock.replace).toHaveBeenCalledWith('/login/doctor');
+    } finally {
+      localStorage.removeItem('ficha-lang');
+    }
+  });
+
+  it('keeps account access separate from the pending record navigation guard', async () => {
+    mock.fetch.mockImplementation(async () => response());
+    function PendingAttempt() {
+      const { setRecordNavigationBlocked } = useDoctorClinicalInbox();
+      useEffect(() => {
+        setRecordNavigationBlocked(true);
+        return () => setRecordNavigationBlocked(false);
+      }, [setRecordNavigationBlocked]);
+      return createElement('p', null, 'Comprobar el mismo intento');
+    }
+    const { host } = await mount(createElement(PendingAttempt));
+    const header = host.querySelector('header')!;
+    expect(header.querySelector('a[href*="tab=perfil"]')?.textContent).toBe('Mi cuenta');
+    expect(host.textContent).toContain('Comprobar el mismo intento');
+  });
 });

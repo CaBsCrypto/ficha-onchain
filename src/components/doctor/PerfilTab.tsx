@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
+import { usePortalLanguage } from '@/hooks/useLanguage';
 import { usePrivyEmail } from '@/hooks/usePrivyEmail';
 import { authedFetch } from '@/lib/auth/authed-fetch';
 import { FormField, inputCls, textareaCls } from './Modal';
@@ -35,6 +37,9 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 // ── PerfilTab ───────────────────────────────────────────────────────────────
 export function PerfilTab() {
+  const { logout } = usePrivy();
+  const english = usePortalLanguage() === 'en';
+  const account = english ? 'My account' : 'Mi cuenta';
   const doctorEmail = usePrivyEmail() ?? '';
 
   const [name, setName] = useState('');
@@ -51,6 +56,23 @@ export function PerfilTab() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [missing, setMissing] = useState(false);
+  const signingOut = useRef(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+
+  async function signOut() {
+    if (signingOut.current) return;
+    signingOut.current = true;
+    setLogoutBusy(true);
+    setLogoutError(false);
+    try {
+      await logout();
+    } catch {
+      signingOut.current = false;
+      setLogoutBusy(false);
+      setLogoutError(true);
+    }
+  }
 
   const load = useCallback(async () => {
     if (!doctorEmail) return;
@@ -120,26 +142,32 @@ export function PerfilTab() {
     setSaving(false);
   }
 
-  if (!doctorEmail) {
-    return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-800">Mi perfil</h2>
-        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200">
-          Inicia sesión para ver y editar tu perfil médico.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-800">Mi perfil</h2>
-        <p className="break-all text-xs text-slate-500">{doctorEmail}</p>
-        <p className="mt-2 text-sm text-slate-600">Perfil de prueba creado por el administrador. Utiliza únicamente datos sintéticos; guardar cambios aquí no modifica tu autorización en Stellar.</p>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-900">{account}</h1>
+            {doctorEmail && <p className="mt-1 break-all text-sm text-slate-600">{doctorEmail}</p>}
+          </div>
+          <button type="button" disabled={logoutBusy} onClick={() => void signOut()}
+            className="min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700 disabled:opacity-50">
+            {logoutBusy ? (english ? 'Signing out…' : 'Cerrando sesión…') : (english ? 'Sign out' : 'Cerrar sesión')}
+          </button>
+        </div>
+        {logoutError && <p role="alert" className="mt-2 text-sm text-rose-800">
+          {english ? 'We could not sign you out. Try again.' : 'No pudimos cerrar la sesión. Vuelve a intentarlo.'}
+        </p>}
       </div>
+      {doctorEmail && <p className="text-sm text-slate-600">{english
+        ? 'Use synthetic data in this test profile. Your medical authorization is verified separately on Stellar.'
+        : 'Usa datos sintéticos en este perfil de prueba. Tu autorización médica se verifica por separado en Stellar.'}</p>}
 
-      {loading ? (
+      {!doctorEmail ? (
+        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200">
+          {english ? 'Sign in to view and edit your doctor profile.' : 'Inicia sesión para ver y editar tu perfil médico.'}
+        </p>
+      ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <Spinner className="h-6 w-6" />
         </div>

@@ -150,7 +150,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     expect(container.textContent).toContain('Permission to issue one prescription');
     expect(button('Authorize one prescription').disabled).toBe(true);
     await click('Confirm my attendance');
-    expect(container.textContent).toContain('Patient attendanceConfirmed');
+    expect(container.textContent).toContain('AttendanceConfirmed');
     expect(button('Authorize one prescription').disabled).toBe(true);
     expect(requests('PATCH', '/api/appointments').map(call => call.body)).toEqual([{ id: 123, action: 'attend' }]);
     expect(provider.signRawHash).not.toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     windowOpen = true;
     await tick();
     await click('Confirm my attendance', patient);
-    expect(patient.textContent).toContain('Patient attendanceConfirmed');
+    expect(patient.textContent).toContain('AttendanceConfirmed');
     expect(patient.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(patient.textContent).not.toContain('Confirm attendance on the scheduled day');
     windowOpen = false;
@@ -229,10 +229,11 @@ describe('active private signing components with controlled Privy and HTTP', () 
     await tick();
     expect(patient.textContent).toContain('Appointment started');
     const access = patient.querySelector('a[href*="appointmentId"]');
-    expect(access?.textContent).toBe('Manage record access');
+    expect(access?.textContent).toBe('Record permissions');
     expect(access?.getAttribute('href')).toBe('/patient?tab=historial&appointmentId=123&lang=en');
     expect(doctor.querySelector('a[href*="appointmentId"]')).toBeNull();
     expect(patient.textContent).not.toContain('Cancel appointment');
+    await act(async () => doctor.querySelector<HTMLElement>('summary')!.click());
     await click('Complete appointment', doctor);
     await tick();
     expect(patient.textContent).toContain('Appointment completed');

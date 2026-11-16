@@ -384,7 +384,7 @@ describe('review, focus and object URL lifecycle', () => {
     const late = deferred<unknown>(); let signal!: AbortSignal;
     deps.fetch.mockResolvedValueOnce(response(snapshot([version({ note: null, fileName: 'examen.pdf', mediaType: 'application/pdf' })]))).mockImplementationOnce((_path, init) => { signal = init.signal; return late.promise; });
     const { root, host } = await mount(createElement(ClinicalHistory));
-    const open = [...host.querySelectorAll('button')].find(button => button.textContent === 'Verificar para descargar')!;
+    const open = [...host.querySelectorAll('button')].find(button => button.textContent === 'Preparar descarga')!;
     await act(async () => open.click()); await act(async () => root.unmount()); roots = roots.filter(item => item.root !== root); host.remove();
     await act(async () => late.resolve({ ok: true, headers: new Headers({ 'content-type': 'application/pdf' }), blob: async () => new Blob(['private late content'], { type: 'application/pdf' }) }));
     expect(signal.aborted).toBe(true); expect(createUrl).not.toHaveBeenCalled();
@@ -467,9 +467,11 @@ describe('prepared history attempt focus', () => {
     const { host } = await mount(createElement(ClinicalHistory, { permissionAppointmentId: 42, renderPermissions: props => createElement(ClinicalPermissions, props) }));
     expect([...host.querySelectorAll('a')].find(link => link.textContent === 'Volver a esta consulta')?.getAttribute('href'))
       .toBe('/patient?tab=consultas&appointmentId=42&lang=es');
-    expect(document.activeElement?.textContent?.trim()).toBe(focal.doctorName);
+    expect(document.activeElement?.textContent?.trim()).toBe(`Acceso de ${focal.doctorName}`);
     expect(scroll).toHaveBeenCalledWith({ block: 'start' });
     const form = document.activeElement!.closest('form')!;
+    expect(form.querySelector('a[href*="appointmentId=42"]')?.textContent).toBe('Volver a esta consulta');
+    expect(scroll.mock.contexts[0]).toBe(form);
     expect(form.querySelector('time')?.dateTime).toBe(focalStart);
     const previous = [...host.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === 'Consultas anteriores')!;
     expect(previous.open).toBe(false);
@@ -486,6 +488,8 @@ describe('prepared history attempt focus', () => {
     await act(async () => checkboxes[0].click());
     await act(async () => checkboxes[1].click());
     expect(checkboxes.map(input => input.checked)).toEqual([true, true]);
+    expect(checkboxes.every(input => input.closest('label')?.textContent?.includes('Sin permiso'))).toBe(true);
+    expect(form.textContent).toContain('Cambios por confirmar');
     expect(deps.fetch).toHaveBeenCalledOnce();
     await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
     expect(getButton(host, 'Confirmar con mi cuenta Privy')).toBeDefined();
@@ -584,7 +588,7 @@ describe('read-only clinical release',()=>{
   if(missing)delete data.writes;
   deps.fetch.mockResolvedValue(response(data));
   const {host}=await mount(createElement(ClinicalHistory,{renderPermissions:props=>createElement(ClinicalPermissions,props)}));
-  expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Ver 1 versión anterior');expect(host.textContent).toContain('Permisos consultados');
+  expect(host.textContent).toContain(note.text);expect(host.textContent).toContain('Detalles 1 versión anterior');expect(host.textContent).toContain('Permisos consultados');
   expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   expect([...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every(input=>input.disabled)).toBe(true);
   expect(host.querySelector('a[href*="stellar.expert"]')).not.toBeNull();
@@ -632,7 +636,7 @@ describe('local drafts while clinical confirmations are paused',()=>{
   await act(async()=>corrections[0].click());expect(host.textContent).toContain('Las versiones guardadas no cambiarán');
   await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
   expect(getButton(host,'Preparar firma').disabled).toBe(true);await act(async()=>getButton(host,'Preparar firma').click());
-  expect(host.textContent).toContain('Ver 1 versión anterior');expect(host.textContent).toContain('Registrado por médico');onlyReads();
+  expect(host.textContent).toContain('Detalles 1 versión anterior');expect(host.textContent).toContain('Registrado por médico');onlyReads();
  });
  it.each(['ready','pending'])('clears a %s file draft and ignores a late file read after a real identity change',async state=>{
   const createUrl=vi.fn().mockReturnValue('blob:local-draft'),revoke=vi.fn();class BrowserURL extends URL{static createObjectURL=createUrl;static revokeObjectURL=revoke;}vi.stubGlobal('URL',BrowserURL);

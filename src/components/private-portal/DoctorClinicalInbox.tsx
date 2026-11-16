@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import type { DoctorClinicalInbox, DoctorClinicalNotification } from '@/types/clinical';
-import { localDate, portalApi } from './client';
+import { chileDateTime, portalApi } from './client';
 import styles from './patient-mobile.module.css';
 
 const inboxPath = '/api/doctor/clinical-inbox';
@@ -60,7 +60,7 @@ interface InboxContextValue extends InboxState {
   markNotificationsRead: () => void;
   recordNavigationBlocked: boolean;
   setRecordNavigationBlocked: (blocked: boolean) => void;
-  canNavigateToRecord: (historyId?: string) => boolean;
+  canNavigateToRecord: (historyId?: string, appointmentId?: number) => boolean;
 }
 
 const InboxContext = createContext<InboxContextValue>({
@@ -88,15 +88,19 @@ function ScopedDoctorClinicalInbox({ identity, children }: { identity: string; c
   const [readIds, setReadIds] = useState(() => readNotificationIds(storageKey));
   const [recordNavigationBlocked, setNavigationBlocked] = useState(false);
   const blocked = useRef(false);
-  const activeRecordIds = useRef(new Set<string>());
+  const activeAppointmentsByRecord = useRef(new Map<string, number[]>());
   const requestNow = useRef(() => {});
   const refresh = useCallback(() => requestNow.current(), []);
   const setRecordNavigationBlocked = useCallback((value: boolean) => {
     blocked.current = value;
     setNavigationBlocked(value);
   }, []);
-  const canNavigateToRecord = useCallback((historyId?: string) =>
-    !blocked.current && (historyId === undefined || activeRecordIds.current.has(historyId)), []);
+  const canNavigateToRecord = useCallback((historyId?: string, appointmentId?: number) => {
+    if (blocked.current) return false;
+    if (historyId === undefined) return appointmentId === undefined;
+    const appointments = activeAppointmentsByRecord.current.get(historyId);
+    return appointments !== undefined && (appointmentId === undefined || appointments.includes(appointmentId));
+  }, []);
 
   useEffect(() => {
     type InboxRead = { controller: AbortController; timeout?: ReturnType<typeof setTimeout> };
@@ -114,7 +118,7 @@ function ScopedDoctorClinicalInbox({ identity, children }: { identity: string; c
         if (activeRequest !== request) return;
         activeRequest = undefined;
         clearTimeout(request.timeout);
-        activeRecordIds.current = new Set(data?.records.map(record => record.historyId));
+        activeAppointmentsByRecord.current = new Map(data?.records.map(record => [record.historyId, record.activeAppointmentIds]));
         setState({ data, loading: false, error: data ? '' : 'clinical_inbox_unavailable' });
         if (visible()) {
           const elapsed = Math.max(0, Date.now() - startedAt);
@@ -138,7 +142,7 @@ function ScopedDoctorClinicalInbox({ identity, children }: { identity: string; c
       clearTimeout(previous?.timeout);
       previous?.controller.abort();
       clearTimeout(pollTimer);
-      activeRecordIds.current.clear();
+      activeAppointmentsByRecord.current.clear();
     }
     function onVisibility() {
       if (!visible()) {
@@ -190,7 +194,7 @@ const copy = {
     checking: 'Consultando notificaciones…', unavailable: 'No pudimos comprobar las notificaciones.',
     empty: 'Aún no tienes notificaciones de fichas.', unread: 'sin leer', openRecord: 'Abrir ficha', chileTime: 'Hora de Chile',
     blocked: 'Consulta o termina el intento pendiente antes de cambiar de ficha.',
-    read: 'Lectura', append: 'Agregar aportes', readAndAppend: 'Lectura y agregado',
+    read: 'Lectura', append: 'Agregar aportes', readAndAppend: 'Lectura y agregado', recordUnavailable: 'Ficha no disponible',
     access_granted: 'Acceso concedido', access_changed: 'Permisos cambiados', access_withdrawn: 'Acceso retirado',
   },
   en: {
@@ -198,7 +202,7 @@ const copy = {
     checking: 'Checking notifications…', unavailable: 'We could not verify your notifications.',
     empty: 'You have no clinical record notifications yet.', unread: 'unread', openRecord: 'Open record', chileTime: 'Chile time',
     blocked: 'Check or finish the pending operation before switching records.',
-    read: 'Read', append: 'Add entries', readAndAppend: 'Read and add',
+    read: 'Read', append: 'Add entries', readAndAppend: 'Read and add', recordUnavailable: 'Record unavailable',
     access_granted: 'Access granted', access_changed: 'Permissions changed', access_withdrawn: 'Access withdrawn',
   },
 };
@@ -231,19 +235,23 @@ export function DoctorClinicalBell() {
   const notifications = inbox.data?.notifications ?? [];
   function notification(notice: DoctorClinicalNotification) {
     const record = notice.historyId && notice.kind !== 'access_withdrawn' ? active.get(notice.historyId) : undefined;
-    const flags = !notice.canRead ? text.append : notice.canAppend ? text.readAndAppend : text.read;
+    const flags = notice.canRead ? notice.canAppend ? text.readAndAppend : text.read : notice.canAppend ? text.append : null;
     return <li key={notice.id} className="px-1 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <p className="font-semibold text-slate-900">{text[notice.kind]}</p>
         {!inbox.readIds.has(notice.id) && <span className="text-xs font-semibold text-sky-700">{text.unread}</span>}
       </div>
-      <p className="mt-1 text-xs text-slate-600"><time dateTime={notice.at}>{localDate(Date.parse(notice.at) / 1000, language)}</time> · {text.chileTime}</p>
-      {record?.patientLabel && <p className="mt-1 break-words text-slate-700">{record.patientLabel}</p>}
-      {record && (notice.canRead || notice.canAppend) && <p className="mt-1 text-slate-600">{flags}</p>}
-      {record && !inbox.recordNavigationBlocked && <Link href={'/doctor?tab=historial&record=' + record.historyId + '&lang=' + language} prefetch={false}
-        onNavigate={event => { if (inbox.canNavigateToRecord(record.historyId)) setOpen(false); else event.preventDefault(); }}
-        className="mt-1 inline-flex min-h-11 items-center rounded text-sm font-semibold text-sky-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
-        aria-label={record.patientLabel ? text.openRecord + ' · ' + record.patientLabel : undefined}>{text.openRecord}</Link>}
+      <p className="mt-1 text-xs text-slate-600"><time dateTime={notice.at}>{chileDateTime(Date.parse(notice.at) / 1000, language)}</time> · {text.chileTime}</p>
+      {record ? <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3">
+        <div className="min-w-0 flex-1">
+          {record.patientLabel && <p className="break-words text-slate-700">{record.patientLabel}</p>}
+          {flags && <p className="text-xs text-slate-600">{flags}</p>}
+        </div>
+        {!inbox.recordNavigationBlocked && <Link href={'/doctor?tab=historial&record=' + record.historyId + '&lang=' + language} prefetch={false}
+          onNavigate={event => { if (inbox.canNavigateToRecord(record.historyId)) setOpen(false); else event.preventDefault(); }}
+          className="inline-flex min-h-11 shrink-0 items-center rounded text-sm font-semibold text-sky-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+          aria-label={record.patientLabel ? text.openRecord + ' · ' + record.patientLabel : undefined}>{text.openRecord}</Link>}
+      </div> : notice.kind !== 'access_withdrawn' && <p className="mt-1 text-xs text-slate-600">{text.recordUnavailable}</p>}
     </li>;
   }
   return <div ref={root} className="relative" onFocusCapture={event => {

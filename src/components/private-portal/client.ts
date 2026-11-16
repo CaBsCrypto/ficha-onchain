@@ -50,6 +50,11 @@ export function localDate(timestamp?: number | null, language: 'es' | 'en' = 'es
   if (!timestamp) return language === 'en' ? 'Pending' : 'Pendiente';
   return new Date(timestamp * 1000).toLocaleString(language === 'en' ? 'en-US' : 'es-CL', { timeZone: 'America/Santiago' });
 }
+export function chileDateTime(timestamp: number, language: 'es' | 'en') {
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'es-CL', {
+    timeZone: 'America/Santiago', dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23',
+  }).format(timestamp * 1000);
+}
 export function santiagoToday() {
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
