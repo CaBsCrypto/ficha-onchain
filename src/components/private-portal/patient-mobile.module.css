@@ -32,7 +32,7 @@
     background: #fff;
     box-shadow: 0 -4px 24px #16304708;
   }
-  .mobileNavList { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px; }
+  .mobileNavList { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 8px 4px; }
   .mobileNavItem {
     display: flex;
     flex-direction: column;

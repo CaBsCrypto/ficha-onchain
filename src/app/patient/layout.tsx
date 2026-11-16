@@ -16,6 +16,7 @@ const tabs = [
   { id: 'recetas', es: 'Recetas', en: 'Prescriptions' },
   { id: 'perfil', es: 'Cuenta', en: 'Account' },
 ] as const;
+const mobileEnglish = { inicio: 'Home', consultas: 'Visits', historial: 'Record', recetas: 'Rx', perfil: 'Account' };
 const copy = {
   es: {
     title: 'Portal del paciente', navigation: 'Menú del paciente', mobileNavigation: 'Menú móvil del paciente',
@@ -35,11 +36,13 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   return <nav aria-label={mobile ? labels.mobileNavigation : labels.navigation} className={mobile ? styles.mobileNavList : 'space-y-1 p-2'}>
     {tabs.map(tab => {
       const active = current === tab.id;
+      const label = mobile && language === 'en' ? mobileEnglish[tab.id] : tab[language];
       return <Link key={tab.id} href={`/patient?tab=${tab.id}`} aria-current={active ? 'page' : undefined}
+        aria-label={label !== tab[language] && !tab[language].toLowerCase().includes(label.toLowerCase()) ? `${label}, ${tab[language]}` : undefined}
         className={cn(styles.focusable, mobile ? styles.mobileNavItem : 'flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-medium',
           !mobile && (active ? 'bg-sky-100 font-semibold text-sky-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'))}>
         {mobile && <PatientIcon name={tab.id} />}
-        <span className="min-w-0 max-w-full">{tab[language]}</span>
+        <span className="min-w-0 max-w-full">{label}</span>
       </Link>;
     })}
   </nav>;

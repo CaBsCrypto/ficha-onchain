@@ -17,13 +17,15 @@ import styles from '@/components/private-portal/patient-mobile.module.css';
 const shellCopy = {
   es: {
     title: 'Portal del médico', portal: 'Portal Médico', profile: 'Mi perfil', signOut: 'Cerrar sesión',
-    home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas compartidas', shortRecords: 'Fichas', prescriptions: 'Recetas',
+    home: 'Inicio', appointments: 'Consultas', availability: 'Disponibilidad', records: 'Fichas compartidas', prescriptions: 'Recetas',
+    shortAppointments: 'Consultas', shortAvailability: 'Horarios', shortRecords: 'Fichas', shortPrescriptions: 'Recetas',
     navigation: 'Menú del médico', mobileNavigation: 'Menú móvil del médico', chileTime: 'Hora de Chile',
     authorized: 'Autorización confirmada', validUntil: 'Vigente hasta', pending: 'Hay una solicitud administrativa pendiente de confirmación.',
   },
   en: {
     title: 'Doctor portal', portal: 'Doctor portal', profile: 'My profile', signOut: 'Sign out',
-    home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Shared records', shortRecords: 'Records', prescriptions: 'Prescriptions',
+    home: 'Home', appointments: 'Appointments', availability: 'Availability', records: 'Shared records', prescriptions: 'Prescriptions',
+    shortAppointments: 'Visits', shortAvailability: 'Hours', shortRecords: 'Records', shortPrescriptions: 'Rx',
     navigation: 'Doctor navigation', mobileNavigation: 'Mobile doctor navigation', chileTime: 'Chile time',
     authorized: 'Authorization confirmed', validUntil: 'Valid until', pending: 'An administrative request is awaiting confirmation.',
   },
@@ -103,10 +105,10 @@ function useDoctorNav() {
 
   const items: NavItem[] = [
     { href: '/doctor?tab=inicio', label: labels.home, icon: <IconHome className="h-5 w-5" />, tab: 'inicio' },
-    { href: '/doctor?tab=consultas', label: labels.appointments, icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
-    { href: '/doctor?tab=disponibilidad', label: labels.availability, icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
+    { href: '/doctor?tab=consultas', label: labels.appointments, mobileLabel: labels.shortAppointments, icon: <IconCalendar className="h-5 w-5" />, tab: 'consultas' },
+    { href: '/doctor?tab=disponibilidad', label: labels.availability, mobileLabel: labels.shortAvailability, icon: <IconClock className="h-5 w-5" />, tab: 'disponibilidad' },
     { href: '/doctor?tab=historial', label: labels.records, mobileLabel: labels.shortRecords, icon: <IconDoc className="h-5 w-5" />, tab: 'historial' },
-    { href: '/doctor?tab=recetas', label: labels.prescriptions, icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
+    { href: '/doctor?tab=recetas', label: labels.prescriptions, mobileLabel: labels.shortPrescriptions, icon: <IconRx className="h-5 w-5" />, tab: 'recetas' },
   ];
 
   function isActive(item: NavItem): boolean {
@@ -168,7 +170,9 @@ function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              aria-label={item.mobileLabel ? item.label : undefined}
+              aria-label={item.mobileLabel && item.mobileLabel !== item.label
+                ? item.label.toLowerCase().includes(item.mobileLabel.toLowerCase()) ? item.label : `${item.mobileLabel}, ${item.label}`
+                : undefined}
               aria-current={active ? 'page' : undefined}
               className={cn(styles.mobileNavItem, styles.focusable)}
             >

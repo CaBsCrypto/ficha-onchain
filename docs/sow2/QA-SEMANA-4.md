@@ -44,6 +44,8 @@ Con la ficha de Semana 2, `GET /api/private-clinical-history` devolvió HTTP 503
 
 La referencia visual anterior es la revisión `7c628e4`. Para comparar el rediseño, usar la misma consulta, ficha sintética, rol, idioma, ventana y estado de la interfaz en ambas capturas. Registrar el SHA probado y guardar las capturas en la carpeta privada de evidencia de Semana 4.
 
+[Comparación visual con datos sintéticos](../evidence/sow2-week4-redesign/) a 1440 × 960 y 320 × 844. Documenta los permisos del Paciente y el acceso a la ficha desde la consulta del Médico.
+
 | Caso | Comprobación del rediseño |
 | --- | --- |
 | Paciente · consulta → ficha | Abrir una consulta iniciada como Paciente y elegir **Gestionar acceso a mi ficha**. Verificar que se enfoca al médico de esa consulta, con el inicio en hora de Chile. Comprobar que **Volver a esta consulta** conserva la cita y el idioma. Abrir también **Ficha clínica** sin cita y comprobar que el acceso general a la ficha, los aportes y los permisos funciona. |
