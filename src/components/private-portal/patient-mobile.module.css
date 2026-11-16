@@ -41,15 +41,16 @@
     gap: 4px;
     min-width: 0;
     min-height: 56px;
-    padding: 6px 2px;
+    padding: 6px 0;
     border-radius: 12px;
     color: #475569;
     text-align: center;
     font-size: 0.75rem;
+    font-weight: 500;
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
-  .mobileNavItem[aria-current=page] { color: #075985; background: #e0f2fe; font-weight: 600; }
+  .mobileNavItem[aria-current=page] { color: #075985; background: #e0f2fe; }
   .portal [data-patient-home] { display: grid; gap: 20px; }
   .portal [data-patient-home] > p { color: #52677a; }
   .portal [data-patient-home-card] { display: flex; align-items: center; gap: 16px; padding: 22px 18px; border: 1px solid #dce8ef; border-radius: 20px; background: white; box-shadow: 0 3px 12px #16304704; }
