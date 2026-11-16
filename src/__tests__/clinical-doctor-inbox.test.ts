@@ -39,11 +39,12 @@ type Observation = ReturnType<typeof observation>;
 function observation(index: number, overrides: {
   observation?: 'record' | 'notification'; kind?: DoctorClinicalNotification['kind']; can_read?: boolean;
   can_append?: boolean; expected_revision?: string; patient_label?: string | null; receipt_hash?: string;
+  active_appointment_ids?: number[] | null;
 } = {}) {
   return {
     ...patients[index], id: '66666666-1234-4baa-8000-000000000001', observation: 'record', kind: null,
     patient_label: '  Ana  María  ', can_read: true, can_append: false, expected_revision: '0', confirmed_at: new Date(time),
-    receipt_hash: String(index + 1).padStart(64, '0'), ...overrides,
+    receipt_hash: String(index + 1).padStart(64, '0'), active_appointment_ids: [], ...overrides,
   };
 }
 function database(rows: Observation[]) {
@@ -106,9 +107,10 @@ it.each(['unrelated user', 'changed binding', 'inactive profile', 'local review 
 );
 
 it('delivers only independent live rights, safe linked notifications, and redacted past or withdrawn events', async () => {
-  const first = observation(0);
-  const append = observation(1, { can_read: false, can_append: true, expected_revision: '2', patient_label: 'somebody@example.test' });
-  const stale = observation(2);
+  const first = observation(0, { active_appointment_ids: [53, 28, 53, -5, 2_147_483_648] });
+  const append = observation(1, { can_read: false, can_append: true, expected_revision: '2', patient_label: 'somebody@example.test',
+    active_appointment_ids: [515] });
+  const stale = observation(2, { active_appointment_ids: [91843] });
   database([
     first, append, stale,
     observation(0, { observation: 'notification', kind: 'access_granted', receipt_hash: 'a'.repeat(64) }),
@@ -135,8 +137,8 @@ it('delivers only independent live rights, safe linked notifications, and redact
   expect(mocks.grant.mock.calls.every(([, wallet]) => wallet === actor.address)).toBe(true);
   const body = await response.json();
   expect(body.records).toEqual([
-    { historyId: first.history_id, patientLabel: 'Ana María', canRead: true, canAppend: false },
-    { historyId: append.history_id, patientLabel: null, canRead: false, canAppend: true },
+    { historyId: first.history_id, patientLabel: 'Ana María', canRead: true, canAppend: false, activeAppointmentIds: [28, 53] },
+    { historyId: append.history_id, patientLabel: null, canRead: false, canAppend: true, activeAppointmentIds: [515] },
   ]);
   expect(body.notifications).toEqual([
     { id: expect.stringMatching(/^[a-f0-9]{64}$/), kind: 'access_granted', at: time, historyId: first.history_id, patientLabel: 'Ana María', canRead: true, canAppend: false },
@@ -148,6 +150,7 @@ it('delivers only independent live rights, safe linked notifications, and redact
   expect(JSON.stringify(body)).not.toContain(first.patient_wallet);
   expect(JSON.stringify(body)).not.toContain(first.id);
   expect(JSON.stringify(body)).not.toContain('a'.repeat(64));
+  expect(body.records.some((row: { activeAppointmentIds: number[] }) => row.activeAppointmentIds.includes(91843))).toBe(false);
 });
 
 it('queries only exact confirmed recipient and owner bindings, ranking states by revision first', async () => {
@@ -164,6 +167,10 @@ it('queries only exact confirmed recipient and owner bindings, ranking states by
   expect(statement).toContain('prior_revision=expected_revision-1 AND prior_peers=1 AND NOT prior_access');
   expect(statement).toContain('a.doctor_user_id=$3 AND a.doctor_wallet_id=$4');
   expect(statement).toContain('a.patient_user_id=r.owner_user_id AND a.patient_wallet_id=r.wallet_id AND a.patient_wallet=r.patient_wallet');
+  expect(statement).toContain("a.status='in_progress' AND a.completed_at IS NULL");
+  expect(statement).toContain('a.attendance_user_id=a.patient_user_id');
+  expect(statement).toContain('a.started_by=a.doctor_user_id AND a.started_at>=a.attendance_at AND a.started_at<=NOW()');
+  expect(statement).toContain("a.date=(a.started_at AT TIME ZONE 'America/Santiago')::date");
 });
 
 it('uses bounded independent chain readers without dropping later available records', async () => {
@@ -182,6 +189,30 @@ it('uses bounded independent chain readers without dropping later available reco
   expect((await response.json()).records).toHaveLength(patients.length);
   expect(peak).toBe(4);
   expect(mocks.reader).toHaveBeenCalledTimes(4);
+});
+
+it('stops scheduling further grant checks when the caller aborts an active inbox request', async () => {
+  database(patients.map((_, index) => observation(index)));
+  let running = 0;
+  let releaseReaders: () => void;
+  let markStarted: () => void;
+  const inFlight = new Promise<void>(resolve => { releaseReaders = resolve; });
+  const started = new Promise<void>(resolve => { markStarted = resolve; });
+  mocks.grant.mockImplementation(async () => {
+    if (++running === 4) markStarted();
+    await inFlight;
+    return { canRead: true, canAppend: false, revision: 1 };
+  });
+  const abort = new AbortController();
+
+  const response = GET(new Request('http://localhost' + path, { signal: abort.signal }));
+  await started;
+  abort.abort();
+  releaseReaders!();
+
+  expect((await response).status).toBe(503);
+  expect(mocks.grant).toHaveBeenCalledTimes(4);
+  expect(mocks.authorized).toHaveBeenCalledTimes(1);
 });
 
 it('treats an unavailable live observation as a provider failure instead of an empty list', async () => {

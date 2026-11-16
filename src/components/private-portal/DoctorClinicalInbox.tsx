@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import type { DoctorClinicalInbox, DoctorClinicalNotification } from '@/types/clinical';
 import { localDate, portalApi } from './client';
+import styles from './patient-mobile.module.css';
 
 const inboxPath = '/api/doctor/clinical-inbox';
 const pollInterval = 5000;
@@ -19,11 +20,13 @@ function verifiedInbox(value: DoctorClinicalInbox): DoctorClinicalInbox {
   if (!value || !Array.isArray(value.records) || !Array.isArray(value.notifications)) throw Error('clinical_inbox_unavailable');
   const records = value.records.map(record => {
     if (!record || typeof record.historyId !== 'string' || !opaqueId.test(record.historyId) || !safeLabel(record.patientLabel) ||
-        typeof record.canRead !== 'boolean' || typeof record.canAppend !== 'boolean' || !record.canRead && !record.canAppend) {
+        typeof record.canRead !== 'boolean' || typeof record.canAppend !== 'boolean' || !record.canRead && !record.canAppend ||
+        !Array.isArray(record.activeAppointmentIds) || record.activeAppointmentIds.some(id => !Number.isSafeInteger(id) || id < 1 || id > 2_147_483_647) ||
+        new Set(record.activeAppointmentIds).size !== record.activeAppointmentIds.length) {
       throw Error('clinical_inbox_unavailable');
     }
-    const { historyId, patientLabel, canRead, canAppend } = record;
-    return { historyId, patientLabel, canRead, canAppend };
+    const { historyId, patientLabel, canRead, canAppend, activeAppointmentIds } = record;
+    return { historyId, patientLabel, canRead, canAppend, activeAppointmentIds: [...activeAppointmentIds] };
   });
   const activeIds = new Set(records.map(record => record.historyId));
   const notifications = value.notifications.map(notice => {
@@ -96,47 +99,69 @@ function ScopedDoctorClinicalInbox({ identity, children }: { identity: string; c
     !blocked.current && (historyId === undefined || activeRecordIds.current.has(historyId)), []);
 
   useEffect(() => {
-    const lifetime = new AbortController();
+    type InboxRead = { controller: AbortController; timeout?: ReturnType<typeof setTimeout> };
+    let disposed = false;
     let pollTimer: ReturnType<typeof setTimeout> | undefined;
-    let inFlight = false;
+    let activeRequest: InboxRead | undefined;
     function visible() { return document.visibilityState !== 'hidden'; }
     async function poll() {
-      if (lifetime.signal.aborted || !visible() || inFlight) return;
+      if (disposed || !visible() || activeRequest) return;
       clearTimeout(pollTimer);
-      inFlight = true;
       const startedAt = Date.now();
-      try {
-        const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(20_000)]);
-        const data = verifiedInbox(await portalApi<DoctorClinicalInbox>(inboxPath, { signal }));
-        if (lifetime.signal.aborted) return;
-        activeRecordIds.current = new Set(data.records.map(record => record.historyId));
-        setState({ data, loading: false, error: '' });
-      } catch {
-        if (lifetime.signal.aborted) return;
-        activeRecordIds.current.clear();
-        setState({ data: null, loading: false, error: 'clinical_inbox_unavailable' });
-      } finally {
-        inFlight = false;
-        if (!lifetime.signal.aborted && visible()) {
+      const request: InboxRead = { controller: new AbortController() };
+      activeRequest = request;
+      function finish(data: DoctorClinicalInbox | null) {
+        if (activeRequest !== request) return;
+        activeRequest = undefined;
+        clearTimeout(request.timeout);
+        activeRecordIds.current = new Set(data?.records.map(record => record.historyId));
+        setState({ data, loading: false, error: data ? '' : 'clinical_inbox_unavailable' });
+        if (visible()) {
           const elapsed = Math.max(0, Date.now() - startedAt);
-          pollTimer = setTimeout(request, Math.max(1000, pollInterval - elapsed));
+          pollTimer = setTimeout(requestNow.current, Math.max(1000, pollInterval - elapsed));
         }
+      }
+      request.timeout = setTimeout(() => {
+        request.controller.abort();
+        finish(null);
+      }, 20_000);
+      try {
+        finish(verifiedInbox(await portalApi<DoctorClinicalInbox>(inboxPath, { signal: request.controller.signal })));
+      } catch {
+        finish(null);
       }
     }
     function request() { void poll(); }
+    function clearUnverified() {
+      const previous = activeRequest;
+      activeRequest = undefined;
+      clearTimeout(previous?.timeout);
+      previous?.controller.abort();
+      clearTimeout(pollTimer);
+      activeRecordIds.current.clear();
+    }
     function onVisibility() {
-      if (!visible()) clearTimeout(pollTimer);
-      else request();
+      if (!visible()) {
+        clearUnverified();
+        setState({ data: null, loading: true, error: '' });
+      } else request();
+    }
+    function restorePage(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      clearUnverified();
+      setState({ data: null, loading: true, error: '' });
+      request();
     }
     requestNow.current = request;
     window.addEventListener('focus', request);
+    window.addEventListener('pageshow', restorePage);
     document.addEventListener('visibilitychange', onVisibility);
     request();
     return () => {
-      lifetime.abort();
-      activeRecordIds.current.clear();
-      clearTimeout(pollTimer);
+      disposed = true;
+      clearUnverified();
       window.removeEventListener('focus', request);
+      window.removeEventListener('pageshow', restorePage);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
@@ -163,7 +188,7 @@ const copy = {
   es: {
     title: 'Notificaciones de fichas', markRead: 'Marcar como leídas', refresh: 'Volver a consultar',
     checking: 'Consultando notificaciones…', unavailable: 'No pudimos comprobar las notificaciones.',
-    empty: 'Aún no tienes notificaciones de fichas.', unread: 'sin leer', openRecord: 'Abrir ficha',
+    empty: 'Aún no tienes notificaciones de fichas.', unread: 'sin leer', openRecord: 'Abrir ficha', chileTime: 'Hora de Chile',
     blocked: 'Consulta o termina el intento pendiente antes de cambiar de ficha.',
     read: 'Lectura', append: 'Agregar aportes', readAndAppend: 'Lectura y agregado',
     access_granted: 'Acceso concedido', access_changed: 'Permisos cambiados', access_withdrawn: 'Acceso retirado',
@@ -171,7 +196,7 @@ const copy = {
   en: {
     title: 'Clinical record notifications', markRead: 'Mark as read', refresh: 'Check again',
     checking: 'Checking notifications…', unavailable: 'We could not verify your notifications.',
-    empty: 'You have no clinical record notifications yet.', unread: 'unread', openRecord: 'Open record',
+    empty: 'You have no clinical record notifications yet.', unread: 'unread', openRecord: 'Open record', chileTime: 'Chile time',
     blocked: 'Check or finish the pending operation before switching records.',
     read: 'Read', append: 'Add entries', readAndAppend: 'Read and add',
     access_granted: 'Access granted', access_changed: 'Permissions changed', access_withdrawn: 'Access withdrawn',
@@ -185,6 +210,7 @@ export function DoctorClinicalBell() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const lastFocusedControl = useRef<HTMLElement | null>(null);
   const panelId = useId();
   useEffect(() => {
     if (!open) return;
@@ -194,6 +220,11 @@ export function DoctorClinicalBell() {
     document.addEventListener('pointerdown', closeOutside);
     return () => document.removeEventListener('pointerdown', closeOutside);
   }, [open]);
+  useEffect(() => {
+    if (open && lastFocusedControl.current && !lastFocusedControl.current.isConnected && document.activeElement === document.body) {
+      trigger.current?.focus();
+    }
+  }, [open, inbox.data, inbox.error, inbox.recordNavigationBlocked]);
 
   if (!inbox.enabled) return null;
   const active = new Map(inbox.data?.records.map(record => [record.historyId, record] as const));
@@ -201,12 +232,12 @@ export function DoctorClinicalBell() {
   function notification(notice: DoctorClinicalNotification) {
     const record = notice.historyId && notice.kind !== 'access_withdrawn' ? active.get(notice.historyId) : undefined;
     const flags = !notice.canRead ? text.append : notice.canAppend ? text.readAndAppend : text.read;
-    return <li key={notice.id} className="rounded-xl border border-slate-200 p-3">
+    return <li key={notice.id} className="px-1 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <p className="font-semibold text-slate-900">{text[notice.kind]}</p>
         {!inbox.readIds.has(notice.id) && <span className="text-xs font-semibold text-sky-700">{text.unread}</span>}
       </div>
-      <time dateTime={notice.at} className="mt-1 block text-xs text-slate-500">{localDate(Date.parse(notice.at) / 1000, language)}</time>
+      <p className="mt-1 text-xs text-slate-600"><time dateTime={notice.at}>{localDate(Date.parse(notice.at) / 1000, language)}</time> · {text.chileTime}</p>
       {record?.patientLabel && <p className="mt-1 break-words text-slate-700">{record.patientLabel}</p>}
       {record && (notice.canRead || notice.canAppend) && <p className="mt-1 text-slate-600">{flags}</p>}
       {record && !inbox.recordNavigationBlocked && <Link href={'/doctor?tab=historial&record=' + record.historyId + '&lang=' + language} prefetch={false}
@@ -215,7 +246,9 @@ export function DoctorClinicalBell() {
         aria-label={record.patientLabel ? text.openRecord + ' · ' + record.patientLabel : undefined}>{text.openRecord}</Link>}
     </li>;
   }
-  return <div ref={root} className="relative" onKeyDown={event => {
+  return <div ref={root} className="relative" onFocusCapture={event => {
+    lastFocusedControl.current = event.target;
+  }} onKeyDown={event => {
     if (event.key === 'Escape' && open) {
       event.stopPropagation();
       setOpen(false);
@@ -236,7 +269,7 @@ export function DoctorClinicalBell() {
       </span>}
     </button>
     <section id={panelId} aria-labelledby={panelId + '-title'} hidden={!open}
-      className="fixed inset-x-3 top-16 z-40 max-h-[min(70dvh,26rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
+      className={`${styles.notificationPanel} fixed inset-x-3 top-16 z-40 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={panelId + '-title'} className="font-semibold text-slate-900">{text.title}</h2>
         {inbox.unreadCount > 0 && <button type="button" onClick={() => { inbox.markNotificationsRead(); trigger.current?.focus(); }}
@@ -253,7 +286,7 @@ export function DoctorClinicalBell() {
       </div>}
       {inbox.recordNavigationBlocked && notifications.some(notice => notice.historyId && active.has(notice.historyId)) &&
         <p className="mt-3 rounded-xl bg-sky-50 p-3 text-sky-900">{text.blocked}</p>}
-      {inbox.data && (notifications.length ? <ul className="mt-3 space-y-2">{notifications.map(notification)}</ul>
+      {inbox.data && (notifications.length ? <ul className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{notifications.map(notification)}</ul>
         : <p className="mt-3 text-slate-600">{text.empty}</p>)}
     </section>
   </div>;

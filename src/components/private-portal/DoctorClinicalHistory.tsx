@@ -79,37 +79,43 @@ function DoctorHistorySelection({ identity, requestedRecord }: { identity: strin
     setDraftError('');
     router.push(href(id), { scroll: false });
   }
-  return <div className="space-y-5">
-    <section aria-labelledby="doctor-shared-records-title" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 id="doctor-shared-records-title" className="text-xl font-semibold text-slate-900">{text.title}</h1>
+  const recordRows = records.map((record, index) => {
+    if (record.historyId === activeId) return null;
+    const label = record.patientLabel ?? text.unnamedRecord + ' ' + (index + 1);
+    return <li key={record.historyId} className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="min-w-0">
+        <p className="break-words font-semibold text-slate-900">{label}</p>
+        <div className="mt-1 flex flex-wrap gap-1.5 text-xs font-medium text-emerald-800">
+          {record.canRead && <span className="rounded-md bg-emerald-50 px-2 py-1">{text.reading}</span>}
+          {record.canAppend && <span className="rounded-md bg-emerald-50 px-2 py-1">{text.appending}</span>}
+        </div>
+      </div>
+      <button type="button" className={button + ' text-sky-800 hover:bg-sky-50'} disabled={!!lockedRecord}
+        aria-label={text.open + ' · ' + label} onClick={() => navigate(record.historyId)}>{text.open}</button>
+    </li>;
+  });
+  return <div className="space-y-6">
+    {activeId
+      ? <button type="button" className={button + ' text-sky-800'} disabled={!!lockedRecord} onClick={() => navigate()}>{text.close}</button>
+      : <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">{text.title}</h1>
         <button type="button" className={button} disabled={loading} onClick={() => void refresh()}>{text.refresh}</button>
-      </header>
-      {!data && loading && <p role="status" className="text-sm text-slate-600">{text.loading}</p>}
-      {error && <p role="alert" className="text-sm text-rose-800">{text.unavailable}</p>}
-      {data && !error && records.length === 0 && <p className="text-sm text-slate-600">{text.empty}</p>}
-      {records.length > 0 && <ul aria-label={text.title} className="space-y-2">
-        {records.map((record, index) => {
-          const label = record.patientLabel ?? text.unnamedRecord + ' ' + (index + 1);
-          return <li key={record.historyId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3">
-          <div className="min-w-0">
-            <p className="break-words text-sm font-semibold text-slate-900">{label}</p>
-            <p className="text-sm text-slate-600">{[record.canRead && text.reading, record.canAppend && text.appending].filter(Boolean).join(' · ')}</p>
-          </div>
-          {activeId === record.historyId
-            ? <button type="button" className={button} disabled={!!lockedRecord} onClick={() => navigate()}>{text.close}</button>
-            : <button type="button" className={button} disabled={!!lockedRecord}
-              aria-label={text.open + ' · ' + label} onClick={() => navigate(record.historyId)}>{text.open}</button>}
-          </li>;
-        })}
-      </ul>}
-      {recordDenied && <p role="alert" className="text-sm text-rose-800">{text.denied}</p>}
-      {lockedRecord && <p role="status" className="text-sm text-slate-600">{text.pending}</p>}
-      {draftError && <p role="alert" className="text-sm text-rose-800">{draftError}</p>}
-    </section>
+      </header>}
+    {!data && loading && <p role="status" className="rounded-2xl bg-white p-4 text-sm text-slate-600">{text.loading}</p>}
+    {error && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{text.unavailable}</p>}
+    {recordDenied && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{text.denied}</p>}
+    {lockedRecord && <p role="status" className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{text.pending}</p>}
+    {draftError && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{draftError}</p>}
+    {activeId && <ClinicalHistory key={activeId} historyId={activeId} recordLabel={activeRecord ? activeRecord.patientLabel : null}
+      doctorAccess={activeRecord || null} onPendingChange={trackPending} />}
+    {!activeId && !!records.length && <ul aria-label={text.title} className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">{recordRows}</ul>}
+    {activeId && recordRows.some(Boolean) && <details className="rounded-2xl border border-slate-200 bg-white">
+      <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{text.title}</summary>
+      <ul aria-label={text.title} className="divide-y divide-slate-200 border-t border-slate-200">{recordRows}</ul>
+    </details>}
+    {!activeId && data && !error && records.length === 0 && <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">{text.empty}</p>}
     {!activeId && <ClinicalDraftWorkspace identity={identity} role="doctor" canPublish={false} disabled={false}
       onPrepare={async () => { throw new Error(text.openFirst); }} onReopen={() => setDraftError(text.reopen)} />}
-    {activeId && <ClinicalHistory key={activeId} historyId={activeId} doctorAccess={activeRecord || null} onPendingChange={trackPending} />}
   </div>;
 }
 

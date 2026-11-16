@@ -1,23 +1,24 @@
 'use client';
 import { Suspense } from 'react';
 import { usePortalLanguage } from '@/hooks/useLanguage';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PortalHome, PortalIdentity } from '@/components/private-portal/Home';
 import { PrivateConsultations } from '@/components/private-portal/Consultations';
 import { PrivatePrescriptions } from '@/components/private-portal/Prescriptions';
 import { ClinicalHistory } from '@/components/private-portal/ClinicalHistory';
 import { ClinicalPermissions } from '@/components/private-portal/ClinicalPermissions';
+import { consultationHref, readConsultationId } from '@/components/private-portal/appointment-navigation';
 function PatientPageContent() {
-  const english = usePortalLanguage() === 'en';
+  const language = usePortalLanguage();
+  const english = language === 'en';
+  const router = useRouter();
   const search = useSearchParams();
   const tab = search.get('tab') ?? 'inicio';
-  if (tab === 'consultas') return <PrivateConsultations role="patient" />;
+  if (tab === 'consultas') return <PrivateConsultations role="patient" appointmentId={readConsultationId(search)}
+    onNavigate={id => router.push(consultationHref('patient', language, id))} />;
   if (tab === 'recetas') return <PrivatePrescriptions role="patient" />;
   if (tab === 'historial') {
-    const appointmentIds = search.getAll('appointmentId');
-    const raw = appointmentIds[0];
-    const appointmentId = appointmentIds.length === 1 && /^[1-9]\d{0,9}$/.test(raw) && Number(raw) <= 2_147_483_647
-      ? Number(raw) : undefined;
+    const appointmentId = readConsultationId(search);
     return <ClinicalHistory permissionAppointmentId={appointmentId} renderPermissions={props => <ClinicalPermissions {...props} />} />;
   }
   if (tab === 'perfil') return <PortalIdentity role="patient" />;

@@ -6,15 +6,19 @@
  * and HTTP transport are controlled. Race outcomes are supplied by that transport;
  * these tests do not claim to prove database locks or on-chain ordering.
  */
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrescriptionCard } from '@/components/private-portal/Prescriptions';
 import { PrivateConsultations } from '@/components/private-portal/Consultations';
 import { LanguageProvider } from '@/hooks/useLanguage';
-import type { PrivateOperation, PrivatePrescription } from '@/components/private-portal/types';
+import type { PortalRole, PrivateOperation, PrivatePrescription } from '@/components/private-portal/types';
 
 const provider = vi.hoisted(() => ({ signRawHash: vi.fn(), getAccessToken: vi.fn() }));
+function ConsultationRoute({ role }: { role: PortalRole }) {
+  const [appointmentId, setAppointmentId] = useState<number>();
+  return createElement(PrivateConsultations, { role, appointmentId, onNavigate: setAppointmentId });
+}
 vi.mock('@privy-io/react-auth/extended-chains', () => ({ useSignRawHash: () => ({ signRawHash: provider.signRawHash }) }));
 vi.mock('@privy-io/react-auth', () => ({ getAccessToken: provider.getAccessToken }));
 vi.mock('@/components/private-portal/WalletBoundary', () => ({
@@ -136,7 +140,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
     };
     window.localStorage.setItem('ficha-lang', 'en');
     await act(async () => root.render(createElement(LanguageProvider, {
-      children: createElement(PrivateConsultations, { role: 'patient' }),
+      children: createElement(ConsultationRoute, { role: 'patient' }),
     })));
     expect(container.textContent).toContain('My appointments');
     expect(container.textContent).toContain('September 10, 2026');
@@ -187,8 +191,8 @@ describe('active private signing components with controlled Privy and HTTP', () 
     window.localStorage.setItem('ficha-lang', 'en');
     await act(async () => root.render(createElement(LanguageProvider, {
       children: createElement('div', null,
-        createElement('div', { 'data-view': 'patient' }, createElement(PrivateConsultations, { role: 'patient' })),
-        createElement('div', { 'data-view': 'doctor' }, createElement(PrivateConsultations, { role: 'doctor' }))),
+        createElement('div', { 'data-view': 'patient' }, createElement(ConsultationRoute, { role: 'patient' })),
+        createElement('div', { 'data-view': 'doctor' }, createElement(ConsultationRoute, { role: 'doctor' }))),
     })));
     const patient = container.querySelector('[data-view="patient"]')!;
     const doctor = container.querySelector('[data-view="doctor"]')!;
@@ -260,7 +264,7 @@ describe('active private signing components with controlled Privy and HTTP', () 
       }
       throw new Error('Unexpected controlled request for denied start');
     };
-    await act(async () => root.render(createElement(PrivateConsultations, { role: 'doctor' })));
+    await act(async () => root.render(createElement(ConsultationRoute, { role: 'doctor' })));
     await click('Abrir consulta');
     expect(container.textContent).toContain('Paciente listo');
     await click('Iniciar ahora');

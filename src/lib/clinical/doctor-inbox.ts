@@ -5,6 +5,7 @@ import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { getDb } from '@/lib/db';
 import { isDoctorLocallyApproved } from '@/lib/doctor-onboarding';
 import { PrivateFlowError, PRIVY_APP } from '@/lib/private-config';
+import { appointmentStartedByDoctorSql } from '@/lib/prescription-booking';
 import type { ClinicalActor, DoctorClinicalInbox, DoctorClinicalNotification, DoctorClinicalRecordAccess } from '@/types/clinical';
 import { createClinicalWebChain, deriveClinicalHistoryId } from './chain';
 import { CLINICAL_ID } from './config';
@@ -20,6 +21,7 @@ interface GrantObservation {
   history_id: string;
   patient_wallet: string;
   patient_label: string | null;
+  active_appointment_ids: number[] | null;
   can_read: boolean;
   can_append: boolean;
   expected_revision: number | string;
@@ -63,15 +65,23 @@ async function inboxObservations(doctorId: number, actor: ClinicalActor) {
   ), recent AS (
     SELECT * FROM revised WHERE peers=1 ORDER BY confirmed_at DESC,id DESC LIMIT $7
   )
-  SELECT 'record' AS observation,r.id,r.receipt_hash,r.history_id,r.patient_wallet,a.patient_name AS patient_label,
-    r.can_read,r.can_append,r.expected_revision,r.confirmed_at,NULL::text AS kind
+  SELECT 'record' AS observation,r.id,r.receipt_hash,r.history_id,r.patient_wallet,visits.patient_name AS patient_label,
+    r.can_read,r.can_append,r.expected_revision,r.confirmed_at,NULL::text AS kind,visits.active_appointment_ids
   FROM revised r
   LEFT JOIN LATERAL (
-    SELECT a.patient_name FROM appointments a WHERE a.doctor_id=$1 AND a.doctor_wallet=$2
-      AND a.doctor_user_id=$3 AND a.doctor_wallet_id=$4
-      AND a.patient_user_id=r.owner_user_id AND a.patient_wallet_id=r.wallet_id AND a.patient_wallet=r.patient_wallet
-    ORDER BY a.date DESC,a.id DESC LIMIT 1
-  ) a ON TRUE
+    WITH paired AS NOT MATERIALIZED (
+      SELECT a.id,a.date,a.patient_name,a.status,a.completed_at,a.attendance_at,a.attendance_user_id,
+        a.patient_user_id,a.started_at,a.started_by,a.doctor_user_id
+      FROM appointments a WHERE a.doctor_id=$1 AND a.doctor_wallet=$2
+        AND a.doctor_user_id=$3 AND a.doctor_wallet_id=$4
+        AND a.patient_user_id=r.owner_user_id AND a.patient_wallet_id=r.wallet_id AND a.patient_wallet=r.patient_wallet
+    )
+    SELECT (SELECT patient_name FROM paired ORDER BY date DESC,id DESC LIMIT 1) AS patient_name,
+      ARRAY(SELECT a.id FROM paired a
+        WHERE a.status='in_progress' AND a.completed_at IS NULL AND (${appointmentStartedByDoctorSql})
+          AND a.date=(a.started_at AT TIME ZONE 'America/Santiago')::date
+        ORDER BY a.id) AS active_appointment_ids
+  ) visits ON TRUE
   WHERE r.current_rank=1 AND r.peers=1 AND (r.can_read OR r.can_append)
   UNION ALL
   SELECT 'notification',id,receipt_hash,history_id,patient_wallet,NULL,can_read,can_append,expected_revision,confirmed_at,
@@ -79,12 +89,13 @@ async function inboxObservations(doctorId: number, actor: ClinicalActor) {
       WHEN NOT (can_read OR can_append) THEN 'access_withdrawn'
       WHEN expected_revision=0 OR (prior_revision=expected_revision-1 AND prior_peers=1 AND NOT prior_access) THEN 'access_granted'
       ELSE 'access_changed'
-    END
+    END,NULL::integer[]
   FROM recent
   ORDER BY confirmed_at DESC,id DESC`, [doctorId, actor.address, actor.userId, actor.walletId, PRIVY_APP, CLINICAL_ID, notificationLimit]);
 }
 
-async function currentInboxRecords(candidates: GrantObservation[], actor: ClinicalActor, primary: ReturnType<typeof createClinicalWebChain>) {
+async function currentInboxRecords(candidates: GrantObservation[], actor: ClinicalActor, primary: ReturnType<typeof createClinicalWebChain>,
+  signal?: AbortSignal) {
   const visible = new Map<string, DoctorClinicalRecordAccess>();
   let nextIndex = 0;
   let failed = false;
@@ -92,6 +103,7 @@ async function currentInboxRecords(candidates: GrantObservation[], actor: Clinic
     // Monotonic RPC observations are sequential within each pinned reader.
     const chain = index === 0 ? primary : createClinicalWebChain();
     while (!failed && nextIndex < candidates.length) {
+      signal?.throwIfAborted();
       const row = candidates[nextIndex++];
       if (!StrKey.isValidEd25519PublicKey(row.patient_wallet) || deriveClinicalHistoryId(row.patient_wallet) !== row.history_id) continue;
       let grant;
@@ -102,27 +114,32 @@ async function currentInboxRecords(candidates: GrantObservation[], actor: Clinic
       }
       if (!grant || (!grant.canRead && !grant.canAppend) || grant.revision !== Number(row.expected_revision) + 1 ||
           grant.canRead !== row.can_read || grant.canAppend !== row.can_append) continue;
+      const ids = (row.active_appointment_ids ?? []).filter(id => Number.isInteger(id) && id > 0 && id <= 2_147_483_647);
       visible.set(row.history_id, { historyId: row.history_id, patientLabel: safePatientLabel(row.patient_label),
-        canRead: grant.canRead, canAppend: grant.canAppend });
+        canRead: grant.canRead, canAppend: grant.canAppend, activeAppointmentIds: [...new Set(ids)].sort((a, b) => a - b) });
     }
   }));
   return visible;
 }
 
-export async function clinicalDoctorInbox(user: AuthedUser, actor: ClinicalActor): Promise<DoctorClinicalInbox> {
+export async function clinicalDoctorInbox(user: AuthedUser, actor: ClinicalActor, signal?: AbortSignal): Promise<DoctorClinicalInbox> {
+  signal?.throwIfAborted();
   const email = user.email?.toLowerCase();
   if (!email) throw denied();
   const chain = createClinicalWebChain();
   const [identity, registry] = await Promise.allSettled([
     clinicalDoctorIdentity(user, actor, true), chain.doctorAuthorized(actor.address),
   ]);
+  signal?.throwIfAborted();
   if (identity.status === 'rejected') throw identity.reason;
   if (registry.status === 'rejected') throw registry.reason;
   if (!registry.value) throw denied();
   const { doctorId } = identity.value;
   const observations = await inboxObservations(doctorId, actor);
+  signal?.throwIfAborted();
   const candidates = observations.filter(row => row.observation === 'record');
-  const visible = await currentInboxRecords(candidates, actor, chain);
+  const visible = await currentInboxRecords(candidates, actor, chain, signal);
+  signal?.throwIfAborted();
   const records = candidates.flatMap(row => {
     const record = visible.get(row.history_id);
     return record ? [record] : [];
@@ -140,6 +157,7 @@ export async function clinicalDoctorInbox(user: AuthedUser, actor: ClinicalActor
   const [approved, authorized] = await Promise.all([
     isDoctorLocallyApproved(getDb(), doctorId, { ...actor, email }), chain.doctorAuthorized(actor.address),
   ]);
+  signal?.throwIfAborted();
   if (!approved || !authorized) throw denied();
   return { records, notifications };
 }

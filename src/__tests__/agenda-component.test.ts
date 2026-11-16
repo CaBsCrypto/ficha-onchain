@@ -5,6 +5,7 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {PrivateConsultations} from '@/components/private-portal/Consultations';
 import {DisponibilidadTab} from '@/components/doctor/DisponibilidadTab';
 import {appointmentDate,santiagoToday} from '@/components/private-portal/client';
+import {consultationHref,readConsultationId} from '@/components/private-portal/appointment-navigation';
 const mock=vi.hoisted(()=>({fetch:vi.fn()}));
 vi.mock('@/lib/auth/authed-fetch',()=>({authedFetch:mock.fetch}));
 vi.mock('@/hooks/usePrivyEmail',()=>({usePrivyEmail:()=> 'doctor@example.test'}));
@@ -27,7 +28,7 @@ it('distinguishes identical doctor labels without revealing their emails',async(
     {id:9,name:'Médico Demo',specialty:'General',email:'two@example.test'},
     {id:10,name:'Otra médica',specialty:'General'},
   ]}:{appointments:[]}));
-  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient',onNavigate:vi.fn()})));
   await click('Reservar consulta');
   const options=[...box.querySelectorAll('option')].slice(1);
   expect(new Set(options.map(o=>o.textContent)).size).toBe(3);
@@ -72,7 +73,7 @@ it('opens the next available date but preserves a manual empty date until reques
     if(url.startsWith('/api/appointments'))return Response.json({appointments:[]});
     return Response.json({data:url.includes('nextAvailable=true')?{date:'2026-09-14',slots:[{time:'09:00',available:true}]}:{date:'2026-09-15',slots:[]}});
   });
-  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient',onNavigate:vi.fn()})));
   await click('Reservar consulta');await change(box.querySelector('select')!,'1');
   expect(box.querySelector<HTMLInputElement>('input[type=date]')!.value).toBe('2026-09-14');expect(button('Confirmar reserva').disabled).toBe(true);
   await change(box.querySelector<HTMLInputElement>('input[type=date]')!,'2026-09-15');
@@ -88,7 +89,7 @@ it('ignores a slow response for the previous doctor and offers retry after failu
     if(url.includes('doctorId=1'))return new Promise<Response>(resolve=>{finish=resolve;});
     throw Error('offline');
   });
-  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient',onNavigate:vi.fn()})));
   await click('Reservar consulta');await change(box.querySelector('select')!,'1');await change(box.querySelector('select')!,'2');
   await act(async()=>finish(Response.json({data:{date:'2026-09-14',slots:[{time:'09:00',available:true}]}})));
   expect(box.textContent).not.toContain('09:00');expect(button('Confirmar reserva').disabled).toBe(true);
@@ -97,7 +98,7 @@ it('ignores a slow response for the previous doctor and offers retry after failu
 
 it('keeps a single booking entry and exposes the complete selected doctor',async()=>{
   mock.fetch.mockImplementation(async(url:string)=>Response.json(url==='/api/doctors'?{doctors:[{id:7,name:'Médica de prueba con nombre completo',specialty:'Medicina general'}]}:url.startsWith('/api/doctor/slots')?{data:{date:null,slots:[]}}:{appointments:[]}));
-  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient'})));
+  await act(async()=>root.render(createElement(PrivateConsultations,{role:'patient',onNavigate:vi.fn()})));
   await click('Reservar consulta');
   expect([...box.querySelectorAll('button')].some(b=>b.textContent==='Reservar consulta')).toBe(false);
   await change(box.querySelector('select')!,'7');
@@ -106,7 +107,50 @@ it('keeps a single booking entry and exposes the complete selected doctor',async
   expect([...box.querySelectorAll('button')].some(b=>b.textContent==='Reservar consulta')).toBe(true);
   expect(mock.fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
 });
+it('summarizes the selected booking and opens its exact appointment only after confirmation', async () => {
+  const today = santiagoToday();
+  const navigate = vi.fn();
+  mock.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === '/api/doctors') return Response.json({ doctors: [{ id: 7, name: 'Médica de prueba' }] });
+    if (url.startsWith('/api/doctor/slots')) return Response.json({ data: { date: today, slots: [{ time: '09:00', available: true }] } });
+    if (init?.method === 'POST') return Response.json({ appointment: { id: 81 } });
+    return Response.json({ appointments: [] });
+  });
+  await act(async () => root.render(createElement(PrivateConsultations, { role: 'patient', onNavigate: navigate })));
+  await click('Reservar consulta');
+  await change(box.querySelector('select')!, '7');
+  await click('09:00');
+  const summary = box.querySelector('[data-selected-doctor]');
+  expect(summary?.textContent).toContain('Médica de prueba');
+  expect(summary?.textContent).toContain(appointmentDate(today) + ' · 09:00 · Hora de Chile');
+  expect(navigate).not.toHaveBeenCalled();
+  await click('Confirmar reserva');
+  expect(navigate).toHaveBeenCalledExactlyOnceWith(81);
+});
+it('orders the patient booking, current and scheduled consultations, with previous visits collapsed', async () => {
+  const today = santiagoToday();
+  const fixture = ['completed', 'scheduled', 'in_progress'].map((status, index) => ({
+    id: index + 1, status, date: today, time_slot: '09:00', doctor_name: ['Anterior', 'Agendada', 'En curso'][index],
+  }));
+  mock.fetch.mockResolvedValue(Response.json({ appointments: fixture }));
+  await act(async () => root.render(createElement(PrivateConsultations, { role: 'patient', onNavigate: vi.fn() })));
+  expect([...box.querySelectorAll('h1,h2,summary,button[data-patient-primary]')].map(element => element.textContent))
+    .toEqual(['Mis consultas', 'Reservar consulta', 'En curso', 'Agendadas', 'Consultas anteriores (1)⌄']);
+  expect(box.querySelector('details')?.hasAttribute('open')).toBe(false);
+});
 it('formats calendar dates with year without moving the Santiago day',()=>{
   expect(appointmentDate('2026-09-06')).toBe('6 de septiembre de 2026');
   expect(appointmentDate('2026-09-09T00:00:00.000Z')).toBe('9 de septiembre de 2026');
+});
+it.each(['', 'appointmentId=0', 'appointmentId=01', 'appointmentId=2147483648', 'appointmentId=12&appointmentId=13'])(
+  'does not open a consultation from an invalid locator %s', query => {
+    expect(readConsultationId(new URLSearchParams(query))).toBeUndefined();
+  },
+);
+it('routes the same appointment back to either role and preserves the language', () => {
+  const id = readConsultationId(new URLSearchParams('tab=consultas&appointmentId=23&lang=en'));
+  expect(id).toBe(23);
+  expect(consultationHref('patient', 'en', id)).toBe('/patient?tab=consultas&appointmentId=23&lang=en');
+  expect(consultationHref('doctor', 'es', id)).toBe('/doctor?tab=consultas&appointmentId=23&lang=es');
+  expect(consultationHref('patient', 'en')).toBe('/patient?tab=consultas&lang=en');
 });

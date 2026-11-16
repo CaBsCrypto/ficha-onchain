@@ -40,7 +40,25 @@ Con la ficha de Semana 2, `GET /api/private-clinical-history` devolvió HTTP 503
 3. Cambiar un permiso y después retirar ambos. La campana debe distinguir concesión, cambio y retiro. Verificar que la ficha retirada desaparece de la lista y que al reabrir un enlace anterior se deniega el acceso. Probar con dos perfiles médicos distintos y con una operación aún pendiente de confirmar.
 4. Abrir la campana y la lista en móvil y con teclado. Verificar que los avisos y la ficha seleccionada se limpian al cambiar de cuenta.
 
-## Regresión de la candidata
+### Rediseño clínico
+
+La referencia visual anterior es la revisión `7c628e4`. Para comparar el rediseño, usar la misma consulta, ficha sintética, rol, idioma, ventana y estado de la interfaz en ambas capturas. Registrar el SHA probado y guardar las capturas en la carpeta privada de evidencia de Semana 4.
+
+[Comparación visual con datos sintéticos](../evidence/sow2-week4-redesign/) a 1440 × 960 y 320 × 844. Documenta los permisos del Paciente y el acceso a la ficha desde la consulta del Médico.
+
+En Edge, Tab llevó el foco visible a **Gestionar acceso a mi ficha**, a ambos permisos y a **Revisar cambios** con una ventana de 320 × 568. La página deja esos controles por encima de la barra inferior. La comprobación usó los componentes del portal con una consulta sintética.
+
+| Caso | Comprobación del rediseño |
+| --- | --- |
+| Paciente · consulta → ficha | Abrir una consulta iniciada como Paciente y elegir **Gestionar acceso a mi ficha**. Verificar que se enfoca al médico de esa consulta, con el inicio en hora de Chile. Comprobar que **Volver a esta consulta** conserva la cita y el idioma. Abrir también **Ficha clínica** sin cita y comprobar que el acceso general a la ficha, los aportes y los permisos funciona. |
+| Médico · consulta → ficha | Abrir la consulta asignada. **Abrir ficha compartida** aparece cuando la consulta y el permiso vigente coinciden con la ficha del directorio. Comparar acceso de lectura, sólo agregado y ambos, en la consulta y en **Fichas compartidas**. Una consulta ajena o cancelada, o un permiso retirado, debe bloquear la apertura sin mostrar otra ficha. |
+| Campana, recuperación y navegación | Comparar el tipo de aviso, fecha y hora de Chile, permisos y enlace. Verificar que un retiro deja el aviso sin enlace y que el fallo de verificación ofrece volver a consultar. Volver a una pestaña suspendida durante un retiro simulado. Mientras se revalida, ocultar ficha anterior, nombres y enlaces. Con un intento pendiente, conservar su consulta y bloquear el cambio a otra ficha. |
+| Capturas antes y después · móvil | Guardar capturas equivalentes a 320 px de ancho CSS, en la ficha del Paciente y en la consulta o campana del Médico. Comprobar cinco destinos utilizables, selección visible, rótulos en español e inglés, panel de campana dentro de la pantalla y última acción visible por encima de la barra y la zona segura. Registrar también el resultado a un ancho móvil habitual y al 200 % de zoom. |
+| Escritorio y teclado | Comparar la barra lateral y la jerarquía de consulta y ficha en escritorio. En el portal médico, confirmar que el estado de autorización vigente queda al final en un control plegable y que el aviso de una solicitud administrativa pendiente sigue arriba. Recorrer ambos portales con Tab y Mayús+Tab, abrir y cerrar la campana con teclado, y comprobar el foco cuando una actualización elimina el enlace enfocado. Verificar nombres de navegación, anuncio de carga o error y contraste de estados. |
+
+Las 22 pruebas enfocadas de barras, acceso y campana pasaron con respuestas controladas. Cubren la suspensión, el rechazo del resultado anterior, la conservación del bloqueo de un intento pendiente, el vencimiento de la consulta a la bandeja y la hora de Chile. La comprobación visual en navegador se registra por separado. Para este pase usar datos sintéticos y respuestas controladas en las acciones que requieren firma. Cualquier firma real en Stellar Testnet requiere autorización específica del usuario y su confirmación en Privy.
+
+## Regresión anterior al rediseño
 
 - Node 22.23.5. Pasaron 2.277 pruebas de aplicación, 873 de servicios privados y 19 de captura y receta.
 - Las 4 pruebas de PostgreSQL que Vitest omite en la ejecución general pasaron por separado en Neon dev con fixtures sintéticos. Pasaron las 25 pruebas Rust de contratos.

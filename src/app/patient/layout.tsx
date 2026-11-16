@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import { privyEmail } from '@/lib/auth/privy-email';
+import { cn } from '@/lib/utils';
 import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 import { PatientIcon } from '@/components/private-portal/PatientIcon';
 import styles from '@/components/private-portal/patient-mobile.module.css';
@@ -15,6 +16,7 @@ const tabs = [
   { id: 'recetas', es: 'Recetas', en: 'Prescriptions' },
   { id: 'perfil', es: 'Cuenta', en: 'Account' },
 ] as const;
+const mobileEnglish = { inicio: 'Home', consultas: 'Visits', historial: 'Record', recetas: 'Rx', perfil: 'Account' };
 const copy = {
   es: {
     title: 'Portal del paciente', navigation: 'Menú del paciente', mobileNavigation: 'Menú móvil del paciente',
@@ -31,7 +33,19 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   const current = useSearchParams().get('tab') ?? 'inicio';
   const language = usePortalLanguage();
   const labels = copy[language];
-  return <nav aria-label={mobile ? labels.mobileNavigation : labels.navigation} className={mobile ? 'flex justify-around gap-1 p-2' : 'space-y-1 p-2'}>{tabs.map(tab => <Link key={tab.id} href={`/patient?tab=${tab.id}`} aria-current={current === tab.id ? 'page' : undefined} className={`${mobile ? 'flex-1 text-center' : 'block'} rounded-xl px-3 py-3 text-sm font-medium ${current === tab.id ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>{mobile && <PatientIcon name={tab.id} />}<span>{tab[language]}</span></Link>)}</nav>;
+  return <nav aria-label={mobile ? labels.mobileNavigation : labels.navigation} className={mobile ? styles.mobileNavList : 'space-y-1 p-2'}>
+    {tabs.map(tab => {
+      const active = current === tab.id;
+      const label = mobile && language === 'en' ? mobileEnglish[tab.id] : tab[language];
+      return <Link key={tab.id} href={`/patient?tab=${tab.id}`} aria-current={active ? 'page' : undefined}
+        aria-label={label !== tab[language] && !tab[language].toLowerCase().includes(label.toLowerCase()) ? `${label}, ${tab[language]}` : undefined}
+        className={cn(styles.focusable, mobile ? styles.mobileNavItem : 'flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-medium',
+          !mobile && (active ? 'bg-sky-100 font-semibold text-sky-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'))}>
+        {mobile && <PatientIcon name={tab.id} />}
+        <span className="min-w-0 max-w-full">{label}</span>
+      </Link>;
+    })}
+  </nav>;
 }
 function AccountActions({ children }: { children: React.ReactNode }) {
   const current = useSearchParams().get('tab');
@@ -53,14 +67,37 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     catch { signingOut.current = false; setLogoutBusy(false); setLogoutError(true); }
   }
   if (!ready || !authenticated) return <p role="status" className="p-8 text-center text-sm text-slate-500">{labels.checking}</p>;
-  return <WalletBoundary key={user?.id}><div className={`${styles.portal} min-h-screen bg-[#f8fafc]`}>
+  return <WalletBoundary key={user?.id}><div className={cn(styles.portal, 'min-h-screen bg-canvas text-ink')}>
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur-sm"><div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-      <Link href="/" className="flex items-center gap-2 font-semibold"><span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-xs font-bold text-white">T</span><span className="text-slate-900">Trust<span className="text-sky-500">Leaf</span><span className={`${styles.mobileOnly} text-[10px] font-medium tracking-wide text-slate-500`}>Stellar Testnet · Demo</span></span></Link>
-      <span data-patient-desktop className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{labels.badge} · Stellar Testnet</span>
-      <Link href="/patient?tab=perfil" className={styles.mobileOnly} data-patient-account-link aria-label={labels.account}><PatientIcon name="perfil" /><span>{labels.account}</span></Link>
-      <div data-patient-desktop className="flex min-w-0 flex-wrap items-center gap-3"><span className="hidden max-w-52 truncate text-xs text-slate-500 sm:block">{privyEmail(user)}</span><button disabled={logoutBusy} onClick={() => void signOut()} className="rounded-xl px-3 py-2 text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">{logoutBusy ? labels.signingOut : labels.signOut}</button>{logoutError && <p role="alert" className="text-sm text-rose-700">{labels.signOutError}</p>}</div>
+      <Link href="/" className={cn(styles.focusable, 'flex min-h-11 items-center gap-2 rounded-md font-semibold')}>
+        <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-[#0369a1] text-xs font-bold text-white">T</span>
+        <span className="text-ink">Trust<span className="text-[#0369a1]">Leaf</span><span className={cn(styles.mobileOnly, 'text-xs font-medium text-slate-600')}>Stellar Testnet · Demo</span></span>
+      </Link>
+      <span data-patient-desktop className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-900">{labels.badge} · Stellar Testnet</span>
+      <Link href="/patient?tab=perfil" className={cn(styles.mobileOnly, styles.focusable)} data-patient-account-link aria-label={labels.account}><PatientIcon name="perfil" /><span>{labels.account}</span></Link>
+      <div data-patient-desktop className="flex min-w-0 flex-wrap items-center gap-3">
+        <span className="hidden max-w-52 truncate text-xs text-slate-600 sm:block">{privyEmail(user)}</span>
+        <button disabled={logoutBusy} onClick={() => void signOut()} className={cn(styles.focusable, 'min-h-11 rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50')}>{logoutBusy ? labels.signingOut : labels.signOut}</button>
+        {logoutError && <p role="alert" className="text-sm text-rose-800">{labels.signOutError}</p>}
+      </div>
     </div></header>
-    <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8"><aside className="hidden w-56 shrink-0 md:block"><div className="sticky top-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><p className="border-b border-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{labels.portal}</p><Suspense><Navigation /></Suspense></div></aside><main className="min-w-0 flex-1 pb-24 md:pb-6">{children}<Suspense><AccountActions><button disabled={logoutBusy} onClick={() => void signOut()} className="w-full rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 disabled:opacity-50">{logoutBusy ? labels.signingOut : labels.signOut}</button>{logoutError && <p role="alert" className="mt-3 text-sm text-rose-700">{labels.signOutError}</p>}</AccountActions></Suspense></main></div>
-    <div data-patient-navigation className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white md:hidden"><Suspense><Navigation mobile /></Suspense></div>
+    <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-8 md:px-6">
+      <aside className="hidden w-56 shrink-0 md:block">
+        <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <p className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600">{labels.portal}</p>
+          <Suspense><Navigation /></Suspense>
+        </div>
+      </aside>
+      <main className={cn(styles.shellMain, 'min-w-0 flex-1 md:pb-6')}>
+        {children}
+        <Suspense><AccountActions>
+          <button disabled={logoutBusy} onClick={() => void signOut()} className={cn(styles.focusable, 'min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 disabled:opacity-50')}>{logoutBusy ? labels.signingOut : labels.signOut}</button>
+          {logoutError && <p role="alert" className="mt-3 text-sm text-rose-800">{labels.signOutError}</p>}
+        </AccountActions></Suspense>
+      </main>
+    </div>
+    <div data-patient-navigation className={cn(styles.mobileNav, 'fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 md:hidden')}>
+      <Suspense><Navigation mobile /></Suspense>
+    </div>
   </div></WalletBoundary>;
 }

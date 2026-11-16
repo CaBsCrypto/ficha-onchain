@@ -322,7 +322,8 @@ describe('identity, refresh and history presentation', () => {
     expect(host.textContent).toContain('Latest contribution'); expect(host.textContent).toContain('Earlier contribution');
     expect(host.textContent).toContain('Registrado por médico'); expect(host.querySelectorAll('button').length).toBeGreaterThan(0);
     const corrections = [...host.querySelectorAll('button')].filter(button => button.textContent === 'Corregir mi aporte'); expect(corrections).toHaveLength(1);
-    expect(host.querySelector('details')?.textContent).toContain('versión anterior');
+    const earlierVersion = [...host.querySelectorAll('summary')].find(summary => summary.textContent?.includes('versión anterior'));
+    expect(earlierVersion?.closest('details')?.textContent).toContain('versión anterior');
   });
   it('reviews a correction before preparing, retains its prior version and prevents a double submission', async () => {
     const saved = deferred<ClinicalOperation>(); const prepare = vi.fn().mockReturnValue(saved.promise);
@@ -383,7 +384,7 @@ describe('review, focus and object URL lifecycle', () => {
     const late = deferred<unknown>(); let signal!: AbortSignal;
     deps.fetch.mockResolvedValueOnce(response(snapshot([version({ note: null, fileName: 'examen.pdf', mediaType: 'application/pdf' })]))).mockImplementationOnce((_path, init) => { signal = init.signal; return late.promise; });
     const { root, host } = await mount(createElement(ClinicalHistory));
-    const open = [...host.querySelectorAll('button')].find(button => button.textContent === 'Preparar descarga privada')!;
+    const open = [...host.querySelectorAll('button')].find(button => button.textContent === 'Verificar para descargar')!;
     await act(async () => open.click()); await act(async () => root.unmount()); roots = roots.filter(item => item.root !== root); host.remove();
     await act(async () => late.resolve({ ok: true, headers: new Headers({ 'content-type': 'application/pdf' }), blob: async () => new Blob(['private late content'], { type: 'application/pdf' }) }));
     expect(signal.aborted).toBe(true); expect(createUrl).not.toHaveBeenCalled();
@@ -408,7 +409,7 @@ describe('prepared history attempt focus', () => {
   async function reviewPermission(host: HTMLElement) {
     const checkbox = host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1];
     await act(async () => checkbox.click());
-    const review = getButton(host, 'Revisar cambio de permisos'); review.focus();
+    const review = getButton(host, 'Revisar cambios'); review.focus();
     await act(async () => review.click());
     return review;
   }
@@ -427,7 +428,7 @@ describe('prepared history attempt focus', () => {
     expect(scroll).not.toHaveBeenCalled();
     await act(async () => saved.resolve(response({ operation: op({ id: requestId(), action: 'set_permissions' }) })));
     const heading = host.querySelector('[aria-label="Intento clínico actual"] h2');
-    expect(heading?.textContent).toBe('Actualizar permisos · Pendiente de tu firma');
+    expect(heading?.textContent).toBe('Actualizar permisos · Pendiente de firma');
     expect(document.activeElement?.textContent).toBe('Actualizar permisos'); expect(getButton(host, 'Confirmar con mi cuenta Privy')).toBeDefined(); expect(scroll).toHaveBeenCalledOnce();
     expect(scroll.mock.calls[0]).toEqual([{ block: 'center' }]);
     expect(deps.fetch.mock.calls.filter(call => call[0].endsWith('/sign'))).toHaveLength(0);
@@ -464,6 +465,8 @@ describe('prepared history attempt focus', () => {
       return Promise.resolve(response({ operation: op({ id: body.requestId, action: 'set_permissions' }) }));
     });
     const { host } = await mount(createElement(ClinicalHistory, { permissionAppointmentId: 42, renderPermissions: props => createElement(ClinicalPermissions, props) }));
+    expect([...host.querySelectorAll('a')].find(link => link.textContent === 'Volver a esta consulta')?.getAttribute('href'))
+      .toBe('/patient?tab=consultas&appointmentId=42&lang=es');
     expect(document.activeElement?.textContent?.trim()).toBe(focal.doctorName);
     expect(scroll).toHaveBeenCalledWith({ block: 'start' });
     const form = document.activeElement!.closest('form')!;
@@ -486,6 +489,7 @@ describe('prepared history attempt focus', () => {
     expect(deps.fetch).toHaveBeenCalledOnce();
     await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
     expect(getButton(host, 'Confirmar con mi cuenta Privy')).toBeDefined();
+    expect(getButton(host, 'Volver a esta consulta').disabled).toBe(true);
     expect(deps.sign).not.toHaveBeenCalled();
   });
   it('filters the closed verified-doctor directory by name across case and accents', async () => {
@@ -664,7 +668,7 @@ describe('local drafts while clinical confirmations are paused',()=>{
   await act(async()=>host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   await act(async()=>root.render(createElement(ClinicalPermissions,{grants:[grant],disabled:false,readOnly:true,onPrepare:prepare})));
   const inputs=[...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];expect(inputs.map(input=>input.checked)).toEqual([true,false]);expect(inputs.every(input=>input.disabled)).toBe(true);
-  expect(getButton(host,'Revisar cambio de permisos').disabled).toBe(true);await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(getButton(host,'Revisar cambios').disabled).toBe(true);await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
   expect(host.textContent).toContain('Confirmar cambios está deshabilitado');expect(prepare).not.toHaveBeenCalled();expect(deps.sign).not.toHaveBeenCalled();
  });
  it('keeps draft openers disabled during an unresolved existing operation',async()=>{
@@ -998,7 +1002,7 @@ describe('clinical rehearsal limit messages and saved-intent safety', () => {
       { error: code, detail: 'RPC PRIVATE_DATA secret@example.test' }, path === '/api/private-clinical-history' ? 200 : status)));
     const { host } = await mount(createElement(ClinicalHistory, { renderPermissions: props => createElement(ClinicalPermissions, props) }));
     await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-    const review = [...host.querySelectorAll('button')].find(button => button.textContent === 'Revisar cambio de permisos')!;
+    const review = [...host.querySelectorAll('button')].find(button => button.textContent === 'Revisar cambios')!;
     await act(async () => review.click());
     const alert = host.querySelector('form [role="alert"]');
     expect(alert?.textContent).toContain(expected);

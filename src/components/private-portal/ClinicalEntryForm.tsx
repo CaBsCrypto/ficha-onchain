@@ -135,14 +135,19 @@ const button = 'min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visi
 export interface ClinicalEntryFormProps {
   correction?: ClinicalVersion | null; disabled?: boolean; readOnly?: boolean; historyId?: string; role?: 'patient' | 'doctor';
   onPrepare: (input: ClinicalIntent) => Promise<ClinicalOperation>; onCancel: () => void;
-  initialPayload?: ClinicalDraftPayload; disablePrescriptionLookup?: boolean; onSaveDraft?: (payload: ClinicalDraftPayload) => Promise<unknown>;
+  initialPayload?: ClinicalDraftPayload; initialKind?: 'note' | 'file';
+  disablePrescriptionLookup?: boolean; onSaveDraft?: (payload: ClinicalDraftPayload) => Promise<unknown>;
 }
 /** Review is local. Preparation encrypts a saved intent; confirmation signs it in the operation panel. */
-export function ClinicalEntryForm({ correction = null, disabled = false, readOnly = false, historyId, role = 'patient', onPrepare, onCancel, initialPayload, onSaveDraft, disablePrescriptionLookup = false }: ClinicalEntryFormProps) {
+export function ClinicalEntryForm({ correction = null, disabled = false, readOnly = false, historyId, role = 'patient', onPrepare, onCancel, initialPayload, initialKind = 'note', onSaveDraft, disablePrescriptionLookup = false }: ClinicalEntryFormProps) {
   const language = usePortalLanguage();
   const copy = entryCopy[language];
   const id = useId();
-  const [kind, setKind] = useState<'note' | 'file'>(initialPayload?.file || correction && !correction.note ? 'file' : 'note');
+  const [kind, setKind] = useState<'note' | 'file'>(() => {
+    if (initialPayload) return initialPayload.file ? 'file' : 'note';
+    if (correction) return correction.note ? 'note' : 'file';
+    return initialKind;
+  });
   const [title, setTitle] = useState(initialPayload?.note?.title ?? correction?.note?.title ?? '');
   const [text, setText] = useState(initialPayload?.note?.text ?? correction?.note?.text ?? '');
   const [date, setDate] = useState(initialPayload?.note?.eventDate ?? correction?.note?.eventDate ?? '');
@@ -255,7 +260,7 @@ export function ClinicalEntryForm({ correction = null, disabled = false, readOnl
       <p className="text-sm leading-relaxed text-slate-600">{readOnly ? onSaveDraft ? copy.privateDraftReview : copy.readOnlyReview : copy.signatureReview}</p>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button type="button" disabled={unavailable} onClick={() => setReview(false)} className={`${button} border border-slate-200 text-slate-700`}>{copy.edit}</button>
-        <button type="button" disabled={unavailable || readOnly} aria-describedby={readOnly ? `${id}-draft-mode` : undefined} onClick={() => void prepare()} className={`${button} bg-sky-700 text-white hover:bg-sky-800`}>{busy ? copy.preparing : copy.prepare}</button>
+        <button type="button" disabled={unavailable || readOnly} aria-describedby={readOnly ? `${id}-draft-mode` : undefined} onClick={() => void prepare()} className={`${button} bg-[#0369a1] text-white hover:bg-sky-800`}>{busy ? copy.preparing : copy.prepare}</button>
       </div>
     </div> : <form onSubmit={beginReview} className="mt-5 space-y-5">
       {!correction && <fieldset disabled={unavailable} className="flex flex-wrap gap-4"><legend className="mb-2 text-sm font-medium text-slate-700">{copy.entryKind}</legend>
@@ -279,7 +284,7 @@ export function ClinicalEntryForm({ correction = null, disabled = false, readOnl
           {preview && <a href={preview} download={file.fileName} className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline focus-visible:outline-2 focus-visible:outline-sky-600">{copy.downloadSelection}</a>}
         </div>}
       </div>}
-      <button type="submit" disabled={unavailable || reading || kind === 'file' && !file} className={`${button} w-full bg-sky-700 text-white hover:bg-sky-800 sm:w-auto`}>{copy.reviewEntry}</button>
+      <button type="submit" disabled={unavailable || reading || kind === 'file' && !file} className={`${button} w-full bg-[#0369a1] text-white hover:bg-sky-800 sm:w-auto`}>{copy.reviewEntry}</button>
     </form>}
     {onSaveDraft && <button type="button" disabled={unavailable || reading || kind === 'file' && !file} onClick={() => void saveDraft()} className={button + ' mt-4 border border-sky-200 text-sky-800'}>{copy.saveDraft}</button>}
     {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm leading-relaxed text-rose-800">{error}</p>}
