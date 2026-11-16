@@ -62,8 +62,12 @@ Las 22 pruebas enfocadas de barras, acceso y campana pasaron con respuestas cont
 
 Usar la publicación del PR #158 (`d77a0a8`) como referencia visual. Comparar con el SHA candidato en la misma consulta, perfil, idioma y estado; guardar capturas equivalentes a 320 px CSS y en escritorio. Tratar esas capturas con datos sintéticos como evidencia de interfaz. Registrar aparte lo observado con las sesiones autenticadas en el dominio publicado.
 
+[Capturas comparativas del pulido](../evidence/sow2-week4-polish/). En Edge se confirmó el foco visible por encima de la navegación inferior a 320 × 568, incluido **Revisar cambios** después de mostrar la selección pendiente.
+
 | Responsable | Comprobación para autorizar el inicio de la grabación |
 | --- | --- |
+| Scrum Master | Revisar los bloqueos en consulta y permisos, y coordinar la revisión con ficha, documentos y campana. |
+| Project Manager | Cotejar el alcance del PR, la evidencia visual, el SHA publicado y el resultado del ensayo con ambas sesiones. |
 | QA de interfaz | En consulta, comprobar que se identifica a la otra persona, se reconoce el siguiente paso y se distingue la disponibilidad de la ficha de la acción de finalizar. En permisos, comprobar el médico enfocado, la fecha, la confirmación vigente y el regreso a la misma consulta. |
 | QA de interfaz | En el portal médico, comparar campana y **Mi cuenta** en ambos anchos y en español e inglés. Leer tipo de aviso, hora de Chile en formato de 24 horas y permisos. Revisar avisos de retiro, enlaces antiguos, consulta temporalmente indisponible y retorno de foco por teclado. Confirmar el cierre de sesión desde **Mi cuenta** y que un intento que requiere conciliación mantiene bloqueado el cambio de ficha desde la campana. **Mi cuenta** sigue disponible para cerrar sesión. |
 | Operación | Cotejar SHA, build y CI, sesiones separadas y consulta, ficha, permisos y recibos existentes en Stellar Testnet. Hacer primero un ensayo de lectura. Si falta un resultado verificable o la interfaz muestra un intento pendiente, comprobar el mismo intento y registrar su estado antes de continuar. |
