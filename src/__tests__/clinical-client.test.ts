@@ -580,6 +580,135 @@ describe('prepared history attempt focus', () => {
     outside.remove();
   });
 });
+describe('confirmed patient permission receipt during revalidation', () => {
+  const historyPath = '/api/private-clinical-history';
+  const receiptHash = 'b'.repeat(64);
+  const panel = (host: HTMLElement) => host.querySelector('[aria-label="Intento clínico actual"]');
+  const receipt = (host: HTMLElement) => host.querySelector(`a[href$="/testnet/tx/${receiptHash}"]`);
+  const button = (host: HTMLElement, label: string) => [...host.querySelectorAll('button')].find(item => item.textContent === label);
+  const view = (id = 42) => createElement(ClinicalHistory, {
+    permissionAppointmentId: id, renderPermissions: props => createElement(ClinicalPermissions, props),
+  });
+  const grant = {
+    doctorId: 7, doctorName: 'Médico sintético', address: 'G' + 'B'.repeat(55),
+    authorized: true, canRead: false, canAppend: false, revision: 1,
+  };
+  function fixture(waitForReceipt = false) {
+    const first = {
+      ...snapshot([version()]),
+      operations: [op({ action: 'set_permissions', state: 'submitted', transactionHash: receiptHash })],
+      grants: [grant],
+      permissionAppointment: { appointmentId: 42, doctorId: grant.doctorId, date: '2026-10-09', startedAt: '2026-10-09T13:00:00.000Z' },
+    };
+    const refreshed = { ...first, operations: [], grants: [{ ...grant, canRead: true, revision: 2 }] };
+    const automaticRead = deferred<unknown>();
+    const manualRead = deferred<unknown>();
+    const newerScope = deferred<unknown>();
+    const confirmation = deferred<unknown>();
+    const confirmedResponse = response({ operation: op({ action: 'set_permissions', state: 'confirmed', transactionHash: receiptHash }) });
+    const paths: string[] = [];
+    let reads = 0;
+    deps.fetch.mockImplementation((path, init) => {
+      expect(init?.method ?? 'GET').toBe('GET');
+      paths.push(path);
+      if (path === historyPath + '?appointmentId=42') {
+        reads++;
+        if (reads === 1) return Promise.resolve(response(first));
+        if (reads === 2) return automaticRead.promise;
+        return manualRead.promise;
+      }
+      if (path === historyPath + '?appointmentId=43') return newerScope.promise;
+      if (path === '/api/private-clinical-operations/' + ID) {
+        return waitForReceipt ? confirmation.promise : Promise.resolve(confirmedResponse);
+      }
+      throw new Error('Unexpected request');
+    });
+    const reconcile = async (host: HTMLElement) => {
+      await act(async () => button(host, 'Consultar intento pendiente')!.click());
+      await act(async () => button(host, 'Consultar confirmación')!.click());
+    };
+    return {
+      automaticRead, manualRead, newerScope, refreshed, paths, reconcile,
+      confirm: () => confirmation.resolve(confirmedResponse),
+    };
+  }
+
+  it('holds the exact receipt and clears protected controls only during the automatic read', async () => {
+    const { automaticRead, manualRead, refreshed, paths, reconcile } = fixture();
+    const { host } = await mount(view());
+    expect(host.textContent).toContain(note.text);
+    await reconcile(host);
+
+    expect(panel(host)?.textContent).toContain('El cambio está confirmado. Estamos comprobando los permisos actuales.');
+    expect(receipt(host)).not.toBeNull();
+    expect(host.textContent).not.toContain(note.text);
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(panel(host)?.querySelector('button')).toBeNull();
+    expect(paths).toEqual([historyPath + '?appointmentId=42', '/api/private-clinical-operations/' + ID, historyPath + '?appointmentId=42']);
+
+    await act(async () => automaticRead.resolve(response(refreshed)));
+    expect(panel(host)?.textContent).toContain('Puedes revisar su recibo en Stellar Testnet.');
+    expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect(receipt(host)).not.toBeNull();
+
+    await act(async () => button(host, 'Actualizar')!.click());
+    expect(receipt(host)).toBeNull();
+    expect(host.textContent).not.toContain(note.text);
+    await act(async () => manualRead.resolve(response(refreshed)));
+    expect(receipt(host)).not.toBeNull();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+
+  it.each(['appointment', 'identity', 'history'])('hides the earlier receipt after a change of %s', async changed => {
+    const { automaticRead, manualRead, newerScope, refreshed, reconcile } = fixture();
+    const { root, host } = await mount(view());
+    await reconcile(host);
+    expect(receipt(host)).not.toBeNull();
+
+    if (changed === 'identity') deps.userId = 'did:privy:another-patient';
+    if (changed !== 'history') {
+      await act(async () => root.render(view(changed === 'appointment' ? 43 : 42)));
+      expect(receipt(host)).toBeNull();
+    }
+    await act(async () => automaticRead.resolve(response(changed === 'history'
+      ? { ...refreshed, history: { ...refreshed.history!, id: '6'.repeat(64) } } : refreshed)));
+    expect(receipt(host)).toBeNull();
+    await act(async () => (changed === 'appointment' ? newerScope : manualRead).resolve(response(refreshed)));
+    expect(receipt(host)).toBeNull();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+
+  it('does not attach a late confirmation to a different consultation', async () => {
+    const { newerScope, refreshed, reconcile, confirm } = fixture(true);
+    const { root, host } = await mount(view());
+    await reconcile(host);
+    await act(async () => root.render(view(43)));
+    await act(async () => newerScope.resolve(response(refreshed)));
+    await act(async () => confirm());
+    expect(receipt(host)).toBeNull();
+    expect(panel(host)).toBeNull();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { code: 'clinical_record_archived', status: 503 },
+    { code: 'clinical_chain_unavailable', status: 503 },
+    { code: 'clinical_access_denied', status: 403 },
+  ])('discards the receipt if the read reports $code', async ({ code, status }) => {
+    const { automaticRead, manualRead, refreshed, reconcile } = fixture();
+    const { host } = await mount(view());
+    await reconcile(host);
+    expect(receipt(host)).not.toBeNull();
+    await act(async () => automaticRead.resolve(response({ error: code }, status)));
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(panel(host)).toBeNull();
+    expect(receipt(host)).toBeNull();
+    await act(async () => button(host, 'Actualizar')!.click());
+    await act(async () => manualRead.resolve(response(refreshed)));
+    expect(receipt(host)).toBeNull();
+    expect(deps.sign).not.toHaveBeenCalled();
+  });
+});
 describe('read-only clinical release',()=>{
  const writes={create_history:false,append_version:false,set_permissions:false};
  const button=(host:HTMLElement,text:string)=>[...host.querySelectorAll('button')].find(x=>x.textContent===text);

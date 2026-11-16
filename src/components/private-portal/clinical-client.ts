@@ -528,8 +528,12 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
   const languageRef = useRef(language);
   languageRef.current = language;
   const [view, setView] = useState<{ identity: string; data: ClinicalSnapshot | null; loading: boolean; error: string; archived?: true }>({ identity: '', data: null, loading: true, error: '' });
-  const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => { setView({ identity: scope, data: null, loading: true, error: '' }); setRevision(n => n + 1); }, [scope]);
+  const [refreshRequest, setRefreshRequest] = useState<{ revision: number; scope: string; permissionReceiptId?: string }>({ revision: 0, scope: '' });
+  const requestRefresh = useCallback((permissionReceiptId?: string) => {
+    setView({ identity: scope, data: null, loading: true, error: '' });
+    setRefreshRequest(previous => ({ revision: previous.revision + 1, scope, permissionReceiptId }));
+  }, [scope]);
+  const refresh = useCallback(() => requestRefresh(), [requestRefresh]);
   useEffect(() => {
     if (!identity) { setView({ identity: scope, data: null, loading: false, error: '' }); return; }
     let alive = true; const abort = new AbortController();
@@ -552,8 +556,14 @@ export function useClinicalSnapshot(identity: string, historyId?: string, langua
       setView({ identity: scope, data: null, loading: false, error: localizedClinicalError(error, locale, locale === 'en' ? 'We could not verify the clinical record.' : 'No pudimos verificar el historial.') });
     });
     return () => { alive = false; abort.abort(); };
-  }, [identity, historyId, appointmentId, revision, scope]);
-  return { ...(view.identity === scope ? view : { identity: scope, data: null, loading: !!identity, error: '' }), refresh };
+  }, [identity, historyId, appointmentId, refreshRequest.revision, scope]);
+  return {
+    ...(view.identity === scope ? view : { identity: scope, data: null, loading: !!identity, error: '' }),
+    refresh,
+    refreshAfterPermissionConfirmation: requestRefresh,
+    refreshingPermissionReceiptId: view.identity === scope && view.loading && refreshRequest.scope === scope
+      ? refreshRequest.permissionReceiptId : undefined,
+  };
 }
 export function clinicalHistoryPath(historyId?: string, suffix = '') {
   if (historyId !== undefined && !HASH.test(historyId)) throw new ClinicalClientError(400, 'clinical_request_invalid');
