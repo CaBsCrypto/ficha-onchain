@@ -9,6 +9,9 @@
   .notificationPanel { max-height: min(70dvh, 26rem); }
 }
 @media (width < 48rem) {
+  :global(html):has(.shellMain) {
+    scroll-padding-block: 4.5rem calc(100px + env(safe-area-inset-bottom, 0px));
+  }
   .mobileOnly { display: block; }
   .portal { background: var(--color-canvas); color: var(--color-ink); font-size: 16px; line-height: 1.5; }
   .portal [data-patient-desktop] { display: none; }

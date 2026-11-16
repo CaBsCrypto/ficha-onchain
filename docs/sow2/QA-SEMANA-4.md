@@ -46,6 +46,8 @@ La referencia visual anterior es la revisión `7c628e4`. Para comparar el redise
 
 [Comparación visual con datos sintéticos](../evidence/sow2-week4-redesign/) a 1440 × 960 y 320 × 844. Documenta los permisos del Paciente y el acceso a la ficha desde la consulta del Médico.
 
+En Edge, Tab llevó el foco visible a **Gestionar acceso a mi ficha**, a ambos permisos y a **Revisar cambios** con una ventana de 320 × 568. La página deja esos controles por encima de la barra inferior. La comprobación usó los componentes del portal con una consulta sintética.
+
 | Caso | Comprobación del rediseño |
 | --- | --- |
 | Paciente · consulta → ficha | Abrir una consulta iniciada como Paciente y elegir **Gestionar acceso a mi ficha**. Verificar que se enfoca al médico de esa consulta, con el inicio en hora de Chile. Comprobar que **Volver a esta consulta** conserva la cita y el idioma. Abrir también **Ficha clínica** sin cita y comprobar que el acceso general a la ficha, los aportes y los permisos funciona. |
