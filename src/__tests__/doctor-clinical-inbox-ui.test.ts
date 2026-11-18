@@ -59,6 +59,19 @@ const open = async (host: HTMLElement) => act(async () => bell(host)!.click());
 const tick = async (ms: number) => act(async () => vi.advanceTimersByTimeAsync(ms));
 const focus = async () => act(async () => window.dispatchEvent(new Event('focus')));
 
+function interceptNativeNavigation(host: HTMLElement) {
+  const preventedByPortal: boolean[] = [];
+  // React's delegated listener is already registered by createRoot. Inspect its
+  // decision before stopping jsdom's native navigation at this same boundary.
+  host.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('a')) {
+      preventedByPortal.push(event.defaultPrevented);
+      event.preventDefault();
+    }
+  });
+  return preventedByPortal;
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.useFakeTimers();
@@ -80,6 +93,116 @@ afterEach(async () => {
 });
 
 describe('authenticated doctor notification tray', () => {
+  it('opens the exact active record and marks only that notice read across identity changes', async () => {
+    transport.fetch.mockImplementation(async () => Response.json(sample));
+    localStorage.setItem('ficha-lang', 'en');
+    const { root, host } = await mount('verified-doctor-a', true);
+    const navigation = interceptNativeNavigation(host);
+    await open(host);
+    const first = panel(host).querySelector<HTMLAnchorElement>('li a')!;
+    expect(first.getAttribute('href')).toBe('/doctor?tab=historial&record=' + historyId + '&lang=en');
+    expect(first.textContent).toContain('Access granted');
+    await act(async () => first.click());
+    expect(navigation).toEqual([false]);
+    expect(panel(host).hidden).toBe(true);
+    expect(current.unreadCount).toBe(2);
+    expect([...current.readIds]).toEqual([sample.notifications[0].id]);
+    expect(bell(host)?.getAttribute('aria-label')).toContain('2 unread');
+    expect(transport.fetch).toHaveBeenCalledOnce();
+
+    await open(host);
+    const rows = [...panel(host).querySelectorAll('li')];
+    expect(rows[0].textContent).not.toContain('unread');
+    expect(rows[1].textContent).toContain('unread');
+    expect(rows[2].textContent).toContain('unread');
+    await act(async () => root.render(view('verified-doctor-b', true)));
+    expect(current.unreadCount).toBe(3);
+    expect(current.readIds.size).toBe(0);
+    await act(async () => root.render(view('verified-doctor-a', true)));
+    expect(current.unreadCount).toBe(2);
+    expect([...current.readIds]).toEqual([sample.notifications[0].id]);
+  });
+
+  it('reopening a read notice preserves all 128 cached IDs and the one remaining unread notice', async () => {
+    const cachedIds = [
+      sample.notifications[0].id, sample.notifications[1].id,
+      ...Array.from({ length: 126 }, (_, index) => (index + 16).toString(16).padStart(64, '0')),
+    ];
+    const storageKey = 'trustleaf:doctor-clinical-inbox:v1:verified-doctor-a';
+    sessionStorage.setItem(storageKey, JSON.stringify(cachedIds));
+    transport.fetch.mockImplementation(async () => Response.json(sample));
+    const { host } = await mount();
+    const navigation = interceptNativeNavigation(host);
+    expect(current.unreadCount).toBe(1);
+    await open(host);
+    await act(async () => panel(host).querySelector<HTMLAnchorElement>('li a')!.click());
+    expect(navigation).toEqual([false]);
+    expect(current.unreadCount).toBe(1);
+    expect(current.readIds.size).toBe(128);
+    expect([...current.readIds]).toEqual(cachedIds);
+    expect(JSON.parse(sessionStorage.getItem(storageKey)!)).toEqual(cachedIds);
+  });
+
+  it('acknowledges inaccessible notices individually, merges rapid clicks and keeps marking all available', async () => {
+    const inaccessible: DoctorClinicalInbox = {
+      records: [],
+      notifications: sample.notifications.map(notice => ({
+        ...notice, historyId: null, patientLabel: null, canRead: false, canAppend: false,
+      })),
+    };
+    transport.fetch.mockImplementation(async () => Response.json(inaccessible));
+    const { host } = await mount();
+    await open(host);
+    const rows = [...panel(host).querySelectorAll('li')];
+    const first = rows[0].querySelector('button')!;
+    const second = rows[1].querySelector('button')!;
+    expect(first.textContent).toContain('Marcar como leída');
+    expect(second.textContent).toContain('Marcar como leída');
+    expect(panel(host).querySelector('a')).toBeNull();
+    expect(panel(host).textContent).not.toContain(grant.patientLabel);
+    await act(async () => second.focus());
+    await act(async () => {
+      first.click();
+      second.click();
+    });
+    expect(current.unreadCount).toBe(1);
+    expect(current.readIds.has(inaccessible.notifications[0].id)).toBe(true);
+    expect(current.readIds.has(inaccessible.notifications[1].id)).toBe(true);
+    expect(current.readIds.has(inaccessible.notifications[2].id)).toBe(false);
+    expect(panel(host).hidden).toBe(false);
+    expect(rows[0].querySelector('button')).toBeNull();
+    expect(rows[1].querySelector('button')).toBeNull();
+    expect(rows[2].querySelector('button')).not.toBeNull();
+    expect(document.activeElement).toBe(bell(host));
+    const markAll = [...panel(host).querySelectorAll('button')].find(button => button.textContent === 'Marcar como leídas')!;
+    await act(async () => markAll.click());
+    expect(current.unreadCount).toBe(0);
+    expect(current.readIds.size).toBe(3);
+    expect(panel(host).querySelector('li button')).toBeNull();
+    expect(bell(host)?.getAttribute('aria-label')).not.toContain('sin leer');
+    expect(transport.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('rechecks a pending lock between render and click without navigating or marking the stale link', async () => {
+    transport.fetch.mockImplementation(async () => Response.json(sample));
+    const { host } = await mount();
+    const navigation = interceptNativeNavigation(host);
+    await open(host);
+    const link = panel(host).querySelector<HTMLAnchorElement>('li a')!;
+    expect(current.canNavigateToRecord(historyId)).toBe(true);
+    await act(async () => {
+      current.setRecordNavigationBlocked(true);
+      link.click();
+    });
+    expect(navigation).toEqual([true]);
+    expect(current.unreadCount).toBe(3);
+    expect(current.readIds.size).toBe(0);
+    expect(panel(host).hidden).toBe(false);
+    expect(panel(host).querySelector('a')).toBeNull();
+    expect(panel(host).textContent).toContain('Consulta o termina el intento pendiente');
+    expect(transport.fetch).toHaveBeenCalledOnce();
+  });
+
   it('shares visible polling, skips hidden intervals and coalesces focus and visibility while a read is in flight', async () => {
     const first = deferredResponse();
     transport.fetch.mockReturnValueOnce(first.promise).mockImplementation(async () => Response.json(sample));
