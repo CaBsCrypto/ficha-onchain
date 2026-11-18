@@ -82,11 +82,34 @@ function fixture() {
     if (q.startsWith('SELECT 1 FROM') && q.includes('state IN')) {
       return { rows: q.includes('FROM clinical_web_operations') ? db.operations.filter(o => o.source_wallet === values[0] && ['awaiting_signature', 'submitted'].includes(o.state)) : [] };
     }
-    if (q.startsWith('SELECT * FROM clinical_web_operations')) {
-      const rows = db.operations.filter(o => q.includes('transaction_hash=$1') ? o.transaction_hash === values[0] && o.contract_id === values[1] && o.state === 'confirmed'
-        : q.includes('actor_user_id=$1') ? o.actor_user_id === values[0] && o.wallet_id === values[1] && o.source_wallet === values[2] && o.contract_id === values[3]
-          : o.id === values[0] && (values.length === 1 || o.actor_user_id === values[1] && o.contract_id === values[2]));
-      return { rows: clone(rows) };
+    if (/^SELECT (?:\*|id,action,state,|action,method,state,)/.test(q) && q.includes(' FROM clinical_web_operations WHERE ')) {
+      const [columns, predicate] = q.slice('SELECT '.length).split(' FROM clinical_web_operations WHERE ');
+      const rows = db.operations.filter(operation => {
+        if (predicate.startsWith('transaction_hash=$1')) {
+          if (operation.transaction_hash !== values[0] || operation.contract_id !== values[1] ||
+            operation.network !== 'testnet' || operation.state !== 'confirmed') return false;
+          return !predicate.includes("action='create_history'") || operation.action === 'create_history' &&
+            operation.actor_user_id === values[2] && operation.wallet_id === values[3] && operation.source_wallet === values[4];
+        }
+        if (predicate.startsWith('actor_user_id=$1')) {
+          if (operation.actor_user_id !== values[0] || operation.wallet_id !== values[1] ||
+            operation.source_wallet !== values[2] || operation.contract_id !== values[3]) return false;
+          if (predicate.includes("expected->>'patient'=$5")) return operation.action === 'create_history' && operation.expected.patient === values[4];
+          return !predicate.includes("expected->>'historyId'=$5") || operation.expected.historyId === values[4];
+        }
+        return operation.id === values[0] && (values.length === 1 || operation.actor_user_id === values[1] && operation.contract_id === values[2]);
+      });
+      if (columns === '*') return { rows: clone(rows) };
+      const projected = rows.map(operation => Object.fromEntries(columns.split(',').map(column => {
+        const field = column.trim();
+        const conditional = field.match(/^CASE WHEN (.+) THEN (\w+) END AS \2$/);
+        if (!conditional) return [field, operation[field]];
+        const [, condition, name] = conditional;
+        const awaiting = operation.state === 'awaiting_signature';
+        const unsigned = operation.signed_xdr === null && operation.transaction_hash === null;
+        return [name, awaiting && (condition === "state='awaiting_signature'" || unsigned) ? operation[name] : null];
+      })));
+      return { rows: clone(projected) };
     }
     if (q.startsWith('INSERT INTO clinical_web_operations')) {
       const row = { id: values[0], actor_user_id: values[1], wallet_id: values[2], source_wallet: values[3], action: values[4], contract_id: values[5], network: 'testnet', method: values[6], expected: JSON.parse(values[7]), prepared_envelope: values[8] ? JSON.parse(values[8]) : null, state: 'awaiting_signature', unsigned_xdr: values[9], signing_hash: values[10], expires_at: values[11], request_fingerprint: values[12], signed_xdr: null, transaction_hash: null, error_code: null };

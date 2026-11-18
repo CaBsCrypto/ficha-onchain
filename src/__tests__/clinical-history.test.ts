@@ -284,6 +284,21 @@ describe('clinical private document reads and integrity', () => {
 });
 
 describe('clinical timeline, historical versions and corresponding receipts', () => {
+  it('requests the exact signed receipt proof fields without reloading contribution envelopes', async () => {
+    const f = fixture(); const version = f.addVersion(), creation = f.addCreation();
+    await clinicalSnapshot(request(), user, actor);
+    const lookups = m.query.mock.calls.filter(([sql]) => sql.includes('FROM clinical_web_operations WHERE transaction_hash=$1'));
+    expect(lookups.map(([, values]) => values[0])).toEqual([version.operation.transaction_hash, creation.transaction_hash]);
+    for (const [sql] of lookups) {
+      const projection = sql.split('FROM clinical_web_operations')[0];
+      expect(projection).not.toMatch(/\*|prepared_envelope/i);
+      for (const field of ['source_wallet','method','expected','unsigned_xdr','signing_hash','signed_xdr','transaction_hash']) {
+        expect(projection).toMatch(new RegExp(`\\b${field}\\b`));
+      }
+    }
+    expect(m.chain.verifyRecordedOperation).toHaveBeenCalledWith('append_version', version.operation.expected);
+    expect(m.chain.verifyRecordedOperation).toHaveBeenCalledWith('create_history', creation.expected);
+  });
   it('scopes bounded worker readers to one snapshot while checking every version before and after decryption', async () => {
     const f = fixture(); f.addVersion(); f.addVersion();
     await clinicalSnapshot(request(), user, actor);
@@ -304,13 +319,14 @@ describe('clinical timeline, historical versions and corresponding receipts', ()
     const f = fixture(doctor); f.addVersion(); const snapshot = await clinicalSnapshot(request(), user, actor);
     expect(snapshot.entries[0]).toMatchObject({ source: 'doctor', author: doctor.publicKey(), canCorrect: false });
   });
-  it.each(['wrong-hash', 'wrong-operation', 'wrong-commitment', 'wrong-recorded-operation', 'missing-chain-version'])('rejects %s rather than exposing a partly verified timeline', async condition => {
+  it.each(['wrong-hash', 'wrong-operation', 'wrong-commitment', 'wrong-recorded-operation', 'missing-chain-version', 'bad-envelope'])('rejects %s rather than exposing a partly verified timeline', async condition => {
     const f = fixture(); f.addVersion();
     if (condition === 'wrong-hash') f.state.stored[0].transaction_hash = '0'.repeat(64);
     if (condition === 'wrong-operation') f.state.operations[0].expected.operationId = '0'.repeat(64);
     if (condition === 'wrong-commitment') f.state.stored[0].commitment = '0'.repeat(64);
     if (condition === 'wrong-recorded-operation') f.state.wrongRecordedOperation = true;
     if (condition === 'missing-chain-version') f.state.chainVersions = [];
+    if (condition === 'bad-envelope') f.state.operations[0].signed_xdr = 'INVALID';
     await expect(clinicalSnapshot(request(), user, actor)).rejects.toThrow();
   });
   it('rejects an incomplete version index whose chain head is newer', async () => {
