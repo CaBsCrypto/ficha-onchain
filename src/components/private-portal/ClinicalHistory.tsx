@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePortalLanguage } from '@/hooks/useLanguage';
-import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import type { ClinicalGrant, ClinicalOperation, ClinicalPermissionAppointment, ClinicalVersion } from '@/types/clinical';
 import { usePortalWallet } from './WalletBoundary';
@@ -114,6 +114,7 @@ const spanish = {
   pendingNotice: 'La confirmación en Stellar sigue pendiente. Usa «Consultar confirmación» para comprobar este mismo intento.',
   pendingTransaction: 'Ver transacción pendiente en Stellar Testnet',
   confirmedNotice: 'El cambio está confirmado. Puedes revisar su recibo en Stellar Testnet.',
+  confirmedPermissionsRefresh: 'El cambio está confirmado. Estamos comprobando los permisos actuales.',
   signatureRequestExpires: 'Esta solicitud de firma vence',
   signingConditions: 'La firma requiere contenido y cotización verificados y vigentes. Puedes consultar este mismo intento o cancelar la firma pendiente.',
   checkConfirmation: 'Consultar confirmación',
@@ -253,6 +254,7 @@ const english: typeof spanish = {
   pendingNotice: 'This transaction is awaiting confirmation on Stellar. Use Check confirmation to verify this same attempt.',
   pendingTransaction: 'View pending transaction on Stellar Testnet',
   confirmedNotice: 'The change is confirmed. You can view its receipt on Stellar Testnet.',
+  confirmedPermissionsRefresh: 'The change is confirmed. Checking the current permissions.',
   signatureRequestExpires: 'This signature request expires',
   signingConditions: 'Signing requires verified content and a valid fee quote. You can check this attempt or cancel the pending signature.',
   checkConfirmation: 'Check confirmation',
@@ -465,6 +467,17 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   const snapshot = useClinicalSnapshot(lookupIdentity, historyId, language, permissionAppointmentId);
   const operation = useClinicalOperation(identity, wallet.address, snapshot.data?.rehearsal, language);
   const current = operation.operation;
+  const data = operation.accessLost || directoryUnavailable ? null : snapshot.data;
+  const ownerHistory = !doctor && data?.history?.patient === wallet.address ? data.history : null;
+  // A visit to a different consultation invalidates this receipt, even if the same patient returns.
+  const permissionView = useMemo(() => ({ identity, permissionAppointmentId }), [identity, permissionAppointmentId]);
+  const [permissionAttempt, setPermissionAttempt] = useState<{ view: typeof permissionView; historyId: string; id?: string } | null>(null);
+  const permissionOrigin = ownerHistory ? { view: permissionView, historyId: ownerHistory.id } : null;
+  const confirmedOwnerPermission = !doctor && current?.action === 'set_permissions' && current.state === 'confirmed';
+  const samePermissionAttempt = !!(confirmedOwnerPermission && permissionAttempt?.view === permissionView &&
+    permissionAttempt.id === current.id && (!data || permissionAttempt.historyId === ownerHistory?.id));
+  const refreshingPermissionReceipt = samePermissionAttempt && !operation.accessLost &&
+    snapshot.refreshingPermissionReceiptId === current?.id;
   const [editing, setEditing] = useState<ClinicalVersion | 'note' | 'file' | null>(null);
   const [filter, setFilter] = useState('all');
   const [independentDraft, setIndependentDraft] = useState(false);
@@ -494,14 +507,19 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     heading.scrollIntoView({ block: 'center' });
   }, [preparedFocus, identity, operation.operation?.id, operation.busy, operation.accessLost, signReview]);
   useEffect(() => {
-    const current = operation.operation;
     if (current && ['confirmed', 'cancelled', 'failed'].includes(current.state) && lastRefresh.current !== `${current.id}:${current.state}`) {
-      lastRefresh.current = `${current.id}:${current.state}`; setEditing(null); setSignReview(false); snapshot.refresh();
+      lastRefresh.current = `${current.id}:${current.state}`;
+      setEditing(null);
+      setSignReview(false);
+      if (samePermissionAttempt && ownerHistory) snapshot.refreshAfterPermissionConfirmation(current.id);
+      else snapshot.refresh();
     }
-  }, [operation.operation?.id, operation.operation?.state, snapshot.refresh]);
-  const data = operation.accessLost || directoryUnavailable ? null : snapshot.data;
+  }, [current, ownerHistory, samePermissionAttempt, snapshot.refresh, snapshot.refreshAfterPermissionConfirmation]);
   const historyUnavailable = !!(snapshot.error || snapshot.archived || operation.accessLost ||
     doctor && doctorAccess !== undefined && !data);
+  useEffect(() => {
+    if (confirmedOwnerPermission && (historyUnavailable || data && !samePermissionAttempt)) setPermissionAttempt(null);
+  }, [confirmedOwnerPermission, historyUnavailable, data, samePermissionAttempt]);
   useEffect(() => {
     if (!historyUnavailable) return;
     setEditing(null);
@@ -562,7 +580,9 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   async function prepare(input: ClinicalIntent) {
     if (!checkReadyNow()) throw new Error(text.checkSigning);
     if (!canWrite(input.action)) throw new Error(text.writesDisabledRead);
+    if (input.action === 'set_permissions') setPermissionAttempt(permissionOrigin);
     const result = await operation.controller.prepare(doctor ? { ...input, historyId } : input);
+    if (result.action === 'set_permissions' && permissionOrigin) setPermissionAttempt({ ...permissionOrigin, id: result.id });
     const prepared = operation.controller.snapshot();
     const showFinalReview = result.state === 'awaiting_signature' && !!result.review && !!result.sponsorship &&
       prepared.operation?.id === result.id && prepared.canSign;
@@ -589,7 +609,13 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
       setActionError(text.writesDisabled);
       return;
     }
-    try { await operation.controller[action](); setSignReview(false); }
+    try {
+      const result = await operation.controller[action]();
+      if (result.action === 'set_permissions') {
+        setPermissionAttempt(attempt => attempt && !attempt.id ? { ...attempt, id: result.id } : attempt);
+      }
+      setSignReview(false);
+    }
     catch (failure) { setActionError(localizedClinicalError(failure, language, text.resultUnverified)); }
   }
   const groups = new Map<string, ClinicalVersion[]>();
@@ -597,6 +623,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
   const chronology = [...groups.values()].map(versions => versions.sort((a, b) => b.version - a.version)).sort((a, b) => b[0].createdAt - a[0].createdAt);
   const shown = chronology.filter(([head]) => filter === 'all' || filter === 'notes' && !!head.note || filter === 'files' && !head.note || filter === 'mine' && (doctor ? head.author === wallet.address : head.source === 'patient') || filter === 'doctor' && head.source === 'doctor');
   const canCheckCurrentAttempt = operation.uncertain || current?.state === 'awaiting_signature' || current?.state === 'submitted';
+  const showCurrentDetails = data && (!confirmedOwnerPermission || samePermissionAttempt);
   const navigationPending = operation.busy || operation.uncertain || hasPending;
   const appointmentReturn = focusedPermission && (navigationPending
     ? <button type="button" disabled className={`${button} border border-slate-200 bg-white text-slate-700`}>{text.goToAppointment}</button>
@@ -633,21 +660,21 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     </div> : (snapshot.error || operation.accessLost) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm leading-relaxed text-rose-800">{operation.accessLost ? operation.error : snapshot.error}<p className="mt-2">{text.earlierInformation} {operation.accessLost ? doctor ? text.recheckDoctorAccess : text.signInAgain : text.refreshHistory}</p></div>}
     {data && (readOnly || data.history && !canWrite('append_version') && !canWrite('set_permissions')) && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">{doctor && canRead && !canAppend ? text.readOnly : data.history ? data.draftsEnabled ? text.publishingDisabled : text.demoReadOnly : text.demoCreateDisabled}</p>}
     {checkScope && canWrite('append_version') && <ClinicalSigningCheck key={checkKey} scope={checkScope} verified={checkPassed} disabled={blocked || hasPending} onStatusChange={checkStatus} />}
-    {snapshot.loading && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">{text.loading}</p>}
-    {(data && current || canCheckCurrentAttempt) && <section aria-label={text.currentAttempt}
+    {snapshot.loading && !refreshingPermissionReceipt && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-800">{text.loading}</p>}
+    {(showCurrentDetails && current || canCheckCurrentAttempt || refreshingPermissionReceipt) && <section aria-label={text.currentAttempt}
       className={`space-y-3 rounded-2xl border p-4 ${operation.uncertain || current?.state === 'failed'
         ? 'border-rose-200 bg-rose-50' : current?.state === 'confirmed' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
       <h2 ref={operationHeading} tabIndex={-1} className="font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">{current ? `${text[actionLabels[current.action]]} · ${current.state === 'cancelled' && current.errorCode === 'signature_request_expired' ? text.signatureExpired : text[stateLabels[current.state]]}` : text.preparationUnverified}</h2>
       {operation.uncertain && <p className="text-sm leading-relaxed text-slate-700">{text.uncertain}</p>}
       {current?.state === 'submitted' && <p role="status" className="text-sm leading-relaxed text-slate-700">{text.pendingNotice}</p>}
-      {current?.state === 'confirmed' && <p role="status" className="text-sm leading-relaxed text-emerald-900">{text.confirmedNotice}</p>}
+      {current?.state === 'confirmed' && <p role="status" className="text-sm leading-relaxed text-emerald-900">{refreshingPermissionReceipt ? text.confirmedPermissionsRefresh : text.confirmedNotice}</p>}
       {data && current?.state === 'awaiting_signature' && <>
         <p className="text-sm leading-relaxed text-slate-700">{text.signatureRequestExpires}: {recordDate(language, current.expiresAt)} · {text.chileTime}</p>
         <ClinicalPreparedReview operation={current} />
         {!operation.canSign && <p className="text-sm leading-relaxed text-slate-700">{text.signingConditions}</p>}
       </>}
-      {(operation.error || actionError) && <p role="alert" className="text-sm leading-relaxed text-rose-800">{operation.error || actionError}</p>}
-      {data && current && <ReceiptLink hash={current.transactionHash} label={current.state === 'submitted' ? text.pendingTransaction : undefined} />}
+      {!refreshingPermissionReceipt && (operation.error || actionError) && <p role="alert" className="text-sm leading-relaxed text-rose-800">{operation.error || actionError}</p>}
+      {(showCurrentDetails || refreshingPermissionReceipt) && current && <ReceiptLink hash={current.transactionHash} label={current.state === 'submitted' ? text.pendingTransaction : undefined} />}
       <div className="flex flex-col flex-wrap gap-3 sm:flex-row">
         {canCheckCurrentAttempt && <button type="button" disabled={operation.busy || operation.accessLost} onClick={() => void act('check')}
           className={`${button} ${operation.uncertain || current?.state !== 'awaiting_signature' ? 'bg-[#0369a1] text-white' : 'border border-sky-200 bg-white text-sky-800'}`}>{text.checkConfirmation}</button>}
@@ -665,7 +692,11 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
     </section>}
     {pending.map(op => <section key={op.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <p className="text-sm font-semibold text-amber-950">{text[actionLabels[op.action]]} · {text[stateLabels[op.state]]}</p>
-      <button type="button" disabled={operation.busy || operation.uncertain} onClick={() => { operation.controller.reopen(op); setSignReview(false); }}
+      <button type="button" disabled={operation.busy || operation.uncertain} onClick={() => {
+        operation.controller.reopen(op);
+        if (!doctor && op.action === 'set_permissions' && permissionOrigin) setPermissionAttempt({ ...permissionOrigin, id: op.id });
+        setSignReview(false);
+      }}
         className={`${button} mt-3 bg-[#0369a1] text-white`}>{text.pendingAttempt}</button>
     </section>)}
     {data && !doctor && !data.history && <section className="rounded-2xl border border-sky-200 bg-white p-5 sm:p-6"><h2 className="text-lg font-semibold text-slate-900">{text.startHistory}</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600">{text.startHistoryDescription}</p><button type="button" disabled={newBlocked || !canWrite('create_history')} onClick={() => void prepare({ action: 'create_history' }).catch(failure => setActionError(localizedClinicalError(failure, language, text.resultUnverified)))} className={`${button} mt-4 bg-[#0369a1] text-white`}>{text.prepareHistory}</button></section>}
