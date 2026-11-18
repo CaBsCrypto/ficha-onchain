@@ -9,8 +9,21 @@ import { authedFetch } from "@/lib/auth/authed-fetch";
 import BodyMap, { type BodyZone, type PainEntry, ZONE_NAMES } from "@/components/pain/BodyMap";
 import BodyMap3D from "@/components/pain/BodyMap3D";
 import PainLogger from "@/components/pain/PainLogger";
+import RegionDetail3D from "@/components/pain/RegionDetail3D";
 
 const VIEW_PREF_KEY = "trustleaf_body_view";
+
+// Resolve a display name for any zone key, including the compound detail
+// sub-zones RegionDetail3D produces (e.g. "hand_r.index.dist") — ZONE_NAMES only
+// knows the coarse body zones, so unknown keys fall back to a readable label
+// instead of rendering "undefined" (and crashing on .split()).
+function zoneLabel(zone: string): string {
+  const known = (ZONE_NAMES as Record<string, string>)[zone];
+  if (known) return known;
+  const [parent, ...rest] = zone.split(".");
+  const base = (ZONE_NAMES as Record<string, string>)[parent] ?? parent;
+  return rest.length ? `${base} · ${rest.join(" ")}` : base;
+}
 
 function getTodayKey(): string {
   return `trustleaf_pain_${new Date().toISOString().split("T")[0]}`;
@@ -101,12 +114,19 @@ export default function PainDiaryPage() {
   const [history, setHistory] = useState<HistoryDay[]>([]);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // Fine-grained sub-zones from the RegionDetail3D pop-ups, keyed by compound id
+  // (e.g. "hand_r.index.dist"). Kept separate from `entries`; the parent zone
+  // gets an aggregate entry so the body map / summary still reflect it.
+  const [detail, setDetail] = useState<Record<string, number>>({});
+  const [detailRegion, setDetailRegion] = useState<{ prefix: string; title: string } | null>(null);
 
   // Load today's entries (localStorage first, then DB)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(getTodayKey());
       if (raw) setEntries(JSON.parse(raw) as PainEntry[]);
+      const rawDetail = localStorage.getItem(getTodayKey() + "_detail");
+      if (rawDetail) setDetail(JSON.parse(rawDetail) as Record<string, number>);
       // Honour a saved preference in either direction; default (no pref) is 3D.
       const savedView = localStorage.getItem(VIEW_PREF_KEY);
       if (savedView === "2d") setView3D(false);
@@ -161,6 +181,35 @@ export default function PainDiaryPage() {
     });
     setSelectedZone(null);
     toast.success(`Dolor en ${ZONE_NAMES[entry.zone]} registrado`);
+  }
+
+  // Save the fine-grained sub-zones from a RegionDetail3D pop-up. `levels` keys
+  // are already compound-prefixed (e.g. "hand_r.index.dist"). We replace the
+  // prior sub-zones for this region, and upsert an aggregate entry on the parent
+  // zone (max sub-level) so the body map / summary / DB still reflect it.
+  function handleDetailSave(levels: Record<string, number>) {
+    if (!detailRegion) return;
+    const prefix = detailRegion.prefix;
+    setDetail((prev) => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(prefix + ".")));
+      const merged = { ...kept, ...levels };
+      try { localStorage.setItem(getTodayKey() + "_detail", JSON.stringify(merged)); } catch { /* ignore */ }
+      const sub = Object.entries(merged).filter(([k]) => k.startsWith(prefix + "."));
+      const maxLvl = sub.reduce((m, [, v]) => Math.max(m, v), 0);
+      setEntries((prevE) => {
+        const filtered = prevE.filter((e) => e.zone !== prefix);
+        if (maxLvl <= 0) return filtered;
+        return [...filtered, {
+          zone: prefix as BodyZone,
+          level: maxLvl,
+          note: `${sub.length} zona${sub.length === 1 ? "" : "s"} en detalle`,
+          timestamp: new Date().toISOString(),
+        }];
+      });
+      return merged;
+    });
+    setDetailRegion(null);
+    toast.success("Detalle guardado");
   }
 
   function handleRemove(zone: BodyZone) {
@@ -313,7 +362,7 @@ export default function PainDiaryPage() {
                 <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-2">
                   {day.entries.sort((a, b) => b.level - a.level).map((entry) => (
                     <div key={entry.zone} className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">{ZONE_NAMES[entry.zone]}</span>
+                      <span className="text-sm text-gray-700">{zoneLabel(entry.zone)}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getLevelBadgeClass(entry.level)}`}>
                         {entry.level}/10
                       </span>
@@ -323,7 +372,7 @@ export default function PainDiaryPage() {
                     <div className="mt-2 pt-2 border-t border-gray-100">
                       {day.entries.filter((e) => e.note).map((e) => (
                         <p key={e.zone} className="text-xs text-gray-400 italic">
-                          {ZONE_NAMES[e.zone]}: &quot;{e.note}&quot;
+                          {zoneLabel(e.zone)}: &quot;{e.note}&quot;
                         </p>
                       ))}
                     </div>
@@ -405,6 +454,22 @@ export default function PainDiaryPage() {
           )}
         </div>
 
+        {/* Detail drill-downs — open a dedicated 3D sub-model for finer marking.
+            Pilot: right arm/hand. More regions (foot, head/dental…) to follow. */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setDetailRegion({ prefix: "hand_r", title: "Brazo y mano derecha" })}
+            className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 hover:bg-sky-100 transition-colors"
+          >
+            <span aria-hidden>🖐️</span>
+            Detalle brazo/mano der.
+            {(() => {
+              const n = Object.keys(detail).filter((k) => k.startsWith("hand_r.")).length;
+              return n > 0 ? <span className="rounded-full bg-sky-500 text-white px-1.5 py-0.5 text-[10px]">{n}</span> : null;
+            })()}
+          </button>
+        </div>
+
         {/* Stats */}
         {entries.length > 0 && (
           <div className="grid grid-cols-3 gap-3">
@@ -419,7 +484,7 @@ export default function PainDiaryPage() {
             <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm text-center">
               <p className="text-gray-500 text-xs mb-1">Más intenso</p>
               <p className="text-gray-900 font-bold text-sm leading-tight">
-                {mostIntense ? ZONE_NAMES[mostIntense.zone].split(" ")[0] : "—"}
+                {mostIntense ? zoneLabel(mostIntense.zone).split(" ")[0] : "—"}
               </p>
             </div>
           </div>
@@ -441,7 +506,7 @@ export default function PainDiaryPage() {
                   className="w-full bg-white rounded-xl p-4 border border-gray-200 hover:border-sky-300 hover:shadow-sm transition-all text-left"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-900 font-medium text-sm">{ZONE_NAMES[entry.zone]}</span>
+                    <span className="text-gray-900 font-medium text-sm">{zoneLabel(entry.zone)}</span>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getLevelBadgeClass(entry.level)}`}>
                       {entry.level}/10
                     </span>
@@ -483,6 +548,21 @@ export default function PainDiaryPage() {
         onRemove={handleRemove}
         onClose={() => setSelectedZone(null)}
       />
+
+      {/* Region drill-down pop-up (dedicated 3D sub-model) */}
+      {detailRegion && (
+        <RegionDetail3D
+          title={detailRegion.title}
+          keyPrefix={detailRegion.prefix}
+          initial={Object.fromEntries(
+            Object.entries(detail)
+              .filter(([k]) => k.startsWith(detailRegion.prefix + "."))
+              .map(([k, v]) => [k.slice(detailRegion.prefix.length + 1), v]),
+          )}
+          onClose={() => setDetailRegion(null)}
+          onSave={handleDetailSave}
+        />
+      )}
     </div>
   );
 }
