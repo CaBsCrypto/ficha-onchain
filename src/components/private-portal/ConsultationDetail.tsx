@@ -57,7 +57,9 @@ const sharedRecordNotices = {
 export function ConsultationDetail({ id, role, onBack }: { id: number; role: PortalRole; onBack: () => void }) {
   const language = usePortalLanguage();
   const english = language === 'en';
-  const { data, error, loading, refresh } = usePortalData<ConsultationState>(`/api/private-consultations/${id}`);
+  const { data, error, loading, checkingFreshness, refresh } = usePortalData<ConsultationState>(
+    `/api/private-consultations/${id}`, 3000, { pauseWhenHidden: true },
+  );
   const inbox = useDoctorClinicalInbox();
   const regular = data?.appointmentMode === 'regular';
   const { run, busy, operation, error: operationError } = usePrivateOperation(regular ? null : data?.operations?.[0]);
@@ -102,7 +104,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
   const patientLabel = regular ? patientName : testPatientLabel(patientName ?? '', english);
   const attended = appointment?.attended_at ?? appointment?.attendance_at;
   const pending = saving || (!regular && (busy || issuing || operation?.state === 'submitted' || !!data?.operations?.some(op => op.state === 'submitted')));
-  const unavailable = !!error || pending;
+  const unavailable = !!error || checkingFreshness || pending;
   const inProgress = appointment?.status === 'in_progress';
   const scheduled = appointment?.status === 'scheduled';
   const needsAttendance = role === 'patient' && !attended && (scheduled || inProgress);
@@ -115,7 +117,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
     (data?.appointmentActions?.complete ?? (!regular && data?.prescription?.rxId != null));
   const canManageClinicalPermissions = role === 'patient' && !error && inProgress && !!attended &&
     !!appointment?.started_at && data?.canManageClinicalPermissions === true;
-  const sharedRecord = role === 'doctor' && inProgress && !!attended && !!appointment?.started_at
+  const sharedRecord = role === 'doctor' && !checkingFreshness && inProgress && !!attended && !!appointment?.started_at
     ? sharedRecordState(inbox, id, pending) : null;
   const checkInOpening = data?.checkIn?.state === 'upcoming' ? Date.parse(data.checkIn.opensAt) : NaN;
   const checkInDate = Number.isFinite(checkInOpening) ? chileDateTime(checkInOpening / 1000, language) : null;
@@ -138,6 +140,7 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
   return <section data-patient-detail={role === 'patient' ? '' : undefined} className="space-y-6">
     <button type="button" onClick={onBack} disabled={busy || saving || issuing} className="min-h-11 text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-sky-700">{english ? '← Back to my appointments' : '← Volver a mis consultas'}</button>
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{english ? 'Could not verify this appointment.' : error} <button type="button" onClick={refresh} className="min-h-11 font-semibold underline">{english ? 'Refresh status' : 'Actualizar estado'}</button></div>}
+    {!error && checkingFreshness && <p role="status" className="text-sm text-slate-600">{english ? 'Checking the appointment…' : 'Consultando la cita…'}</p>}
     {data && appointment && <>
       <div className={card}>
         {inProgress && <p className="mb-1 text-sm font-semibold text-emerald-800">{english ? 'Appointment in progress' : 'Consulta en curso'}</p>}
@@ -210,11 +213,11 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
         <p className="text-sm font-semibold text-slate-800">{consentLabels[language][data.consent.status]}</p>
         {data.consent.validUntil && <p className="text-xs text-slate-500">{english ? 'Expires' : 'Vence'}: {localDate(data.consent.validUntil, language)} · {english ? "Chile time" : "Hora de Chile"}</p>}
         {role === 'patient' && <>
-          {data.consent.status !== 'consumed' && data.consent.status !== 'active' && <ConfirmationButton label={english ? "Authorize one prescription" : "Autorizar una emisión"} title={english ? "Authorize this doctor to issue one prescription" : "Autorizar a este médico para una receta"} disabled={unavailable || !canAuthorizeIssuance(data)} onConfirm={reviewQuote => consent('consent', reviewQuote)}>
+          {data.consent.status !== 'consumed' && data.consent.status !== 'active' && <ConfirmationButton label={english ? "Authorize one prescription" : "Autorizar una emisión"} title={english ? "Authorize this doctor to issue one prescription" : "Autorizar a este médico para una receta"} disabled={unavailable || !canAuthorizeIssuance(data)} confirmDisabled={checkingFreshness} onConfirm={reviewQuote => consent('consent', reviewQuote)}>
             <p>{english ? 'Doctor' : 'Médico'}: <strong>{appointment.doctor_name || appointment.doctor_email}</strong>.</p><p>{english ? 'Patient' : 'Paciente'}: <strong>{patientLabel}</strong>. {english ? 'Appointment' : 'Consulta'} #{id}.</p>
             <p>{english ? 'You will allow one prescription to be issued. This permission expires by' : 'Permitirás una sola emisión. El permiso vence como máximo el'} <strong>{localDate(Number(data.booking?.valid_until), language)}</strong> {english ? 'and can be withdrawn before use.' : 'y puedes retirarlo antes de que se utilice.'}</p>
           </ConfirmationButton>}
-          {data.consent.status === 'active' && <ConfirmationButton danger label={english ? "Withdraw permission" : "Retirar permiso"} title={english ? "Withdraw issuance permission" : "Retirar el permiso de emisión"} disabled={unavailable} onConfirm={reviewQuote => consent('withdraw_consent', reviewQuote)}><p>{english ? "You will withdraw this appointment’s unused permission. The new status appears after its receipt is confirmed." : "Retirarás el permiso que aún no se ha utilizado en esta consulta. Esperaremos su recibo antes de mostrarlo como retirado."}</p></ConfirmationButton>}
+          {data.consent.status === 'active' && <ConfirmationButton danger label={english ? "Withdraw permission" : "Retirar permiso"} title={english ? "Withdraw issuance permission" : "Retirar el permiso de emisión"} disabled={unavailable} confirmDisabled={checkingFreshness} onConfirm={reviewQuote => consent('withdraw_consent', reviewQuote)}><p>{english ? "You will withdraw this appointment’s unused permission. The new status appears after its receipt is confirmed." : "Retirarás el permiso que aún no se ha utilizado en esta consulta. Esperaremos su recibo antes de mostrarlo como retirado."}</p></ConfirmationButton>}
           {!canAuthorizeIssuance(data) && data.consent.status === 'absent' && <p className="text-xs text-slate-500">{english ? "Available after you confirm attendance, the doctor starts the appointment and the booking is attested." : "Se habilitará después de tu asistencia, el inicio por el médico y la acreditación de la reserva."}</p>}
         </>}
       </div>
@@ -242,13 +245,15 @@ export function ConsultationDetail({ id, role, onBack }: { id: number; role: Por
           <label className="block text-sm text-slate-600">{english ? "Instructions" : "Instrucciones"}<textarea maxLength={2000} value={document.instructions} onChange={e => setDocument(value => ({ ...value, instructions: e.target.value }))} className={fieldClass} rows={3} /></label>
         </fieldset>
         {!mintReady && <p className="text-sm text-amber-700">{english ? "Issuance requires a started appointment, an attested booking and active patient permission." : "Para emitir se requieren una consulta iniciada, reserva acreditada y permiso vigente del paciente."}</p>}
-        <ConfirmationButton label={english ? "Review and issue prescription" : "Revisar y emitir receta"} title={english ? "Review prescription before issuing" : "Revisar receta antes de emitir"} disabled={unavailable || !mintReady || !document.medication.trim() || !document.dosage.trim() || !document.instructions.trim()} onConfirm={issue}>
+        <ConfirmationButton label={english ? "Review and issue prescription" : "Revisar y emitir receta"} title={english ? "Review prescription before issuing" : "Revisar receta antes de emitir"} disabled={unavailable || !mintReady || !document.medication.trim() || !document.dosage.trim() || !document.instructions.trim()} confirmDisabled={checkingFreshness} onConfirm={issue}>
           <p>{english ? 'Recipient' : 'Destinatario'}: <strong>{patientLabel}</strong>.</p>
           <p className="whitespace-pre-wrap"><strong>{document.medication}</strong><br />{document.dosage}<br />{document.instructions}</p>
           <p>{english ? "TrustLeaf encrypts and saves this document before submission. It appears as registered once the receipt is confirmed. Activation requires a separate signature." : "Guardaremos este documento cifrado antes de transmitir. Tras el recibo aparecerá como registrada; la activación será una acción posterior con tu firma."}</p>
         </ConfirmationButton>
       </div>}
-      {data.prescription && !issuing && <PrescriptionCard prescription={data.prescription} role={role} onChange={refresh} unavailable={unavailable} />}
+      {data.prescription && !issuing && <fieldset disabled={checkingFreshness} className="min-w-0">
+        <PrescriptionCard prescription={data.prescription} role={role} onChange={refresh} unavailable={unavailable} />
+      </fieldset>}
       </>}
     </>}
   </section>;

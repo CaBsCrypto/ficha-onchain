@@ -21,30 +21,113 @@ export async function portalApi<T>(url: string, init?: RequestInit): Promise<T> 
   return body as T;
 }
 export const jsonBody = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-export function usePortalData<T>(path: string | null, interval = 3000) {
+export function usePortalData<T>(path: string | null, interval = 3000, { pauseWhenHidden = false } = {}) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
   const [resultPath, setResultPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkingFreshness, setCheckingFreshness] = useState(false);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
-  useEffect(() => { setData(null); setError(''); setResultPath(null); setLoading(true); }, [path]);
+  useEffect(() => { setData(null); setError(''); setResultPath(null); setLoading(true); setCheckingFreshness(false); }, [path]);
   useEffect(() => {
     if (!path) { setLoading(false); return; }
-    const controller = new AbortController();
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      try {
-        const next = await portalApi<T>(path!, { signal: controller.signal });
-        if (alive) { setData(next); setResultPath(path); setError(''); }
-      } catch (failure) { if (alive) setError(failure instanceof Error ? failure.message : 'No se pudo consultar.'); }
-      finally { if (alive) { setLoading(false); if (interval > 0) timer = setTimeout(() => void poll(), interval); } }
+    const url = path;
+    let request: AbortController | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastStartedAt = -Infinity;
+    let disposed = false;
+    let resumeNeeded = true;
+    let awaitingPageShow = false;
+    function canPoll() {
+      return !disposed && (!pauseWhenHidden || (!awaitingPageShow && document.visibilityState === 'visible'));
     }
-    void poll();
-    return () => { alive = false; controller.abort(); clearTimeout(timer); };
-  }, [path, revision, interval]);
-  return { data: path && resultPath === path ? data : null, error, loading: !!path && (loading || resultPath !== path && !error), refresh };
+    async function poll() {
+      if (!canPoll() || request) return;
+      clearTimeout(timer);
+      const controller = new AbortController();
+      request = controller;
+      lastStartedAt = Date.now();
+      try {
+        const next = await portalApi<T>(url, { signal: controller.signal });
+        if (request === controller && canPoll()) {
+          setData(next); setResultPath(url); setError('');
+        }
+      } catch (failure) {
+        if (request === controller && canPoll()) setError(failure instanceof Error ? failure.message : 'No se pudo consultar.');
+      } finally {
+        if (request === controller) {
+          request = undefined;
+          if (canPoll()) {
+            setLoading(false);
+            setCheckingFreshness(false);
+            if (interval > 0) timer = setTimeout(() => void poll(), interval);
+          }
+        }
+      }
+    }
+    function stop() {
+      clearTimeout(timer);
+      const current = request;
+      request = undefined;
+      current?.abort();
+    }
+    function suspend() {
+      stop();
+      resumeNeeded = true;
+      setCheckingFreshness(true);
+    }
+    function resume() {
+      if (!resumeNeeded || !canPoll()) return;
+      resumeNeeded = false;
+      void poll();
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') resume();
+      else suspend();
+    }
+    function onFocus() {
+      if (!canPoll()) return;
+      if (resumeNeeded) resume();
+      else if (interval > 0 && Date.now() - lastStartedAt >= interval) {
+        setCheckingFreshness(true);
+        void poll();
+      }
+    }
+    function onPageHide(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      awaitingPageShow = true;
+      suspend();
+    }
+    function onPageShow(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      if (!awaitingPageShow) suspend();
+      awaitingPageShow = false;
+      resume();
+    }
+    if (pauseWhenHidden) {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('focus', onFocus);
+      window.addEventListener('pagehide', onPageHide);
+      window.addEventListener('pageshow', onPageShow);
+      onVisibilityChange();
+    } else void poll();
+    return () => {
+      disposed = true;
+      stop();
+      if (pauseWhenHidden) {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        window.removeEventListener('focus', onFocus);
+        window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('pageshow', onPageShow);
+      }
+    };
+  }, [path, revision, interval, pauseWhenHidden]);
+  return {
+    data: path && resultPath === path ? data : null,
+    error, loading: !!path && (loading || resultPath !== path && !error),
+    checkingFreshness: pauseWhenHidden && checkingFreshness, refresh,
+  };
 }
 export function localDate(timestamp?: number | null, language: 'es' | 'en' = 'es') {
   if (!timestamp) return language === 'en' ? 'Pending' : 'Pendiente';
