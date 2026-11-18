@@ -1,0 +1,22 @@
+{
+  "environment": "main-testnet",
+  "url": "https://trustleaf-demo.vercel.app",
+  "localDate": "2026-09-11",
+  "evidenceType": "browser observations; independent chain audit pending",
+  "consultation1": {
+    "grantConfirmed": "123f58a32f12f5044d94ad88d0e86330ea46d81ea56a58e38eb9416e5b54d9a9",
+    "withdrawalConfirmed": "50d58f594f448a74f326f19160be587530ba7f1746254378009c2af73218cd39",
+    "regrantConfirmed": "c94862784e334dd48ef6f9a2ef5ad304e642089a82a501ab81eca49183b61f63",
+    "expiresChile": "2026-09-11T21:36:46",
+    "withdrawalObserved": "Sin permiso de emisión",
+    "regrantObserved": "Permiso vigente; Operación confirmada"
+  },
+  "consultation2": {
+    "grantConfirmed": "002529dbcf2cbbf5d4dd994ca432f4fed7732006128fbbf7e8859ef0e3c58e1f",
+    "expiresChile": "2026-09-11T21:37:13"
+  },
+  "limitations": [
+    "No doctor issuance attempt made during withdrawn consent interval; isolated tests cover this case.",
+    "Subsequent issuance and private reading are recorded in prescription-ui-validation.json."
+  ]
+}

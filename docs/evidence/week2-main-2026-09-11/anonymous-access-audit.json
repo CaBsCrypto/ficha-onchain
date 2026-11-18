@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-09-12T00:31:29.257Z",
+  "environment": "main",
+  "results": [
+    {
+      "recordId": "ce47f381-dbd5-4ca6-bdd3-297f28043049",
+      "status": 401,
+      "onlyErrorReturned": true
+    },
+    {
+      "recordId": "21ea3b4d-a6aa-434e-b268-bec18433c544",
+      "status": 401,
+      "onlyErrorReturned": true
+    }
+  ],
+  "status": "passed",
+  "scope": "Unauthenticated requests only; authenticated foreign-user tests remain separate"
+}

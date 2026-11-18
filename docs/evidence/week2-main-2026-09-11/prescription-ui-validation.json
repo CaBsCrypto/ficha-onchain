@@ -1,0 +1,43 @@
+{
+  "environment": "main-testnet",
+  "url": "https://trustleaf-demo.vercel.app",
+  "localDate": "2026-09-11",
+  "evidenceType": "Browser observations; independent chain audit pending",
+  "prescriptions": [
+    {
+      "id": 7,
+      "consultationId": 1,
+      "mintConfirmed": "378fecb6362476ec7907ade7e769807500bbcf0a967b9b8738253dfc73496e19",
+      "registeredObserved": true,
+      "activationConfirmed": "1186ceffb15e4dd788f7ba58e440c07a85af8b0316eb4cb2913a36508c045aa9",
+      "activeObserved": true,
+      "issuerReading": true,
+      "consultationFinished": true,
+      "patientReading": true
+    },
+    {
+      "id": 8,
+      "consultationId": 2,
+      "mintConfirmed": "e022f0c73ab5481eff5f0f415753b9ed21dac7bb28e7b3f7beeeb396f6511bc1",
+      "activationConfirmed": "686c3a071f1e9346b552bc60ceee8505b377d3b824c8037bb16f7baa8478730f",
+      "revocationConfirmed": "1ff828ede9bc24970ad4de7835343e2fc5a919915400c99cc645bfef6d1f3b51",
+      "registeredObserved": true,
+      "activeObserved": true,
+      "revokedObserved": true,
+      "issuerHistoricalReading": true,
+      "consultationFinished": true,
+      "patientReading": true
+    }
+  ],
+  "observations": [
+    "Both bookings and consents displayed as consumed after mint",
+    "Transient prerequisite warnings appeared during reconciliation and cleared after receipt confirmation"
+  ],
+  "remaining": [
+    "Authenticated foreign-user and administrator document rejection on main",
+    "Authenticated patient doctor-only request rejection on main",
+    "Recording and delivery documentation"
+  ],
+  "patientReloadVerified": true,
+  "patientHasNoDoctorControlsObserved": true
+}

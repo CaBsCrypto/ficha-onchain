@@ -1,0 +1,33 @@
+{
+  "environment": "main-testnet",
+  "url": "https://trustleaf-demo.vercel.app",
+  "localDate": "2026-09-11",
+  "timezone": "America/Santiago",
+  "evidenceType": "browser observation and local worker output; chain audit pending",
+  "consultations": [
+    {
+      "id": 1,
+      "time": "21:15",
+      "attendance": "confirmed",
+      "doctorStarted": true,
+      "booking": "accredited",
+      "receipt": "https://stellar.expert/explorer/testnet/tx/f91685332c03149cdcc7dd73d3fa79f0a033cd55e978aec78a519d7584af892e"
+    },
+    {
+      "id": 2,
+      "time": "21:30",
+      "attendance": "confirmed",
+      "doctorStarted": true,
+      "booking": "accredited",
+      "receipt": "https://stellar.expert/explorer/testnet/tx/5cc510257cfb064e69dd6f4102fe803335675bc7cac29fef30a39db7dbc70052"
+    }
+  ],
+  "observedChecks": [
+    "Doctor entered with confirmed registry authorization",
+    "Attendance alone did not grant consent",
+    "Doctor start first showed pending booking accreditation",
+    "Worker confirmed both booking operations",
+    "Prescription form remained disabled without patient consent"
+  ],
+  "remaining": "Independent audit completed; see independent-chain-audit.json. See prescription-ui-validation.json for subsequent lifecycle and reading."
+}
