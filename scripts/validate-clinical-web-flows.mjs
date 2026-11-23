@@ -3,20 +3,36 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const sourceFiles = [
+const require = createRequire(import.meta.url);
+const testFile = name => `src/__tests__/${name}.test.ts`;
+const isolatedSourceFiles = [
   'clinical-flow-integration', 'clinical-api', 'clinical-chain', 'clinical-client',
   'clinical-document-route', 'clinical-history', 'clinical-identity', 'clinical-input',
   'clinical-keys', 'clinical-operations', 'clinical-permissions', 'clinical-store',
   'clinical-schema', 'clinical-web-schema',
-].map(name => `src/__tests__/${name}.test.ts`);
+].map(testFile);
 const privateFiles = [
   'scripts/lib/clinical-crypto.test.mjs', 'scripts/lib/clinical-read.test.mjs',
   'scripts/lib/clinical-neon-store.test.mjs', 'scripts/lib/clinical-chain-write.test.mjs',
   'scripts/validate-clinical-web-schema.test.mjs',
+];
+const portalFlows = {
+  'permissions-and-receipts': ['clinical-client', 'clinical-permissions', 'clinical-flow-integration'],
+  'notifications-and-revocation': ['doctor-clinical-inbox-ui', 'clinical-doctor-inbox', 'clinical-doctor-read', 'clinical-flow-integration'],
+  'consultation-between-roles': ['private-signing-component', 'consultation-notices', 'prescription-bookings', 'regular-appointments'],
+  'history-pdf-and-versions': ['clinical-flow-integration', 'clinical-history', 'clinical-prepared-review', 'clinical-document-route'],
+  'prescription-list': ['prescription-list', 'private-prescription-read-performance'],
+};
+
+const portalLimitations = [
+  'Functional tests use controlled adapters and do not certify a real Privy signature or a new Stellar receipt.',
+  'The report covers the checked-out commit. Run it on the candidate revision to test changes absent from main.',
+  'Test totals per flow can overlap because the shared integration covers permissions, withdrawal and clinical history.',
 ];
 
 // Only operating-system/toolchain variables travel to the isolated test processes.
@@ -42,7 +58,10 @@ async function execute(command, args) {
 }
 
 async function run() {
-  if (process.argv.slice(2).length !== 1 || process.argv[2] !== '--isolated') throw new Error('explicit_isolated_mode_required');
+  const [mode, ...extra] = process.argv.slice(2);
+  if (extra.length || !['--isolated', '--portal-qa'].includes(mode)) throw new Error('explicit_isolated_mode_required');
+  const portalQa = mode === '--portal-qa';
+  const sourceFiles = portalQa ? [...new Set(Object.values(portalFlows).flat())].map(testFile) : isolatedSourceFiles;
   const startedAt = new Date().toISOString();
   const stamp = startedAt.replace(/[:.]/g, '-');
   const outputDir = join(root, '.trustleaf-local', 'sow2-validation');
@@ -52,7 +71,8 @@ async function run() {
   const productDiff = await execute('git', ['diff', '--quiet', 'HEAD', '--', 'src', 'scripts', 'contracts', 'package.json', 'package-lock.json', 'tsconfig.json']);
   if (productDiff.exitCode !== 0) throw new Error('uncommitted_validation_sources');
   const checksums = [];
-  for (const file of [...sourceFiles, ...privateFiles, 'contracts/clinical-history-private/src/test.rs', 'scripts/validate-clinical-web-flows.mjs']) {
+  const extraSources = portalQa ? [] : [...privateFiles, 'contracts/clinical-history-private/src/test.rs'];
+  for (const file of [...sourceFiles, ...extraSources, 'scripts/validate-clinical-web-flows.mjs']) {
     const bytes = await readFile(join(root, file));
     checksums.push({ path: file, sha256: createHash('sha256').update(bytes).digest('hex') });
   }
@@ -63,7 +83,8 @@ async function run() {
   const configPath = join(outputDir, `clinical-flows-${stamp}-vitest.config.mjs`);
   await writeFile(configPath, configContent, 'utf8');
   const rawReport = join(outputDir, `clinical-flows-${stamp}-vitest.json`);
-  const app = await execute(process.execPath, [join(root, 'node_modules', 'vitest', 'vitest.mjs'), 'run', ...sourceFiles, '--config', configPath, '--reporter=json', `--outputFile=${rawReport}`]);
+  const vitest = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
+  const app = await execute(process.execPath, [vitest, 'run', ...sourceFiles, '--config', configPath, '--reporter=json', `--outputFile=${rawReport}`]);
   let parsed;
   try { parsed = JSON.parse(await readFile(rawReport, 'utf8')); } catch { throw new Error('isolated_application_report_unavailable'); }
   const cases = parsed.testResults?.flatMap(suite => suite.assertionResults ?? []) ?? [];
@@ -73,6 +94,30 @@ async function run() {
   const actualSuites = (parsed.testResults ?? []).map(suite => suite.name?.replaceAll('\\', '/')).sort();
   const allRequestedSuitesPresent = JSON.stringify(actualSuites) === JSON.stringify(expectedSuites);
   const appPassed = app.exitCode === 0 && parsed.success === true && cases.length > 0 && cases.every(test => test.status === 'passed') && integrationPassed && allRequestedSuitesPresent;
+  const appCheck = { id: 'clinical-application-boundaries-and-shared-state-flow', status: appPassed ? 'passed' : 'failed', exitCode: app.exitCode, testsPassed: cases.filter(test => test.status === 'passed').length, testFiles: parsed.testResults?.length ?? 0, sharedStateIntegrationPassed: integrationPassed, allRequestedSuitesPresent };
+  const provenance = {
+    schemaVersion: 1, startedAt, sourceCommit: git.stdout.trim(),
+    newStellarTransactions: 0, liveDatabaseWrites: 0, authenticPrivySessions: 0,
+    workspaceEnvironmentFilesLoaded: false, applicationCredentialsRemovedFromChildren: true,
+    trackedValidationSourcesMatchCommit: true,
+    isolatedConfig: { envDir: false, sha256: createHash('sha256').update(configContent).digest('hex') },
+    sourceChecksums: checksums,
+  };
+  if (portalQa) {
+    const suiteCases = new Map((parsed.testResults ?? []).map(suite => [suite.name.replaceAll('\\', '/'), suite.assertionResults ?? []]));
+    const checks = Object.entries(portalFlows).map(([id, names]) => {
+      const suites = names.map(name => suiteCases.get(join(root, testFile(name)).replaceAll('\\', '/')) ?? []);
+      const tests = suites.flat();
+      return { id, status: suites.every(suite => suite.length && suite.every(test => test.status === 'passed')) ? 'passed' : 'failed',
+        testsPassed: tests.filter(test => test.status === 'passed').length, testFiles: names.map(testFile) };
+    });
+    await writeReport(outputDir, stamp, {
+      ...provenance, kind: 'isolated-clinical-portal-qa', completedAt: new Date().toISOString(),
+      status: appPassed && checks.every(check => check.status === 'passed') ? 'passed' : 'failed',
+      checks: [appCheck, ...checks], limitations: portalLimitations,
+    });
+    return;
+  }
   const services = await execute(process.execPath, ['--test', '--test-reporter=tap', ...privateFiles]);
   const total = Number(services.stdout.match(/^# tests (\d+)\r?$/m)?.[1]);
   const passed = Number(services.stdout.match(/^# pass (\d+)\r?$/m)?.[1]);
@@ -82,21 +127,20 @@ async function run() {
   const contractCount = Number(contracts.stdout.match(/test result: ok\. (\d+) passed; 0 failed;/)?.[1]);
   const contractsPassed = contracts.exitCode === 0 && contractCount > 0;
   const report = {
-    schemaVersion: 1, kind: 'isolated-clinical-web-flow-validation', startedAt, completedAt: new Date().toISOString(),
-    sourceCommit: git.stdout.trim(), status: appPassed && servicesPassed && contractsPassed ? 'passed' : 'failed',
-    newStellarTransactions: 0, liveDatabaseWrites: 0, authenticPrivySessions: 0,
-    workspaceEnvironmentFilesLoaded: false, applicationCredentialsRemovedFromChildren: true,
-    trackedValidationSourcesMatchCommit: true,
-    isolatedConfig: { envDir: false, sha256: createHash('sha256').update(configContent).digest('hex') },
+    ...provenance, kind: 'isolated-clinical-web-flow-validation', completedAt: new Date().toISOString(),
+    status: appPassed && servicesPassed && contractsPassed ? 'passed' : 'failed',
     checks: [
-      { id: 'clinical-application-boundaries-and-shared-state-flow', status: appPassed ? 'passed' : 'failed', exitCode: app.exitCode, testsPassed: cases.filter(test => test.status === 'passed').length, testFiles: parsed.testResults?.length ?? 0, sharedStateIntegrationPassed: integrationPassed, allRequestedSuitesPresent },
+      appCheck,
       { id: 'private-crypto-read-storage-and-recovery', status: servicesPassed ? 'passed' : 'failed', exitCode: services.exitCode, testsPassed: Number.isFinite(passed) ? passed : 0 },
       { id: 'clinical-contract-local-host', status: contractsPassed ? 'passed' : 'failed', exitCode: contracts.exitCode, testsPassed: Number.isFinite(contractCount) ? contractCount : 0 },
     ],
     scope: ['create and confirm history', 'contribute and read private content', 'correct while preserving versions', 'independent permissions and withdrawal', 'identity, integrity, limits, cancellation and uncertain-attempt recovery'],
     limitations: ['SQL, Privy and RPC in the application lifecycle use controlled adapters.', 'Contract tests run in a local Soroban host; not Testnet.', 'No authenticated browser session, live database restart/persistence or new Testnet receipts are certified.', 'Visual review, 200% text enlargement and specifically authorized preview configuration remain separate.'],
-    sourceChecksums: checksums,
   };
+  await writeReport(outputDir, stamp, report);
+}
+
+async function writeReport(outputDir, stamp, report) {
   const path = join(outputDir, `clinical-web-flows-${stamp}.json`);
   await writeFile(path, JSON.stringify(report, null, 2) + '\n', 'utf8');
   // Do not forward provider diagnostics, credentials or private test payloads.
