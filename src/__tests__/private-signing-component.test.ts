@@ -195,6 +195,68 @@ describe('active private signing components with controlled Privy and HTTP', () 
     expect(requests('PATCH', '/api/appointments')).toHaveLength(0);
   });
 
+  it('refreshes the patient when the doctor starts and completes the consultation while the tab is hidden', async () => {
+    const visibility = browserVisibility('visible');
+    const transitions = [
+      { previous: 'scheduled', next: 'in_progress', label: 'Consulta en curso', canManagePermissions: true },
+      { previous: 'in_progress', next: 'completed', label: 'Consulta finalizada', canManagePermissions: false },
+    ] as const;
+    const detail = (status: 'scheduled' | 'in_progress' | 'completed') => Response.json({
+      appointment: { ...appointment, status, started_at: status === 'scheduled' ? null : '2026-09-10T12:01:00Z' },
+      appointmentMode: 'regular',
+      appointmentActions: { cancel: status === 'scheduled' },
+      canManageClinicalPermissions: status === 'in_progress',
+      booking: null, consent: { status: 'absent' }, operations: [],
+    });
+    const details = vi.fn<() => Response | Promise<Response>>(() => detail('scheduled'));
+    transport = call => {
+      if (call.method === 'GET' && call.url === consultationPath) return details();
+      throw new Error('Unexpected request while refreshing the patient consultation');
+    };
+    const permissionsLink = () => container.querySelector('a[href*="appointmentId=123"]');
+
+    await renderDetail('patient');
+    expect(details).toHaveBeenCalledTimes(1);
+    expect(button('Cancelar consulta').disabled).toBe(false);
+
+    for (const transition of transitions) {
+      const beforePoll = details.mock.calls.length;
+      const oldRead = deferred<Response>();
+      const resumedRead = deferred<Response>();
+      details.mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(resumedRead.promise);
+
+      await tick();
+      expect(details).toHaveBeenCalledTimes(beforePoll + 1);
+      const oldSignal = requests('GET', consultationPath).at(-1)?.signal;
+      await visibility('hidden');
+      expect(oldSignal?.aborted).toBe(true);
+      await tick(9000);
+      expect(details).toHaveBeenCalledTimes(beforePoll + 1);
+
+      await visibility('visible');
+      expect(details).toHaveBeenCalledTimes(beforePoll + 2);
+      expect(container.textContent).toContain('Consultando la cita…');
+      expect(permissionsLink()).toBeNull();
+      if (transition.previous === 'scheduled') expect(button('Cancelar consulta').disabled).toBe(true);
+
+      await act(async () => resumedRead.resolve(detail(transition.next)));
+      expect(container.textContent).toContain(transition.label);
+      expect(container.textContent).not.toContain('Consultando la cita…');
+      expect(Boolean(permissionsLink())).toBe(transition.canManagePermissions);
+
+      // Deliver the aborted read after the fresh result to simulate a transport ignoring the abort.
+      await act(async () => oldRead.resolve(detail(transition.previous)));
+      expect(container.textContent).toContain(transition.label);
+      expect(Boolean(permissionsLink())).toBe(transition.canManagePermissions);
+      expect(details).toHaveBeenCalledTimes(beforePoll + 2);
+    }
+
+    expect(container.textContent).not.toContain('Consulta en curso');
+    expect(requests('GET', consultationPath)).toHaveLength(5);
+    expect(calls).toHaveLength(5);
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+  });
+
   it('rechecks a restored page once and keeps a verified inbox link hidden when the consultation read fails', async () => {
     const visibility = browserVisibility('visible');
     const historyId = 'a'.repeat(64);
