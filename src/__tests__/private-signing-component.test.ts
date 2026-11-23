@@ -11,6 +11,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrescriptionCard } from '@/components/private-portal/Prescriptions';
 import { PrivateConsultations } from '@/components/private-portal/Consultations';
+import { ConsultationDetail } from '@/components/private-portal/ConsultationDetail';
+import { DoctorClinicalInboxProvider } from '@/components/private-portal/DoctorClinicalInbox';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import type { PortalRole, PrivateOperation, PrivatePrescription } from '@/components/private-portal/types';
 
@@ -74,6 +76,25 @@ async function click(label: string, within: ParentNode = container) {
 }
 async function confirm() { await click('Confirmar con mi cuenta', dialog()); }
 async function tick(milliseconds = 3000) { await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); }); }
+const consultationPath = '/api/private-consultations/123';
+const appointment = {
+  id: 123, date: '2026-09-10', time_slot: '10:00', type: 'Presencial',
+  patient_email: 'patient@example.test', patient_name: 'Test patient',
+  doctor_email: 'doctor@example.test', doctor_name: 'Test doctor',
+  attended_at: '2026-09-10T12:00:00Z',
+};
+function browserVisibility(initial: DocumentVisibilityState) {
+  let visibility = initial;
+  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+  return async (next: DocumentVisibilityState) => act(async () => {
+    visibility = next;
+    document.dispatchEvent(new Event('visibilitychange'));
+    if (next === 'visible') window.dispatchEvent(new Event('focus'));
+  });
+}
+async function renderDetail(role: PortalRole) {
+  await act(async () => root.render(createElement(ConsultationDetail, { id: 123, role, onBack: vi.fn() })));
+}
 async function openMint() {
   await render(prescription({ rxId: null, status: 'Pending' }));
   await click('Revisar y continuar emisión');
@@ -119,9 +140,216 @@ afterEach(async () => {
   vi.clearAllTimers();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('active private signing components with controlled Privy and HTTP', () => {
+  it('pauses a hidden consultation and keeps its actions blocked until a fresh visible result', async () => {
+    const visibility = browserVisibility('hidden');
+    const oldRead = deferred<Response>();
+    const resumedRead = deferred<Response>();
+    const verified = (canStart: boolean) => Response.json({
+      appointment: { ...appointment, status: 'scheduled' },
+      appointmentMode: 'regular', appointmentActions: { start: canStart },
+      booking: null, consent: { status: 'absent' }, operations: [],
+    });
+    const details = vi.fn()
+      .mockImplementationOnce(() => verified(true)).mockReturnValueOnce(oldRead.promise)
+      .mockReturnValueOnce(resumedRead.promise)
+      .mockImplementationOnce(() => Response.json({ error: 'unavailable' }, { status: 503 }))
+      .mockImplementation(() => verified(true));
+    transport = call => {
+      if (call.method === 'GET' && call.url === consultationPath) return details();
+      throw new Error('Unexpected request during visibility checks');
+    };
+
+    await renderDetail('doctor');
+    await tick(9000);
+    expect(details).not.toHaveBeenCalled();
+    await visibility('visible');
+    expect(details).toHaveBeenCalledTimes(1);
+    expect(button('Iniciar ahora').disabled).toBe(false);
+    await tick();
+    const oldSignal = requests('GET', consultationPath)[1].signal;
+    await visibility('hidden');
+    expect(oldSignal?.aborted).toBe(true);
+    await tick(9000);
+    expect(details).toHaveBeenCalledTimes(2);
+
+    await visibility('visible');
+    expect(details).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain('Consultando la cita…');
+    expect(button('Iniciar ahora').disabled).toBe(true);
+    await act(async () => oldRead.resolve(verified(true)));
+    expect(button('Iniciar ahora').disabled).toBe(true);
+    await act(async () => resumedRead.resolve(verified(false)));
+    expect(container.textContent).not.toContain('Consultando la cita…');
+    expect(button('Iniciar ahora').disabled).toBe(true);
+
+    await visibility('hidden');
+    await visibility('visible');
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('Iniciar ahora');
+    await click('Actualizar estado');
+    expect(button('Iniciar ahora').disabled).toBe(false);
+    expect(requests('PATCH', '/api/appointments')).toHaveLength(0);
+  });
+
+  it('refreshes the patient when the doctor starts and completes the consultation while the tab is hidden', async () => {
+    const visibility = browserVisibility('visible');
+    const transitions = [
+      { previous: 'scheduled', next: 'in_progress', label: 'Consulta en curso', canManagePermissions: true },
+      { previous: 'in_progress', next: 'completed', label: 'Consulta finalizada', canManagePermissions: false },
+    ] as const;
+    const detail = (status: 'scheduled' | 'in_progress' | 'completed') => Response.json({
+      appointment: { ...appointment, status, started_at: status === 'scheduled' ? null : '2026-09-10T12:01:00Z' },
+      appointmentMode: 'regular',
+      appointmentActions: { cancel: status === 'scheduled' },
+      canManageClinicalPermissions: status === 'in_progress',
+      booking: null, consent: { status: 'absent' }, operations: [],
+    });
+    const details = vi.fn<() => Response | Promise<Response>>(() => detail('scheduled'));
+    transport = call => {
+      if (call.method === 'GET' && call.url === consultationPath) return details();
+      throw new Error('Unexpected request while refreshing the patient consultation');
+    };
+    const permissionsLink = () => container.querySelector('a[href*="appointmentId=123"]');
+
+    await renderDetail('patient');
+    expect(details).toHaveBeenCalledTimes(1);
+    expect(button('Cancelar consulta').disabled).toBe(false);
+
+    for (const transition of transitions) {
+      const beforePoll = details.mock.calls.length;
+      const oldRead = deferred<Response>();
+      const resumedRead = deferred<Response>();
+      details.mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(resumedRead.promise);
+
+      await tick();
+      expect(details).toHaveBeenCalledTimes(beforePoll + 1);
+      const oldSignal = requests('GET', consultationPath).at(-1)?.signal;
+      await visibility('hidden');
+      expect(oldSignal?.aborted).toBe(true);
+      await tick(9000);
+      expect(details).toHaveBeenCalledTimes(beforePoll + 1);
+
+      await visibility('visible');
+      expect(details).toHaveBeenCalledTimes(beforePoll + 2);
+      expect(container.textContent).toContain('Consultando la cita…');
+      expect(permissionsLink()).toBeNull();
+      if (transition.previous === 'scheduled') expect(button('Cancelar consulta').disabled).toBe(true);
+
+      await act(async () => resumedRead.resolve(detail(transition.next)));
+      expect(container.textContent).toContain(transition.label);
+      expect(container.textContent).not.toContain('Consultando la cita…');
+      expect(Boolean(permissionsLink())).toBe(transition.canManagePermissions);
+
+      // Deliver the aborted read after the fresh result to simulate a transport ignoring the abort.
+      await act(async () => oldRead.resolve(detail(transition.previous)));
+      expect(container.textContent).toContain(transition.label);
+      expect(Boolean(permissionsLink())).toBe(transition.canManagePermissions);
+      expect(details).toHaveBeenCalledTimes(beforePoll + 2);
+    }
+
+    expect(container.textContent).not.toContain('Consulta en curso');
+    expect(requests('GET', consultationPath)).toHaveLength(5);
+    expect(calls).toHaveLength(5);
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+  });
+
+  it('rechecks a restored page once and keeps a verified inbox link hidden when the consultation read fails', async () => {
+    const visibility = browserVisibility('visible');
+    const historyId = 'a'.repeat(64);
+    const oldRead = deferred<Response>();
+    const restoredRead = deferred<Response>();
+    const detail = () => Response.json({
+      appointment: { ...appointment, started_at: '2026-09-10T12:01:00Z', status: 'in_progress' },
+      appointmentMode: 'regular', booking: null, consent: { status: 'absent' }, operations: [],
+    });
+    const details = vi.fn().mockImplementationOnce(detail).mockReturnValueOnce(oldRead.promise)
+      .mockReturnValueOnce(restoredRead.promise).mockImplementation(detail);
+    transport = call => {
+      if (call.method === 'GET' && call.url === consultationPath) return details();
+      if (call.method === 'GET' && call.url === '/api/doctor/clinical-inbox') return Response.json({
+        records: [{ historyId, patientLabel: 'Test patient', canRead: true, canAppend: false, activeAppointmentIds: [123] }],
+        notifications: [],
+      });
+      throw new Error('Unexpected request during page restoration');
+    };
+    const recordLink = () => container.querySelector('a[href*="record="]');
+    await act(async () => root.render(createElement(DoctorClinicalInboxProvider, {
+      identity: 'verified-doctor',
+      children: createElement(ConsultationDetail, { id: 123, role: 'doctor', onBack: vi.fn() }),
+    })));
+    expect(recordLink()).not.toBeNull();
+    await tick();
+    const oldSignal = requests('GET', consultationPath)[1].signal;
+    await act(async () => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+    expect(oldSignal?.aborted).toBe(true);
+    await visibility('visible');
+    expect(details).toHaveBeenCalledTimes(2);
+
+    await act(async () => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    await visibility('visible');
+    expect(details).toHaveBeenCalledTimes(3);
+    expect(recordLink()).toBeNull();
+    await act(async () => oldRead.resolve(detail()));
+    expect(recordLink()).toBeNull();
+    await act(async () => restoredRead.resolve(Response.json({ error: 'unavailable' }, { status: 503 })));
+    expect(recordLink()).toBeNull();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    await click('Actualizar estado');
+    expect(recordLink()?.getAttribute('href')).toContain(historyId);
+  });
+
+  it('keeps a quote mounted and reconciles the same submitted operation while the consultation is hidden', async () => {
+    const visibility = browserVisibility('visible');
+    const resumedRead = deferred<Response>();
+    const now = Math.floor(Date.now() / 1000);
+    const prepared = {
+      ...operation('awaiting_signature', 'consent'),
+      sponsorship: { maxFeeStroops: '100', quotePreparedAt: now, quoteExpiresAt: now + 120 },
+    };
+    const detail = () => Response.json({
+      appointment: { ...appointment, started_at: '2026-09-10T12:01:00Z', status: 'in_progress' },
+      booking: { state: 'confirmed', issuance_id: 'test-booking', valid_until: now + 300 },
+      consent: { status: 'absent' }, operations: [],
+    });
+    const details = vi.fn().mockImplementationOnce(detail).mockReturnValueOnce(resumedRead.promise).mockImplementation(detail);
+    let receiptReady = false;
+    transport = call => {
+      if (call.method === 'GET' && call.url === consultationPath) return details();
+      if (call.method === 'POST' && call.url === '/api/private-operations') return reply(prepared);
+      if (call.method === 'POST' && call.url === `${operationPath}/confirm`) return reply(operation('submitted', 'consent'));
+      if (call.method === 'GET' && call.url === operationPath) return reply(operation(receiptReady ? 'confirmed' : 'submitted', 'consent'));
+      throw new Error('Unexpected request during visibility and recovery checks');
+    };
+
+    await renderDetail('patient');
+    await click('Autorizar una emisión');
+    await confirm();
+    const review = dialog();
+    await visibility('hidden');
+    await visibility('visible');
+    expect(dialog()).toBe(review);
+    expect(button('Confirmar con Privy', review).disabled).toBe(true);
+    expect(provider.signRawHash).not.toHaveBeenCalled();
+    await act(async () => resumedRead.resolve(detail()));
+    expect(button('Confirmar con Privy', review).disabled).toBe(false);
+    await click('Confirmar con Privy', review);
+    expect(provider.signRawHash).toHaveBeenCalledOnce();
+    expect(requests('GET', operationPath)).toHaveLength(1);
+
+    await visibility('hidden');
+    const detailCount = details.mock.calls.length;
+    receiptReady = true;
+    await tick();
+    expect(details).toHaveBeenCalledTimes(detailCount);
+    expect(requests('GET', operationPath)).toHaveLength(2);
+    expect(container.textContent).toContain('Operación confirmada');
+    expect(requests('POST', `${operationPath}/confirm`)).toHaveLength(1);
+  });
+
   it('keeps the patient appointment and attendance flow in English', async () => {
     let attended = false;
     const appointment = {
