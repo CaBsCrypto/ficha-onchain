@@ -107,8 +107,31 @@ describe('bounded verified prescription lists', () => {
     adapters.connection.mockResolvedValue({ release, query });
     const chain = { verifyDeployment: vi.fn(async () => undefined), prescription: vi.fn(async (id: string) => record(id)) };
     adapters.chain.mockReturnValue(chain);
-    return { chain, release };
+    return { chain, query, release };
   }
+
+  it.each(['patient', 'doctor'])('lists %s prescriptions using an existing wallet binding without refreshing it', async role => {
+    const query = vi.fn(async (_sql: string, _values: unknown[]) => ({ rows: [] }));
+    const release = vi.fn();
+    const verifyDeployment = vi.fn(async () => undefined);
+    adapters.connection.mockResolvedValue({ query, release });
+    adapters.chain.mockReturnValue({ verifyDeployment });
+
+    await expect(listPrivatePrescriptions(actor, role)).resolves.toMatchObject({ prescriptions: [] });
+
+    expect(adapters.wallet).toHaveBeenCalledExactlyOnceWith(expect.anything(), actor.userId, actor.email, { existingOnly: true });
+    expect(query).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^SELECT /), [owner, actor.userId, RX_PRIVATE]);
+    expect(release).toHaveBeenCalledBefore(verifyDeployment);
+  });
+
+  it('fails before querying prescriptions when the wallet binding is missing', async () => {
+    adapters.wallet.mockRejectedValueOnce(Error('wallet_creation_required'));
+
+    await expect(listPrivatePrescriptions(actor, 'patient')).rejects.toThrow('wallet_creation_required');
+
+    expect(adapters.connection).not.toHaveBeenCalled();
+    expect(adapters.chain).not.toHaveBeenCalled();
+  });
 
   it('keeps the original order with at most three record reads in flight and returns only after every record verifies', async () => {
     const f = listFixture(['1', '2', '3', '4', '5', '6', '7'].map(row));
@@ -132,6 +155,15 @@ describe('bounded verified prescription lists', () => {
     expect(verified.prescriptions.map(value => value.rxId)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
     expect(Number.isFinite(Date.parse(verified.checkedAt))).toBe(true);
     expect(maximum).toBe(3); expect(f.chain.verifyDeployment).toHaveBeenCalledOnce(); expect(f.release).toHaveBeenCalledOnce();
+    expect(f.release).toHaveBeenCalledBefore(f.chain.verifyDeployment);
+  });
+
+  it('releases the database connection on a failed query without starting Stellar verification', async () => {
+    const f = listFixture([]);
+    f.query.mockRejectedValueOnce(Error('database unavailable'));
+    await expect(listPrivatePrescriptions(actor, 'patient')).rejects.toThrow('database unavailable');
+    expect(f.release).toHaveBeenCalledOnce();
+    expect(adapters.chain).not.toHaveBeenCalled();
   });
 
   it.each(['patient', 'doctor', 'commitment', 'expiresAt', 'schemaVersion', 'id'])('does not return a partial list when record %s mismatches', async field => {
