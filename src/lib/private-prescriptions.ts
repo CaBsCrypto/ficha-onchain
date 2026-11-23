@@ -20,10 +20,10 @@ export function encryptionKey() {
   return key;
 }
 export function storageContext(id:string) {return JSON.stringify(['TrustLeaf/PrivatePrescriptionStorage/v1',id,'testnet',RX_PRIVATE]);}
-export async function privateActorWallet(actor:AuthedUser) {
+export async function privateActorWallet(actor:AuthedUser,options?:{existingOnly?:boolean}) {
   assertPrivateEnvironment();
   if(!actor.email)throw new PrivateFlowError('verified_email_required',403);
-  return verifiedWallet(getDb(),actor.userId,actor.email);
+  return verifiedWallet(getDb(),actor.userId,actor.email,options);
 }
 export async function loadPrivateContext(client:PoolClient,actor:AuthedUser,appointmentId:number,lock=false) {
   const {rows}=await client.query(`SELECT a.*,d.name AS doctor_name,d.id AS doctor_id,
@@ -149,7 +149,7 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number,regular
   } finally {client.release();}
 }
 export async function listPrivatePrescriptions(actor:AuthedUser,role:string) {
-  const wallet=await privateActorWallet(actor);
+  const wallet=await privateActorWallet(actor,{existingOnly:true});
   const client=await getDbConnection();
   let rows: PrivateRow[];
   try {

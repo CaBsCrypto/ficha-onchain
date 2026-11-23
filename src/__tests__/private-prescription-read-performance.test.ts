@@ -110,6 +110,29 @@ describe('bounded verified prescription lists', () => {
     return { chain, query, release };
   }
 
+  it.each(['patient', 'doctor'])('lists %s prescriptions using an existing wallet binding without refreshing it', async role => {
+    const query = vi.fn(async (_sql: string, _values: unknown[]) => ({ rows: [] }));
+    const release = vi.fn();
+    const verifyDeployment = vi.fn(async () => undefined);
+    adapters.connection.mockResolvedValue({ query, release });
+    adapters.chain.mockReturnValue({ verifyDeployment });
+
+    await expect(listPrivatePrescriptions(actor, role)).resolves.toMatchObject({ prescriptions: [] });
+
+    expect(adapters.wallet).toHaveBeenCalledExactlyOnceWith(expect.anything(), actor.userId, actor.email, { existingOnly: true });
+    expect(query).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^SELECT /), [owner, actor.userId, RX_PRIVATE]);
+    expect(release).toHaveBeenCalledBefore(verifyDeployment);
+  });
+
+  it('fails before querying prescriptions when the wallet binding is missing', async () => {
+    adapters.wallet.mockRejectedValueOnce(Error('wallet_creation_required'));
+
+    await expect(listPrivatePrescriptions(actor, 'patient')).rejects.toThrow('wallet_creation_required');
+
+    expect(adapters.connection).not.toHaveBeenCalled();
+    expect(adapters.chain).not.toHaveBeenCalled();
+  });
+
   it('keeps the original order with at most three record reads in flight and returns only after every record verifies', async () => {
     const f = listFixture(['1', '2', '3', '4', '5', '6', '7'].map(row));
     let active = 0, maximum = 0;
