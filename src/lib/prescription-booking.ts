@@ -4,7 +4,7 @@ import type { PoolClient } from '@neondatabase/serverless';
 import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, resolveDoctor, readPrivateDoctor } from '@/lib/doctor-authorizations';
-import { assertPrivateEnvironment, assertPrivateWrites, PRIVY_APP, RX_PRIVATE } from '@/lib/private-config';
+import { assertPrivateEnvironment, assertPrivateWrites, privatePrivyAppId, RX_PRIVATE } from '@/lib/private-config';
 import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxCreate, assertPrivateRxScopeOpen, lockHostedPrivateRxMutation, privateRxRole,
   type PrivateRxAppointmentScope } from '@/lib/digital-cabs-rx';
 import { assertRegularAppointments, classifyHostedAppointment, hostedAppointmentManifestMatchesSql, lockRegularAppointments } from '@/lib/regular-appointments';
@@ -277,8 +277,8 @@ export async function preparePrescriptionBooking(sql: Sql, actor: AuthedUser, ap
       a.patient_wallet,a.doctor_wallet,a.doctor_user_id,a.doctor_wallet_id,a.patient_wallet_id,
       FLOOR(EXTRACT(EPOCH FROM NOW()+INTERVAL '30 minutes'))::bigint,'prepared'
     FROM appointments a JOIN doctors dr ON dr.id=a.doctor_id AND LOWER(dr.email)=a.doctor_email
-    JOIN privy_stellar_wallet_bindings p ON p.app_id=${PRIVY_APP} AND p.user_id=a.patient_user_id AND p.wallet_id=a.patient_wallet_id AND p.address=a.patient_wallet
-    JOIN privy_stellar_wallet_bindings d ON d.app_id=${PRIVY_APP} AND d.user_id=a.doctor_user_id AND d.wallet_id=a.doctor_wallet_id AND d.address=a.doctor_wallet
+    JOIN privy_stellar_wallet_bindings p ON p.app_id=${privatePrivyAppId()} AND p.user_id=a.patient_user_id AND p.wallet_id=a.patient_wallet_id AND p.address=a.patient_wallet
+    JOIN privy_stellar_wallet_bindings d ON d.app_id=${privatePrivyAppId()} AND d.user_id=a.doctor_user_id AND d.wallet_id=a.doctor_wallet_id AND d.address=a.doctor_wallet
     WHERE a.id=${appointmentId} AND a.status='in_progress' AND a.attendance_at<=NOW() AND a.attendance_user_id=a.patient_user_id
       AND a.started_by=a.doctor_user_id AND a.started_at<=NOW() AND a.started_at>NOW()-INTERVAL '24 hours'
       AND a.date=(NOW() AT TIME ZONE 'America/Santiago')::date

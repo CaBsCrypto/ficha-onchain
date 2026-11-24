@@ -1,4 +1,4 @@
-export type ClinicalPartnerScope = 'clinical-links:bind' | 'clinical-links:write' | 'clinical-links:read' | 'proofs:verify';
+export type ClinicalPartnerScope = 'clinical-links:bind' | 'clinical-links:enroll' | 'clinical-links:write' | 'clinical-links:read' | 'proofs:verify' | 'prescriptions:issue';
 export type ClinicalLinkIntegrity = 'pending' | 'verified' | 'unavailable';
 
 type ClinicalLinkEventFields = {
@@ -22,4 +22,18 @@ export type ClinicalLinkProof = {
   revision: number;
   integrityStatus: ClinicalLinkIntegrity;
   commitment: string | null;
+};
+
+export type ClinicalAssociationStatus = 'active' | 'not_authorized' | 'revoked' | 'expired';
+
+export type ClinicalPatientAccount = {
+  accountStatus: 'active' | 'not_enrolled';
+  recordStatus: 'ready' | 'not_created';
+  hasNativeWallet: boolean;
+  sources: Array<{
+    partnerId: string;
+    source: string;
+    associationStatus: ClinicalAssociationStatus;
+    bindingId: string;
+  }>;
 };

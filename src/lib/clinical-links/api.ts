@@ -4,7 +4,6 @@ import { isSameOrigin } from '@/lib/auth/same-origin';
 import {
   assertClinicalLinksPilot,
   ClinicalLinksApiError,
-  getClinicalLinksPilotPartnerOrigin,
   isClinicalLinksPilotPatient,
 } from './config';
 import { authenticateClinicalPartner, PilotStoreError } from './store';
@@ -38,7 +37,5 @@ export async function pilotPatient(request: Request) {
 }
 
 export async function pilotPartner(request: Request, scope: ClinicalPartnerScope) {
-  const partner = await authenticateClinicalPartner(request, scope);
-  if (partner.origin !== getClinicalLinksPilotPartnerOrigin()) throw new ClinicalLinksApiError('not_found', 404);
-  return partner;
+  return authenticateClinicalPartner(request, scope);
 }

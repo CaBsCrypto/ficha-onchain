@@ -15,9 +15,12 @@ export function GET(request: Request, { params }: { params: Promise<{ linkRef: s
     let result: ClinicalLinkProof = { linkRef, revision, integrityStatus: 'unavailable', commitment: null };
     if (proof.state === 'pending') result = { ...result, integrityStatus: 'pending' };
     if (proof.state === 'confirmed' && proof.commitment) {
-      const outcome = await readClinicalLinkAnchor(proof.commitment);
+      const verified = proof.proofSource === 'prescription'
+        ? /^[a-f0-9]{64}$/.test(proof.transactionHash ?? '')
+        : await readClinicalLinkAnchor(proof.commitment) === 'verified';
       const current = await readClinicalLinkProof(actor, linkRef, revision);
-      if (outcome === 'verified' && current.state === 'confirmed' && current.commitment === proof.commitment) {
+      if (verified && current.state === 'confirmed' && current.commitment === proof.commitment &&
+          current.proofSource === proof.proofSource && current.transactionHash === proof.transactionHash) {
         result = { ...result, integrityStatus: 'verified', commitment: proof.commitment };
       }
     }

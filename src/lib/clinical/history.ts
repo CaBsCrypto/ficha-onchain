@@ -5,7 +5,7 @@ import { clinicalSponsorshipQuoteView } from './sponsorship';
 import { getDb } from '@/lib/db';
 import { requireUser, type AuthedUser } from '@/lib/auth/privy-auth';
 import { resolveDoctor } from '@/lib/doctor-authorizations';
-import { PrivateFlowError, REGISTRY_PRIVATE, PRIVATE_ADMIN, PRIVY_APP } from '@/lib/private-config';
+import { PrivateFlowError, REGISTRY_PRIVATE, PRIVATE_ADMIN, privatePrivyAppId } from '@/lib/private-config';
 import { appointmentStartedByDoctorSql } from '@/lib/prescription-booking';
 import type { ClinicalActor, ClinicalSnapshot, ClinicalVersion, ClinicalGrant, ClinicalOperation, ClinicalOperationReview,
   ClinicalPermissionAppointment } from '@/types/clinical';
@@ -269,7 +269,7 @@ async function patientAppointmentPermissions(user: AuthedUser, actor: ClinicalAc
     SELECT 'focus' AS kind,doctor_id,appointment_id,visit_date,started_at FROM focus
     UNION ALL SELECT 'prior',doctor_id,NULL,visit_date,started_at FROM ranked_visits WHERE visit_rank<=5
     ORDER BY kind,doctor_id,started_at DESC`,
-    [actor.userId, user.email, actor.walletId, actor.address, JSON.stringify(targets), appointmentId ?? null, PRIVY_APP]);
+    [actor.userId, user.email, actor.walletId, actor.address, JSON.stringify(targets), appointmentId ?? null, privatePrivyAppId()]);
   } catch {
     // The verified clinical record and its grants remain useful without appointment metadata.
     return { grants, ...unfocused };

@@ -45,7 +45,7 @@ jobs:
         run: npm run test:private
 
       - name: Hosted capture and prescription scopes
-        run: node --test scripts/lib/hosted-capture-store.test.mjs scripts/lib/digital-cabs-rx-scope.test.mjs scripts/lib/private-rx-sponsorship.test.mjs
+        run: node --test scripts/lib/hosted-capture-store.test.mjs scripts/lib/digital-cabs-rx-scope.test.mjs scripts/lib/private-rx-sponsorship.test.mjs scripts/lib/clinical-links-mint-policy.test.mjs
 
       # NEXT_PUBLIC_* are inlined at build time. The real values live in Vercel;
       # here they only need to be present and well-formed so the build does not

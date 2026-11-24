@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { StrKey } from '@stellar/stellar-sdk';
 import { databaseConnectionString } from './database-connection.mjs';
 import { assertHostedCaptureOperator } from './hosted-capture-store.mjs';
+import { partnerPrescriptionAppointment } from './clinical-links-mint-policy.mjs';
 
 export const PRIVATE_RX_SCOPE_ENV = Object.freeze({
   file: 'TRUSTLEAF_DIGITAL_CABS_RX_SCOPE_FILE',
@@ -25,6 +26,7 @@ const CAP = 10_000_000n;
 const STEPS = ['attest', 'consent', 'mint'];
 const approvedScopes = new WeakSet();
 const hostedScopes = new WeakMap();
+const partnerScopes = new WeakMap();
 const hex = /^[0-9a-f]{64}$/;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const epoch = value => Number.isSafeInteger(value) && value > 0;
@@ -154,7 +156,37 @@ export function privateRxHostedContext(scope) {
   return hostedScopes.get(scope);
 }
 
+/** Scope a pair of owner-authorized transactions to one approved pilot appointment.
+ * Callers must obtain the context from locked Ficha records, not request JSON. */
+export function loadPartnerPrivateRxScope(plan, context, { env = process.env, historical = false } = {}) {
+  const { consultationRef, attestationHash, commitment, bindingId, partnerId, expiresAt } = context;
+  check(consultationRef && partnerPrescriptionAppointment(consultationRef, env) === plan.appointmentId &&
+    plan.phase === 'issuance' && plan.network === 'testnet' &&
+    plan.contractId === PRIVATE_RX_CONTRACT_ID && plan.registryId === PRIVATE_RX_REGISTRY_ID && plan.authority === PRIVATE_RX_AUTHORITY &&
+    StrKey.isValidEd25519PublicKey(plan.relayer) && plan.relayer === env.TRUSTLEAF_PARTNER_RX_RELAYER_ADDRESS &&
+    partnerId === 'trustleaf-cannabis' && uuid.test(bindingId) && nonzeroDigest(attestationHash) && nonzeroDigest(commitment) &&
+    nonzeroDigest(plan.issuanceId) && uuid.test(plan.prescriptionId) && uuid.test(plan.steps.consent.requestId) &&
+    uuid.test(plan.steps.mint.requestId) && plan.steps.consent.requestId !== plan.steps.mint.requestId &&
+    actor(plan.patient, plan.patient) && actor(plan.doctor, plan.doctor) && plan.patient.userId !== plan.doctor.userId &&
+    plan.patient.address !== plan.doctor.address && epoch(plan.openedAt) && epoch(plan.until) &&
+    plan.until === plan.bookingValidUntil && plan.openedAt < plan.until && epoch(expiresAt) && expiresAt > plan.until);
+  check(amount(plan.steps.consent.maxFeeStroops) + amount(plan.steps.mint.maxFeeStroops) <= amount(plan.maxTotalFeeStroops));
+  const scope = { ...plan, policyHash: sha(JSON.stringify([plan, context])), approved: !historical };
+  if (!historical) approvedScopes.add(scope);
+  partnerScopes.set(scope, Object.freeze({ ...context, historical }));
+  return freeze(scope);
+}
+
+export function privateRxPartnerContext(scope) {
+  return partnerScopes.get(scope);
+}
+
 export function assertHostedPrivateRxReceiptScope(scope, step) {
+  const partner = privateRxPartnerContext(scope);
+  if (partner) {
+    check(partner.historical === true && (step === 'consent' || step === 'mint'));
+    return;
+  }
   const context = privateRxHostedContext(scope);
   check(context?.historical === true && scope.phase === 'issuance' &&
     (step === 'attest' || context.phase === 'issuance' && (step === 'consent' || step === 'mint')));
@@ -199,6 +231,16 @@ export function loadPrivateRxScope({ env = process.env, now = Math.floor(Date.no
 
 /** Never accept a preview object or an expired/stale policy at a mutation. */
 export function assertPrivateRxScopeOpen(scope, { env = process.env, now, step } = {}) {
+  const partner = privateRxPartnerContext(scope);
+  if (partner) {
+    const clock = now ?? Math.floor(Date.now() / 1000);
+    check(approvedScopes.has(scope) && scope.approved === true &&
+      partnerPrescriptionAppointment(partner.consultationRef, env) === scope.appointmentId &&
+      scope.relayer === env.TRUSTLEAF_PARTNER_RX_RELAYER_ADDRESS &&
+      (step === undefined || step === 'consent' || step === 'mint'));
+    check(clock >= scope.openedAt && clock < scope.until, 'private_rx_scope_expired');
+    return scope;
+  }
   const hosted = privateRxHostedContext(scope);
   if (hosted) {
     const clock = now ?? Math.floor(Date.now() / 1000);

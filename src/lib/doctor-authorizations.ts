@@ -4,7 +4,7 @@ import type { Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import type { FrozenDoctorSubmission } from '@/lib/doctor-onboarding';
 import { resolveStellarWallet } from '@/lib/stellar/privy-wallet-binding';
-import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError } from '@/lib/private-config';
+import { assertPrivateEnvironment, assertPrivateWrites, privatePrivyAppId, PrivateFlowError } from '@/lib/private-config';
 import { readAuthorization } from '../../scripts/lib/private-registry.mjs';
 import { loadRehearsalPolicy } from '../../scripts/lib/clinical-rehearsal-policy.mjs';
 import { assertInitialDoctorJob, loadInitialDoctorScope } from '../../scripts/lib/initial-doctor-scope.mjs';
@@ -12,7 +12,6 @@ import { commitmentFor, encryptDossier, decryptDossier, type DoctorDossier } fro
 
 export const PRIVATE_REGISTRY = 'CBNY2NFS6I3UHF6GQ3IEQG4OCQD3JHQREDZT2ECDV2OF2TOO5GAGTQH2';
 export const REGISTRY_ADMIN = 'GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7T7VVAO';
-const PRIVY_APP = 'cmrix722m03d30clewd1fuffq';
 export class DoctorAuthorizationError extends Error { constructor(message: string, public status = 409) { super(message); } }
 export function assertPrivateRegistryConfiguration() {
   try { assertPrivateEnvironment(); }
@@ -21,14 +20,14 @@ export function assertPrivateRegistryConfiguration() {
 function provider() {
   assertPrivateRegistryConfiguration();
   if (!process.env.PRIVY_APP_SECRET) throw new DoctorAuthorizationError('configuration_missing', 503);
-  return new PrivyClient(PRIVY_APP, process.env.PRIVY_APP_SECRET);
+  return new PrivyClient(privatePrivyAppId(), process.env.PRIVY_APP_SECRET);
 }
 export async function verifiedWallet(sql: Sql, userId: string, email: string, options?: { existingOnly?: boolean }) {
   const p = provider();
   const user = await p.getUser(userId);
   const actualEmail = (user.email?.address ?? user.google?.email)?.toLowerCase();
   if (actualEmail !== email.toLowerCase()) throw new DoctorAuthorizationError('identity_changed', 403);
-  return resolveStellarWallet(sql, { getUser: id => id === userId ? Promise.resolve(user) : p.getUser(id), walletApi: p.walletApi }, PRIVY_APP, userId, false, options);
+  return resolveStellarWallet(sql, { getUser: id => id === userId ? Promise.resolve(user) : p.getUser(id), walletApi: p.walletApi }, privatePrivyAppId(), userId, false, options);
 }
 export async function resolveDoctor(sql: Sql, doctorId: number, options?: { existingOnly?: boolean }) {
   const [doctor] = await sql`SELECT id,name,email,specialty,status FROM doctors WHERE id=${doctorId}`;

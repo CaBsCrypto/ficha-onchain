@@ -114,6 +114,13 @@ describe('clinical links API', () => {
     expect(await response.json()).toEqual({ error: 'not_found' });
   });
 
+  it('uses the confirmed private prescription receipt instead of a detached anchor', async () => {
+    mocks.proof.mockResolvedValue({ state: 'confirmed', commitment, proofSource: 'prescription', transactionHash: '23'.repeat(32) });
+    expect(await (await proofRequest()).json()).toEqual({ linkRef, revision: 1, integrityStatus: 'verified', commitment });
+    expect(mocks.proof).toHaveBeenCalledTimes(2);
+    expect(mocks.anchor).not.toHaveBeenCalled();
+  });
+
   it('reports the ledger outage independently of the stored confirmation', async () => {
     mocks.anchor.mockResolvedValue('unavailable');
     const response = await proofRequest('Bearer patient-session');

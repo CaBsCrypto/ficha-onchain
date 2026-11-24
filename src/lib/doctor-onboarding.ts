@@ -3,7 +3,7 @@ import type { PoolClient } from '@neondatabase/serverless';
 import { getDbConnection, sqlForConnection, type Sql } from '@/lib/db';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { verifiedWallet, resolveDoctor } from '@/lib/doctor-authorizations';
-import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, PRIVY_APP } from '@/lib/private-config';
+import { assertPrivateEnvironment, assertPrivateWrites, PrivateFlowError, privatePrivyAppId } from '@/lib/private-config';
 import { encryptDossier, decryptDossier } from '../../scripts/lib/private-doctor-dossier.mjs';
 
 export type DoctorOnboardingSource = 'application' | 'invitation';
@@ -37,7 +37,7 @@ function key() {
   return value;
 }
 function context(kind: 'draft' | 'submission', id: string) {
-  return JSON.stringify(['TrustLeaf/DoctorOnboarding/v1', 'testnet', PRIVY_APP, kind, id]);
+  return JSON.stringify(['TrustLeaf/DoctorOnboarding/v1', 'testnet', privatePrivyAppId(), kind, id]);
 }
 function encryptProfile(profile: DoctorOnboardingProfile, kind: 'draft' | 'submission', id: string) {
   return encryptDossier({ schemaVersion: 1, profile }, key(), context(kind, id));
@@ -61,7 +61,7 @@ function assertOwner(row: Row, owner: Owner) {
 async function assertBinding(sql: Sql, owner: Owner) {
   const rows = await sql.query(`SELECT user_id FROM privy_stellar_wallet_bindings
     WHERE app_id=$1 AND user_id=$2 AND wallet_id=$3 AND address=$4 FOR SHARE`,
-  [PRIVY_APP, owner.userId, owner.walletId, owner.address]);
+  [privatePrivyAppId(), owner.userId, owner.walletId, owner.address]);
   if (rows.length !== 1) fail('doctor_identity_mismatch', 403);
 }
 /** Every writer uses this normalized email lock, then doctor/onboarding row locks. */

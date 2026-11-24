@@ -3,6 +3,7 @@ import { Account, Address, Keypair, Networks, SorobanDataBuilder, nativeToScVal,
 import type { Transaction } from '@stellar/stellar-sdk';
 import { PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import { listPrivatePrescriptions } from '@/lib/private-prescriptions';
+import { PARTNER_PRESCRIPTION_CUSTODY } from '../../scripts/lib/clinical-links-mint-policy.mjs';
 
 const adapters = vi.hoisted(() => ({ connection: vi.fn(), wallet: vi.fn(), chain: vi.fn() }));
 vi.mock('@/lib/db', () => ({ getDb: vi.fn(() => ({})), getDbConnection: adapters.connection, sqlForConnection: vi.fn() }));
@@ -139,6 +140,14 @@ describe('bounded verified prescription lists', () => {
     f.chain.prescription.mockImplementation(async id => id === '2' ? { ...record(id), [field]: 'wrong' } : record(id));
     await expect(listPrivatePrescriptions(actor, 'patient')).rejects.toThrow('prescription_integrity_unavailable');
     expect(f.chain.prescription).toHaveBeenCalledTimes(3); expect(f.release).toHaveBeenCalledOnce();
+  });
+
+  it('keeps external-custody records out of the private-document list before querying their IDs', async () => {
+    const partnerRecord = { ...row('2'), ciphertext: PARTNER_PRESCRIPTION_CUSTODY };
+    const f = listFixture([row('1'), partnerRecord]);
+    const result = await listPrivatePrescriptions(actor, 'patient');
+    expect(result.prescriptions.map(value => value.rxId)).toEqual(['1']);
+    expect(f.chain.prescription).toHaveBeenCalledExactlyOnceWith('1');
   });
 
   it('rejects an unavailable record and an invalid deployment instead of reporting an empty success', async () => {

@@ -1,5 +1,6 @@
 import { PRIVATE_REGISTRY_ID } from '../../scripts/lib/private-registry.mjs';
 import { databaseConnectionString } from '@/lib/database-config';
+import { clinicalLinksMigrationConnection } from '../../scripts/lib/clinical-links-migration.mjs';
 
 export const REGISTRY_PRIVATE = PRIVATE_REGISTRY_ID;
 export const RX_PRIVATE = 'CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE';
@@ -8,6 +9,19 @@ export const PRIVATE_ADMIN = 'GBK4WWTIWXWTYNXDFOYPV2ZZKTBAJKG7NHZOSLLX7ZDLCXBXE7
 export class PrivateFlowError extends Error {
   constructor(message: string, public status = 409) { super(message); }
 }
+
+export function privatePrivyAppId() {
+  const sandboxApp = process.env.TRUSTLEAF_CLINICAL_LINKS_TEST_PRIVY_APP_ID;
+  if (!sandboxApp || process.env.TRUSTLEAF_CLINICAL_LINKS_PILOT_ENABLED !== 'true') return PRIVY_APP;
+  try {
+    clinicalLinksMigrationConnection();
+    if (sandboxApp === PRIVY_APP || !/^[a-z0-9]{15,64}$/.test(sandboxApp)) throw new Error();
+    return sandboxApp;
+  } catch {
+    throw new PrivateFlowError('private_configuration_mismatch', 503);
+  }
+}
+
 export function assertPrivateEnvironment() {
   const e = process.env;
   let host = '';
@@ -26,7 +40,8 @@ export function assertPrivateEnvironment() {
       (e.VERCEL_ENV === 'production' && e.TRUSTLEAF_ENV !== 'test')) {
     throw new PrivateFlowError('private_environment_mismatch', 503);
   }
-  if (e.PRIVY_APP_ID !== PRIVY_APP || e.NEXT_PUBLIC_PRIVY_APP_ID !== PRIVY_APP ||
+  const appId = privatePrivyAppId();
+  if (e.PRIVY_APP_ID !== appId || e.NEXT_PUBLIC_PRIVY_APP_ID !== appId ||
       e.DOCTOR_REGISTRY_PRIVATE_CONTRACT_ID !== REGISTRY_PRIVATE || e.PRESCRIPTION_PRIVATE_CONTRACT_ID !== RX_PRIVATE ||
       e.DOCTOR_REGISTRY_ADMIN_PUBLIC_KEY !== PRIVATE_ADMIN || e.BOOKING_AUTHORITY_PUBLIC_KEY !== PRIVATE_ADMIN ||
       e.NEXT_PUBLIC_STELLAR_NETWORK !== 'testnet' ||

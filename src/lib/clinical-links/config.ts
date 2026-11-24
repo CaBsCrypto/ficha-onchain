@@ -12,7 +12,6 @@ export function assertClinicalLinksPilot() {
   try {
     clinicalLinksMigrationConnection(process.env);
     assertPrivateEnvironment();
-    getClinicalLinksPilotPartnerOrigin();
   } catch {
     throw new ClinicalLinksApiError('pilot_configuration_invalid', 503);
   }
@@ -20,11 +19,21 @@ export function assertClinicalLinksPilot() {
 
 export function getClinicalLinksPilotPartnerOrigin() {
   const raw = process.env.TRUSTLEAF_CLINICAL_LINKS_PARTNER_ORIGIN ?? '';
-  const url = new URL(raw);
-  if (url.protocol !== 'https:' || url.origin !== raw || url.hostname === 'cannabis.trustleaf.org') {
+  if (!isClinicalPartnerOrigin(raw)) {
     throw new ClinicalLinksApiError('pilot_configuration_invalid', 503);
   }
-  return url.origin;
+  return raw;
+}
+
+export function isClinicalPartnerOrigin(raw: string) {
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' && url.origin === raw &&
+      url.hostname !== 'trustleaf.org' && !url.hostname.endsWith('.trustleaf.org') &&
+      !['trustleaf.vercel.app', 'trustleaf-demo.vercel.app'].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function isClinicalLinksPilotPatient(userId: string) {

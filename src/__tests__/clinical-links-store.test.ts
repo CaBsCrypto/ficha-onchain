@@ -11,11 +11,14 @@ vi.mock('@/lib/db', () => {
   };
   return { getDb: () => sql, getDbConnection: async () => client, sqlForConnection: () => sql };
 });
-vi.mock('@/lib/clinical-links/config', () => ({ getClinicalLinksPilotPartnerOrigin: () => 'https://partner.example' }));
+vi.mock('@/lib/clinical-links/config', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/clinical-links/config')>(),
+  getClinicalLinksPilotPartnerOrigin: () => 'https://partner.example',
+}));
 
 import {
-  authenticateClinicalPartner, claimClinicalBinding, confirmClinicalBinding, listClinicalLinks,
-  readClinicalLinkProof, recordClinicalLinkEvent,
+  authenticateClinicalPartner, claimClinicalBinding, confirmClinicalBinding, enrollClinicalPatient, listClinicalLinks,
+  readClinicalLinkProof, readClinicalPatientAccount, recordClinicalLinkEvent,
 } from '@/lib/clinical-links/store';
 
 const partner = { id: 'trustleaf-cannabis', name: 'TrustLeaf Cannabis', origin: 'https://partner.example' };
@@ -134,12 +137,60 @@ describe('clinical links pilot storage', () => {
     reply((query, parameters) => {
       if (query.includes('LEFT JOIN clinical_link_anchors')) {
         expect(query).toMatch(/b\.status = 'active' AND b\.expires_at > now\(\) AND p\.active/);
-        expect(parameters).toContain('https://partner.example');
+        expect(parameters).toContain(query.includes('l.link_ref =') && parameters.at(-1) ? partner.id : patientUserId);
       }
       return [];
     });
     await expect(listClinicalLinks(patientUserId)).resolves.toEqual([]);
     await expect(readClinicalLinkProof({ patientUserId }, linkRef, 1)).rejects.toMatchObject({ status: 404 });
     await expect(readClinicalLinkProof({ partner }, linkRef, 1)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('lists documents from their own registered origins and projects a verified prescription ID', async () => {
+    const second = 'https://synthetic-second.example';
+    reply(query => query.includes('COALESCE(a.state') ? [
+      { link_ref: linkRef, occurred_at: occurredAt, origin: partner.origin, resource_ref: issue.resourceRef,
+        proof_state: 'confirmed', prescription_rx_id: '17' },
+      { link_ref: bindingId, occurred_at: occurredAt, origin: second, resource_ref: issue.resourceRef, proof_state: 'pending' },
+    ] : []);
+    await expect(listClinicalLinks(patientUserId)).resolves.toMatchObject([
+      { href: `${partner.origin}/pilot/recetas/${issue.resourceRef}`, credentialId: '17' },
+      { href: `${second}/pilot/recetas/${issue.resourceRef}` },
+    ]);
+  });
+
+  it('does not grant exposure when an authenticated source enrolls a patient without consent', async () => {
+    const sandboxPartner = { ...partner, privyAppClientId: 'client_cannabis' };
+    reply(query => query.includes('SELECT partner_id FROM clinical_link_partners') ? [{ partner_id: partner.id }] : []);
+    await expect(enrollClinicalPatient(sandboxPartner, { userId: patientUserId, verifiedAtEpochSeconds: 1 }, false))
+      .resolves.toEqual({ status: 'active', partnerPatientRef: null, associationStatus: 'not_authorized' });
+    expect(calls(/INSERT INTO clinical_link_patient_accounts/)).toHaveLength(1);
+    expect(calls(/INSERT INTO clinical_partner_bindings/)[0][1]).toContain('revoked');
+  });
+
+  it('refuses an enrollment replay after the owner revokes consent', async () => {
+    reply(query => {
+      if (query.includes('SELECT partner_id FROM clinical_link_partners')) return [{ partner_id: partner.id }];
+      if (query.includes('stale_after_revocation')) return [{ ...binding, status: 'revoked', stale_after_revocation: true }];
+      return [];
+    });
+    await expect(enrollClinicalPatient({ ...partner, privyAppClientId: 'client_cannabis' },
+      { userId: patientUserId, verifiedAtEpochSeconds: 1 }, true))
+      .rejects.toMatchObject({ code: 'consent_session_refresh_required', status: 409 });
+    expect(calls(/INSERT INTO clinical_link_patient_accounts|UPDATE clinical_partner_bindings/)).toHaveLength(0);
+  });
+
+  it('reads the owner account without provisioning a wallet and exposes existing wallet readiness', async () => {
+    reply((query, parameters) => {
+      if (query.includes('AS has_wallet')) {
+        expect(parameters.at(-1)).toBe(patientUserId);
+        return [{ enrolled: false, has_record: false, has_wallet: true }];
+      }
+      return [];
+    });
+    await expect(readClinicalPatientAccount(patientUserId)).resolves.toEqual({
+      accountStatus: 'active', recordStatus: 'not_created', hasNativeWallet: true, sources: [],
+    });
+    expect(calls(/INSERT|UPDATE|BEGIN/)).toHaveLength(0);
   });
 });

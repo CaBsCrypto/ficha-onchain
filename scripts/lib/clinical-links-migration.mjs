@@ -1,4 +1,5 @@
 import { databaseConnectionString } from './database-connection.mjs';
+import { clinicalLinkMintStatements } from './clinical-links-mint-migration.mjs';
 
 export function clinicalLinksMigrationConnection(env = process.env) {
   const connection = databaseConnectionString(env);
@@ -31,13 +32,24 @@ export function migrateClinicalLinksPilot(sql) {
       origin TEXT NOT NULL,
       active BOOLEAN NOT NULL DEFAULT true
     )`,
+    sql`ALTER TABLE clinical_link_partners ADD COLUMN IF NOT EXISTS privy_app_client_id TEXT`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_link_partners_privy_app_client_unique
+      ON clinical_link_partners (privy_app_client_id) WHERE privy_app_client_id IS NOT NULL`,
     sql`CREATE TABLE IF NOT EXISTS clinical_link_partner_credentials (
       key_hash TEXT PRIMARY KEY CHECK (key_hash ~ '^[0-9a-f]{64}$'),
       partner_id TEXT NOT NULL REFERENCES clinical_link_partners(partner_id),
       scopes TEXT[] NOT NULL,
       expires_at TIMESTAMPTZ NOT NULL,
       revoked_at TIMESTAMPTZ,
-      CHECK (scopes <@ ARRAY['clinical-links:bind','clinical-links:write','clinical-links:read','proofs:verify']::TEXT[])
+      CHECK (scopes <@ ARRAY['clinical-links:bind','clinical-links:enroll','clinical-links:write','clinical-links:read','proofs:verify','prescriptions:issue']::TEXT[])
+    )`,
+    sql`ALTER TABLE clinical_link_partner_credentials DROP CONSTRAINT IF EXISTS clinical_link_partner_credentials_scopes_check`,
+    sql`ALTER TABLE clinical_link_partner_credentials ADD CONSTRAINT clinical_link_partner_credentials_scopes_check
+      CHECK (scopes <@ ARRAY['clinical-links:bind','clinical-links:enroll','clinical-links:write','clinical-links:read','proofs:verify','prescriptions:issue']::TEXT[])`,
+    sql`CREATE TABLE IF NOT EXISTS clinical_link_patient_accounts (
+      patient_user_id TEXT PRIMARY KEY CHECK (patient_user_id ~ '^did:privy:[A-Za-z0-9_-]{6,128}$'),
+      patient_ref UUID NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`,
     sql`CREATE TABLE IF NOT EXISTS clinical_partner_bindings (
       binding_id UUID PRIMARY KEY,
@@ -60,6 +72,12 @@ export function migrateClinicalLinksPilot(sql) {
       ON clinical_partner_bindings (partner_id, partner_actor_ref) WHERE status = 'active'`,
     sql`CREATE INDEX IF NOT EXISTS clinical_partner_bindings_patient
       ON clinical_partner_bindings (patient_user_id, created_at DESC)`,
+    sql`ALTER TABLE clinical_partner_bindings
+      ADD COLUMN IF NOT EXISTS shared_identity BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS shared_granted_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS shared_revoked_at TIMESTAMPTZ`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS clinical_partner_bindings_one_shared_patient
+      ON clinical_partner_bindings (partner_id, patient_user_id) WHERE shared_identity`,
     sql`CREATE TABLE IF NOT EXISTS clinical_partner_links (
       link_ref UUID PRIMARY KEY,
       partner_id TEXT NOT NULL,
@@ -100,6 +118,9 @@ export function migrateClinicalLinksPilot(sql) {
     )`,
     sql`CREATE INDEX IF NOT EXISTS clinical_link_anchors_pending
       ON clinical_link_anchors (available_at) WHERE state = 'pending'`,
+    sql`ALTER TABLE clinical_link_anchors
+      ADD COLUMN IF NOT EXISTS proof_source TEXT NOT NULL DEFAULT 'anchor' CHECK (proof_source IN ('anchor','prescription')),
+      ADD COLUMN IF NOT EXISTS prescription_rx_id TEXT`,
     sql`CREATE TABLE IF NOT EXISTS clinical_link_audit (
       id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       partner_id TEXT REFERENCES clinical_link_partners(partner_id),
@@ -109,5 +130,6 @@ export function migrateClinicalLinksPilot(sql) {
       outcome TEXT NOT NULL,
       at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`,
+    ...clinicalLinkMintStatements(sql),
   ]);
 }
