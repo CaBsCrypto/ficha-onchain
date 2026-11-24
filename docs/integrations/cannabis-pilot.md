@@ -10,6 +10,8 @@ TrustLeaf Cannabis custodia el PDF sintético. FichaOnChain conserva la referenc
 4. Compilar `clinical-link-anchor` con `stellar contract build` y desplegarlo en Testnet con una cuenta técnica dedicada. Fijar el contrato, el publicador y el SHA-256 del WASM desplegado en `TRUSTLEAF_CLINICAL_LINK_ANCHOR_CONTRACT`, `TRUSTLEAF_CLINICAL_LINK_ANCHOR_PUBLISHER` y `TRUSTLEAF_CLINICAL_LINK_ANCHOR_WASM_SHA256`. Guardar la clave de esa cuenta como `TRUSTLEAF_CLINICAL_LINK_ANCHOR_SECRET`.
 5. Invocar `POST /api/v1/clinical-link-anchor/worker` con un Bearer exclusivo `TRUSTLEAF_CLINICAL_LINK_WORKER_TOKEN` aleatorio de al menos 43 caracteres base64url. Cada invocación procesa un trabajo. Repetir hasta confirmar o vaciar la cola. El worker guarda el sobre firmado antes de transmitir y reconcilia ese mismo intento después de un fallo.
 
+Para los previews protegidos de Vercel, configurar en Trusted Sources de `trustleaf-demo` el proyecto `trustleaf` con la regla **Preview → Preview**, previa autorización para ese cambio de acceso. La llamada usa OIDC de Vercel para llegar al deployment y la credencial del socio para que la API aplique permisos clínicos. Los participantes del ensayo acceden al preview con su sesión autorizada de Vercel. [Trusted Sources](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/trusted-sources)
+
 ## Recorrido de aceptación
 
 1. Abrir la ficha de P1 en FichaOnChain, generar el código y canjearlo en `/pilot/ficha` con la sesión de P1 en Cannabis. Confirmar en FichaOnChain con el código mostrado en Cannabis. Comprobar que ambas cuentas conservan su historial. El código inicial vence a los diez minutos y la vinculación confirmada a las 24 horas.
