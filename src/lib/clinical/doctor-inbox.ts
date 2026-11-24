@@ -4,7 +4,7 @@ import { StrKey } from '@stellar/stellar-sdk';
 import type { AuthedUser } from '@/lib/auth/privy-auth';
 import { getDb } from '@/lib/db';
 import { isDoctorLocallyApproved } from '@/lib/doctor-onboarding';
-import { PrivateFlowError, PRIVY_APP } from '@/lib/private-config';
+import { PrivateFlowError, privatePrivyAppId } from '@/lib/private-config';
 import { appointmentStartedByDoctorSql } from '@/lib/prescription-booking';
 import type { ClinicalActor, DoctorClinicalInbox, DoctorClinicalNotification, DoctorClinicalRecordAccess } from '@/types/clinical';
 import { createClinicalWebChain, deriveClinicalHistoryId } from './chain';
@@ -91,7 +91,7 @@ async function inboxObservations(doctorId: number, actor: ClinicalActor) {
       ELSE 'access_changed'
     END,NULL::integer[]
   FROM recent
-  ORDER BY confirmed_at DESC,id DESC`, [doctorId, actor.address, actor.userId, actor.walletId, PRIVY_APP, CLINICAL_ID, notificationLimit]);
+  ORDER BY confirmed_at DESC,id DESC`, [doctorId, actor.address, actor.userId, actor.walletId, privatePrivyAppId(), CLINICAL_ID, notificationLimit]);
 }
 
 async function currentInboxRecords(candidates: GrantObservation[], actor: ClinicalActor, primary: ReturnType<typeof createClinicalWebChain>,

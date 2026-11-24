@@ -5,11 +5,11 @@ import type { PoolClient } from '@neondatabase/serverless';
 import { loadPrivateRxScope, loadHostedPrivateRxScope, privateRxHostedContext, assertPrivateRxScopeOpen as assertOpen,
   privateRxScopeConfigured as localRxScopeConfigured,
   type PrivateRxAppointmentScope, type PrivateRxIssuanceScope, type PrivateRxRole, type PrivateRxScope,
-  type PrivateRxStepKey } from '../../scripts/lib/digital-cabs-rx-scope.mjs';
+  type PrivateRxStepKey, type PartnerPrivateRxScope, type PrivateRxOperationScope } from '../../scripts/lib/digital-cabs-rx-scope.mjs';
 import { assertHostedCaptureWeb, hostedCaptureWebConfigured, lockHostedCaptureMutation, lockHostedCaptureRecovery,
   readHostedCaptureActive, readHostedCaptureByRequest } from '../../scripts/lib/hosted-capture-store.mjs';
 
-export type { PrivateRxAppointmentScope, PrivateRxIssuanceScope, PrivateRxScope, PrivateRxRole, PrivateRxStepKey };
+export type { PrivateRxAppointmentScope, PrivateRxIssuanceScope, PrivateRxScope, PrivateRxRole, PrivateRxStepKey, PartnerPrivateRxScope, PrivateRxOperationScope };
 const denied = () => new PrivateFlowError('private_rx_scope_rejected', 403);
 type Wallet = { walletId: string; address: string };
 type Row = Record<string, unknown>;
@@ -61,7 +61,7 @@ export async function historicalHostedPrivateRxScope(id: string) {
   } finally { client.release(); }
 }
 
-export async function lockHostedPrivateRxMutation(client: PoolClient, scope: PrivateRxScope) {
+export async function lockHostedPrivateRxMutation(client: PoolClient, scope: PrivateRxScope | PartnerPrivateRxScope) {
   const context = privateRxHostedContext(scope);
   if (!context) return;
   if (context.phase === 'attest' || context.historical) throw denied();
@@ -85,7 +85,7 @@ export async function lockHostedPrivateRxRecovery(client: PoolClient, scope: Pri
   catch { throw denied(); }
 }
 
-export function assertPrivateRxScopeOpen<T extends PrivateRxScope>(scope: T, step?: PrivateRxStepKey): T {
+export function assertPrivateRxScopeOpen<T extends PrivateRxScope | PartnerPrivateRxScope>(scope: T, step?: PrivateRxStepKey): T {
   return scoped(() => { assertPrivateEnvironment(); return assertOpen(scope, { step }) as T; });
 }
 
@@ -122,14 +122,14 @@ export function privateRxSlotHost(request: Request, scope: PrivateRxScope) {
   return /^(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?$/.test(host);
 }
 
-export function privateRxRole(scope: PrivateRxScope, user: AuthedUser): PrivateRxRole {
+export function privateRxRole(scope: PrivateRxScope | PartnerPrivateRxScope, user: AuthedUser): PrivateRxRole {
   if (!user.email) throw denied();
   if (scope.patient.userId === user.userId) return 'patient';
   if (scope.doctor.userId === user.userId) return 'doctor';
   throw denied();
 }
 
-export function assertPrivateRxActor(scope: PrivateRxScope, user: AuthedUser, wallet: Wallet | undefined, role: PrivateRxRole) {
+export function assertPrivateRxActor(scope: PrivateRxScope | PartnerPrivateRxScope, user: AuthedUser, wallet: Wallet | undefined, role: PrivateRxRole) {
   if (privateRxRole(scope, user) !== role || (wallet && (wallet.walletId !== scope[role].walletId || wallet.address !== scope[role].address))) throw denied();
 }
 
@@ -146,7 +146,7 @@ function appointmentDate(value: unknown) {
 }
 
 /** Validate the exact protected row inside the existing resource lock. */
-export function assertPrivateRxContext(scope: PrivateRxScope, appointment: Row, booking?: Row | null, prescription?: Row | null) {
+export function assertPrivateRxContext(scope: PrivateRxScope | PartnerPrivateRxScope, appointment: Row, booking?: Row | null, prescription?: Row | null) {
   if (!appointment || Number(appointment.doctor_id) !== scope.doctorId ||
       appointmentDate(appointment.date) !== scope.slot.date || appointment.time_slot !== scope.slot.timeSlot || appointment.type !== scope.slot.type ||
       appointment.patient_user_id !== scope.patient.userId || appointment.patient_wallet_id !== scope.patient.walletId || appointment.patient_wallet !== scope.patient.address ||
@@ -167,7 +167,7 @@ export function assertPrivateRxDocument(scope: PrivateRxIssuanceScope, document:
       !(['medication', 'dosage', 'instructions'] as const).every(key => Object.hasOwn(document, key) && (document as Row)[key] === scope.document[key])) throw denied();
 }
 
-export function assertPrivateRxOperationIntent(scope: PrivateRxIssuanceScope, user: AuthedUser, action: string,
+export function assertPrivateRxOperationIntent(scope: PrivateRxOperationScope, user: AuthedUser, action: string,
   resource: { appointmentId?: number; prescriptionId?: string }) {
   if (action === 'consent' && resource.appointmentId === scope.appointmentId && resource.prescriptionId === undefined) {
     assertPrivateRxScopeOpen(scope, 'consent'); assertPrivateRxActor(scope, user, undefined, 'patient'); return;
@@ -178,7 +178,7 @@ export function assertPrivateRxOperationIntent(scope: PrivateRxIssuanceScope, us
   throw denied();
 }
 
-export function assertPrivateRxConfirmationIntent(scope: PrivateRxIssuanceScope, user: AuthedUser, id: string) {
+export function assertPrivateRxConfirmationIntent(scope: PrivateRxOperationScope, user: AuthedUser, id: string) {
   const step = id === scope.steps.consent.requestId ? 'consent' : id === scope.steps.mint.requestId ? 'mint' : null;
   if (!step) throw denied();
   assertPrivateRxScopeOpen(scope, step);

@@ -1,10 +1,10 @@
 import type { FeeBumpTransaction, xdr } from '@stellar/stellar-sdk';
-import type { PrivateRxScope } from './digital-cabs-rx-scope.mjs';
+import type { PrivateRxOperationScope } from './digital-cabs-rx-scope.mjs';
 import type { Reservation, Receipt, SponsorshipPolicy } from './sponsorship-domain.mjs';
 import type { SponsorshipQuote } from './sponsorship-quote.mjs';
 import type { SponsorshipConnection } from './sponsorship-sql-store.mjs';
 
-type IssuanceScope = Extract<PrivateRxScope, { phase: 'issuance' }>;
+type IssuanceScope = PrivateRxOperationScope;
 export type PrivateRxStep = 'attest' | 'consent' | 'mint';
 export type PrivateRxExpected = { doctor: string; patient: string; issuanceId: string; validUntil: number; commitment?: string; expiresAt?: number };
 type PreparedAuthority = { xdr: string; hash: string; unsignedXdr: string; signedAt: number };

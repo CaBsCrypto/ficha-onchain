@@ -16,6 +16,7 @@ import { clinicalMigrationConnection } from './lib/clinical-migration-policy.mjs
 import { CLINICAL_RESILIENCE_SCHEMA_SQL } from './lib/clinical-resilience-schema.mjs';
 import { APPOINTMENT_DURATION_SCHEMA_SQL, HOSTED_CAPTURE_SCHEMA_SQL } from './lib/hosted-capture-schema.mjs';
 import { assertHostedCaptureOperator } from './lib/hosted-capture-store.mjs';
+import { clinicalLinksMigrationConnection, migrateClinicalLinksPilot } from './lib/clinical-links-migration.mjs';
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -23,7 +24,8 @@ if (!process.env.DATABASE_URL && existsSync(".env.local")) {
     if (m) process.env.DATABASE_URL = m[1].trim();
   }
 }
-const connection = databaseConnectionString();
+const selectedStep = process.argv.find((arg) => arg.startsWith("--step="))?.slice(7);
+const connection = selectedStep === 'clinical-links-pilot' ? clinicalLinksMigrationConnection() : databaseConnectionString();
 if (!connection) {
   console.error("DATABASE_URL is not set (looked in the environment and .env.local)");
   process.exit(1);
@@ -1088,10 +1090,10 @@ step('hosted-capture-v1', async () => {
   ]);
 });
 // ── Run ─────────────────────────────────────────────────────────────────────
+if (selectedStep === 'clinical-links-pilot') step('clinical-links-pilot', () => migrateClinicalLinksPilot(sql));
 const host = new URL(connection).hostname;
 console.log(`\n  target: ${host}\n`);
 
-const selectedStep = process.argv.find((arg) => arg.startsWith("--step="))?.slice(7);
 if (selectedStep && !steps.some((s) => s.name === selectedStep)) throw new Error("Unknown migration step");
 for (const { name, fn } of steps.filter((s) => !selectedStep || s.name === selectedStep)) {
   try {

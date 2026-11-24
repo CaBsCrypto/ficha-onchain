@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { assertPrivateEnvironment, assertPrivateWrites, PRIVATE_ADMIN, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
+import { assertPrivateEnvironment, assertPrivateWrites, PRIVATE_ADMIN, privatePrivyAppId, PRIVY_APP, REGISTRY_PRIVATE, RX_PRIVATE } from '@/lib/private-config';
 import { assertClinicalEnvironment, CLINICAL_ID } from '@/lib/clinical/config';
 
 const localHost = 'ep-lingering-water-ahzh89z5-pooler.c-3.us-east-1.aws.neon.tech';
@@ -32,6 +32,30 @@ describe('explicit private Testnet configuration', () => {
     expect(() => assertClinicalEnvironment()).toThrow('clinical_configuration_unavailable');
   });
   it('accepts the complete local development environment', () => expect(assertPrivateWrites).not.toThrow());
+  it('pins a distinct shared app only inside the isolated clinical-links preview', () => {
+    const sandboxApp = 'cmsyntheticsandbox00001';
+    const host = 'isolated.neon.tech';
+    for (const [key, value] of Object.entries({
+      TRUSTLEAF_CLINICAL_LINKS_PILOT_ENABLED: 'true',
+      TRUSTLEAF_CLINICAL_LINKS_TEST_PRIVY_APP_ID: sandboxApp,
+      TRUSTLEAF_CLINICAL_LINKS_DB_HOST: host,
+      TRUSTLEAF_DB_HOST: host,
+      TRUSTLEAF_DATABASE_URL: `postgres://test:test@${host}/pilot`,
+      TRUSTLEAF_ENV: 'preview',
+      VERCEL_ENV: 'preview',
+      PRIVY_APP_ID: sandboxApp,
+      NEXT_PUBLIC_PRIVY_APP_ID: sandboxApp,
+    })) vi.stubEnv(key, value);
+    expect(privatePrivyAppId()).toBe(sandboxApp);
+    expect(assertPrivateEnvironment).not.toThrow();
+    vi.stubEnv('PRIVY_APP_ID', PRIVY_APP);
+    expect(assertPrivateEnvironment).toThrow('private_configuration_mismatch');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('TRUSTLEAF_ENV', 'test');
+    expect(privatePrivyAppId).toThrow('private_configuration_mismatch');
+    vi.stubEnv('TRUSTLEAF_CLINICAL_LINKS_PILOT_ENABLED', 'false');
+    expect(privatePrivyAppId()).toBe(PRIVY_APP);
+  });
   it.each([['preview', 'preview'], ['test', 'production']])('accepts an isolated %s database for Vercel %s', (environment, vercel) => {
     vi.stubEnv('TRUSTLEAF_ENV', environment); vi.stubEnv('VERCEL_ENV', vercel);
     vi.stubEnv('TRUSTLEAF_DB_HOST', 'isolated.neon.tech'); vi.stubEnv('DATABASE_URL', 'postgres://test:test@isolated.neon.tech/test');

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Address, Contract, FeeBumpTransaction, Keypair, Networks, Transaction, TransactionBuilder, nativeToScVal, xdr } from '@stellar/stellar-sdk';
-import { assertHostedPrivateRxReceiptScope, assertPrivateRxScopeOpen, privateRxHostedContext } from './digital-cabs-rx-scope.mjs';
+import { assertHostedPrivateRxReceiptScope, assertPrivateRxScopeOpen, privateRxHostedContext, privateRxPartnerContext } from './digital-cabs-rx-scope.mjs';
+import { PARTNER_PRESCRIPTION_SCOPE_PATH } from './clinical-links-mint-policy.mjs';
 import { clinicalSimulationIsLive } from './clinical-live-read.mjs';
 import { assertBinding, assertPolicy, CLINICAL_QUOTE_MAX_AGE_SECONDS, quoteExpiresAt, sha256, stroops, verifySponsorshipPrincipal } from './sponsorship-domain.mjs';
 import { quoteSponsorship, signedEnvelope } from './sponsorship-quote.mjs';
@@ -75,10 +76,11 @@ export async function privateRxQuote(scope, step, unsignedXdr, expected, { prepa
 }
 
 function policyFor(scope, step, env) {
-  const path = step === 'attest' ? '/api/prescription-bookings' : '/api/private-operations';
+  const partner = privateRxPartnerContext(scope);
+  const path = partner ? PARTNER_PRESCRIPTION_SCOPE_PATH : step === 'attest' ? '/api/prescription-bookings' : '/api/private-operations';
   const paths = env.TRUSTLEAF_SPONSORSHIP_PATHS;
   const hostedWeb = privateRxHostedContext(scope)?.phase === 'issuance';
-  const allowedPath = hostedWeb ? paths?.split(',').includes(path) : paths === path;
+  const allowedPath = hostedWeb || partner ? paths?.split(',').includes(path) : paths === path;
   check(env.TRUSTLEAF_SPONSORSHIP_ENABLED === 'true' && allowedPath &&
     env.TRUSTLEAF_PRIVATE_WRITES_ENABLED === 'false', 'private_rx_sponsorship_disabled');
   const minimum = (left, right) => (stroops(left) < stroops(right) ? left : right);
@@ -182,7 +184,10 @@ export function createPrivateRxSponsorship({ scope, client, connect, env = proce
       open(step);
       const { principal } = await principalFor(scope, step, unsignedXdr, expected), store = storeFor(atomic);
       check(!(await store.get(principal.requestId)), 'private_rx_sponsorship_attempt_exists');
+      // A pilot consultation enters this flow only after the worker's attestation
+      // has been checked against the fixed authority's exact Testnet receipt.
       for (const previous of STEPS.slice(0, STEPS.indexOf(step))) {
+        if (previous === 'attest' && privateRxPartnerContext(scope)) continue;
         const prior = await store.get(scope.steps[previous].requestId), actor = actorFor(scope, previous);
         check(prior?.state === 'settled' && prior.outcome === 'SUCCESS' && prior.binding.action === METHODS[previous] &&
           prior.binding.contractId === scope.contractId && prior.binding.encounterId === scope.issuanceId && prior.binding.patientAddress === scope.patient.address &&

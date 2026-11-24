@@ -11,6 +11,7 @@ import { createPrivateChain, type ExpectedOperation } from '@/lib/stellar/privat
 import { encryptPrescription, decryptPrescription, prescriptionCommitment } from '../../scripts/lib/private-prescription.mjs';
 import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxDocument, assertPrivateRxScopeOpen, lockHostedPrivateRxMutation,
   type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
+import { PARTNER_PRESCRIPTION_CUSTODY } from '../../scripts/lib/clinical-links-mint-policy.mjs';
 
 // Rows stay inside the server boundary; only explicit view models leave it.
 export type PrivateRow = Record<string, any>;
@@ -142,6 +143,10 @@ export async function readPrivateConsultation(actor:AuthedUser,id:number,regular
     }
     const operationRows=(await client.query('SELECT * FROM private_operations WHERE appointment_id=$1 AND actor_user_id=$2 ORDER BY created_at DESC LIMIT 20',[id,actor.userId])).rows;
     const operations=operationRows.map(publicOperation);
+    if(prescription?.ciphertext===PARTNER_PRESCRIPTION_CUSTODY) return {
+      appointment:appointmentView,booking:publicBooking,consent,prescription:null,operations:[],
+      ...(classification?{appointmentMode:'scoped' as const,appointmentActions,canManageClinicalPermissions}:{}),
+    };
     if(prescription)prescription.operation=operationRows.find(o=>o.prescription_id===prescription.id);
     return {appointment:appointmentView,booking:publicBooking,consent,
       ...(classification?{appointmentMode:classification.kind==='regular'?'legacy' as const:'scoped' as const,appointmentActions,canManageClinicalPermissions,checkIn}:{}),
@@ -159,7 +164,8 @@ export async function listPrivatePrescriptions(actor:AuthedUser,role:string) {
         FROM private_operations o WHERE o.prescription_id=p.id AND o.actor_user_id=$2 ORDER BY o.created_at DESC LIMIT 1) AS operation FROM private_prescriptions p
       JOIN prescription_booking_requests b ON b.appointment_id=p.appointment_id JOIN appointments a ON a.id=p.appointment_id
       JOIN doctors d ON LOWER(d.email)=LOWER(a.doctor_email) WHERE p.${column}=$1 AND b.${identity}=$2 AND p.contract_id=$3
-      ${role==='patient'?"AND p.state='confirmed'":''} ORDER BY p.created_at DESC`,[wallet.address,actor.userId,RX_PRIVATE])).rows;
+      ${role==='patient'?"AND p.state='confirmed'":''} ORDER BY p.created_at DESC`,[wallet.address,actor.userId,RX_PRIVATE])).rows
+      .filter(row => row.ciphertext !== PARTNER_PRESCRIPTION_CUSTODY);
     const chain=createPrivateChain();await chain.verifyDeployment();
     const prescriptions: Awaited<ReturnType<typeof prescriptionView>>[]=[];
     // Bound RPC pressure without serializing independent records. Any rejected
@@ -187,6 +193,7 @@ export async function preparePrescription(actor:AuthedUser,appointmentId:number,
     await client.query('BEGIN');
     if (scope) await lockHostedPrivateRxMutation(client, scope);
     const {appointment,booking,prescription}=await loadPrivateContext(client,actor,appointmentId,true);
+    if(prescription?.ciphertext===PARTNER_PRESCRIPTION_CUSTODY)throw new PrivateFlowError('partner_prescription_required',403);
     if(scope)assertPrivateRxContext(scope,appointment,booking,prescription);
     if(actor.email!==appointment.doctor_email||!booking||actor.userId!==booking.doctor_user_id||wallet.address!==booking.doctor_wallet)throw new PrivateFlowError('forbidden',403);
     const chain=createPrivateChain();await chain.verifyDeployment();await verifyParticipants(client,booking);
@@ -217,7 +224,7 @@ export async function readPrivateDocument(actor:AuthedUser,id:string) {
         AND o.action='revoke' AND o.state='confirmed' ORDER BY o.created_at DESC LIMIT 1) AS revocation_hash FROM private_prescriptions p
       JOIN prescription_booking_requests b ON b.appointment_id=p.appointment_id WHERE p.id=$1 AND p.contract_id=$2
       AND ((p.state='confirmed' AND p.patient_wallet=$3 AND b.patient_requested_by=$4) OR (p.doctor_wallet=$3 AND b.doctor_user_id=$4))`,[id,RX_PRIVATE,wallet.address,actor.userId])).rows[0];
-    if(!row)throw new PrivateFlowError('private_prescription_unavailable',404);
+    if(!row||row.ciphertext===PARTNER_PRESCRIPTION_CUSTODY)throw new PrivateFlowError('private_prescription_unavailable',404);
     const chain=createPrivateChain();
     const [,view]=await Promise.all([chain.verifyDeployment(), prescriptionView(row,{},chain)]);
     const plain=decryptPrescription(row.ciphertext,encryptionKey(),storageContext(row.id));

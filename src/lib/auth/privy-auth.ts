@@ -22,6 +22,8 @@
 import { PrivyClient } from "@privy-io/server-auth";
 import { NextResponse } from "next/server";
 import { AccessServiceError } from '@/lib/auth/access-error';
+import { PRIVY_APP, privatePrivyAppId } from '@/lib/private-config';
+import { decodeJwt } from 'jose';
 
 export interface AuthedUser {
   /** Privy DID, e.g. "did:privy:cmrixg4c702vy0cjmt0jsyt8s" */
@@ -112,7 +114,13 @@ export async function requirePrivySession(request: Request): Promise<{ userId: s
   const token = extractToken(request);
   if (!token) return null;
   try {
+    const appId = privatePrivyAppId();
+    const sharedSandbox = appId !== PRIVY_APP;
+    if (sharedSandbox && (process.env.PRIVY_APP_ID !== appId || !process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID)) {
+      throw new AccessServiceError('auth_configuration_invalid', 'configuration');
+    }
     const claims = await getPrivy().verifyAuthToken(token);
+    if (sharedSandbox && decodeJwt(token).app_client_id !== process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID) return null;
     return { userId: claims.userId };
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
@@ -165,7 +173,9 @@ export function unauthorized() {
 export function authEnforced(): boolean {
   return (
     process.env.TRUSTLEAF_REQUIRE_AUTH === "true" ||
-    process.env.NEXT_PUBLIC_PASSKEY_ENABLED === "true"
+    process.env.NEXT_PUBLIC_PASSKEY_ENABLED === "true" ||
+    (process.env.TRUSTLEAF_CLINICAL_LINKS_PILOT_ENABLED === 'true' &&
+      !!process.env.TRUSTLEAF_CLINICAL_LINKS_TEST_PRIVY_APP_ID)
   );
 }
 

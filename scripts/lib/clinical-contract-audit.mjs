@@ -4,6 +4,7 @@ import { PRIVATE_REGISTRY_ID } from './private-registry.mjs';
 
 export const CLINICAL_AUDIT_DOCTOR = 'GA2CSQROVUXJYUH6MTGN42UP3P624NY23HXUW2N3LYX5FSEQ4E2TX3TR';
 export const PRIVATE_PRESCRIPTION_ID = 'CDUN6FXFX6OYLP6DS3W7RC72GBVMS3TFJ7LFTB3LGVPF6PWMR6FCZSYE';
+export const PRIVATE_PRESCRIPTION_WASM_HASH = '4703d26f7ed6321c4c5f1bcb20ac9392c43c79fae3e0f16adbc7ac70e738155c';
 const HEX = /^[a-f0-9]{64}$/;
 const METHODS = new Set(['interface_version', 'get_registry', 'get_admin', 'get_booking_authority', 'get_authorization', 'is_authorized', 'get_prescription', 'is_valid']);
 const failed = reason => new Error(reason);
@@ -77,6 +78,7 @@ export function createClinicalContractAuditor({ server, readerAddress }) {
     return { observedWasmHash: expectedWasmHash, wasmBytes: value.code().length, observedLedger: ledger };
   }
   return {
+    verifyWasm,
     async auditDeployment({ name, contractId, expectedWasmHash, interfaceVersion, configuration = {} }) {
       const code = await verifyWasm(contractId, expectedWasmHash);
       if (await read(contractId, 'interface_version') !== interfaceVersion) throw failed('audit_interface_mismatch');

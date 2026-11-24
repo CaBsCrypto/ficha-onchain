@@ -2,7 +2,7 @@ import { Account, Address, BASE_FEE, Contract, Keypair, Networks, Transaction, T
 import { PRIVATE_ADMIN, RX_PRIVATE, REGISTRY_PRIVATE, PrivateFlowError } from '@/lib/private-config';
 import { clinicalSimulationIsLive } from '../../../scripts/lib/clinical-live-read.mjs';
 import { assertUnintegratedSponsorship } from '../../../scripts/lib/sponsorship-write-gate.mjs';
-import { assertPrivateRxScopeOpen, type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
+import { assertPrivateRxScopeOpen, type PrivateRxOperationScope } from '@/lib/digital-cabs-rx';
 
 export type PrivateAction = 'consent' | 'withdraw_consent' | 'mint' | 'activate' | 'revoke';
 export interface ExpectedOperation {
@@ -91,7 +91,7 @@ export function createPrivateChain(server=new rpc.Server('https://soroban-testne
       if(!Number.isSafeInteger(until)||until<=0)throw new PrivateFlowError('consent_unavailable',503);
       return until;
     },
-    async prepare(source:string,action:PrivateAction,expected:ExpectedOperation,scope?:PrivateRxIssuanceScope) {
+    async prepare(source:string,action:PrivateAction,expected:ExpectedOperation,scope?:PrivateRxOperationScope) {
       if (scope) {
         if ((action !== 'consent' && action !== 'mint') || source !== scope[action === 'consent' ? 'patient' : 'doctor'].address ||
           expected.patient !== scope.patient.address || expected.doctor !== scope.doctor.address || expected.issuanceId !== scope.issuanceId ||

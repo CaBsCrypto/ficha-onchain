@@ -18,6 +18,18 @@ export interface PrivateRxIssuanceScope extends ScopeBase {
   readonly steps: Readonly<Record<PrivateRxStepKey, PrivateRxStep>>;
 }
 export type PrivateRxScope = PrivateRxAppointmentScope | PrivateRxIssuanceScope;
+export interface PrivateRxPartnerContext {
+  readonly consultationRef: string;
+  readonly bindingId: string;
+  readonly partnerId: string;
+  readonly attestationHash: string;
+  readonly commitment: string;
+  readonly expiresAt: number;
+}
+export type PartnerPrivateRxScope = Omit<PrivateRxIssuanceScope, 'basePdfScopeSha256' | 'document' | 'historyId' | 'attestationQuoteSha256' | 'steps'> & {
+  readonly steps: Readonly<Record<'consent' | 'mint', PrivateRxStep>>;
+};
+export type PrivateRxOperationScope = PrivateRxIssuanceScope | PartnerPrivateRxScope;
 export const PRIVATE_RX_SCOPE_ENV: Readonly<{ file: string; hash: string; approval: string }>;
 export const DIGITAL_CABS_RX_DOCUMENT: PrivateRxDocument;
 export const PRIVATE_RX_CONTRACT_ID: string;
@@ -34,6 +46,8 @@ export interface PrivateRxHostedSnapshot {
   historyId: string; relayer: string; patient: PrivateRxActor; doctor: PrivateRxActor;
 }
 export function loadHostedPrivateRxScope(snapshot: PrivateRxHostedSnapshot, options?: { now?: number; historical?: boolean }): PrivateRxScope;
-export function privateRxHostedContext(scope: PrivateRxScope): Readonly<{ phase: 'appointment' | 'attest' | 'issuance'; expiresAt: number; origin: string; historical: boolean }> | undefined;
-export function assertHostedPrivateRxReceiptScope(scope: PrivateRxScope, step: PrivateRxStepKey): void;
-export function assertPrivateRxScopeOpen(scope: PrivateRxScope, options?: { env?: NodeJS.ProcessEnv; now?: number; step?: PrivateRxStepKey }): PrivateRxScope;
+export function privateRxHostedContext(scope: PrivateRxScope | PartnerPrivateRxScope): Readonly<{ phase: 'appointment' | 'attest' | 'issuance'; expiresAt: number; origin: string; historical: boolean }> | undefined;
+export function loadPartnerPrivateRxScope(plan: Omit<PartnerPrivateRxScope, 'approved' | 'policyHash'>, context: PrivateRxPartnerContext, options?: { env?: NodeJS.ProcessEnv; historical?: boolean }): PartnerPrivateRxScope;
+export function privateRxPartnerContext(scope: PrivateRxScope | PartnerPrivateRxScope): Readonly<PrivateRxPartnerContext & { historical: boolean }> | undefined;
+export function assertHostedPrivateRxReceiptScope(scope: PrivateRxScope | PartnerPrivateRxScope, step: PrivateRxStepKey): void;
+export function assertPrivateRxScopeOpen<T extends PrivateRxScope | PartnerPrivateRxScope>(scope: T, options?: { env?: NodeJS.ProcessEnv; now?: number; step?: PrivateRxStepKey }): T;

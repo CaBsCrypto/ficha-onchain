@@ -9,9 +9,12 @@ import { assertBookingReady, assertReviewedPrescriber, expectedBooking, loadPriv
 import type { PoolClient } from '@neondatabase/serverless';
 import { assertPrivateRxActor, assertPrivateRxContext, assertPrivateRxOperationIntent, assertPrivateRxConfirmationIntent,
   assertPrivateRxScopeOpen, currentPrivateRxScope, historicalHostedPrivateRxScope, lockHostedPrivateRxMutation,
-  lockHostedPrivateRxRecovery, type PrivateRxIssuanceScope } from '@/lib/digital-cabs-rx';
+  lockHostedPrivateRxRecovery, type PrivateRxOperationScope } from '@/lib/digital-cabs-rx';
 import { createPrivateRxSponsorship } from '../../scripts/lib/private-rx-sponsorship.mjs';
 import { canonicalJSON } from '../../scripts/lib/clinical-rehearsal-policy.mjs';
+import { privateRxPartnerContext } from '../../scripts/lib/digital-cabs-rx-scope.mjs';
+import { assertPartnerRxContext, verifyPartnerRxAttestation, verifyPartnerRxWasm } from '@/lib/clinical-links/prescription-context';
+import { PARTNER_PRESCRIPTION_CUSTODY } from '../../scripts/lib/clinical-links-mint-policy.mjs';
 
 async function operationContext(client:PoolClient,actor:AuthedUser,action:PrivateAction,appointmentId:number,prescriptionId:string|null) {
   const context=await loadPrivateContext(client,actor,appointmentId,true);
@@ -63,11 +66,12 @@ function rxError(error: unknown): never {
   throw new PrivateFlowError('private_rx_sponsorship_unavailable',503);
 }
 
-function rxSponsorship(scope: PrivateRxIssuanceScope, client: PoolClient) {
+function rxSponsorship(scope: PrivateRxOperationScope, client: PoolClient) {
   return createPrivateRxSponsorship({scope,client,connect:getDbConnection});
 }
 
-function assertScopedRow(scope: PrivateRxIssuanceScope, step: RxOperationStep, actor: AuthedUser, wallet: PrivateWallet, row: PrivateRow | undefined): asserts row is PrivateRow {
+function assertScopedRow(scope: PrivateRxOperationScope, step: RxOperationStep, actor: AuthedUser, wallet: PrivateWallet, row: PrivateRow | undefined): asserts row is PrivateRow {
+  const partner = privateRxPartnerContext(scope);
   const role = step === 'consent' ? 'patient' : 'doctor';
   assertPrivateRxActor(scope,actor,wallet,role);
   if (!row || row.id !== scope.steps[step].requestId || row.action !== step || row.method !== ACTION_METHODS[step] ||
@@ -76,31 +80,37 @@ function assertScopedRow(scope: PrivateRxIssuanceScope, step: RxOperationStep, a
     row.actor_user_id !== actor.userId || row.actor_email !== actor.email || row.wallet_id !== wallet.walletId || row.source_wallet !== wallet.address ||
     row.expected?.rxScopeSha256 !== scope.policyHash || row.expected.issuanceId !== scope.issuanceId || row.expected.validUntil !== scope.bookingValidUntil ||
     row.expected.patient !== scope.patient.address || row.expected.doctor !== scope.doctor.address ||
+    (partner && step === 'mint' && (row.expected.commitment !== partner.commitment || row.expected.expiresAt !== partner.expiresAt)) ||
     Number(row.expires_at) > Math.min(scope.until,scope.bookingValidUntil)) throw new PrivateFlowError('operation_not_found',404);
 }
 
-async function scopedContext(client: PoolClient, scope: PrivateRxIssuanceScope, actor: AuthedUser, step: RxOperationStep) {
+async function scopedContext(client: PoolClient, scope: PrivateRxOperationScope, actor: AuthedUser, step: RxOperationStep) {
   const context = await operationContext(client,actor,step,scope.appointmentId,step === 'mint' ? scope.prescriptionId : null);
   assertPrivateRxContext(scope,context.appointment,context.booking,context.prescription);
+  await assertPartnerRxContext(client,scope,context.booking,context.prescription);
   return context;
 }
 
-async function scopedExpected(client: PoolClient, scope: PrivateRxIssuanceScope, actor: AuthedUser, step: RxOperationStep,
+async function scopedExpected(client: PoolClient, scope: PrivateRxOperationScope, actor: AuthedUser, step: RxOperationStep,
   context: Awaited<ReturnType<typeof scopedContext>>, chain = createPrivateChain(), resubmitting = false) {
   const eligible = await assertEligible(client,actor,step,context,chain,resubmitting);
+  if (privateRxPartnerContext(scope)) {
+    if (step === 'consent') await assertReviewedPrescriber(client,context.appointment,context.booking);
+    await Promise.all([verifyPartnerRxWasm(scope,chain),verifyPartnerRxAttestation(scope,chain)]);
+  }
   assertPrivateRxScopeOpen(scope,step);
   return { ...expectedBooking(context.booking), ...(step === 'mint' ? {commitment:eligible.commitment,expiresAt:eligible.expiresAt} : {}),
     rxScopeSha256:scope.policyHash };
 }
 
-async function scopedOperationView(scope: PrivateRxIssuanceScope, step: RxOperationStep, row: PrivateRow, client: PoolClient) {
+async function scopedOperationView(scope: PrivateRxOperationScope, step: RxOperationStep, row: PrivateRow, client: PoolClient) {
   const operation = publicOperation(row);
   if (row.state !== 'awaiting_signature' || row.signed_xdr || row.transaction_hash) return {operation};
   const sponsorship = await rxSponsorship(scope,client).quoteView(step,row.unsigned_xdr,row.expected,{atomic:true});
   return {operation:{...operation,sponsorship}};
 }
 
-async function withScopedWallet<T>(actor: AuthedUser, scope: PrivateRxIssuanceScope, step: RxOperationStep,
+async function withScopedWallet<T>(actor: AuthedUser, scope: PrivateRxOperationScope, step: RxOperationStep,
   work:(client:PoolClient,wallet:PrivateWallet)=>Promise<T>, historical = false):Promise<T> {
   if (!historical) assertPrivateRxScopeOpen(scope,step);
   const wallet = await privateActorWallet(actor);
@@ -108,8 +118,9 @@ async function withScopedWallet<T>(actor: AuthedUser, scope: PrivateRxIssuanceSc
   const client = await getDbConnection();
   try {
     await client.query('BEGIN');
-    if (historical) await lockHostedPrivateRxRecovery(client,scope,scope.steps[step].requestId);
-    else await lockHostedPrivateRxMutation(client,scope);
+    if (historical) {
+      if ('historyId' in scope) await lockHostedPrivateRxRecovery(client,scope,scope.steps[step].requestId);
+    } else await lockHostedPrivateRxMutation(client,scope);
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`private-user:${wallet.address}`]);
     const result = await work(client,wallet);
     await client.query('COMMIT');
@@ -120,7 +131,7 @@ async function withScopedWallet<T>(actor: AuthedUser, scope: PrivateRxIssuanceSc
   } finally { client.release(); }
 }
 
-async function prepareScopedOperation(actor: AuthedUser, action: PrivateAction, resource: RxResource, scope: PrivateRxIssuanceScope) {
+async function prepareScopedOperation(actor: AuthedUser, action: PrivateAction, resource: RxResource, scope: PrivateRxOperationScope) {
   assertPrivateRxOperationIntent(scope,actor,action,resource);
   if (action !== 'consent' && action !== 'mint') throw new PrivateFlowError('private_rx_scope_rejected',403);
   return withScopedWallet(actor,scope,action,async (client,wallet) => {
@@ -153,7 +164,7 @@ async function prepareScopedOperation(actor: AuthedUser, action: PrivateAction, 
   });
 }
 
-async function confirmScopedOperation(actor: AuthedUser, id: string, signature: string, scope: PrivateRxIssuanceScope) {
+async function confirmScopedOperation(actor: AuthedUser, id: string, signature: string, scope: PrivateRxOperationScope) {
   const step = assertPrivateRxConfirmationIntent(scope,actor,id);
   const newlySigned = await withScopedWallet(actor,scope,step,async (client,wallet) => {
     const sponsorship = rxSponsorship(scope,client);
@@ -176,7 +187,7 @@ async function confirmScopedOperation(actor: AuthedUser, id: string, signature: 
   return reconcileScopedOperation(actor,id,scope,newlySigned ? 'submit' : 'observe');
 }
 
-async function reconcileScopedOperation(actor: AuthedUser, id: string, scope: PrivateRxIssuanceScope,
+async function reconcileScopedOperation(actor: AuthedUser, id: string, scope: PrivateRxOperationScope,
   mode: 'observe' | 'submit' | 'historical' = 'observe') {
   const historical = mode === 'historical';
   const step = historical ? id === scope.steps.consent.requestId ? 'consent' : 'mint'
@@ -198,7 +209,7 @@ async function reconcileScopedOperation(actor: AuthedUser, id: string, scope: Pr
     if (receipt.status === 'SUCCESS' || receipt.status === 'FAILED') {
       let rxId: string | undefined;
       if (receipt.status === 'SUCCESS') {
-        await chain.verifyDeployment();
+        await Promise.all([chain.verifyDeployment(),verifyPartnerRxWasm(scope,chain)]);
         if (step === 'mint') {
           const e = row.expected as ExpectedOperation;
           rxId = receipt.returnValue ? String(scValToNative(receipt.returnValue)) : '';
@@ -224,7 +235,8 @@ async function reconcileScopedOperation(actor: AuthedUser, id: string, scope: Pr
       return {operation:publicOperation(terminal)};
     }
     if (mode === 'submit') {
-      await scopedExpected(client,scope,actor,step,context,chain,true);
+      const expected = await scopedExpected(client,scope,actor,step,context,chain,true);
+      if (canonicalJSON(JSON.parse(JSON.stringify(expected))) !== canonicalJSON(row.expected)) throw new PrivateFlowError('operation_context_changed');
       const outer = await sponsorship.assertCanSubmit(step,row.unsigned_xdr,row.expected,row.signed_xdr,row.transaction_hash);
       assertPrivateRxScopeOpen(scope,step);
       try { await chain.server.sendTransaction(outer); } catch { /* The durable hash remains pending. */ }
@@ -233,7 +245,7 @@ async function reconcileScopedOperation(actor: AuthedUser, id: string, scope: Pr
   }, historical);
 }
 
-export async function preparePrivateOperation(actor:AuthedUser,action:PrivateAction,resource:RxResource,scope?:PrivateRxIssuanceScope) {
+export async function preparePrivateOperation(actor:AuthedUser,action:PrivateAction,resource:RxResource,scope?:PrivateRxOperationScope) {
   if (scope) return prepareScopedOperation(actor,action,resource,scope);
   assertPrivateWrites();
   const wallet=await privateActorWallet(actor),client=await getDbConnection();
@@ -261,6 +273,7 @@ export async function preparePrivateOperation(actor:AuthedUser,action:PrivateAct
       await client.query('COMMIT');return {operation:publicOperation(pending)};
     }
     const context=await operationContext(client,actor,action,appointmentId,resource.prescriptionId??null);
+    if(context.prescription?.ciphertext===PARTNER_PRESCRIPTION_CUSTODY)throw new PrivateFlowError('partner_prescription_required',403);
     const chain=createPrivateChain(),expected=await assertEligible(client,actor,action,context,chain);
     const source=action==='consent'||action==='withdraw_consent'?expected.patient:expected.doctor;
     if(source!==wallet.address)throw new PrivateFlowError('wallet_binding_changed',403);
@@ -285,7 +298,7 @@ export function assertSavedEnvelope(row:PrivateRow, scopedRelayer?:string) {
       !outer.signatures.some(s=>Keypair.fromPublicKey(outer.feeSource).verify(outer.hash(),s.signature())))throw new PrivateFlowError('saved_operation_invalid',503);
   }
 }
-export async function confirmPrivateOperation(actor:AuthedUser,id:string,signature:string,scope?:PrivateRxIssuanceScope) {
+export async function confirmPrivateOperation(actor:AuthedUser,id:string,signature:string,scope?:PrivateRxOperationScope) {
   if (scope) return confirmScopedOperation(actor,id,signature,scope);
   assertPrivateEnvironment();
   const wallet=await privateActorWallet(actor),client=await getDbConnection();
@@ -302,6 +315,7 @@ export async function confirmPrivateOperation(actor:AuthedUser,id:string,signatu
     }else {
     assertPrivateWrites();assertSavedEnvelope(selected);
     const context=await operationContext(client,actor,selected.action,selected.appointment_id,selected.prescription_id);
+    if(context.prescription?.ciphertext===PARTNER_PRESCRIPTION_CUSTODY)throw new PrivateFlowError('partner_prescription_required',403);
     row=(await client.query('SELECT * FROM private_operations WHERE id=$1 FOR UPDATE',[id])).rows[0];
     const expected=await assertEligible(client,actor,row.action,context);
     if(JSON.stringify(expected)!==JSON.stringify(row.expected)) {
@@ -317,7 +331,13 @@ export async function confirmPrivateOperation(actor:AuthedUser,id:string,signatu
   // Release this connection before reconciliation; the signed attempt is durable.
   return reconcilePrivateOperation(actor,id);
 }
-export async function reconcilePrivateOperation(actor:AuthedUser,id:string,scope?:PrivateRxIssuanceScope) {
+export async function reconcilePartnerPrivateOperation(actor: AuthedUser, id: string, scope: PrivateRxOperationScope) {
+  const context = privateRxPartnerContext(scope);
+  if (!context) throw new PrivateFlowError('partner_prescription_required',403);
+  return reconcileScopedOperation(actor,id,scope,context.historical ? 'historical' : 'submit');
+}
+
+export async function reconcilePrivateOperation(actor:AuthedUser,id:string,scope?:PrivateRxOperationScope) {
   if (!scope) {
     let current;
     try { current = await currentPrivateRxScope(); } catch { /* Stored rows remain readable after scope closure. */ }

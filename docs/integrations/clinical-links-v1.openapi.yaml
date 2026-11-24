@@ -1,0 +1,314 @@
+openapi: 3.1.0
+info:
+  title: TrustLeaf Clinical Links
+  version: 1.0.0
+  description: API privada de prueba con identidades y documentos sintéticos.
+servers:
+  - url: /api/v1
+paths:
+  /patient-enrollments:
+    post:
+      summary: Da de alta o recupera una cuenta con la identidad compartida antes de abrir la ficha.
+      security: [{ partner: [], partnerPrivySession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [authorizePrescriptionLinks]
+              properties:
+                authorizePrescriptionLinks: { type: boolean }
+      responses:
+        '200':
+          description: Cuenta disponible. La referencia del socio se entrega con un permiso activo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, partnerPatientRef, associationStatus]
+                properties:
+                  status: { const: active }
+                  partnerPatientRef: { type: [string, 'null'], format: uuid }
+                  associationStatus: { enum: [active, not_authorized] }
+        default: { $ref: '#/components/responses/Error' }
+  /me/account:
+    get:
+      summary: Consulta el perfil de la cuenta, su ficha y permisos como titular autenticado.
+      security: [{ patient: [] }]
+      responses:
+        '200':
+          description: Estado de la cuenta, ficha y portales conectados.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountStatus, recordStatus, sources]
+                properties:
+                  accountStatus: { enum: [active, not_enrolled] }
+                  recordStatus: { enum: [ready, not_created] }
+                  hasNativeWallet: { type: boolean }
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      required: [partnerId, source, associationStatus, bindingId]
+                      properties:
+                        partnerId: { type: string }
+                        source: { type: string }
+                        associationStatus: { enum: [active, revoked, expired, not_authorized] }
+                        bindingId: { type: [string, 'null'], format: uuid }
+        default: { $ref: '#/components/responses/Error' }
+  /partner-prescriptions:
+    post:
+      summary: Prepara la emisión de una receta versionada durante una consulta verificada.
+      security: [{ partner: [], partnerPrivySession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrescriptionPreparation' }
+      responses:
+        '202': { $ref: '#/components/responses/PrescriptionReceipt' }
+        '200': { $ref: '#/components/responses/PrescriptionReceipt' }
+        default: { $ref: '#/components/responses/Error' }
+  /partner-prescriptions/{id}:
+    get:
+      summary: Consulta el resultado de su propia emisión como portal emisor.
+      security: [{ partner: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/PrescriptionReceipt' }
+        default: { $ref: '#/components/responses/Error' }
+  /bindings/claim:
+    post:
+      summary: Canjea el código de una vinculación iniciada por el paciente.
+      security: [{ partner: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code, actorRef]
+              properties:
+                code: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+                actorRef: { $ref: '#/components/schemas/Commitment' }
+      responses:
+        '200':
+          description: Código que el paciente confirma en FichaOnChain.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bindingId, confirmationCode]
+                properties:
+                  bindingId: { type: string, format: uuid }
+                  confirmationCode: { type: string, pattern: '^[0-9]{8}$' }
+        default: { $ref: '#/components/responses/Error' }
+  /bindings/status:
+    post:
+      summary: Consulta el estado de la vinculación del mismo actor de Cannabis.
+      security: [{ partner: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [bindingId, actorRef]
+              properties:
+                bindingId: { type: string, format: uuid }
+                actorRef: { $ref: '#/components/schemas/Commitment' }
+      responses:
+        '200':
+          description: La referencia del paciente se entrega con una vinculación activa.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, expiresAt]
+                properties:
+                  status: { enum: [pending, claimed, active, revoked, expired] }
+                  partnerPatientRef: { type: string, format: uuid }
+                  expiresAt: { type: string, format: date-time }
+        default: { $ref: '#/components/responses/Error' }
+  /clinical-link-events:
+    post:
+      summary: Registra una emisión o revocación con permiso vigente.
+      security: [{ partner: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Event' }
+      responses:
+        '202': { $ref: '#/components/responses/Receipt' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /clinical-link-events/{eventId}:
+    get:
+      summary: Consulta el recibo del evento propio del socio.
+      security: [{ partner: [] }]
+      parameters:
+        - { name: eventId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Receipt' }
+        default: { $ref: '#/components/responses/Error' }
+  /me/clinical-links:
+    get:
+      summary: Lista las recetas vinculadas visibles para el paciente autenticado.
+      security: [{ patient: [] }]
+      responses:
+        '200':
+          description: Referencias privadas y navegación autenticada al portal emisor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [links]
+                properties:
+                  links:
+                    type: array
+                    items: { $ref: '#/components/schemas/Link' }
+        default: { $ref: '#/components/responses/Error' }
+  /clinical-links/{linkRef}/proof:
+    get:
+      summary: Comprueba en Testnet el compromiso de la revisión del documento.
+      security: [{ patient: [] }, { partner: [] }]
+      parameters:
+        - { name: linkRef, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: revision
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Revision' }
+      responses:
+        '200':
+          description: El visor comprueba los bytes del PDF con el compromiso verificado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [linkRef, revision, integrityStatus, commitment]
+                properties:
+                  linkRef: { type: string, format: uuid }
+                  revision: { $ref: '#/components/schemas/Revision' }
+                  integrityStatus: { enum: [pending, verified, unavailable] }
+                  commitment:
+                    oneOf: [{ $ref: '#/components/schemas/Commitment' }, { type: 'null' }]
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    partner:
+      type: http
+      scheme: bearer
+      description: Credencial de servidor sandbox con alcance para la operación solicitada.
+    patient:
+      type: http
+      scheme: bearer
+      description: Token Privy del paciente emitido para FichaOnChain.
+    partnerPrivySession:
+      type: apiKey
+      in: header
+      name: Privy-Access-Token
+      description: Token de la sesión del actor para el cliente web registrado del socio. Lo envía el servidor del socio por HTTPS junto a su propia credencial.
+  responses:
+    PrescriptionReceipt:
+      description: Confirmación pendiente o emisión no transferible verificada en Stellar Testnet.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PrescriptionReceipt' }
+    Error:
+      description: Error de validación, autorización, conflicto o disponibilidad.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+    Receipt:
+      description: Recibo persistido. Un reenvío idéntico conserva su resultado inicial.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [eventId, linkRef, revision, result, receivedAt]
+            properties:
+              eventId: { type: string, format: uuid }
+              linkRef: { type: string, format: uuid }
+              revision: { $ref: '#/components/schemas/Revision' }
+              result: { enum: [applied, stale] }
+              receivedAt: { type: string, format: date-time }
+  schemas:
+    PrescriptionPreparation:
+      type: object
+      additionalProperties: false
+      required: [consultationRef, partnerPatientRef, documentId, version, commitment]
+      properties:
+        consultationRef: { type: string, format: uuid }
+        partnerPatientRef: { type: string, format: uuid }
+        documentId: { type: string, pattern: '^[A-Za-z0-9_-]{16,64}$' }
+        version: { $ref: '#/components/schemas/Revision' }
+        commitment: { $ref: '#/components/schemas/Commitment' }
+    PrescriptionReceipt:
+      type: object
+      required: [id, state, consultationRef, documentId, version, commitment, network, contractId, transactionHash, rxId]
+      properties:
+        id: { type: string, format: uuid }
+        state: { enum: [pending, confirmed] }
+        consultationRef: { type: string, format: uuid }
+        documentId: { type: string }
+        version: { $ref: '#/components/schemas/Revision' }
+        commitment: { $ref: '#/components/schemas/Commitment' }
+        network: { const: testnet }
+        contractId: { type: string }
+        transactionHash: { type: [string, 'null'] }
+        rxId: { type: [string, 'null'], pattern: '^[1-9][0-9]*$' }
+    Revision: { type: integer, minimum: 1, maximum: 2147483647 }
+    Commitment: { type: string, pattern: '^[0-9a-f]{64}$' }
+    Event:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, eventId, eventType, partnerPatientRef, resourceRef, category, clinicalStatus, revision, occurredAt, documentRevision]
+      properties:
+        schemaVersion: { const: 1 }
+        eventId: { type: string, format: uuid }
+        eventType: { enum: [clinical-link.issued, clinical-link.revoked] }
+        partnerPatientRef: { type: string, format: uuid }
+        resourceRef: { type: string, pattern: '^[A-Za-z0-9_-]{16,64}$' }
+        category: { const: cannabis.prescription }
+        clinicalStatus: { enum: [active, revoked] }
+        revision: { $ref: '#/components/schemas/Revision' }
+        documentRevision: { $ref: '#/components/schemas/Revision' }
+        occurredAt: { type: string, format: date-time, description: Fecha UTC con sufijo Z. }
+        commitment: { $ref: '#/components/schemas/Commitment' }
+      oneOf:
+        - properties:
+            eventType: { const: clinical-link.issued }
+            clinicalStatus: { const: active }
+          required: [commitment]
+          description: La revisión del documento es igual a la revisión del evento.
+        - properties:
+            eventType: { const: clinical-link.revoked }
+            clinicalStatus: { const: revoked }
+          not: { required: [commitment] }
+          description: La revisión del documento es anterior a la revisión del evento.
+    Link:
+      type: object
+      required: [linkRef, category, source, clinicalStatus, revision, documentRevision, occurredAt, proofState, href]
+      properties:
+        linkRef: { type: string, format: uuid }
+        category: { const: cannabis.prescription }
+        source: { type: string }
+        clinicalStatus: { enum: [active, revoked] }
+        revision: { $ref: '#/components/schemas/Revision' }
+        documentRevision: { $ref: '#/components/schemas/Revision' }
+        occurredAt: { type: string, format: date-time }
+        proofState: { enum: [pending, confirmed, unavailable] }
+        href: { type: string, format: uri }
+        credentialId: { type: [string, 'null'], pattern: '^[1-9][0-9]*$' }

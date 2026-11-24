@@ -69,6 +69,7 @@ export interface ClinicalPermissionAppointment {
   startedAt: string;
 }
 export interface ClinicalSnapshot {
+  clinicalLinksPilot?: true;
   draftsEnabled?: boolean;
   rehearsal?: { runId: string; until: number; signingCheck?: true; steps: Array<{ requestId: string; action: ClinicalAction; entryId?: string; expectedVersion?: number; expectedRevision?: number; canRead?: boolean; canAppend?: boolean; kind?: 'note' | 'file' }> };
   context?: { role: 'doctor'; canRead: boolean; canAppend: boolean; grantRevision: number };
