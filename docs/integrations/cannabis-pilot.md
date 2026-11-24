@@ -1,0 +1,20 @@
+# Piloto de recetas vinculadas con TrustLeaf Cannabis
+
+TrustLeaf Cannabis custodia el PDF sintético. FichaOnChain conserva la referencia, la revisión, el estado informado por el emisor y el recibo privado. La [API v1](clinical-links-v1.openapi.yaml) recibe metadatos por HTTPS. «Ver receta» abre el portal emisor, que comprueba otra vez la sesión y la pertenencia de la receta antes de entregar el PDF.
+
+## Configuración de FichaOnChain
+
+1. Preparar un preview y una base Neon aislada con el esquema de la ficha y dos pacientes sintéticos. P1 tiene una ficha y P2 sirve como control. Mantener la configuración privada de Privy, wallets y Testnet del portal. Usar `TRUSTLEAF_ENV=preview`, la conexión `TRUSTLEAF_DATABASE_URL` de la base del piloto y su mismo hostname exacto en `TRUSTLEAF_DB_HOST` y `TRUSTLEAF_CLINICAL_LINKS_DB_HOST`.
+2. Configurar `TRUSTLEAF_CLINICAL_LINKS_PILOT_ENABLED=true`, `TRUSTLEAF_CLINICAL_LINKS_PARTNER_ORIGIN` con el origen HTTPS exacto del preview de Cannabis y `TRUSTLEAF_CLINICAL_LINKS_PATIENT_IDS` con los dos DID sintéticos separados por coma. Ejecutar `node scripts/migrate.mjs --step=clinical-links-pilot` con ese destino explícito.
+3. Generar `tl_clp_` seguido de 32 bytes aleatorios en hex y guardar el valor como secreto `TRUSTLEAF_CLINICAL_LINKS_PARTNER_CREDENTIAL` para `node scripts/provision-clinical-links-partner.mjs`. Configurar la misma credencial en Cannabis como `TRUSTLEAF_FICHA_LINK_SERVICE_TOKEN`. La credencial vence a las 24 horas. Para revocarla, ejecutar el mismo comando con `--revoke`.
+4. Compilar `clinical-link-anchor` con `stellar contract build` y desplegarlo en Testnet con una cuenta técnica dedicada. Fijar el contrato, el publicador y el SHA-256 del WASM desplegado en `TRUSTLEAF_CLINICAL_LINK_ANCHOR_CONTRACT`, `TRUSTLEAF_CLINICAL_LINK_ANCHOR_PUBLISHER` y `TRUSTLEAF_CLINICAL_LINK_ANCHOR_WASM_SHA256`. Guardar la clave de esa cuenta como `TRUSTLEAF_CLINICAL_LINK_ANCHOR_SECRET`.
+5. Invocar `POST /api/v1/clinical-link-anchor/worker` con un Bearer exclusivo `TRUSTLEAF_CLINICAL_LINK_WORKER_TOKEN` aleatorio de al menos 43 caracteres base64url. Cada invocación procesa un trabajo. Repetir hasta confirmar o vaciar la cola. El worker guarda el sobre firmado antes de transmitir y reconcilia ese mismo intento después de un fallo.
+
+## Recorrido de aceptación
+
+1. Abrir la ficha de P1 en FichaOnChain, generar el código y canjearlo en `/pilot/ficha` con la sesión de P1 en Cannabis. Confirmar en FichaOnChain con el código mostrado en Cannabis. Comprobar que ambas cuentas conservan su historial. El código inicial vence a los diez minutos y la vinculación confirmada a las 24 horas.
+2. Como médico de prueba, emitir la receta sintética para P1 en Cannabis. Comprobar una sola entrada en su ficha y abrir el PDF en escritorio y móvil. Con la sesión de P2, comprobar el rechazo de la referencia, la prueba y el acceso directo al PDF.
+3. Reenviar la emisión, registrar la revocación con una revisión mayor y enviar otro evento con la revisión original. Comprobar que la ficha conserva el estado revocado. Retirar el permiso en FichaOnChain y comprobar el rechazo de nuevas consultas de la integración.
+4. Publicar y verificar el compromiso de la revisión aprobada. Comparar el PDF original y una copia alterada en la verificación de Cannabis. Probar una lectura con RPC no disponible. La ficha muestra el estado informado por el emisor y el registro del compromiso, mientras el visor de Cannabis verifica los bytes del documento.
+
+El compromiso es `SHA256(UTF8("TrustLeaf/ClinicalLink/PDF/v1\0") || nonce32 || SHA256(pdfBytes))`, con un `nonce32` aleatorio distinto por revisión. Tanto el PDF como su nonce se conservan en Cannabis. El registro de aceptación debe indicar las versiones de ambos repositorios, los entornos de prueba y el resultado de cada caso. El interruptor en ambos previews permite pausar el piloto y conservar la evidencia.

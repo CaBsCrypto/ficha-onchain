@@ -11,6 +11,7 @@ import { DocumentView } from './DocumentView';
 import { prescriptionLabel } from './state';
 import { ClinicalDraftEntryForm, ClinicalDraftWorkspace } from './ClinicalDraftWorkspace';
 import { ClinicalEntryForm, type ClinicalEntryFormProps } from './ClinicalEntryForm';
+import { ClinicalLinksPanel } from './ClinicalLinksPanel';
 import { ClinicalSigningCheck, clinicalSigningCheckScopeKey, type ClinicalSigningCheckStatus } from './ClinicalSigningCheck';
 import { consultationHref } from './appointment-navigation';
 import { clinicalApi, localizedClinicalError, verifiedClinicalOperation, readClinicalDownload, useClinicalOperation, useClinicalSnapshot, type ClinicalIntent } from './clinical-client';
@@ -691,6 +692,7 @@ export function ClinicalHistory({ renderPermissions, historyId, permissionAppoin
             : !doctor && <p className="mt-2">{text.creationReceiptUnavailable}</p>}
         </details>}
       </section>
+      {!doctor && permissionAppointmentId === undefined && data.clinicalLinksPilot && <ClinicalLinksPanel key={identity} />}
       {!canRead && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{text.appendOnly}</p>}
       {canAppend && <div className="grid gap-3 sm:flex sm:flex-wrap">
         <button type="button" disabled={newBlocked} onClick={event => { formOpener.current = event.currentTarget; setEditing('note'); }}
