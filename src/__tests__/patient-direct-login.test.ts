@@ -60,6 +60,12 @@ it('honors a patient entry URL for an existing session without opening Privy',as
   mock.authenticated=true;window.history.replaceState(null,'','/?login=patient');await render();
   expect(mock.replace).toHaveBeenCalledExactlyOnceWith('/patient');expect(mock.login).not.toHaveBeenCalled();
 });
+it('preserves the account destination through Privy without accepting an arbitrary redirect',async()=>{
+  window.history.replaceState(null,'','/?login=patient&entry=account&next=https://untrusted.example');await render();
+  expect(mock.login).toHaveBeenCalledOnce();
+  await act(async()=>mock.callbacks.onComplete());
+  expect(mock.replace).toHaveBeenCalledExactlyOnceWith('/patient?tab=perfil');
+});
 it('recovers from a provider error and ignores completion after cancellation',async()=>{
   await render();await click('Iniciar sesión');await act(async()=>mock.callbacks.onError());
   expect(box.querySelector('[role=alert]')).not.toBeNull();await click('Iniciar sesión');
@@ -81,6 +87,11 @@ it('keeps the portal after logout failure and allows retry',async()=>{
 it('routes an expired portal session to the patient entry',async()=>{
   await render(true);expect(mock.replace).toHaveBeenCalledWith('/login/patient');
   expect(box.textContent).not.toContain('Protected content');
+});
+
+it('sends patients arriving at the account tab to the matching login intent',async()=>{
+  window.history.replaceState(null,'','/patient?tab=perfil');await render(true);
+  expect(mock.replace).toHaveBeenCalledWith('/?login=patient&entry=account');
 });
 
 it('offers logout in the mobile account and recovers from failure without redirecting',async()=>{

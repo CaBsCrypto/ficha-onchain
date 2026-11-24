@@ -6,6 +6,82 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /patient-enrollments:
+    post:
+      summary: Da de alta o recupera una cuenta con la identidad compartida antes de abrir la ficha.
+      security: [{ partner: [], partnerPrivySession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [authorizePrescriptionLinks]
+              properties:
+                authorizePrescriptionLinks: { type: boolean }
+      responses:
+        '200':
+          description: Cuenta disponible. La referencia del socio se entrega con un permiso activo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, partnerPatientRef, associationStatus]
+                properties:
+                  status: { const: active }
+                  partnerPatientRef: { type: [string, 'null'], format: uuid }
+                  associationStatus: { enum: [active, not_authorized] }
+        default: { $ref: '#/components/responses/Error' }
+  /me/account:
+    get:
+      summary: Consulta el perfil de la cuenta, su ficha y permisos como titular autenticado.
+      security: [{ patient: [] }]
+      responses:
+        '200':
+          description: Estado de la cuenta, ficha y portales conectados.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountStatus, recordStatus, sources]
+                properties:
+                  accountStatus: { enum: [active, not_enrolled] }
+                  recordStatus: { enum: [ready, not_created] }
+                  hasNativeWallet: { type: boolean }
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      required: [partnerId, source, associationStatus, bindingId]
+                      properties:
+                        partnerId: { type: string }
+                        source: { type: string }
+                        associationStatus: { enum: [active, revoked, expired, not_authorized] }
+                        bindingId: { type: [string, 'null'], format: uuid }
+        default: { $ref: '#/components/responses/Error' }
+  /partner-prescriptions:
+    post:
+      summary: Prepara la emisión de una receta versionada durante una consulta verificada.
+      security: [{ partner: [], partnerPrivySession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrescriptionPreparation' }
+      responses:
+        '202': { $ref: '#/components/responses/PrescriptionReceipt' }
+        '200': { $ref: '#/components/responses/PrescriptionReceipt' }
+        default: { $ref: '#/components/responses/Error' }
+  /partner-prescriptions/{id}:
+    get:
+      summary: Consulta el resultado de su propia emisión como portal emisor.
+      security: [{ partner: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/PrescriptionReceipt' }
+        default: { $ref: '#/components/responses/Error' }
   /bindings/claim:
     post:
       summary: Canjea el código de una vinculación iniciada por el paciente.
@@ -135,7 +211,17 @@ components:
       type: http
       scheme: bearer
       description: Token Privy del paciente emitido para FichaOnChain.
+    partnerPrivySession:
+      type: apiKey
+      in: header
+      name: Privy-Access-Token
+      description: Token de la sesión del actor para el cliente web registrado del socio. Lo envía el servidor del socio por HTTPS junto a su propia credencial.
   responses:
+    PrescriptionReceipt:
+      description: Confirmación pendiente o emisión no transferible verificada en Stellar Testnet.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PrescriptionReceipt' }
     Error:
       description: Error de validación, autorización, conflicto o disponibilidad.
       content:
@@ -159,6 +245,30 @@ components:
               result: { enum: [applied, stale] }
               receivedAt: { type: string, format: date-time }
   schemas:
+    PrescriptionPreparation:
+      type: object
+      additionalProperties: false
+      required: [consultationRef, partnerPatientRef, documentId, version, commitment]
+      properties:
+        consultationRef: { type: string, format: uuid }
+        partnerPatientRef: { type: string, format: uuid }
+        documentId: { type: string, pattern: '^[A-Za-z0-9_-]{16,64}$' }
+        version: { $ref: '#/components/schemas/Revision' }
+        commitment: { $ref: '#/components/schemas/Commitment' }
+    PrescriptionReceipt:
+      type: object
+      required: [id, state, consultationRef, documentId, version, commitment, network, contractId, transactionHash, rxId]
+      properties:
+        id: { type: string, format: uuid }
+        state: { enum: [pending, confirmed] }
+        consultationRef: { type: string, format: uuid }
+        documentId: { type: string }
+        version: { $ref: '#/components/schemas/Revision' }
+        commitment: { $ref: '#/components/schemas/Commitment' }
+        network: { const: testnet }
+        contractId: { type: string }
+        transactionHash: { type: [string, 'null'] }
+        rxId: { type: [string, 'null'], pattern: '^[1-9][0-9]*$' }
     Revision: { type: integer, minimum: 1, maximum: 2147483647 }
     Commitment: { type: string, pattern: '^[0-9a-f]{64}$' }
     Event:
@@ -201,3 +311,4 @@ components:
         occurredAt: { type: string, format: date-time }
         proofState: { enum: [pending, confirmed, unavailable] }
         href: { type: string, format: uri }
+        credentialId: { type: [string, 'null'], pattern: '^[1-9][0-9]*$' }

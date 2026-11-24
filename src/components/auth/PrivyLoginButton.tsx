@@ -12,6 +12,7 @@ export function PrivyLoginButton() {
   const { lang } = useLanguage();
   useTrackUser();
   const trigger = useRef<HTMLButtonElement>(null);
+  const destination = useRef('/patient');
   const requested = useRef(false);
   const wasOpen = useRef(false);
   const restoreFocus = useRef(false);
@@ -26,7 +27,7 @@ export function PrivyLoginButton() {
     onComplete: () => {
       if (!requested.current) return;
       requested.current = false;
-      router.replace('/patient');
+      router.replace(destination.current);
     },
     onError: (code) => {
       requested.current = false;
@@ -36,7 +37,7 @@ export function PrivyLoginButton() {
   });
   function enter() {
     if (!ready || requested.current) return;
-    if (authenticated) { router.replace('/patient'); return; }
+    if (authenticated) { router.replace(destination.current); return; }
     requested.current = true; setBusy(true); setError(false);
     try { login(); }
     catch { requested.current = false; setBusy(false); setError(true); }
@@ -45,8 +46,10 @@ export function PrivyLoginButton() {
     if (!ready) return;
     const url = new URL(window.location.href);
     if (url.searchParams.get('login') !== 'patient') return;
+    if (url.searchParams.get('entry') === 'account') destination.current = '/patient?tab=perfil';
     // Consume before opening so cancellation, reload and StrictMode cannot reopen it.
     url.searchParams.delete('login');
+    url.searchParams.delete('entry');
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     enter();
   });

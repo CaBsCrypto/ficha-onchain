@@ -6,7 +6,6 @@ import { usePrivy } from '@privy-io/react-auth';
 import { usePortalLanguage } from '@/hooks/useLanguage';
 import { privyEmail } from '@/lib/auth/privy-email';
 import { cn } from '@/lib/utils';
-import { WalletBoundary } from '@/components/private-portal/WalletBoundary';
 import { PatientIcon } from '@/components/private-portal/PatientIcon';
 import styles from '@/components/private-portal/patient-mobile.module.css';
 const tabs = [
@@ -59,7 +58,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const signingOut = useRef(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
-  useEffect(() => { if (ready && !authenticated) router.replace(signingOut.current ? '/' : '/login/patient'); }, [ready, authenticated, router]);
+  useEffect(() => {
+    if (!ready || authenticated) return;
+    const account = new URLSearchParams(window.location.search).get('tab') === 'perfil';
+    router.replace(signingOut.current ? '/' : account ? '/?login=patient&entry=account' : '/login/patient');
+  }, [ready, authenticated, router]);
   async function signOut() {
     if (signingOut.current) return;
     signingOut.current = true; setLogoutBusy(true); setLogoutError(false);
@@ -67,7 +70,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     catch { signingOut.current = false; setLogoutBusy(false); setLogoutError(true); }
   }
   if (!ready || !authenticated) return <p role="status" className="p-8 text-center text-sm text-slate-500">{labels.checking}</p>;
-  return <WalletBoundary key={user?.id}><div className={cn(styles.portal, 'min-h-screen bg-canvas text-ink')}>
+  return <div key={user?.id} className={cn(styles.portal, 'min-h-screen bg-canvas text-ink')}>
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur-sm"><div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
       <Link href="/" className={cn(styles.focusable, 'flex min-h-11 items-center gap-2 rounded-md font-semibold')}>
         <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-[#0369a1] text-xs font-bold text-white">T</span>
@@ -99,5 +102,5 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     <div data-patient-navigation className={cn(styles.mobileNav, 'fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 md:hidden')}>
       <Suspense><Navigation mobile /></Suspense>
     </div>
-  </div></WalletBoundary>;
+  </div>;
 }
